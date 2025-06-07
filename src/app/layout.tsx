@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'State Lens',
+  title: 'StatePulse',
   description: 'Stay informed on U.S. state-level developments.',
 };
 

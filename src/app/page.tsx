@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { StateLensHeader } from "@/components/StateLensHeader";
+import { StatePulseHeader } from "@/components/StatePulseHeader";
 import { InteractiveMap } from "@/components/features/InteractiveMap";
 import { PolicyUpdatesFeed } from "@/components/features/PolicyUpdatesFeed";
 import { PolicyTracker } from "@/components/features/PolicyTracker";
@@ -84,7 +84,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Gavel className="h-7 w-7 text-sidebar-primary" />
             <h2 className="text-xl font-semibold font-headline text-sidebar-foreground">
-              State Lens
+              StatePulse
             </h2>
           </div>
         </SidebarHeader>
@@ -108,12 +108,12 @@ export default function HomePage() {
         <SidebarFooter className="p-4">
           <SidebarSeparator className="my-2" />
           <p className="text-xs text-sidebar-foreground/70 text-center">
-            © {new Date().getFullYear()} State Lens
+            © {new Date().getFullYear()} StatePulse
           </p>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <StateLensHeader />
+        <StatePulseHeader />
         <main className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 bg-background">
           {renderContent()}
         </main>
