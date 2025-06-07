@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -29,9 +30,11 @@ export function LegislationTimeline() {
               <div key={event.id} className="mb-8 relative">
                 {/* Dot on the line */}
                 <div className={`absolute -left-[calc(0.5rem+1px)] top-1 w-4 h-4 rounded-full ${event.date === "Pending" ? "bg-muted-foreground" : "bg-primary"}`}></div>
-                <p className={`font-semibold ${event.date === "Pending" ? "text-muted-foreground" : "text-primary"}`}>{event.status}</p>
-                <p className="text-sm text-muted-foreground">{event.date}</p>
-                <p className="text-sm mt-1">{event.details}</p>
+                <div className="ml-3"> {/* Added ml-3 to shift text content to the right */}
+                  <p className={`font-semibold ${event.date === "Pending" ? "text-muted-foreground" : "text-primary"}`}>{event.status}</p>
+                  <p className="text-sm text-muted-foreground">{event.date}</p>
+                  <p className="text-sm mt-1">{event.details}</p>
+                </div>
               </div>
             ))}
           </div>
