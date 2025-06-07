@@ -1,3 +1,4 @@
+@import 'leaflet/dist/leaflet.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -89,7 +90,7 @@
     --sidebar-accent-foreground: 210 20% 98%;
     --sidebar-border: 215 27.9% 16.9%;
     --sidebar-ring: 178 21% 54%;
-    
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
