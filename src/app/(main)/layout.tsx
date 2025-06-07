@@ -70,17 +70,14 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
           <SidebarMenu>
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.id}>
-                <Link href={item.path} passHref legacyBehavior>
+                <Link href={item.path}>
                   <SidebarMenuButton
-                    asChild
                     isActive={pathname === item.path}
                     tooltip={item.label}
                     className="justify-start"
                   >
-                    <a>
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.label}</span>
-                    </a>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
