@@ -10,20 +10,62 @@ config({ path: '../../.env' }); // Adjust path if your .env is elsewhere relativ
 const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
 const OPENSTATES_API_BASE_URL = 'https://v3.openstates.org';
 
-// --- IMPORTANT: Populate this list with OCD-IDs for all 50 states ---
+// --- IMPORTANT: Populate this list with OCD-IDs and abbreviations for all 50 states ---
 // You can find these via the OpenStates API: /jurisdictions endpoint
 // Example: https://v3.openstates.org/jurisdictions?classification=state&apikey=YOUR_KEY
+// This list is crucial for the script to function correctly for all states.
 const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' },
   { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' },
   { ocdId: 'ocd-jurisdiction/country:us/state:az/government', abbr: 'AZ' },
   { ocdId: 'ocd-jurisdiction/country:us/state:ar/government', abbr: 'AR' },
   { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' },
-  // ... ADD ALL 50 STATES HERE ...
-  // For example:
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ny/government', abbr: 'NY' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX' },
+  // TODO: ADD ALL 50 STATES HERE. Examples:
+  // { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'CO' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ct/government', abbr: 'CT' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' },
   // { ocdId: 'ocd-jurisdiction/country:us/state:fl/government', abbr: 'FL' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:id/government', abbr: 'ID' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:in/government', abbr: 'IN' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ky/government', abbr: 'KY' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:la/government', abbr: 'LA' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:md/government', abbr: 'MD' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:mi/government', abbr: 'MI' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ms/government', abbr: 'MS' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:mo/government', abbr: 'MO' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:mt/government', abbr: 'MT' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nv/government', abbr: 'NV' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nm/government', abbr: 'NM' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ny/government', abbr: 'NY' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nd/government', abbr: 'ND' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:oh/government', abbr: 'OH' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ok/government', abbr: 'OK' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:pa/government', abbr: 'PA' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ri/government', abbr: 'RI' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:sc/government', abbr: 'SC' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:sd/government', abbr: 'SD' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:tn/government', abbr: 'TN' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ut/government', abbr: 'UT' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:vt/government', abbr: 'VT' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:va/government', abbr: 'VA' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:wa/government', abbr: 'WA' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:wv/government', abbr: 'WV' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:wi/government', abbr: 'WI' },
+  // { ocdId: 'ocd-jurisdiction/country:us/state:wy/government', abbr: 'WY' },
 ];
 
 // Helper function to introduce delays (milliseconds)
@@ -141,7 +183,8 @@ async function fetchAndStoreBills(ocdId: string, jurisdictionAbbr: string, sessi
           try {
             const legislationData = transformOpenStatesBill(osBill, jurisdictionAbbr);
             // TODO: Implement check if bill (by sourceId) already exists to avoid duplicates or to update.
-            // For now, we are just adding.
+            // For now, we are just adding. A more robust solution would query Firestore for an existing
+            // document with the same `sourceId` and update it if found, or create it if not.
             await addLegislation(legislationData);
             console.log(`Added: ${legislationData.billNumber} (${jurisdictionAbbr}) - ${legislationData.title.substring(0,30)}...`);
             billsProcessed++;
@@ -175,8 +218,8 @@ async function main() {
     console.error("Error: OPENSTATES_API_KEY environment variable is not set. Please add it to your .env file.");
     return;
   }
-  if (STATE_OCD_IDS.length === 0 || STATE_OCD_IDS[0].abbr === 'AL' && STATE_OCD_IDS.length <= 5) {
-      console.warn("Warning: STATE_OCD_IDS list is not fully populated. Please add all state OCD-IDs and abbreviations to src/scripts/fetchOpenStatesData.ts for complete data fetching.");
+  if (STATE_OCD_IDS.length === 0 || (STATE_OCD_IDS[0].abbr === 'AL' && STATE_OCD_IDS.length <= 5 && STATE_OCD_IDS.length > 0 && STATE_OCD_IDS.every(s => s.ocdId.startsWith('ocd-jurisdiction/country:us/state:')))) {
+      console.warn("Warning: STATE_OCD_IDS list in src/scripts/fetchOpenStatesData.ts is not fully populated with all 50 states. Please add all state OCD-IDs and abbreviations for complete data fetching.");
   }
 
 
@@ -185,20 +228,44 @@ async function main() {
     const sessions = await fetchSessionsForJurisdiction(state.ocdId);
     
     if (sessions.length > 0) {
-      // Example: Fetch for the most recent 1-2 primary/regular sessions. Adjust as needed.
-      const relevantSessions = sessions.filter(s => s.classification === 'primary' || !s.classification).slice(0, 1); 
-      // You might want more sophisticated logic to pick sessions (e.g., by year).
-      // For "special" sessions, you might want to include them if they are recent.
+      const fiveYearsAgo = new Date();
+      fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+      const today = new Date();
+
+      let relevantSessions = sessions.filter(s => {
+        const sessionStartDate = s.start_date ? new Date(s.start_date) : null;
+        const sessionEndDate = s.end_date ? new Date(s.end_date) : null;
+
+        if (!sessionStartDate) return false; // Skip sessions without a start date
+
+        // Scenario 1: Session has an end date
+        if (sessionEndDate) {
+          // Relevant if session ended after 5 years ago AND started before today (not future)
+          return sessionEndDate >= fiveYearsAgo && sessionStartDate <= today;
+        }
+        // Scenario 2: Session has no end date (ongoing or very recent)
+        // Relevant if it started within the last 5 years AND started before today (not future)
+        return sessionStartDate >= fiveYearsAgo && sessionStartDate <= today;
+      });
       
-      if(relevantSessions.length === 0 && sessions.length > 0) {
-        relevantSessions.push(sessions[0]); // Fallback to the absolute most recent if no "primary" found
+      console.log(`Found ${relevantSessions.length} session(s) for ${state.abbr} active within the last 5 years: ${relevantSessions.map(s=>`${s.name} (${s.identifier})`).join(', ')}`);
+      
+      if (relevantSessions.length === 0 && sessions.length > 0) {
+          console.log(`No sessions found strictly within the last 5 years for ${state.abbr}. Using the single most recent session as a fallback.`);
+          const mostRecentSession = sessions[0]; // sessions are already sorted by recency
+          const mostRecentStartDate = mostRecentSession.start_date ? new Date(mostRecentSession.start_date) : null;
+          if (mostRecentStartDate && mostRecentStartDate <= today) { // Ensure it's not a future session
+               relevantSessions = [mostRecentSession]; // Assign as an array
+               console.log(`Using fallback: most recent session ${mostRecentSession.name} (${mostRecentSession.identifier})`);
+          } else {
+            console.log(`Most recent session ${mostRecentSession.name} for ${state.abbr} appears to be in the future or invalid; skipping.`);
+          }
       }
 
-      console.log(`Found ${relevantSessions.length} relevant session(s) for ${state.abbr}: ${relevantSessions.map(s=>s.name).join(', ')}`);
 
       for (const session of relevantSessions) {
         await fetchAndStoreBills(state.ocdId, state.abbr, session.identifier);
-        await delay(5000); // Wait 5 seconds between different sessions/states
+        await delay(5000); // Wait 5 seconds between different sessions/states or multiple sessions of the same state
       }
     } else {
       console.log(`No sessions found for ${state.abbr}. Skipping.`);
@@ -211,10 +278,12 @@ async function main() {
 
 // To run this script:
 // 1. Ensure .env file at project root has OPENSTATES_API_KEY="your_actual_key"
-// 2. Ensure Firebase Admin SDK is set up if running outside Firebase environment, OR that client-side Firebase config is sufficient for 'addLegislation' (it should be for Firestore client SDK).
-// 3. From your project root, run: tsx src/scripts/fetchOpenStatesData.ts
-//    (You might need to install tsx: npm install -g tsx or npx tsx src/scripts/fetchOpenStatesData.ts)
+// 2. Ensure Firebase Admin SDK is set up if running outside Firebase environment, OR that client-side Firebase config is sufficient for 'addLegislation'.
+// 3. From your project root, run: npx tsx src/scripts/fetchOpenStatesData.ts
+//    (You might need to install tsx: npm install -g tsx or npm install --save-dev tsx)
+// 4. CRITICAL: Fully populate the STATE_OCD_IDS array in this script with all 50 states for comprehensive data.
 
 main().catch(err => {
   console.error("Unhandled error in main execution:", err);
 });
+
