@@ -39,7 +39,6 @@ export function InteractiveMap() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {/* Markers and other map features can be added here later */}
           </MapContainer>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
@@ -49,3 +48,4 @@ export function InteractiveMap() {
     </Card>
   );
 }
+
