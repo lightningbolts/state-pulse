@@ -59,6 +59,7 @@ export function InteractiveMap() {
       </CardHeader>
       <CardContent>
         <MapContainer
+          key="leaflet-map-container" // Added key
           center={defaultPosition}
           zoom={defaultZoom}
           scrollWheelZoom={true}
@@ -76,4 +77,3 @@ export function InteractiveMap() {
     </Card>
   );
 }
-
