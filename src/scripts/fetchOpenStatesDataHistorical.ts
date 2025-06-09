@@ -1,6 +1,5 @@
-import { upsertLegislation } from '../services/legislationService';
+import { upsertLegislation } from '@/services/legislationService';
 import { config } from 'dotenv';
-import type { components } from '../types/openstates.types.d.ts';
 
 config();
 
@@ -20,8 +19,55 @@ interface OpenStatesApiBillListResponse {
 
 // State IDs for fetching data
 const STATE_OCD_IDS: { ocdId: string; abbr: string }[] = [
-  { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'WA' },
-  // TODO: Add all 50 states for full functionality
+  { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:az/government', abbr: 'AZ' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ar/government', abbr: 'AR' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'CO' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ct/government', abbr: 'CT' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:fl/government', abbr: 'FL' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:id/government', abbr: 'ID' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:in/government', abbr: 'IN' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ky/government', abbr: 'KY' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:la/government', abbr: 'LA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:md/government', abbr: 'MD' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:mm/government', abbr: 'MI'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ms/government', abbr: 'MS' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:mo/government', abbr: 'MO' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:mt/government', abbr: 'MT' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nv/government', abbr: 'NV' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nm/government', abbr: 'NM' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nd/government', abbr: 'ND' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:oh/government', abbr: 'OH' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ok/government', abbr: 'OK'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:pa/government', abbr: 'PA'},
+  { ocdId: 'ocd-jurisdiction/country:us/state-ri/government', abbr: 'RI'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-sc/government', abbr: 'SC'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-sd/government', abbr: 'SD'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-tn/government', abbr: 'TN'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-tx/government', abbr: 'TX'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-ut/government', abbr: 'UT'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-vt/government', abbr: 'VT'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-va/government', abbr: 'VA'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-wa/government', abbr: 'WA'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-wv/government', abbr: 'WV'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-wi/government', abbr: 'WI'},
+  { ocdId: 'ocd-jurisdiction/country/US/state-wy/government', abbr: 'WY'}
 ];
 
 function delay(ms: number): Promise<void> {
@@ -233,6 +279,20 @@ async function fetchAndStoreBillsForSessionPage(
 
   try {
     const response = await fetch(url);
+    if (response.status === 429) {
+      console.error(
+        `Rate limit hit (429) for ${jurisdictionAbbr}, session ${sessionIdentifier}, page ${page}. Waiting 30 seconds before retrying...`
+      );
+      await delay(30000); // Wait 30 seconds
+      return await fetchAndStoreBillsForSessionPage(
+        ocdId,
+        jurisdictionAbbr,
+        sessionIdentifier,
+        sessionName,
+        page,
+        perPage
+      );
+    }
     if (!response.ok) {
       console.error(
         `Error fetching bills (page ${page}) for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${response.status} ${response.statusText}`
@@ -263,6 +323,7 @@ async function fetchAndStoreBillsForSessionPage(
         );
       }
     }
+    await delay(6000); // Wait 6 seconds to respect rate limit
     return billData.pagination;
   } catch (error) {
     console.error(
@@ -351,3 +412,23 @@ main().catch(err => {
   console.error('Unhandled error in main execution:', err);
   process.exit(1);
 });
+
+/**
+ * Test function for legislation collection
+ */
+export async function testLegislationCollectionScript(): Promise<void> {
+  try {
+    const { getCollection } = await import('../lib/mongodb');
+    const collection = await getCollection('legislation');
+    const count = await collection.countDocuments();
+    console.log(`[Script] Legislation collection has ${count} documents.`);
+    const oneDoc = await collection.findOne();
+    if (oneDoc) {
+      console.log('[Script] Sample document:', oneDoc);
+    } else {
+      console.log('[Script] No documents found in legislation collection.');
+    }
+  } catch (error) {
+    console.error('[Script] Failed to connect to legislation collection:', error);
+  }
+}

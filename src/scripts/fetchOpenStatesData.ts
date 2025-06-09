@@ -1,19 +1,12 @@
-
-import { upsertLegislationBySourceId } from '../services/legislationService'; // Changed from addLegislation
+import { upsertLegislationBySourceId } from '../services/legislationService';
 import type { Legislation, LegislationHistoryEvent, LegislationSponsor } from '../types/legislation';
-import { Timestamp } from 'firebase/firestore';
 import { config } from 'dotenv';
 
-// Load environment variables from .env file
-config({ path: '../../.env' }); // Adjust path if your .env is elsewhere relative to script execution
+config({ path: '../../.env' });
 
 const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
 const OPENSTATES_API_BASE_URL = 'https://v3.openstates.org';
 
-// --- IMPORTANT: Populate this list with OCD-IDs and abbreviations for all 50 states ---
-// You can find these via the OpenStates API: /jurisdictions endpoint
-// Example: https://v3.openstates.org/jurisdictions?classification=state&apikey=YOUR_KEY
-// This list is crucial for the script to function correctly for all states.
 const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' },
   { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' },
@@ -130,7 +123,7 @@ interface OpenStatesSession {
   name: string;
   start_date?: string;
   end_date?: string;
-  classification: string; 
+  classification: string;
 }
 
 async function fetchSessionsForJurisdiction(ocdId: string): Promise<OpenStatesSession[]> {
@@ -154,37 +147,44 @@ async function fetchSessionsForJurisdiction(ocdId: string): Promise<OpenStatesSe
   }
 }
 
-// UPDATED_SINCE_HOURS: Set to 24 for daily, 1 for hourly.
-const UPDATED_SINCE_HOURS = 24; 
+// --- NEW: 30-minute update system ---
+const UPDATE_INTERVAL_MINUTES = 30;
 
-async function fetchAndStoreUpdatedBills(ocdId: string, jurisdictionAbbr: string, sessionIdentifier: string, updatedSince: string) {
+function getUpdatedSinceString(minutesAgo: number): string {
+  const now = new Date();
+  const updatedSinceDate = new Date(now.getTime() - (minutesAgo * 60 * 1000));
+  return updatedSinceDate.toISOString(); // Use full ISO for more precise updates
+}
+
+async function fetchAndStoreUpdatedBills(
+  ocdId: string,
+  jurisdictionAbbr: string,
+  sessionIdentifier: string,
+  updatedSince: string
+) {
   let page = 1;
-  const perPage = 50; // Maximize per_page to reduce number of requests for updates
+  const perPage = 50;
   let hasMore = true;
   let billsProcessed = 0;
 
   console.log(`Fetching bills updated since ${updatedSince} for ${jurisdictionAbbr} - Session: ${sessionIdentifier}`);
 
   while (hasMore) {
-    // Added updated_since parameter
     const url = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=${page}&per_page=${perPage}&apikey=${OPENSTATES_API_KEY}&include=sponsorships&include=abstracts&include=versions&include=actions&sort=updated_desc&updated_since=${updatedSince}`;
-    
     console.log(`Fetching page ${page} from: ${url.replace(OPENSTATES_API_KEY as string, 'REDACTED_KEY')}`);
-
     try {
       const response = await fetch(url);
       if (!response.ok) {
         console.error(`Error fetching updated bills page ${page} for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${response.status} ${await response.text()}`);
-        hasMore = false; 
+        hasMore = false;
         break;
       }
       const data = await response.json();
-      
       if (data.results && data.results.length > 0) {
         for (const osBill of data.results) {
           try {
             const legislationData = transformOpenStatesBill(osBill, jurisdictionAbbr);
-            await upsertLegislationBySourceId(legislationData); // Using upsert function
+            await upsertLegislationBySourceId(legislationData);
             console.log(`Upserted: ${legislationData.billNumber} (${jurisdictionAbbr}) - OS ID: ${legislationData.sourceId}`);
             billsProcessed++;
           } catch (transformError) {
@@ -195,24 +195,22 @@ async function fetchAndStoreUpdatedBills(ocdId: string, jurisdictionAbbr: string
         console.log(`No more updated bills found for ${jurisdictionAbbr}, session ${sessionIdentifier}, page ${page} (since ${updatedSince}).`);
         hasMore = false;
       }
-
       if (data.pagination && page < data.pagination.max_page) {
         page++;
-        await delay(1500); // Slightly shorter delay for paged updates, but still respectful
+        await delay(1500);
       } else {
         hasMore = false;
       }
-
     } catch (error) {
       console.error(`Network error fetching updated bills for ${jurisdictionAbbr}, session ${sessionIdentifier}, page ${page}:`, error);
-      hasMore = false; 
+      hasMore = false;
       break;
     }
   }
   console.log(`Finished fetching updates for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}). Processed ${billsProcessed} bills.`);
 }
 
-async function main() {
+async function runUpdateCycle() {
   if (!OPENSTATES_API_KEY) {
     console.error("Error: OPENSTATES_API_KEY environment variable is not set. Please add it to your .env file.");
     return;
@@ -220,85 +218,52 @@ async function main() {
   if (STATE_OCD_IDS.length === 0 || (STATE_OCD_IDS[0].abbr === 'AL' && STATE_OCD_IDS.length <= 5 && STATE_OCD_IDS.length > 0 && STATE_OCD_IDS.every(s => s.ocdId.startsWith('ocd-jurisdiction/country:us/state:')))) {
       console.warn("Warning: STATE_OCD_IDS list in src/scripts/fetchOpenStatesData.ts is not fully populated with all 50 states. Please add all state OCD-IDs and abbreviations for complete data fetching.");
   }
-
-  // Calculate the 'updated_since' timestamp (e.g., 24 hours ago for daily run)
-  const now = new Date();
-  const updatedSinceDate = new Date(now.getTime() - (UPDATED_SINCE_HOURS * 60 * 60 * 1000));
-  // OpenStates API expects ISO 8601 format, but sometimes just YYYY-MM-DD works for updated_since.
-  // For safety, let's use YYYY-MM-DD. If more precision is needed, use .toISOString().split('T')[0] or full ISO.
-  // OpenStates documentation for `updated_since` specifies "A date or datetime"
-  // Using YYYY-MM-DD format.
-  const updatedSinceString = updatedSinceDate.toISOString().split('T')[0];
-  // For more precise "updated_since" (e.g. specific time):
-  // const updatedSinceString = updatedSinceDate.toISOString();
-
-
+  const updatedSinceString = getUpdatedSinceString(UPDATE_INTERVAL_MINUTES);
   console.log(`--- Starting fetch for legislation updated since ${updatedSinceString} ---`);
-
   for (const state of STATE_OCD_IDS) {
     console.log(`\n--- Processing State: ${state.abbr} (${state.ocdId}) ---`);
     const sessions = await fetchSessionsForJurisdiction(state.ocdId);
-    
     if (sessions.length > 0) {
       const today = new Date();
-      // Filter for sessions that are likely current or very recent.
-      // A session is "current" if:
-      // 1. It has no end_date and its start_date is not in the future.
-      // 2. Its end_date is in the future or very recent (e.g., within the last few months for carry-over).
-      // 3. Its classification is 'primary'.
       let currentSessions = sessions.filter(s => {
         const sessionStartDate = s.start_date ? new Date(s.start_date) : null;
         const sessionEndDate = s.end_date ? new Date(s.end_date) : null;
-
-        if (!sessionStartDate || sessionStartDate > today) return false; // Skip future sessions
-
-        // Prioritize 'primary' sessions if available
-        // if (s.classification !== 'primary' && sessions.some(p => p.classification === 'primary')) return false;
-
-
-        if (!sessionEndDate) return true; // Ongoing session
-
-        // Session ends today or in the future, or ended recently (e.g., within last 90 days for buffer)
+        if (!sessionStartDate || sessionStartDate > today) return false;
+        if (!sessionEndDate) return true;
         const ninetyDaysAgo = new Date(today.getTime() - (90 * 24 * 60 * 60 * 1000));
         return sessionEndDate >= ninetyDaysAgo;
       });
-      
       if (currentSessions.length === 0 && sessions.length > 0) {
-          console.log(`No strictly "current" sessions found for ${state.abbr}. Using the single most recent session as a fallback if not in future.`);
-          const mostRecentSession = sessions[0]; 
-          const mostRecentStartDate = mostRecentSession.start_date ? new Date(mostRecentSession.start_date) : null;
-          if (mostRecentStartDate && mostRecentStartDate <= today) { 
-               currentSessions = [mostRecentSession];
-               console.log(`Using fallback: most recent session ${mostRecentSession.name} (${mostRecentSession.identifier})`);
-          } else {
-            console.log(`Most recent session ${mostRecentSession.name} for ${state.abbr} appears to be in the future or invalid; skipping.`);
-          }
+        const mostRecentSession = sessions[0];
+        const mostRecentStartDate = mostRecentSession.start_date ? new Date(mostRecentSession.start_date) : null;
+        if (mostRecentStartDate && mostRecentStartDate <= today) {
+          currentSessions = [mostRecentSession];
+          console.log(`Using fallback: most recent session ${mostRecentSession.name} (${mostRecentSession.identifier})`);
+        } else {
+          console.log(`Most recent session ${mostRecentSession.name} for ${state.abbr} appears to be in the future or invalid; skipping.`);
+        }
       }
-      
       console.log(`Found ${currentSessions.length} potentially current session(s) for ${state.abbr}: ${currentSessions.map(s=>`${s.name} (${s.identifier})`).join(', ')}`);
-
       for (const session of currentSessions) {
         await fetchAndStoreUpdatedBills(state.ocdId, state.abbr, session.identifier, updatedSinceString);
-        await delay(3000); // Wait 3 seconds between sessions of the same state
+        await delay(3000);
       }
     } else {
       console.log(`No sessions found for ${state.abbr}. Skipping.`);
     }
-     await delay(5000); // Wait 5 seconds between states
+    await delay(5000);
   }
-
   console.log("\n--- Finished processing all states for updates. ---");
-  console.log("--- This script is designed for frequent updates (e.g., daily/hourly). ---");
-  console.log("--- To run it automatically, use a scheduler like cron, a scheduled Cloud Function, or GitHub Actions. ---");
+  console.log("--- This script is designed for frequent updates (e.g., every 30 minutes). ---");
 }
 
-// To run this script:
-// 1. Ensure .env file at project root has OPENSTATES_API_KEY="your_actual_key"
-// 2. Ensure Firebase Admin SDK is set up if running outside Firebase environment, OR that client-side Firebase config is sufficient.
-// 3. From your project root, run: npx tsx src/scripts/fetchOpenStatesData.ts
-//    (You might need to install tsx: npm install -g tsx or npm install --save-dev tsx)
-// 4. CRITICAL: Fully populate the STATE_OCD_IDS array in this script with all 50 states for comprehensive data.
-// 5. SCHEDULING: For automatic daily/hourly runs, set up a cron job, a scheduled Cloud Function, or a similar task scheduler to execute this script.
+async function main() {
+  while (true) {
+    await runUpdateCycle();
+    console.log(`Waiting ${UPDATE_INTERVAL_MINUTES} minutes before next update cycle...`);
+    await delay(UPDATE_INTERVAL_MINUTES * 60 * 1000);
+  }
+}
 
 main().catch(err => {
   console.error("Unhandled error in main execution:", err);
