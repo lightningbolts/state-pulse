@@ -1,7 +1,7 @@
 
-import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAnalytics, isSupported } from "firebase/analytics";
+import { initializeApp, getApps, getApp, type FirebaseOptions, FirebaseApp} from "firebase/app";
+import {getFirestore} from "firebase/firestore";
+import {getAnalytics, isSupported} from "firebase/analytics";
 // import { getAuth } from "firebase/auth"; // Example if you need Auth
 // import { getStorage } from "firebase/storage"; // Example if you need Storage
 
@@ -17,7 +17,7 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase
-let app;
+let app: FirebaseApp | undefined;
 let analytics;
 
 if (!getApps().length) {

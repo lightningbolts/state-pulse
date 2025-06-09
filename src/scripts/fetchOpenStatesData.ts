@@ -83,14 +83,14 @@ function transformOpenStatesBill(osBill: any, jurisdictionAbbr: string): Omit<Le
 } {
   const sponsors: LegislationSponsor[] = osBill.sponsorships?.map((sp: any) => ({
     name: sp.name,
-    id: sp.person_id || undefined,
+    id: sp.person_id || null,
   })) || [];
 
   const history: Array<Omit<LegislationHistoryEvent, 'date'> & { date: Date }> = osBill.actions?.map((act: any) => ({
     date: new Date(act.date.split(' ')[0]), 
     action: act.description,
     actor: act.organization_id || 'Unknown', 
-    details: act.classification?.join(', ') || undefined,
+    details: act.classification?.join(', ') || null,
   })) || [];
 
   const versions: Array<{ date: Date; url: string; name: string }> = osBill.versions?.map((ver: any) => ({
@@ -110,16 +110,16 @@ function transformOpenStatesBill(osBill: any, jurisdictionAbbr: string): Omit<Le
     billNumber: osBill.identifier,
     jurisdiction: jurisdictionAbbr,
     status: osBill.status?.length > 0 ? osBill.status[0] : (osBill.actions?.[osBill.actions.length -1]?.description || 'Unknown'),
-    summary: summary || undefined,
-    fullTextUrl: osBill.sources?.find((s:any) => s.url.includes('.html') || s.url.includes('.pdf'))?.url || osBill.sources?.[0]?.url || undefined,
+    summary: summary || null,
+    fullTextUrl: osBill.sources?.find((s:any) => s.url.includes('.html') || s.url.includes('.pdf'))?.url || osBill.sources?.[0]?.url || null,
     sponsors,
-    introductionDate: osBill.first_action_date ? new Date(osBill.first_action_date.split(' ')[0]) : undefined,
-    lastActionDate: osBill.latest_action_date ? new Date(osBill.latest_action_date.split(' ')[0]) : undefined,
+    introductionDate: osBill.first_action_date ? new Date(osBill.first_action_date.split(' ')[0]) : null,
+    lastActionDate: osBill.latest_action_date ? new Date(osBill.latest_action_date.split(' ')[0]) : null,
     history,
     tags: osBill.subject || [],
     sourceId: osBill.id, // This is the OpenStates bill ID, used for deduplication
-    chamber: osBill.from_organization?.classification || undefined,
-    versions: versions.length > 0 ? versions : undefined,
+    chamber: osBill.from_organization?.classification || null,
+    versions: versions.length > 0 ? versions : null,
   };
    // Type assertion needed if TS can't infer sourceId presence strictly from the object literal
   return legislationData as ReturnType<typeof transformOpenStatesBill>;

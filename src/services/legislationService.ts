@@ -1,179 +1,162 @@
-
-'use server';
-
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, Timestamp, query, where, getDocs, doc, updateDoc, writeBatch } from "firebase/firestore";
-import type { Legislation, LegislationHistoryEvent, LegislationSponsor } from '@/types/legislation';
-
-// Helper to convert JS Dates in legislation data to Firestore Timestamps
-function prepareDataForFirestore(
-  legislationData: Omit<Legislation, 'id' | 'lastActionDate' | 'introductionDate' | 'history' | 'effectiveDate' | 'versions'> & {
-    introductionDate?: Date;
-    lastActionDate?: Date;
-    effectiveDate?: Date;
-    history?: Array<Omit<LegislationHistoryEvent, 'date'> & { date: Date }>;
-    versions?: Array<{ date: Date; url: string; name: string }>;
-  }
-): Partial<Legislation> {
-  const dataToSave: Partial<Legislation> = { ...legislationData };
-
-  if (legislationData.introductionDate) {
-    dataToSave.introductionDate = Timestamp.fromDate(legislationData.introductionDate);
-  }
-  if (legislationData.lastActionDate) {
-    dataToSave.lastActionDate = Timestamp.fromDate(legislationData.lastActionDate);
-  }
-  if (legislationData.effectiveDate) {
-    dataToSave.effectiveDate = Timestamp.fromDate(legislationData.effectiveDate);
-  }
-
-  if (legislationData.history) {
-    dataToSave.history = legislationData.history.map(event => ({
-      ...event,
-      date: Timestamp.fromDate(event.date),
-    }));
+import {
+    collection,
+    doc,
+    setDoc,
+    getDoc,
+    Timestamp,
+    // Add any other Firestore imports you use, like query, where, getDocs, etc.
+  } from 'firebase/firestore';
+  import { db } from '@/lib/firebase'; // Adjust path if your Firebase init is elsewhere
+  import { OpenStatesBill } from '@/types/legislation'; // Or your specific type path
+  
+  // Helper function to robustly convert various date inputs to Firestore Timestamp or null
+  function toFirestoreTimestamp(dateInput: Date | Timestamp | string | null | undefined): Timestamp | null {
+    if (dateInput === null || typeof dateInput === 'undefined') {
+      return null;
+    }
+    if (dateInput instanceof Timestamp) {
+      return dateInput; // Already a Firestore Timestamp
+    }
+    if (dateInput instanceof Date) {
+      // Check if the Date object is valid before converting
+      return isNaN(dateInput.getTime()) ? null : Timestamp.fromDate(dateInput);
+    }
+    if (typeof dateInput === 'string') {
+      if (dateInput.trim() === "") {
+        return null;
+      }
+      // Attempt to parse the string, taking only the date part if time is included with a space
+      const date = new Date(dateInput.split(' ')[0]);
+      return isNaN(date.getTime()) ? null : Timestamp.fromDate(date);
+    }
+    // console.warn(`toFirestoreTimestamp (legislationService): Unhandled date type - ${typeof dateInput}`, dateInput); // Optional for debugging
+    return null; // Fallback for unhandled types
   }
   
-  if (legislationData.versions) {
-      dataToSave.versions = legislationData.versions.map(version => ({
-          ...version,
-          date: Timestamp.fromDate(version.date),
-      }));
-  }
-  return dataToSave;
-}
-
-
-/**
- * Adds a new legislation document to the 'legislations' collection in Firestore.
- * Dates should be JavaScript Date objects; they will be converted to Firestore Timestamps.
- * @param legislationData - The legislation data to add.
- * @returns The ID of the newly created document.
- */
-export async function addLegislation(legislationData: Omit<Legislation, 'id' | 'lastActionDate' | 'introductionDate' | 'history' | 'effectiveDate' | 'versions'> & {
-  introductionDate?: Date;
-  lastActionDate?: Date;
-  effectiveDate?: Date;
-  history?: Array<Omit<LegislationHistoryEvent, 'date'> & { date: Date }>;
-  versions?: Array<{ date: Date; url: string; name: string }>;
-}): Promise<string> {
-  try {
-    const dataToSave = prepareDataForFirestore(legislationData);
-
-    // If lastActionDate is not provided, set it to now for new entries
-    if (!dataToSave.lastActionDate) {
-      dataToSave.lastActionDate = serverTimestamp() as Timestamp;
+  /**
+   * Prepares data for Firestore by converting specific fields (especially dates)
+   * to Firestore-compatible types (e.g., Timestamp).
+   * @param data The raw data object, potentially with mixed date types.
+   * @returns A new object with data prepared for Firestore.
+   */
+  function prepareDataForFirestore(data: Partial<OpenStatesBill> | any): any {
+    const preparedData = { ...data };
+  
+    // Convert known top-level date fields using the helper
+    if (preparedData.hasOwnProperty('introductionDate')) {
+      preparedData.introductionDate = toFirestoreTimestamp(preparedData.introductionDate);
     }
-
-    const docRef = await addDoc(collection(db, "legislations"), dataToSave);
-    console.log("Legislation document written with ID: ", docRef.id);
-    return docRef.id;
-  } catch (e) {
-    console.error("Error adding legislation document: ", e);
-    throw new Error("Failed to add legislation.");
-  }
-}
-
-/**
- * Adds or updates a legislation document in Firestore based on its sourceId.
- * If a document with the given sourceId exists, it's updated. Otherwise, a new document is created.
- * Dates in legislationData should be JavaScript Date objects.
- * @param legislationData - The legislation data to upsert. Must include `sourceId`.
- * @returns The Firestore document ID of the upserted document.
- */
-export async function upsertLegislationBySourceId(
-  legislationData: Omit<Legislation, 'id' | 'lastActionDate' | 'introductionDate' | 'history' | 'effectiveDate' | 'versions'> & {
-    sourceId: string; // sourceId is mandatory for upserting
-    introductionDate?: Date;
-    lastActionDate?: Date;
-    effectiveDate?: Date;
-    history?: Array<Omit<LegislationHistoryEvent, 'date'> & { date: Date }>;
-    versions?: Array<{ date: Date; url: string; name: string }>;
-  }
-): Promise<string> {
-  if (!legislationData.sourceId) {
-    throw new Error("sourceId is required for upserting legislation.");
-  }
-
-  const legislationsRef = collection(db, "legislations");
-  const q = query(legislationsRef, where("sourceId", "==", legislationData.sourceId));
-
-  try {
-    const querySnapshot = await getDocs(q);
-    const dataToSave = prepareDataForFirestore(legislationData);
-
-    if (!querySnapshot.empty) {
-      // Document exists, update it
-      const existingDocRef = querySnapshot.docs[0].ref;
-      // Ensure lastActionDate is updated if provided, otherwise keep existing or set if new.
-      // For updates, we typically expect lastActionDate to be part of the incoming data if it changed.
-      // If not provided in update data, it implies no change to this specific field from the source.
-      // However, if the record itself is updated, its lastActionDate (from OpenStates) effectively becomes the update time.
-      if (!dataToSave.lastActionDate && legislationData.lastActionDate) { // If JS date was provided
-         dataToSave.lastActionDate = Timestamp.fromDate(legislationData.lastActionDate);
-      }
-
-      await updateDoc(existingDocRef, dataToSave);
-      console.log(`Legislation document with sourceId ${legislationData.sourceId} updated. Firestore ID: ${existingDocRef.id}`);
-      return existingDocRef.id;
-    } else {
-      // Document does not exist, add it
-      // If lastActionDate is not provided for a new record, set it to now
-      if (!dataToSave.lastActionDate) {
-        dataToSave.lastActionDate = serverTimestamp() as Timestamp;
-      }
-      const newDocRef = await addDoc(legislationsRef, dataToSave);
-      console.log(`New legislation document with sourceId ${legislationData.sourceId} added. Firestore ID: ${newDocRef.id}`);
-      return newDocRef.id;
+    if (preparedData.hasOwnProperty('lastActionDate')) {
+      preparedData.lastActionDate = toFirestoreTimestamp(preparedData.lastActionDate);
     }
-  } catch (e) {
-    console.error(`Error upserting legislation document with sourceId ${legislationData.sourceId}: `, e);
-    throw new Error("Failed to upsert legislation.");
+    if (preparedData.hasOwnProperty('effectiveDate')) {
+      preparedData.effectiveDate = toFirestoreTimestamp(preparedData.effectiveDate);
+    }
+  
+    // Handle history events if they exist and have dates
+    if (Array.isArray(preparedData.history)) {
+      preparedData.history = preparedData.history.map((event: any) => {
+        if (event && event.hasOwnProperty('date')) {
+          const timestamp = toFirestoreTimestamp(event.date);
+          if (timestamp === null) {
+            // console.warn('Invalid date in history event, removing event:', event);
+            return null; // Mark for removal if date is invalid
+          }
+          return { ...event, date: timestamp };
+        }
+        return event; // Return event as-is if no date property or not an object
+      }).filter((event: any) => event !== null); // Remove events marked for removal
+    }
+  
+    // Handle versions if they exist and have dates
+    if (Array.isArray(preparedData.versions)) {
+      preparedData.versions = preparedData.versions.map((version: any) => {
+        if (version && version.hasOwnProperty('date')) {
+           const timestamp = toFirestoreTimestamp(version.date);
+          if (timestamp === null) {
+            // console.warn('Invalid date in version, removing version:', version);
+            return null; // Mark for removal if date is invalid
+          }
+          return { ...version, date: timestamp };
+        }
+        return version; // Return version as-is if no date property or not an object
+      }).filter((version: any) => version !== null); // Remove versions marked for removal
+    }
+  
+    // Ensure createdAt and updatedAt are Timestamps
+    // If createdAt is being set for the first time (i.e., not present or not a Timestamp), use Timestamp.now()
+    // If it exists and is already a Timestamp (e.g. from fetchOpenStatesDataHistorical), it will be returned as is by toFirestoreTimestamp
+    preparedData.createdAt = toFirestoreTimestamp(preparedData.createdAt) || Timestamp.now();
+    preparedData.updatedAt = Timestamp.now(); // Always set updatedAt to current time on upsert
+  
+    // Optional: Remove any fields that became null if Firestore should omit them
+    // This depends on your schema and whether you want to store nulls or delete the field.
+    // Example:
+    // Object.keys(preparedData).forEach(key => {
+    //   if (preparedData[key] === null) {
+    //     delete preparedData[key];
+    //   }
+    // });
+  
+    return preparedData;
   }
-}
-
-
-// Example of how you might call this function:
-/*
-async function exampleUsage() {
-  const newBill: Omit<Legislation, 'id' | 'lastActionDate' | 'introductionDate' | 'history' | 'effectiveDate' | 'versions'> & {
-    sourceId: string;
-    introductionDate?: Date;
-    lastActionDate?: Date;
-    effectiveDate?: Date;
-    history?: Array<Omit<LegislationHistoryEvent, 'date'> & { date: Date }>;
-    versions?: Array<{ date: Date; url: string; name: string }>;
-  } = {
-    title: "The Sunshine Act of 2024 (Updated)",
-    billNumber: "SB 101",
-    jurisdiction: "CA",
-    status: "In Committee", // Status updated
-    summary: "A bill to promote transparency in government and add new reporting requirements.", // Summary updated
-    fullTextUrl: "https://example.com/sb101.pdf",
-    sponsors: [{ name: "Sen. Jane Doe" }, { name: "Sen. John Smith", id: "ocd-person/xyz" }], // Sponsor added
-    introductionDate: new Date("2024-01-15"),
-    lastActionDate: new Date("2024-07-29"), // lastActionDate updated
-    history: [
-      { date: new Date("2024-01-15"), action: "Introduced", actor: "Senate" },
-      { date: new Date("2024-02-01"), action: "Referred to Committee", actor: "Rules Committee" },
-      { date: new Date("2024-07-29"), action: "Amended in Committee", actor: "Rules Committee"} // New history event
-    ],
-    tags: ["transparency", "government", "reporting"], // Tag added
-    sourceId: "ca-sb-101-2024", // CRUCIAL for upsert
-    chamber: "Senate",
-    versions: [
-        { date: new Date("2024-01-15"), url: "https://example.com/sb101-v1.pdf", name: "Introduced Version"},
-        { date: new Date("2024-07-29"), url: "https://example.com/sb101-v2-amended.pdf", name: "Amended Committee Version"} // New version
-    ]
-  };
-
-  try {
-    const billId = await upsertLegislationBySourceId(newBill);
-    console.log("Successfully upserted bill with Firestore ID:", billId);
-  } catch (error) {
-    console.error("Could not upsert bill:", error);
+  
+  export async function upsertLegislationBySourceId(legislationData: OpenStatesBill): Promise<void> {
+    if (!legislationData.id) {
+      console.error('sourceId is required to upsert legislation.', legislationData);
+      throw new Error('sourceId is required to upsert legislation.');
+    }
+  
+    const legislationCollection = collection(db, 'legislation');
+    // Firestore disallows empty strings as document IDs.
+    // Ensure sourceId is a non-empty string.
+    const docId = legislationData.id.replace(/\//g, '_'); // Replace slashes if they cause issues, or ensure valid ID
+    if (!docId) {
+        console.error('Generated document ID is empty. Original sourceId:', legislationData.id);
+        throw new Error('Generated document ID is empty.');
+    }
+    const legislationRef = doc(legislationCollection, docId);
+  
+    try {
+      // Prepare data for Firestore, ensuring all date fields are correctly formatted
+      // This is the critical step where `prepareDataForFirestore` is called.
+      const dataToSet = prepareDataForFirestore(legislationData);
+  
+      // console.log(`Upserting to Firestore (ID: ${docId}):`, JSON.stringify(dataToSet, null, 2)); // For debugging
+  
+      await setDoc(legislationRef, dataToSet, { merge: true });
+      // console.log(`Legislation with sourceId ${legislationData.sourceId} (docId: ${docId}) upserted successfully.`);
+    } catch (error) {
+      console.error(`Error upserting legislation document with sourceId ${legislationData.id} (docId: ${docId}): `, error);
+      // Log the data that was attempted to be set for more detailed debugging
+      // console.error('Data attempted to set:', JSON.stringify(legislationData, null, 2)); // Log original data
+      // console.error('Prepared data attempted to set:', JSON.stringify(prepareDataForFirestore(legislationData), null, 2)); // Log prepared data
+      throw new Error('Failed to upsert legislation.');
+    }
   }
-}
-
-// exampleUsage();
-*/
+  
+  // Example of fetching a single legislation document (if you need it)
+  export async function getLegislationBySourceId(sourceId: string): Promise<OpenStatesBill | null> {
+    if (!sourceId) {
+      console.error('sourceId is required to fetch legislation.');
+      return null;
+    }
+    const legislationCollection = collection(db, 'legislation');
+    const docId = sourceId.replace(/\//g, '_');
+    const legislationRef = doc(legislationCollection, docId);
+  
+    try {
+      const docSnap = await getDoc(legislationRef);
+      if (docSnap.exists()) {
+        // Note: Firestore Timestamps will be retrieved as Timestamp objects.
+        // If you need to convert them to JS Dates for client-side use, do it here or in the client.
+        return docSnap.data() as OpenStatesBill;
+      } else {
+        // console.log(`No legislation found with sourceId ${sourceId}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error fetching legislation document with sourceId ${sourceId}: `, error);
+      return null;
+    }
+  }
