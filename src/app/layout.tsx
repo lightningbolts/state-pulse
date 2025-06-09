@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
   title: 'StatePulse',
@@ -24,6 +25,9 @@ export default function RootLayout({
       <body className="font-body antialiased">
         {children}
         <Toaster />
+        <SpeedInsights />
+        <Analytics />
+        {/* Add any additional global scripts or components here */}
       </body>
     </html>
   );
