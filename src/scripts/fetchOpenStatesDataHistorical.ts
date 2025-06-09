@@ -343,11 +343,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('--- Starting historical data import for the last five years ---');
-  const fiveYearsAgo = new Date();
-  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-  const fiveYearsAgoDateString = fiveYearsAgo.toISOString().split('T')[0];
-  console.log(`Fetching data for sessions active since ${fiveYearsAgoDateString}`);
+  console.log('--- Starting historical data import for sessions from 2024 and later ---');
+  const minYear = 2024;
+  console.log(`Fetching data for sessions active since ${minYear}`);
 
   for (const state of STATE_OCD_IDS) {
     console.log(`\n--- Processing State: ${state.abbr} (${state.ocdId}) ---`);
@@ -355,15 +353,10 @@ async function main() {
     await delay(500);
 
     const relevantSessions = sessions.filter(s => {
-      const sessionEndDateStr = s.end_date;
       const sessionIdentifierStr = s.identifier;
       const sessionYearMatch = sessionIdentifierStr.match(/\b(20[1-9][0-9])\b/);
       const sessionYear = sessionYearMatch ? parseInt(sessionYearMatch[1], 10) : 0;
-      return (
-        !sessionEndDateStr ||
-        sessionEndDateStr >= fiveYearsAgoDateString ||
-        sessionYear >= fiveYearsAgo.getFullYear() - 1
-      );
+      return sessionYear >= minYear;
     });
 
     if (relevantSessions.length > 0) {
@@ -401,7 +394,7 @@ async function main() {
       }
     } else {
       console.log(
-        `No relevant recent sessions found for ${state.abbr} since ${fiveYearsAgoDateString}.`
+        `No relevant recent sessions found for ${state.abbr} since ${minYear}.`
       );
     }
   }
