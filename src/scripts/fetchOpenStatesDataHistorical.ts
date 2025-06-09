@@ -1,327 +1,353 @@
-import { upsertLegislationBySourceId } from '@/services/legislationService';
-  import {
-    OpenStatesBill,
-    OpenStatesAction,
-    OpenStatesSponsor,
-    OpenStatesVersion,
-    OpenStatesLegislativeSession,
-    OpenStatesAbstract,
-    OpenStatesBillSource,
-    OpenStatesOrganization,
-  } from '@/types/legislation'; // Adjusted imports
-  import { Timestamp } from 'firebase/firestore';
-  import { config } from 'dotenv';
+import { upsertLegislation } from '../services/legislationService';
+import { config } from 'dotenv';
+import type { components } from '../types/openstates.types.d.ts';
 
-  // Load environment variables from .env file at the project root
-  config();
+config();
 
-  const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
-  const OPENSTATES_API_BASE_URL = 'https://v3.openstates.org';
+const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
+const OPENSTATES_API_BASE_URL = 'https://v3.openstates.org';
 
-  // --- IMPORTANT: Populate this list with OCD-IDs and abbreviations for all 50 states ---
-  const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
-    // { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' },
-    // { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' },
-    // { ocdId: 'ocd-jurisdiction/country:us/state:az/government', abbr: 'AZ' },
-    // { ocdId: 'ocd-jurisdiction/country:us/state:ar/government', abbr: 'AR' },
-    // { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' },
-    { ocdId : 'ocd-jurisdiction/country:us/state:co/government', abbr: 'WA' }, // Note: OCD ID is CO, abbr is WA in example
-    // ... (ensure all 50 states are listed for full functionality)
-  ];
-
-  // Helper function to introduce delays (milliseconds)
-  function delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  // --- Firestore-specific data structures ---
-  interface FirestoreLegislationSponsor {
-    id?: string | null;
-    name: string;
-    entityType?: 'person' | 'organization' | string | null;
-    primary?: boolean | null;
-    classification?: string | null;
-  }
-
-  interface FirestoreLegislationHistoryEvent {
-    date: Timestamp;
-    action: string;
-    actor: string; // Organization name or ID
-    details?: string | null; // e.g., classifications
-  }
-
-  interface FirestoreLegislationVersion {
-    date: Timestamp;
-    name: string; // Note of the version
-    url: string;
-  }
-
-  interface FirestoreLegislation {
-    sourceId: string; // OpenStatesBill.id
-    title: string;
-    billNumber: string;
-    jurisdiction: string; // State abbreviation
-    status: string;
-    summary?: string | null;
-    fullTextUrl?: string | null;
-    sponsors: FirestoreLegislationSponsor[];
-    introductionDate?: Timestamp | null;
-    lastActionDate?: Timestamp | null;
-    effectiveDate?: Timestamp | null; // Ensure this is handled if needed
-    history?: FirestoreLegislationHistoryEvent[];
-    tags?: string[];
-    chamber?: string | null;
-    versions?: FirestoreLegislationVersion[];
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-  }
-  // --- End Firestore-specific data structures ---
-
-  // --- Robust Timestamp Conversion Helper ---
-  function toFirestoreTimestamp(dateInput: Date | Timestamp | string | null | undefined): Timestamp | null {
-    if (dateInput === null || typeof dateInput === 'undefined') {
-      return null;
-    }
-    if (dateInput instanceof Timestamp) {
-      return dateInput; // Already a Firestore Timestamp
-    }
-    if (dateInput instanceof Date) {
-      // Check if the Date object is valid before converting
-      return isNaN(dateInput.getTime()) ? null : Timestamp.fromDate(dateInput);
-    }
-    if (typeof dateInput === 'string') {
-      if (dateInput.trim() === "") {
-        return null;
-      }
-      // Attempt to parse the string, taking only the date part if time is included with a space
-      const date = new Date(dateInput.split(' ')[0]);
-      return isNaN(date.getTime()) ? null : Timestamp.fromDate(date);
-    }
-    // console.warn(`toFirestoreTimestamp: Unhandled date type - ${typeof dateInput}`, dateInput); // Optional for debugging
-    return null; // Fallback for unhandled types
-  }
-
-  // Updated safeParseTimestamp to use the robust helper
-  const safeParseTimestamp = (dateString: string | undefined | null): Timestamp | null => {
-    return toFirestoreTimestamp(dateString);
+// Define type for API response
+interface OpenStatesApiBillListResponse {
+  results?: any[];
+  pagination?: {
+    page: number;
+    max_page: number;
+    per_page: number;
+    total_items: number;
   };
+}
 
+// State IDs for fetching data
+const STATE_OCD_IDS: { ocdId: string; abbr: string }[] = [
+  { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'WA' },
+  // TODO: Add all 50 states for full functionality
+];
 
-  // Helper to transform OpenStates bill data to our FirestoreLegislation type
-  export function transformOpenStatesBill(osBill: OpenStatesBill, jurisdictionAbbr: string): FirestoreLegislation {
-    const sponsors: FirestoreLegislationSponsor[] = (osBill.sponsorships || []).map((sp: OpenStatesSponsor) => ({
-      name: sp.name || '',
-      id: sp.person_id || sp.organization_id || null, // Prioritize person/org specific IDs
-      entityType: sp.entity_type || null,
-      primary: typeof sp.primary === 'boolean' ? sp.primary : null,
-      classification: sp.classification || null,
-    }));
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-    const historyItems: FirestoreLegislationHistoryEvent[] = (osBill.actions || [])
-    .map((act: OpenStatesAction) => {
-      const eventTimestamp = safeParseTimestamp(act.date); // Uses updated safeParseTimestamp
-      if (!eventTimestamp) {
-        // console.warn(`Invalid or missing date in history for bill ${osBill.identifier}: ${act.date}. Item skipped.`);
-        return null;
-      }
-      const detailsText = act.classification?.join(', ');
-      return {
-        date: eventTimestamp,
-        action: act.description || '',
-        actor: act.organization?.name || 'Unknown',
-        details: detailsText && detailsText.trim() !== '' ? detailsText : undefined,
-      } as FirestoreLegislationHistoryEvent;
-    })
-    .filter((h): h is FirestoreLegislationHistoryEvent => h !== null);
-
-    const versionItems: FirestoreLegislationVersion[] = (osBill.versions || [])
-      .map((ver: OpenStatesVersion) => {
-        const versionTimestamp = safeParseTimestamp(ver.date); // Uses updated safeParseTimestamp
-        if (!versionTimestamp) {
-          // if (ver.date && ver.date.trim() !== "") {
-          //     console.warn(`Invalid date in versions for bill ${osBill.identifier}: ${ver.date}. Item skipped.`);
-          // }
-          return null;
-        }
-        return {
-          date: versionTimestamp,
-          name: ver.note || '',
-          url: ver.links?.find(link => link.media_type === 'application/pdf')?.url || ver.links?.[0]?.url || '',
-        };
-      })
-      .filter((v): v is FirestoreLegislationVersion => v !== null);
-
-    let summaryText: string | null = null;
-    if (osBill.abstracts && osBill.abstracts.length > 0 && osBill.abstracts[0].abstract) {
-      summaryText = osBill.abstracts[0].abstract.trim() || null;
-      if (summaryText === '') summaryText = null;
-    }
-
-    let processedTags: string[] = [];
-    if (Array.isArray(osBill.subject)) {
-      processedTags = osBill.subject.filter((tag: any): tag is string => typeof tag === 'string' && tag.trim().length > 0);
-    } else if (typeof osBill.subject === 'string' && osBill.subject.trim().length > 0) {
-      processedTags = [osBill.subject.trim()];
-    }
-
-    let status = 'Unknown';
-    if (osBill.status) {
-      if (Array.isArray(osBill.status) && osBill.status.length > 0 && typeof osBill.status[0] === 'string') {
-          status = osBill.status[0];
-      } else if (typeof osBill.status === 'string') {
-          status = osBill.status;
-      }
-    }
-    if (status === 'Unknown' && osBill.latest_action_description) {
-      status = osBill.latest_action_description;
-    }
-    if (status === 'Unknown' && osBill.actions && osBill.actions.length > 0) {
-      status = osBill.actions[0]?.description || 'Unknown';
-    }
-
-
-    const now = Timestamp.now(); // This is already a Firestore Timestamp
-
-    const legislationData: FirestoreLegislation = {
-      sourceId: osBill.id,
-      title: osBill.title || '',
-      billNumber: osBill.identifier || '',
-      jurisdiction: jurisdictionAbbr,
-      status: status,
-      summary: summaryText,
-      fullTextUrl: osBill.sources?.find(s => s.url?.includes('.html') || s.url?.includes('.pdf'))?.url || osBill.sources?.[0]?.url || null,
-      sponsors: sponsors,
-      introductionDate: safeParseTimestamp(osBill.first_action_date), // Uses updated safeParseTimestamp
-      lastActionDate: safeParseTimestamp(osBill.latest_action_date),   // Uses updated safeParseTimestamp
-      // effectiveDate: safeParseTimestamp(osBill.effective_date_field_if_it_exists_on_OpenStatesBill), // Example
-      history: historyItems.length > 0 ? historyItems : undefined,
-      tags: processedTags.length > 0 ? processedTags : undefined,
-      chamber: osBill.from_organization?.classification || null,
-      versions: versionItems.length > 0 ? versionItems : undefined,
-      createdAt: now, // Already a Timestamp
-      updatedAt: now, // Already a Timestamp
-    };
-
-    // Remove top-level undefined properties
-    Object.keys(legislationData).forEach(keyStr => {
-      const key = keyStr as keyof FirestoreLegislation;
-      if (legislationData[key] === undefined) {
-        delete legislationData[key];
-      }
-    });
-
-    return legislationData;
+/**
+ * Convert date strings or timestamp objects to JavaScript Date objects
+ */
+function toMongoDate(
+  dateInput: Date | { seconds: number; nanoseconds: number } | string | null | undefined
+): Date | null {
+  if (dateInput === null || typeof dateInput === 'undefined' || dateInput === '') {
+    return null;
   }
 
-  async function fetchSessionsForJurisdiction(ocdId: string): Promise<OpenStatesLegislativeSession[]> {
-    const url = `${OPENSTATES_API_BASE_URL}/jurisdictions/${ocdId}?apikey=${OPENSTATES_API_KEY}&include=legislative_sessions`;
-    // console.log(`Fetching sessions from: ${url.replace(OPENSTATES_API_KEY!, 'REDACTED_KEY')}`);
+  if (dateInput instanceof Date) {
+    return isNaN(dateInput.getTime()) ? null : dateInput;
+  }
+
+  if (typeof dateInput === 'object' && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
+    // Convert Firebase Timestamp format to Date
+    return new Date(dateInput.seconds * 1000);
+  }
+
+  // Handle string dates
+  if (typeof dateInput === 'string') {
+    const date = new Date(dateInput.split(' ')[0]);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
+}
+
+/**
+ * Transforms an OpenStates bill to a MongoDB-compatible document
+ */
+export function transformOpenStatesBillToMongoDB(osBill: any): any {
+  // Process sponsors
+  const sponsors = (osBill.sponsorships || []).map((sp: any) => {
+    let sponsorId: string | null = null;
+    let entityType: string | null = sp.entity_type || null;
+    let personId: string | null = null;
+    let organizationId: string | null = null;
+
+    if (sp.person) {
+      sponsorId = sp.person.id;
+      personId = sp.person.id;
+      if (!entityType) entityType = 'person';
+    } else if (sp.organization) {
+      sponsorId = sp.organization.id;
+      organizationId = sp.organization.id;
+      if (!entityType) entityType = 'organization';
+    }
+
+    return {
+      name: sp.name,
+      id: sponsorId,
+      entityType: entityType,
+      primary: sp.primary || false,
+      classification: sp.classification || null,
+      personId: personId,
+      organizationId: organizationId,
+    };
+  });
+
+  // Process bill action history
+  const history = (osBill.actions || [])
+    .map((act: any) => {
+      const eventDate = toMongoDate(act.date);
+      if (!eventDate) return null;
+      return {
+        date: eventDate,
+        action: act.description,
+        actor: act.organization.name,
+        classification: Array.isArray(act.classification) ? act.classification : [],
+        order: act.order,
+      };
+    })
+    .filter((h: any): h is NonNullable<typeof h> => h !== null);
+
+  // Process bill versions
+  const versions = (osBill.versions || [])
+    .map((ver: any) => {
+      const versionDate = toMongoDate(ver.date);
+      if (!versionDate) return null;
+      return {
+        note: ver.note,
+        date: versionDate,
+        classification: ver.classification || null,
+        links: (ver.links || []).map((l: any) => ({
+          url: l.url,
+          media_type: l.media_type || null,
+        })),
+      };
+    })
+    .filter((v: any): v is NonNullable<typeof v> => v !== null);
+
+  // Process sources
+  const sources = (osBill.sources || []).map((s: any) => ({
+    url: s.url,
+    note: s.note || null,
+  }));
+
+  // Process abstracts
+  const abstracts = (osBill.abstracts || []).map((a: any) => ({
+    abstract: a.abstract,
+    note: a.note || null,
+  }));
+
+  // Get summary from first abstract if available
+  const summary = abstracts.length > 0 ? abstracts[0].abstract : null;
+
+  // Process extras
+  let processedExtras: Record<string, any> | null = null;
+  if (osBill.extras && Object.keys(osBill.extras).length > 0) {
     try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error(`Error fetching sessions for ${ocdId}: ${response.status} ${response.statusText}`);
-        const errorBody = await response.text();
-        console.error("Error body:", errorBody);
-        return [];
-      }
-      const data = await response.json();
-      return data.legislative_sessions || [];
-    } catch (error) {
-      console.error(`Exception fetching sessions for ${ocdId}:`, error);
+      processedExtras = JSON.parse(JSON.stringify(osBill.extras));
+    } catch (e) {
+      console.warn(`Could not process extras for bill ${osBill.id}: ${e}`);
+      processedExtras = null;
+    }
+  }
+
+  const now = new Date();
+
+  return {
+    id: osBill.id,
+    identifier: osBill.identifier,
+    title: osBill.title,
+    session: osBill.session,
+    jurisdictionId: osBill.jurisdiction.id,
+    jurisdictionName: osBill.jurisdiction.name,
+    chamber:
+      osBill.from_organization?.classification ||
+      osBill.jurisdiction?.classification ||
+      null,
+    classification: Array.isArray(osBill.classification) ? osBill.classification : [],
+    subjects: Array.isArray(osBill.subject) ? osBill.subject : [],
+    statusText: osBill.latest_action_description || null,
+    sponsors,
+    history,
+    versions: versions || [],
+    sources: sources || [],
+    abstracts: abstracts || [],
+    openstatesUrl: osBill.openstates_url,
+    firstActionAt: toMongoDate(osBill.first_action_date),
+    latestActionAt: toMongoDate(osBill.latest_action_date),
+    latestActionDescription: osBill.latest_action_description || null,
+    latestPassageAt: toMongoDate(osBill.latest_passage_date),
+    createdAt: toMongoDate(osBill.created_at) || now,
+    updatedAt: toMongoDate(osBill.updated_at) || now,
+    summary: summary,
+    extras: processedExtras,
+  };
+}
+
+/**
+ * Fetches legislative session data for a jurisdiction
+ */
+async function fetchSessionsForJurisdiction(
+  ocdId: string
+): Promise<any[]> {
+  const url = `${OPENSTATES_API_BASE_URL}/jurisdictions/${ocdId}?apikey=${OPENSTATES_API_KEY}&include=legislative_sessions`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(
+        `Error fetching sessions for ${ocdId}: ${response.status} ${response.statusText}`
+      );
+      const errorBody = await response.text();
+      console.error('Error body:', errorBody);
       return [];
     }
+    const data = (await response.json()) as {
+      legislative_sessions?: any[];
+    };
+    return data.legislative_sessions || [];
+  } catch (error) {
+    console.error(`Exception fetching sessions for ${ocdId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Fetches and stores bills for a specific session page
+ */
+async function fetchAndStoreBillsForSessionPage(
+  ocdId: string,
+  jurisdictionAbbr: string,
+  sessionIdentifier: string,
+  sessionName: string,
+  page: number,
+  perPage: number
+): Promise<OpenStatesApiBillListResponse['pagination'] | null> {
+  const includes = [
+    'sponsorships',
+    'abstracts',
+    'versions',
+    'actions',
+    'sources',
+  ];
+  const includeParams = includes.map(inc => `include=${inc}`).join('&');
+  const url = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=${page}&per_page=${perPage}&apikey=${OPENSTATES_API_KEY}&${includeParams}&sort=updated_desc`;
+
+  console.log(
+    `Fetching bills for ${jurisdictionAbbr} - Session: ${sessionName} (${sessionIdentifier}) - Page ${page}`
+  );
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(
+        `Error fetching bills (page ${page}) for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${response.status} ${response.statusText}`
+      );
+      const errorBody = await response.text();
+      console.error('Error body:', errorBody);
+      return null;
+    }
+
+    const billData = (await response.json()) as OpenStatesApiBillListResponse;
+    const bills = billData.results || [];
+
+    if (bills.length === 0) {
+      console.log(
+        `No bills found on page ${page} for ${jurisdictionAbbr}, session ${sessionIdentifier}.`
+      );
+      return billData.pagination;
+    }
+
+    for (const osBill of bills) {
+      try {
+        const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
+        await upsertLegislation(legislationToStore);
+      } catch (error) {
+        console.error(
+          `Error transforming or upserting bill ${osBill.identifier} (OS ID: ${osBill.id}):`,
+          error
+        );
+      }
+    }
+    return billData.pagination;
+  } catch (error) {
+    console.error(
+      `Exception fetching bills (page ${page}) for ${jurisdictionAbbr}, session ${sessionIdentifier}:`,
+      error
+    );
+    return null;
+  }
+}
+
+/**
+ * Main function to fetch and process bill data
+ */
+async function main() {
+  if (!OPENSTATES_API_KEY) {
+    console.error('OPENSTATES_API_KEY is not set in the environment variables.');
+    process.exit(1);
   }
 
-  async function fetchAndStoreBillsForSession(ocdId: string, jurisdictionAbbr: string, sessionIdentifier: string, sessionName: string) {
-    console.log(`Fetching bills for ${jurisdictionAbbr} - Session: ${sessionName} (${sessionIdentifier})`);
-    let page = 1;
-    const perPage = 20;
-    let hasMore = true;
+  console.log('--- Starting historical data import for the last five years ---');
+  const fiveYearsAgo = new Date();
+  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+  const fiveYearsAgoDateString = fiveYearsAgo.toISOString().split('T')[0];
+  console.log(`Fetching data for sessions active since ${fiveYearsAgoDateString}`);
 
-    while (hasMore) {
-      const url = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=${page}&per_page=${perPage}&apikey=${OPENSTATES_API_KEY}&include=sponsorships&include=abstracts&include=versions&include=actions&sort=updated_desc`;
-      console.log(`Fetching page ${page} from: ${url.replace(OPENSTATES_API_KEY!, 'REDACTED_KEY')}`);
+  for (const state of STATE_OCD_IDS) {
+    console.log(`\n--- Processing State: ${state.abbr} (${state.ocdId}) ---`);
+    const sessions = await fetchSessionsForJurisdiction(state.ocdId);
+    await delay(500);
 
-      try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          console.error(`Error fetching bills (page ${page}) for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${response.status} ${response.statusText}`);
-          const errorBody = await response.text();
-          console.error("Error body:", errorBody);
-          hasMore = false;
-          continue;
-        }
-        const billData = await response.json();
-        const bills: OpenStatesBill[] = billData.results || [];
+    const relevantSessions = sessions.filter(s => {
+      const sessionEndDateStr = s.end_date;
+      const sessionIdentifierStr = s.identifier;
+      const sessionYearMatch = sessionIdentifierStr.match(/\b(20[1-9][0-9])\b/);
+      const sessionYear = sessionYearMatch ? parseInt(sessionYearMatch[1], 10) : 0;
+      return (
+        !sessionEndDateStr ||
+        sessionEndDateStr >= fiveYearsAgoDateString ||
+        sessionYear >= fiveYearsAgo.getFullYear() - 1
+      );
+    });
 
-        if (bills.length === 0) {
-          hasMore = false;
-          continue;
-        }
+    if (relevantSessions.length > 0) {
+      console.log(
+        `Found ${relevantSessions.length} relevant session(s) for ${state.abbr}: ${relevantSessions
+          .map(s => `${s.name} (${s.identifier})`)
+          .join(', ')}`
+      );
+      for (const session of relevantSessions) {
+        const sessionIdentifier = session.identifier;
+        const sessionName = session.name;
 
-        for (const osBill of bills) {
-          try {
-            const legislationToStore = transformOpenStatesBill(osBill, jurisdictionAbbr);
-            await upsertLegislationBySourceId(legislationToStore as any);
-            // console.log(`Successfully upserted bill ${osBill.identifier} (OS ID: ${osBill.id})`);
-          } catch (error) {
-            console.error(`Error transforming or upserting bill ${osBill.identifier} (OS ID: ${osBill.id}):`, error);
+        let currentPage = 1;
+        const perPage = 20;
+        let hasMorePages = true;
+
+        while (hasMorePages) {
+          const pagination = await fetchAndStoreBillsForSessionPage(
+            state.ocdId,
+            state.abbr,
+            sessionIdentifier,
+            sessionName,
+            currentPage,
+            perPage
+          );
+
+          if (pagination && pagination.page < pagination.max_page) {
+            currentPage++;
+            await delay(1000);
+          } else {
+            hasMorePages = false;
           }
         }
-
-        if (billData.pagination && billData.pagination.page < billData.pagination.max_page) {
-          page++;
-          await delay(1000); // Rate limiting
-        } else {
-          hasMore = false;
-        }
-      } catch (error) {
-        console.error(`Exception fetching bills (page ${page}) for ${jurisdictionAbbr}, session ${sessionIdentifier}:`, error);
-        hasMore = false;
+        await delay(2000);
       }
+    } else {
+      console.log(
+        `No relevant recent sessions found for ${state.abbr} since ${fiveYearsAgoDateString}.`
+      );
     }
   }
+  console.log('\n--- Historical data import process finished ---');
+}
 
-  async function main() {
-    if (!OPENSTATES_API_KEY) {
-      console.error("OPENSTATES_API_KEY is not set in the environment variables.");
-      return;
-    }
-
-    console.log("--- Starting historical data import for the last five years ---");
-    const fiveYearsAgo = new Date();
-    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-    const fiveYearsAgoDateString = fiveYearsAgo.toISOString().split('T')[0];
-    console.log(`Fetching data for sessions active since ${fiveYearsAgoDateString}`);
-
-
-    for (const state of STATE_OCD_IDS) {
-      console.log(`\n--- Processing State for Historical Data: ${state.abbr} (${state.ocdId}) ---`);
-      const sessions = await fetchSessionsForJurisdiction(state.ocdId);
-      await delay(500);
-
-      const relevantSessions = sessions.filter(s => {
-        const sessionEndDate = s.end_date || s.identifier;
-        const sessionYearMatch = s.identifier.match(/\b(20[1-9][0-9])\b/);
-        const sessionYear = sessionYearMatch ? parseInt(sessionYearMatch[1], 10) : 0;
-
-        return !s.end_date || s.end_date >= fiveYearsAgoDateString || sessionYear >= fiveYearsAgo.getFullYear() -1;
-      });
-
-      if (relevantSessions.length > 0) {
-        console.log(`Found ${relevantSessions.length} session(s) for ${state.abbr} within the last five years: ${relevantSessions.map(s => `${s.name} (${s.identifier})`).join(', ')}`);
-        for (const session of relevantSessions) {
-          await fetchAndStoreBillsForSession(state.ocdId, state.abbr, session.identifier, session.name);
-          await delay(2000); // Rate limiting
-        }
-      } else {
-        console.log(`No relevant recent sessions found for ${state.abbr} since ${fiveYearsAgoDateString}.`);
-      }
-    }
-    console.log("\n--- Historical data import process finished ---");
-  }
-
-  main().catch(err => {
-    console.error("Unhandled error in main execution:", err);
-    process.exit(1);
-  });
+main().catch(err => {
+  console.error('Unhandled error in main execution:', err);
+  process.exit(1);
+});

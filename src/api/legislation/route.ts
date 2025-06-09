@@ -3,13 +3,13 @@
         import {
           addLegislation,
           getAllLegislation
-        } from '@/services/legislationService'; // Corrected path
+        } from '@/services/legislationService';
         // Handler for POST /api/legislation (Create)
         export async function POST(request: Request) {
           try {
-            const body = await request.json(); // Use the correct input type
+            const body = await request.json();
             // Add validation for the body here
-            const newLegislation = await addLegislation(body); // Assuming addLegislation returns the created object with an ID
+            const newLegislation = await addLegislation(body);
             return NextResponse.json(newLegislation, { status: 201 });
           } catch (error) {
             console.error('Error creating legislation:', error);
@@ -20,8 +20,45 @@
         // Handler for GET /api/legislation (Read all)
         export async function GET(request: Request) {
           try {
-            // You might want to add query parameters for pagination, filtering, sorting
-            const legislations = await getAllLegislation();
+            const { searchParams } = new URL(request.url);
+
+            // Parse pagination parameters
+            const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '100', 10) : 100;
+            const skip = searchParams.get('skip') ? parseInt(searchParams.get('skip') || '0', 10) : 0;
+
+            // Parse sorting parameters
+            let sort: Record<string, 1 | -1> = { updatedAt: -1 }; // Default sort
+            const sortField = searchParams.get('sortBy');
+            const sortDirection = searchParams.get('sortDir');
+
+            if (sortField) {
+              sort = { [sortField]: sortDirection === 'asc' ? 1 : -1 };
+            }
+
+            // Parse filtering parameters
+            const filter: Record<string, any> = {};
+
+            // Common filters
+            if (searchParams.get('session')) {
+              filter.session = searchParams.get('session');
+            }
+
+            if (searchParams.get('jurisdiction')) {
+              filter.jurisdictionId = searchParams.get('jurisdiction');
+            }
+
+            if (searchParams.get('subject')) {
+              filter.subjects = searchParams.get('subject');
+            }
+
+            // Get legislation with the constructed parameters
+            const legislations = await getAllLegislation({
+              limit,
+              skip,
+              sort,
+              filter
+            });
+
             return NextResponse.json(legislations, { status: 200 });
           } catch (error) {
             console.error('Error fetching all legislation:', error);
