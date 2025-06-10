@@ -139,8 +139,8 @@ export function PolicyUpdatesFeed() {
           ))}
         </div>
         <div className="space-y-4">
-          {updates.map((update) => (
-            <Card key={update.id} className="p-4">
+          {updates.map((update, idx) => (
+            <Card key={update.id || idx} className="p-4">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-semibold text-lg">{update.title}</h3>
