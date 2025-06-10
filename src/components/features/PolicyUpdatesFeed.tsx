@@ -90,18 +90,18 @@ export function PolicyUpdatesFeed() {
       </CardHeader>
       <CardContent>
         <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
-          <div className="relative flex-grow">
+          <div className="relative flex-grow w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Search updates..."
-              className="pl-10"
+              className="pl-10 w-full"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="w-full sm:w-auto">
                 Sort: {sort.field === "createdAt" ? "Most Recent" : sort.field === "title" ? "Alphabetical" : "Custom"}
               </Button>
             </DropdownMenuTrigger>
@@ -121,7 +121,7 @@ export function PolicyUpdatesFeed() {
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline">
+          <Button variant="outline" className="w-full sm:w-auto">
             <Bookmark className="mr-2 h-4 w-4" />
             Bookmarked (0)
           </Button>
