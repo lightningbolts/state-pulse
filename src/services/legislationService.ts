@@ -1,5 +1,5 @@
 import { getCollection } from '../lib/mongodb';
-    import { Collection } from 'mongodb';
+    import { Collection, ObjectId } from 'mongodb';
 
     export interface Legislation {
       id: string;
@@ -29,7 +29,8 @@ import { getCollection } from '../lib/mongodb';
     }
 
     interface LegislationMongoDbDocument extends Omit<Legislation, 'id' | 'createdAt' | 'updatedAt'> {
-      _id: string;
+      _id: ObjectId;
+      id: string;
       createdAt?: Date;
       updatedAt?: Date;
     }
@@ -52,32 +53,26 @@ import { getCollection } from '../lib/mongodb';
             console.error('Legislation ID is required to add legislation.');
             throw new Error('Legislation ID is required to add legislation.');
         }
-
         try {
-            const docId = legislationData.id.trim().replace(/\//g, '_');
             const { id, ...dataToAdd } = legislationData;
-
             let cleanedData = cleanupDataForMongoDB(dataToAdd);
-
             cleanedData.createdAt = new Date();
             cleanedData.updatedAt = new Date();
-            if (cleanedData.firstActionAt && !(cleanedData.firstActionAt instanceof Date)) {
-            cleanedData.firstActionAt = new Date(cleanedData.firstActionAt);
+            if (cleanedData.firstActionAt) {
+              cleanedData.firstActionAt = new Date(cleanedData.firstActionAt);
             }
-            if (cleanedData.latestActionAt && !(cleanedData.latestActionAt instanceof Date)) {
-            cleanedData.latestActionAt = new Date(cleanedData.latestActionAt);
+            if (cleanedData.latestActionAt) {
+              cleanedData.latestActionAt = new Date(cleanedData.latestActionAt);
             }
-            if (cleanedData.latestPassageAt && !(cleanedData.latestPassageAt instanceof Date)) {
-            cleanedData.latestPassageAt = new Date(cleanedData.latestPassageAt);
+            if (cleanedData.latestPassageAt) {
+              cleanedData.latestPassageAt = new Date(cleanedData.latestPassageAt);
             }
-
             const legislationCollection = await getCollection('legislation');
-
             console.log(`Adding legislation ${legislationData.id} (${legislationData.identifier || 'no identifier'})`);
-
             await legislationCollection.insertOne({
-            _id: docId,
-            ...cleanedData
+              _id: new ObjectId(),
+              id,
+              ...cleanedData
             });
         } catch (error) {
             console.error(`Error adding legislation document with id ${legislationData.id}: `, error);
@@ -90,35 +85,27 @@ import { getCollection } from '../lib/mongodb';
         console.error('Legislation ID is required to upsert legislation.');
         throw new Error('Legislation ID is required to upsert legislation.');
       }
-
       try {
-        const docId = legislationData.id.trim().replace(/\//g, '_');
         const { id, ...dataToUpsert } = legislationData;
-
         let cleanedData = cleanupDataForMongoDB(dataToUpsert);
-
-        // Remove createdAt from cleanedData for $set
         const { createdAt, ...dataForSet } = cleanedData;
         dataForSet.updatedAt = new Date();
-        if (dataForSet.firstActionAt && !(dataForSet.firstActionAt instanceof Date)) {
+        if (dataForSet.firstActionAt) {
           dataForSet.firstActionAt = new Date(dataForSet.firstActionAt);
         }
-        if (dataForSet.latestActionAt && !(dataForSet.latestActionAt instanceof Date)) {
+        if (dataForSet.latestActionAt) {
           dataForSet.latestActionAt = new Date(dataForSet.latestActionAt);
         }
-        if (dataForSet.latestPassageAt && !(dataForSet.latestPassageAt instanceof Date)) {
+        if (dataForSet.latestPassageAt) {
           dataForSet.latestPassageAt = new Date(dataForSet.latestPassageAt);
         }
-
         const legislationCollection = await getCollection('legislation');
-
         console.log(`Upserting legislation ${legislationData.id} (${legislationData.identifier || 'no identifier'})`);
-
         await legislationCollection.updateOne(
-          { _id: docId },
+          { id },
           {
             $set: dataForSet,
-            $setOnInsert: { createdAt: createdAt || new Date() }
+            $setOnInsert: { createdAt: createdAt || new Date(), id }
           },
           { upsert: true }
         );
@@ -133,19 +120,12 @@ import { getCollection } from '../lib/mongodb';
         console.error('ID is required to fetch legislation.');
         return null;
       }
-
       try {
-        const docId = id.replace(/\//g, '_');
         const legislationCollection = await getCollection('legislation');
-        const document = await legislationCollection.findOne({ _id: docId });
-
+        const document = await legislationCollection.findOne({ id });
         if (document) {
           const { _id, ...restOfDoc } = document;
-          const appLegislation: Legislation = {
-            id: _id,
-            ...restOfDoc,
-          };
-          return appLegislation;
+          return { id: document.id, ...restOfDoc };
         } else {
           return null;
         }
@@ -159,29 +139,20 @@ import { getCollection } from '../lib/mongodb';
       limit?: number;
       skip?: number;
       sort?: Record<string, 1 | -1>;
-      filter?: Partial<LegislationMongoDbDocument>;
+      filter?: Record<string, any>;
     } = {}): Promise<Legislation[]> {
       try {
         const { limit = 100, skip = 0, sort = { updatedAt: -1 }, filter = {} } = options;
-
         const legislationCollection = await getCollection('legislation');
-
         const cursor = legislationCollection
           .find(filter)
           .sort(sort)
           .skip(skip)
           .limit(limit);
-
-        const documents = await cursor.toArray();
-
-        // @ts-ignore
-        return documents.map((doc: LegislationMongoDbDocument) => {
+        const documents = (await cursor.toArray()) as LegislationMongoDbDocument[];
+        return documents.map((doc) => {
           const { _id, ...restOfDoc } = doc;
-          const appLegislation: Legislation = {
-            id: _id,
-            ...restOfDoc,
-          };
-          return appLegislation;
+          return { ...restOfDoc };
         });
       } catch (error) {
         console.error(`Error fetching legislation documents: `, error);
