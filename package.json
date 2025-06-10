@@ -46,6 +46,7 @@
     "eslint-plugin-import": "^2.31.0",
     "firebase": "^11.8.1",
     "firebase-admin": "^13.4.0",
+    "framer-motion": "^12.16.0",
     "genkit": "^1.8.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.475.0",

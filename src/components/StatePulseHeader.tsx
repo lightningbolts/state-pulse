@@ -3,7 +3,7 @@ import { Gavel } from "lucide-react";
 
 export function StatePulseHeader() {
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 shadow-sm">
+    <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 shadow-sm w-full max-w-none">
       <SidebarTrigger className="md:hidden" />
       <div className="flex items-center gap-2">
         <Gavel className="h-6 w-6 text-primary" />

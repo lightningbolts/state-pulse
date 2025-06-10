@@ -138,23 +138,25 @@ export function PolicyUpdatesFeed() {
             </Badge>
           ))}
         </div>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
           {updates.map((update, idx) => (
-            <Card key={update.id || idx} className="p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-lg">{update.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {update.createdAt ? new Date(update.createdAt).toLocaleDateString() : ""}
-                    {update.jurisdictionName ? ` - ${update.jurisdictionName}` : ""}
-                  </p>
+            <Card key={update.id || idx} className="flex flex-col h-full">
+              <div className="flex flex-col flex-1 p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-lg">{update.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {update.createdAt ? new Date(update.createdAt).toLocaleDateString() : ""}
+                      {update.jurisdictionName ? ` - ${update.jurisdictionName}` : ""}
+                    </p>
+                  </div>
+                  <Badge>{update.subjects?.[0] || "Policy"}</Badge>
                 </div>
-                <Badge>{update.subjects?.[0] || "Policy"}</Badge>
+                <p className="mt-2 text-sm flex-1">{update.summary}</p>
+                <Button variant="ghost" size="sm" className="mt-2">
+                  <Bookmark className="mr-2 h-4 w-4" /> Bookmark
+                </Button>
               </div>
-              <p className="mt-2 text-sm">{update.summary}</p>
-              <Button variant="ghost" size="sm" className="mt-2">
-                <Bookmark className="mr-2 h-4 w-4" /> Bookmark
-              </Button>
             </Card>
           ))}
         </div>
