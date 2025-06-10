@@ -24,7 +24,9 @@ interface PolicyUpdate {
   summary?: string;
 }
 
-async function fetchUpdatesFeed({ skip = 0, limit = 25, search = "", subject = "", sortField = "createdAt", sortDir = "desc" }) {
+let cardNumber = 20;
+
+async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc" }) {
   const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
   if (search) params.append("search", search);
   if (subject) params.append("subject", subject);
