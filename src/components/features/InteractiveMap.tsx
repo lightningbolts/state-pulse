@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -56,24 +55,27 @@ export function InteractiveMap() {
 
   // Once isClient is true, render the actual map.
   return (
-    <Card className="shadow-lg">
+    <Card className="shadow-lg mt-16 md:mt-0">
       <CardHeader>
         <CardTitle className="font-headline text-2xl">Interactive State Map</CardTitle>
         <CardDescription>Explore state-level developments across the U.S. Pan and zoom to navigate.</CardDescription>
       </CardHeader>
       <CardContent>
-        <MapContainer
-          key={MAP_COMPONENT_KEY} 
-          center={DEFAULT_POSITION}
-          zoom={DEFAULT_ZOOM}
-          scrollWheelZoom={true}
-          className="h-[500px] w-full rounded-md overflow-hidden border" // Apply styles directly to MapContainer
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        </MapContainer>
+        <div className="relative">
+          <MapContainer
+            key={MAP_COMPONENT_KEY}
+            center={DEFAULT_POSITION}
+            zoom={DEFAULT_ZOOM}
+            scrollWheelZoom={true}
+            className="h-[500px] w-full rounded-md overflow-hidden border z-0 mt-16 md:mt-0"
+            style={{ zIndex: 0 }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </MapContainer>
+        </div>
         <p className="mt-4 text-sm text-muted-foreground">
           Interact with the map to explore policy information. Future enhancements could include clicking states for details or overlaying data.
         </p>
