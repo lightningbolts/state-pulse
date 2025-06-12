@@ -44,7 +44,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "updates", path: "/updates", label: "Policy Updates", icon: Newspaper },
+  { id: "updates", path: "/legislation", label: "Policy Updates", icon: Newspaper },
   { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },
   { id: "timeline", path: "/timeline", label: "Legislation Timeline", icon: GitMerge },
   { id: "summaries", path: "/summaries", label: "AI Summaries", icon: BrainCircuit },

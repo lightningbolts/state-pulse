@@ -26,7 +26,7 @@ export async function GET(
   }
 }
 
-// Note: PUT is used for updates, ensure proper validation and authorization in production
+// Note: PUT is used for legislation, ensure proper validation and authorization in production
 // Handler for PUT /api/legislation/[id] (Edit)
 export async function PUT(
   request: Request,

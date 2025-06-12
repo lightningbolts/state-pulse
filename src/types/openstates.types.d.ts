@@ -1459,7 +1459,7 @@ export interface operations {
                 classification?: string;
                 /** @description Filter by one or more subjects. */
                 subject?: string[];
-                /** @description Filter to only include bills with updates since a given date. */
+                /** @description Filter to only include bills with legislation since a given date. */
                 updated_since?: string;
                 /** @description Filter to only include bills created since a given date. */
                 created_since?: string;

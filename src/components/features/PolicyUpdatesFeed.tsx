@@ -13,6 +13,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 interface PolicyUpdate {
   id: string;
@@ -22,7 +23,23 @@ interface PolicyUpdate {
   subjects?: string[];
   createdAt?: string;
   summary?: string;
+  classification?: string[];
+  openstatesUrl?: string;
+  latestActionDescription?: string;
+  sources?: { url: string; note?: string | null }[];
+  sponsors?: { name: string }[];
 }
+
+// Classification tags (no descriptions)
+const CLASSIFICATIONS = [
+  { label: "All", value: "" },
+  { label: "Bill", value: "bill" },
+  { label: "Resolution", value: "resolution" },
+  { label: "Joint Resolution", value: "joint resolution" },
+  { label: "Concurrent Resolution", value: "concurrent resolution" },
+  { label: "Memorial", value: "memorial" },
+  { label: "Proclamation", value: "proclamation" },
+];
 
 let cardNumber = 20;
 
@@ -44,7 +61,10 @@ export function PolicyUpdatesFeed() {
   const [skip, setSkip] = useState(0);
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("");
+  const [classification, setClassification] = useState("");
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
+  const [showLoadingText, setShowLoadingText] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const loader = useRef<HTMLDivElement | null>(null);
 
   const loadMore = useCallback(async () => {
@@ -76,13 +96,33 @@ export function PolicyUpdatesFeed() {
   useEffect(() => {
     if (!loader.current) return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !loading) {
-        loadMore();
+      if (entries[0].isIntersecting && hasMore && !loading && !isFetchingMore) {
+        setIsFetchingMore(true);
+        loadMore().finally(() => setIsFetchingMore(false));
       }
     });
     observer.observe(loader.current);
     return () => observer.disconnect();
-  }, [loadMore, hasMore, loading]);
+  }, [loadMore, hasMore, loading, isFetchingMore]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (loading || isFetchingMore) {
+      // Only set to true if this is the first time loading starts
+      setShowLoadingText(prev => prev);
+      timer = setInterval(() => {
+        setShowLoadingText(prev => !prev);
+      }, 1000);
+    }
+    // Do not reset showLoadingText to true on every loading/isFetchingMore change
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [loading, isFetchingMore]);
+
+  const filteredUpdates = classification
+    ? updates.filter(u => (u.classification || []).map((c: string) => c.toLowerCase()).includes(classification))
+    : updates;
 
   return (
     <Card className="shadow-lg">
@@ -128,6 +168,18 @@ export function PolicyUpdatesFeed() {
             Bookmarked (0)
           </Button>
         </div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {CLASSIFICATIONS.map(opt => (
+            <Badge
+              key={opt.value}
+              variant={classification === opt.value ? "default" : "secondary"}
+              onClick={() => setClassification(opt.value)}
+              className="cursor-pointer"
+            >
+              {opt.label}
+            </Badge>
+          ))}
+        </div>
         <div className="mb-6 space-x-2">
           {["Education", "Healthcare", "Policing", "Climate", "Labor", "Tech"].map((cat) => (
             <Badge
@@ -141,29 +193,106 @@ export function PolicyUpdatesFeed() {
           ))}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-          {updates.map((update, idx) => (
-            <Card key={update.id || idx} className="flex flex-col h-full">
-              <div className="flex flex-col flex-1 p-4">
-                <div className="flex justify-between items-start">
+          {filteredUpdates.map((update, idx) => {
+            const date = update.createdAt ? new Date(update.createdAt) : null;
+            const formattedDate = date ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+            const stateUrl = update.sources && update.sources.length > 0 ? update.sources[0].url : update.openstatesUrl;
+            const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+            // Ensure unique key: fallback to idx only if update.id is missing or duplicated
+            const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
+            return (
+              <Link
+                key={uniqueKey}
+                href={`/legislation/${update.id}`}
+                className="block mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full"
+                style={{ textDecoration: 'none', color: 'inherit' }}
+                tabIndex={0}
+              >
+                <div className="flex flex-col h-full">
                   <div>
-                    <h3 className="font-semibold text-lg">{update.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {update.createdAt ? new Date(update.createdAt).toLocaleDateString() : ""}
-                      {update.jurisdictionName ? ` - ${update.jurisdictionName}` : ""}
-                    </p>
+                    <div className="font-bold text-lg mb-1">{update.title}</div>
+                    <div className="text-sm text-muted-foreground mb-1">
+                      {update.jurisdictionName} • {update.session} {formattedDate && <>• {formattedDate}</>}
+                    </div>
+                    {update.classification && update.classification.length > 0 && (
+                      <div className="mb-1">
+                        {update.classification.map((c, i) => (
+                          <Badge
+                            key={c + i}
+                            variant={classification === c.toLowerCase() ? "default" : "secondary"}
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setClassification(c.toLowerCase());
+                            }}
+                            className="mr-1 cursor-pointer"
+                          >
+                            {capitalize(c)}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {update.subjects && update.subjects.length > 0 && (
+                      <div className="mb-1">
+                        {update.subjects.map((s, i) => (
+                          <Badge
+                            key={s + i}
+                            variant={subject === s ? "default" : "outline"}
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSubject(subject === s ? "" : s);
+                            }}
+                            className="mr-1 cursor-pointer"
+                          >
+                            #{capitalize(s)}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {update.sponsors && update.sponsors.length > 0 && (
+                      <div className="mb-1 text-xs text-muted-foreground">
+                        <span className="font-semibold">Sponsors: </span>
+                        {update.sponsors.map((sp: any, i: number) => (
+                          <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < update.sponsors.length - 1 ? ', ' : ''}</span>
+                        ))}
+                      </div>
+                    )}
+                    {update.latestActionDescription && (
+                      <div className="text-sm text-muted-foreground mb-1">
+                        <span className="font-semibold">Last Action: </span>{update.latestActionDescription}
+                      </div>
+                    )}
+                    {formattedDate && (
+                      <div className="text-xs text-muted-foreground mb-1">
+                        <span className="font-semibold">Date: </span>{formattedDate}
+                      </div>
+                    )}
+                    {update.summary && (
+                      <div className="mt-2 text-sm">{update.summary}</div>
+                    )}
                   </div>
-                  <Badge>{update.subjects?.[0] || "Policy"}</Badge>
+                  <div className="mt-auto pt-4 flex justify-start">
+                    <button
+                      type="button"
+                      className="px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      onClick={e => {
+                        e.stopPropagation();
+                        window.open(stateUrl, '_blank', 'noopener');
+                      }}
+                    >
+                      {update.sources && update.sources.length > 0 ? 'Official State Link' : 'OpenStates Link'}
+                    </button>
+                  </div>
                 </div>
-                <p className="mt-2 text-sm flex-1">{update.summary}</p>
-                <Button variant="ghost" size="sm" className="mt-2">
-                  <Bookmark className="mr-2 h-4 w-4" /> Bookmark
-                </Button>
-              </div>
-            </Card>
-          ))}
+              </Link>
+            );
+          })}
         </div>
         <div ref={loader} />
-        {loading && <p className="mt-6 text-center text-muted-foreground">Loading more updates...</p>}
+        {showLoadingText && loading && (
+          <p className="mt-6 text-center text-muted-foreground">Loading more updates...</p>
+        )}
         {!hasMore && !loading && <p className="mt-6 text-center text-muted-foreground">No more updates.</p>}
       </CardContent>
     </Card>

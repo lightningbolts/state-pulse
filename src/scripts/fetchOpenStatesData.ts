@@ -153,7 +153,7 @@ const UPDATE_INTERVAL_MINUTES = 30;
 function getUpdatedSinceString(minutesAgo: number): string {
   const now = new Date();
   const updatedSinceDate = new Date(now.getTime() - (minutesAgo * 60 * 1000));
-  return updatedSinceDate.toISOString(); // Use full ISO for more precise updates
+  return updatedSinceDate.toISOString(); // Use full ISO for more precise legislation
 }
 
 async function fetchAndStoreUpdatedBills(
@@ -253,8 +253,8 @@ async function runUpdateCycle() {
     }
     await delay(5000);
   }
-  console.log("\n--- Finished processing all states for updates. ---");
-  console.log("--- This script is designed for frequent updates (e.g., every 30 minutes). ---");
+  console.log("\n--- Finished processing all states for legislation. ---");
+  console.log("--- This script is designed for frequent legislation (e.g., every 30 minutes). ---");
 }
 
 async function main() {

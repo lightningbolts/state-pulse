@@ -343,8 +343,8 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('--- Starting historical data import for sessions from 2024 and later ---');
   const minYear = 2024;
+  console.log(`--- Starting historical data import for sessions from ${minYear} and later ---`);
   console.log(`Fetching data for sessions active since ${minYear}`);
 
   for (const state of STATE_OCD_IDS) {
@@ -369,7 +369,7 @@ async function main() {
         const sessionIdentifier = session.identifier;
         const sessionName = session.name;
 
-        let currentPage = 1;
+        let currentPage = 32;
         const perPage = 20;
         let hasMorePages = true;
 
