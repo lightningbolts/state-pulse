@@ -51,7 +51,9 @@ async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", sub
   if (sortDir) params.append("sortDir", sortDir);
   const res = await fetch(`/api/legislation?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to fetch updates");
-  return res.json();
+  const data = await res.json();
+  console.log('[PolicyUpdatesFeed] Fetched updates:', data);
+  return data;
 }
 
 export function PolicyUpdatesFeed() {
@@ -65,6 +67,7 @@ export function PolicyUpdatesFeed() {
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
   const [showLoadingText, setShowLoadingText] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const loader = useRef<HTMLDivElement | null>(null);
 
   const loadMore = useCallback(async () => {
@@ -82,16 +85,45 @@ export function PolicyUpdatesFeed() {
     }
   }, [skip, loading, hasMore, search, subject, sort]);
 
-  useEffect(() => {
-    setUpdates([]);
-    setSkip(0);
-    setHasMore(true);
-  }, [search, subject]);
+  // Search handler for button/enter
+  const handleSearch = useCallback(() => {
+    if (search !== searchInput) {
+      setSearch(searchInput);
+      setSkip(0);
+      setHasMore(true);
+    }
+  }, [searchInput, search]);
 
+  // Remove polling effect and replace with effect that fetches only when search/subject/classification/sort changes
   useEffect(() => {
-    loadMore();
-    // eslint-disable-next-line
-  }, [search, subject]);
+    let isMounted = true;
+    const fetchAndSet = async () => {
+      setLoading(true);
+      try {
+        const newUpdates = await fetchUpdatesFeed({
+          skip: 0,
+          limit: 25,
+          search,
+          subject,
+          sortField: sort.field,
+          sortDir: sort.dir,
+          classification
+        });
+        if (!isMounted) return;
+        setUpdates(newUpdates);
+        setSkip(newUpdates.length);
+        setHasMore(newUpdates.length === 25);
+      } catch {
+        if (!isMounted) return;
+        setHasMore(false);
+      } finally {
+        if (!isMounted) return;
+        setLoading(false);
+      }
+    };
+    fetchAndSet();
+    return () => { isMounted = false; };
+  }, [search, subject, classification, sort]);
 
   useEffect(() => {
     if (!loader.current) return;
@@ -132,14 +164,25 @@ export function PolicyUpdatesFeed() {
       </CardHeader>
       <CardContent>
         <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
-          <div className="relative flex-grow w-full sm:w-auto">
+          <div className="relative flex-grow w-full sm:w-auto flex">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Search updates..."
               className="pl-10 w-full"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSearch();
+              }}
             />
+            <Button
+              className="ml-2"
+              variant="default"
+              onClick={handleSearch}
+              aria-label="Search"
+            >
+              Search
+            </Button>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -195,7 +238,11 @@ export function PolicyUpdatesFeed() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
           {filteredUpdates.map((update, idx) => {
             const date = update.createdAt ? new Date(update.createdAt) : null;
-            const formattedDate = date ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+            const formattedDate = date
+              ? (typeof window !== 'undefined'
+                  ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                  : date.toISOString().slice(0, 10))
+              : '';
             const stateUrl = update.sources && update.sources.length > 0 ? update.sources[0].url : update.openstatesUrl;
             const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
             // Ensure unique key: fallback to idx only if update.id is missing or duplicated

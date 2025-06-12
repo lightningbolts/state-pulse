@@ -36,6 +36,18 @@
 
             // Parse filtering parameters
             const filter: Record<string, any> = {};
+            // Full text search
+            const searchValue = searchParams.get('search');
+            if (searchValue) {
+              filter.$or = [
+                { title: { $regex: searchValue, $options: 'i' } },
+                { summary: { $regex: searchValue, $options: 'i' } },
+                { classification: searchValue },
+                { classification: { $regex: searchValue, $options: 'i' } },
+                { subjects: searchValue },
+                { subjects: { $regex: searchValue, $options: 'i' } }
+              ];
+            }
             // Common filters
             if (searchParams.get('session')) {
               filter.session = searchParams.get('session');
@@ -67,6 +79,19 @@
               if (firstActionAtLte) filter.firstActionAt.$lte = new Date(firstActionAtLte);
             }
             // Add more filters as needed
+
+            console.log('[API] GET /api/legislation filter:', JSON.stringify(filter));
+            // Debug: log a sample document matching the filter
+            const legislationCollection = (await import('@/lib/mongodb')).getCollection ? await (await import('@/lib/mongodb')).getCollection('legislation') : null;
+            if (legislationCollection) {
+              const sample = await (await legislationCollection).findOne(filter);
+              console.log('[API] Sample matching document:', sample);
+            }
+            // Debug: log a sample document from the collection with no filter
+            if (legislationCollection) {
+              const sampleAny = await (await legislationCollection).findOne();
+              console.log('[API] Sample ANY document:', sampleAny);
+            }
 
             // Get legislation with the constructed parameters
             const legislations = await getAllLegislation({
