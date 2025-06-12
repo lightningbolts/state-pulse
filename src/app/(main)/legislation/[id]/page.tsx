@@ -1,4 +1,5 @@
 import { getLegislationById, type Legislation } from '@/services/legislationService';
+import { LegislationTimeline } from '@/components/features/LegislationTimeline'; // Updated import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CalendarDays, Users, FileText, Tag, Info, ListChecks } from 'lucide-react';
@@ -10,15 +11,18 @@ const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['hi
     return <p className="text-muted-foreground">No history events available for this legislation.</p>;
   }
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-foreground mb-2">Timeline</h3>
+    <div className="space-y-4 mt-6">
+      <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
+        <ListChecks className="mr-2 h-6 w-6 text-primary" /> Timeline
+      </h3>
       <ul className="list-none p-0 space-y-3">
         {historyEvents.map((event, index) => (
-          <li key={index} className="border-l-2 border-primary pl-4 py-2 bg-card rounded-md shadow-sm">
-            <p className="font-medium text-primary-foreground bg-primary px-2 py-1 rounded-t-md text-sm">
-              {event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'} - {event.actor || 'Unknown Actor'}
+          <li key={index} className="border-l-2 border-primary pl-4 py-2 bg-card rounded-md shadow-sm hover:shadow-md transition-shadow">
+            <p className="font-medium text-primary-foreground bg-primary px-3 py-1.5 rounded-t-md text-sm flex justify-between items-center">
+              <span>{event.date ? event.date.toLocaleDateString() : 'Date N/A'}</span>
+              <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
             </p>
-            <div className="p-2">
+            <div className="p-3 bg-background rounded-b-md">
               <p className="text-sm text-foreground">{event.action}</p>
               {event.details && <p className="text-xs text-muted-foreground mt-1">Details: {event.details}</p>}
             </div>
@@ -32,122 +36,207 @@ const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['hi
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const id = params.id;
   const legislation = await getLegislationById(id);
+
   if (!legislation) {
     return (
-      <Card className="mt-6">
+      <Card className="mt-6 shadow-lg">
         <CardHeader>
-          <CardTitle>Not Found</CardTitle>
+          <CardTitle className="text-2xl text-destructive">Legislation Not Found</CardTitle>
+          <CardDescription>
+            The legislation with ID <Badge variant="outline">{id}</Badge> could not be found.
+            It might have been removed or the ID is incorrect.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p>The requested legislation could not be found.</p>
-          <Link href="/legislation" className="text-primary hover:underline mt-4 block">
-            Back to legislation list
+          <Link href="/legislation" className="text-primary hover:underline flex items-center">
+            <ExternalLink className="mr-2 h-4 w-4" /> Go back to legislation search
           </Link>
         </CardContent>
       </Card>
     );
   }
 
+  const {
+    identifier,
+    title,
+    session,
+    jurisdictionName,
+    chamber,
+    classification,
+    subjects,
+    statusText,
+    sponsors,
+    history,
+    versions,
+    sources,
+    abstracts,
+    openstatesUrl,
+    firstActionAt,
+    latestActionAt,
+    latestActionDescription,
+    aiSummary,
+    tags,
+  } = legislation;
+
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
-        <CardHeader className="bg-muted/30 p-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <Badge variant="secondary" className="mb-2">{legislation.jurisdictionName || 'N/A'}</Badge>
-              <CardTitle className="text-3xl font-bold text-primary mb-1">{legislation.title || 'No Title Available'}</CardTitle>
-              <CardDescription className="text-lg text-muted-foreground">{legislation.identifier || 'No Bill Number'}</CardDescription>
-            </div>
-            {legislation.openstatesUrl && (
-              <a
-                href={legislation.openstatesUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center text-sm text-primary hover:text-primary/80 transition-colors"
-                title="View on OpenStates.org"
-              >
-                OpenStates.org <ExternalLink className="ml-1.5 h-4 w-4" />
-              </a>
-            )}
-          </div>
+    <div className="container mx-auto py-8 px-4 md:px-6">
+      <Card className="w-full max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-primary to-primary-focus text-primary-foreground p-6">
+          <CardTitle className="text-3xl font-bold tracking-tight">{identifier}: {title}</CardTitle>
+          <CardDescription className="text-primary-foreground/80 text-sm mt-1">
+            {session} - {jurisdictionName} {chamber && `(${chamber})`}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 space-y-6">
+        <CardContent className="p-6 space-y-6 bg-background">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold text-foreground flex items-center"><Info className="mr-2 h-5 w-5 text-primary" />Details</h3>
-              <p><strong className="font-medium">Status:</strong> {legislation.statusText || 'N/A'}</p>
-              <p><strong className="font-medium">Session:</strong> {legislation.session || 'N/A'}</p>
-              <p><strong className="font-medium">Chamber:</strong> {legislation.chamber || 'N/A'}</p>
-              {legislation.classification && legislation.classification.length > 0 && (
-                <p><strong className="font-medium">Type:</strong> {legislation.classification.join(', ')}</p>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center">
+                <Info className="mr-2 h-5 w-5 text-primary" /> Key Details
+              </h3>
+              {statusText && <p><Badge variant="secondary" className="text-sm">{statusText}</Badge></p>}
+              {classification && classification.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Type: {classification.map(c => <Badge key={c} variant="outline" className="mr-1">{c}</Badge>)}
+                </p>
               )}
+              {firstActionAt && (
+                <p className="text-sm text-muted-foreground flex items-center">
+                  <CalendarDays className="mr-2 h-4 w-4" /> First Action: {firstActionAt.toLocaleDateString()}
+                </p>
+              )}
+              {latestActionAt && (
+                <p className="text-sm text-muted-foreground flex items-center">
+                  <CalendarDays className="mr-2 h-4 w-4" /> Latest Action: {latestActionAt.toLocaleDateString()}
+                </p>
+              )}
+              {latestActionDescription && <p className="text-sm text-muted-foreground">Latest Action Detail: {latestActionDescription}</p>}
             </div>
-            <div className="space-y-3">
-               <h3 className="text-lg font-semibold text-foreground flex items-center"><CalendarDays className="mr-2 h-5 w-5 text-primary" />Key Dates</h3>
-              <p>
-                <strong className="font-medium">Introduced:</strong>
-                {legislation.firstActionAt ? new Date(legislation.firstActionAt).toLocaleDateString() : ' N/A'}
-              </p>
-              <p>
-                <strong className="font-medium">Last Action:</strong>
-                {legislation.latestActionAt ? new Date(legislation.latestActionAt).toLocaleDateString() : ' N/A'}
-              </p>
-              {legislation.latestActionDescription && (
-                <p><strong className="font-medium">Last Action Desc:</strong> {legislation.latestActionDescription}</p>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center">
+                <Tag className="mr-2 h-5 w-5 text-primary" /> Subjects & Tags
+              </h3>
+              {subjects && subjects.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {subjects.map(subject => <Badge key={subject} variant="default">{subject}</Badge>)}
+                </div>
+              )}
+              {tags && tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {tags.map((tag: string) => <Badge key={tag} variant="secondary" className="italic">{tag}</Badge>)}
+                </div>
+              )}
+              {(!subjects || subjects.length === 0) && (!tags || tags.length === 0) && (
+                <p className="text-sm text-muted-foreground">No subjects or tags available.</p>
               )}
             </div>
           </div>
 
-          {legislation.summary && (
-            <div>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2"><FileText className="mr-2 h-5 w-5 text-primary" />Summary</h3>
-              <p className="text-muted-foreground leading-relaxed bg-muted/50 p-4 rounded-md">{legislation.summary}</p>
+          {openstatesUrl && (
+            <div className="mt-4">
+              <Link href={openstatesUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center text-sm">
+                <ExternalLink className="mr-2 h-4 w-4" /> View on OpenStates
+              </Link>
             </div>
           )}
 
-          {legislation.sponsors && legislation.sponsors.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2"><Users className="mr-2 h-5 w-5 text-primary" />Sponsors</h3>
-              <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                {legislation.sponsors.map((sponsor, index) => (
-                  <li key={index}>{sponsor.name} {sponsor.primary ? <Badge variant="outline" className="ml-1">Primary</Badge> : ''}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {legislation.subjects && legislation.subjects.length > 0 && (
-             <div>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2"><Tag className="mr-2 h-5 w-5 text-primary" />Subjects</h3>
-              <div className="flex flex-wrap gap-2">
-                {legislation.subjects.map((subject, index) => (
-                  <Badge key={index} variant="secondary">{subject}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {legislation.versions && legislation.versions.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2"><ListChecks className="mr-2 h-5 w-5 text-primary" />Versions</h3>
+          {sponsors && sponsors.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
+                <Users className="mr-2 h-6 w-6 text-primary" /> Sponsors
+              </h3>
               <ul className="space-y-2">
-                {legislation.versions.map((version, index) => (
-                  <li key={index} className="text-sm text-muted-foreground p-2 border rounded-md bg-muted/20">
-                    <span className="font-medium text-foreground">{version.name || 'Unnamed Version'}</span>
-                    {version.date && ` - ${new Date(version.date).toLocaleDateString()}`}
-                    {version.url && (
-                       <a href={version.url} target="_blank" rel="noopener noreferrer" className="ml-2 text-primary hover:underline">
-                         View Document <ExternalLink className="inline h-3 w-3" />
-                       </a>
-                    )}
+                {sponsors.map(sponsor => (
+                  <li key={sponsor.id || sponsor.name} className="text-sm p-2 bg-muted/50 rounded-md">
+                    {sponsor.name} ({sponsor.primary ? 'Primary' : 'Co-sponsor'}) - {sponsor.entityType}
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          <LegislationTimeline historyEvents={legislation.history} />
+          {abstracts && abstracts.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
+                <FileText className="mr-2 h-6 w-6 text-primary" /> Abstracts
+              </h3>
+              {abstracts.map((abstract, index) => (
+                <div key={index} className="p-3 border rounded-md bg-muted/50 mb-2">
+                  <p className="text-sm text-foreground">{abstract.abstract}</p>
+                  {abstract.note && <p className="text-xs text-muted-foreground mt-1">Note: {abstract.note}</p>}
+                </div>
+              ))}
+            </div>
+          )}
 
+          {aiSummary && (
+            <div className="mt-6 p-4 border border-primary/30 rounded-lg bg-primary/5">
+              <h3 className="text-xl font-semibold text-primary mb-3">AI Generated Summaries</h3>
+              {aiSummary.short && (
+                <div className="mb-2">
+                  <h4 className="font-semibold text-foreground">Short Summary (Tweet-length):</h4>
+                  <p className="text-sm text-muted-foreground italic">{aiSummary.short}</p>
+                </div>
+              )}
+              {aiSummary.medium && (
+                <div className="mb-2">
+                  <h4 className="font-semibold text-foreground">Medium Summary:</h4>
+                  <p className="text-sm text-muted-foreground">{aiSummary.medium}</p>
+                </div>
+              )}
+              {aiSummary.long && (
+                <div className="mb-2">
+                  <h4 className="font-semibold text-foreground">Detailed Summary (Legal Analysis):</h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiSummary.long}</p>
+                </div>
+              )}
+              {aiSummary.lastGeneratedAt && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Last generated: {aiSummary.lastGeneratedAt.toLocaleString()}
+                </p>
+              )}
+            </div>
+          )}
+
+          {versions && versions.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
+                <FileText className="mr-2 h-6 w-6 text-primary" /> Versions & Documents
+              </h3>
+              <ul className="space-y-2">
+                {versions.map((version, index) => (
+                  <li key={index} className="p-3 border rounded-md bg-muted/50">
+                    <p className="font-medium text-foreground">{version.note}</p>
+                    {version.date && <p className="text-xs text-muted-foreground">Date: {version.date.toLocaleDateString()}</p>}
+                    {version.links && version.links.map((link: { url: string; media_type?: string | null }) => (
+                      <Link key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm block mt-1">
+                        <ExternalLink className="inline-block mr-1 h-3 w-3" /> {link.media_type || 'View Document'}
+                      </Link>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {sources && sources.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
+                <ExternalLink className="mr-2 h-6 w-6 text-primary" /> Sources
+              </h3>
+              <ul className="space-y-1">
+                {sources.map((source, index) => (
+                  <li key={index}>
+                    <Link href={source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
+                      {source.note || source.url}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <LegislationTimeline historyEvents={history} />
         </CardContent>
       </Card>
     </div>

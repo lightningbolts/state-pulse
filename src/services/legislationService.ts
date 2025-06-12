@@ -115,6 +115,34 @@ import { getCollection } from '../lib/mongodb';
       }
     }
 
+    function convertDocumentToLegislation(doc: LegislationMongoDbDocument): Legislation {
+      const { _id, ...rest } = doc;
+      return { id: rest.id, ...rest };
+    }
+
+    export async function getLegislationByMongoId(mongoId: string): Promise<Legislation | null> {
+      if (!mongoId) {
+        console.error('MongoDB ID is required to fetch legislation.');
+        return null;
+      }
+      try {
+        if (!ObjectId.isValid(mongoId)) {
+          console.error('Invalid MongoDB ID format.');
+          return null;
+        }
+        const legislationCollection = await getCollection('legislation');
+        const document = await legislationCollection.findOne({ _id: new ObjectId(mongoId) }) as LegislationMongoDbDocument | null;
+        if (document) {
+          return convertDocumentToLegislation(document);
+        } else {
+          return null;
+        }
+      } catch (error) {
+        console.error(`Error fetching legislation document with MongoDB ID ${mongoId}: `, error);
+        return null;
+      }
+    }
+
     export async function getLegislationById(id: string): Promise<Legislation | null> {
       if (!id) {
         console.error('ID is required to fetch legislation.');
