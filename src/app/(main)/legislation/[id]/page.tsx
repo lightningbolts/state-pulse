@@ -1,5 +1,4 @@
 import { getLegislationById, type Legislation } from '@/services/legislationService';
-import { LegislationTimeline } from '@/components/features/LegislationTimeline'; // Updated import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CalendarDays, Users, FileText, Tag, Info, ListChecks } from 'lucide-react';
