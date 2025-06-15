@@ -203,3 +203,4 @@ import { getCollection } from '../lib/mongodb';
         console.error('[Service] Failed to connect to legislation collection:', error);
       }
     }
+

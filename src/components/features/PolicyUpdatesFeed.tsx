@@ -9,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
@@ -23,6 +22,7 @@ interface PolicyUpdate {
   subjects?: string[];
   createdAt?: string;
   summary?: string;
+  geminiSummary?: string; // Add geminiSummary field
   classification?: string[];
   openstatesUrl?: string;
   latestActionDescription?: string;
@@ -43,12 +43,13 @@ const CLASSIFICATIONS = [
 
 let cardNumber = 20;
 
-async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc" }) {
+async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc", classification = "" }: { skip?: number; limit?: number; search?: string; subject?: string; sortField?: string; sortDir?: string; classification?: string }) {
   const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
   if (search) params.append("search", search);
   if (subject) params.append("subject", subject);
   if (sortField) params.append("sortBy", sortField);
   if (sortDir) params.append("sortDir", sortDir);
+  if (classification) params.append("classification", classification);
   const res = await fetch(`/api/legislation?${params.toString()}`);
   if (!res.ok) throw new Error("Failed to fetch updates");
   const data = await res.json();
@@ -74,10 +75,10 @@ export function PolicyUpdatesFeed() {
     if (loading || !hasMore) return;
     setLoading(true);
     try {
-      const newUpdates = await fetchUpdatesFeed({ skip, limit: 25, search, subject, sortField: sort.field, sortDir: sort.dir });
+      const newUpdates = await fetchUpdatesFeed({ skip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir });
       setUpdates((prev) => [...prev, ...newUpdates]);
       setSkip((prev) => prev + newUpdates.length);
-      setHasMore(newUpdates.length === 25);
+      setHasMore(newUpdates.length === 20);
     } catch {
       setHasMore(false);
     } finally {
@@ -102,7 +103,7 @@ export function PolicyUpdatesFeed() {
       try {
         const newUpdates = await fetchUpdatesFeed({
           skip: 0,
-          limit: 25,
+          limit: 20,
           search,
           subject,
           sortField: sort.field,
@@ -112,7 +113,7 @@ export function PolicyUpdatesFeed() {
         if (!isMounted) return;
         setUpdates(newUpdates);
         setSkip(newUpdates.length);
-        setHasMore(newUpdates.length === 25);
+        setHasMore(newUpdates.length === 20);
       } catch {
         if (!isMounted) return;
         setHasMore(false);
@@ -203,6 +204,8 @@ export function PolicyUpdatesFeed() {
                 <DropdownMenuRadioItem value="createdAt:asc">Oldest</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="title:asc">Alphabetical (A-Z)</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="title:desc">Alphabetical (Z-A)</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="lastAction:desc">Last Action (Latest)</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="lastAction:asc">Last Action (Earliest)</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -247,18 +250,25 @@ export function PolicyUpdatesFeed() {
             const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
             // Ensure unique key: fallback to idx only if update.id is missing or duplicated
             const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
+            // Find last action date (if available)
+            const lastActionDate = update.latestActionDate ? new Date(update.latestActionDate) : null;
+            const formattedLastActionDate = lastActionDate
+              ? (typeof window !== 'undefined'
+                  ? lastActionDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                  : lastActionDate.toISOString().slice(0, 10))
+              : null;
             return (
               <Link
                 key={uniqueKey}
                 href={`/legislation/${update.id}`}
-                className="block mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full"
+                className="block mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full"
                 style={{ textDecoration: 'none', color: 'inherit' }}
                 tabIndex={0}
               >
                 <div className="flex flex-col h-full">
                   <div>
-                    <div className="font-bold text-lg mb-1">{update.title}</div>
-                    <div className="text-sm text-muted-foreground mb-1">
+                    <div className="font-bold text-lg mb-1 text-left">{update.title}</div>
+                    <div className="text-sm text-muted-foreground mb-1 text-left">
                       {update.jurisdictionName} • {update.session} {formattedDate && <>• {formattedDate}</>}
                     </div>
                     {update.classification && update.classification.length > 0 && (
@@ -306,8 +316,11 @@ export function PolicyUpdatesFeed() {
                       </div>
                     )}
                     {update.latestActionDescription && (
-                      <div className="text-sm text-muted-foreground mb-1">
+                      <div className="text-sm text-muted-foreground mb-1 text-left">
                         <span className="font-semibold">Last Action: </span>{update.latestActionDescription}
+                        {formattedLastActionDate && (
+                          <span className="ml-2">({formattedLastActionDate})</span>
+                        )}
                       </div>
                     )}
                     {formattedDate && (
@@ -315,8 +328,11 @@ export function PolicyUpdatesFeed() {
                         <span className="font-semibold">Date: </span>{formattedDate}
                       </div>
                     )}
-                    {update.summary && (
-                      <div className="mt-2 text-sm">{update.summary}</div>
+                    {update.geminiSummary && (
+                      <div className="mt-2 text-sm text-left">{update.geminiSummary}</div>
+                    )}
+                    {!update.geminiSummary && update.summary && (
+                      <div className="mt-2 text-sm text-left">{update.summary}</div>
                     )}
                   </div>
                   <div className="mt-auto pt-4 flex justify-start">
