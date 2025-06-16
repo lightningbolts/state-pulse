@@ -162,7 +162,7 @@ export function PolicyUpdatesFeed() {
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle className="font-headline text-2xl">Real-Time Policy Updates</CardTitle>
+        <CardTitle className="font-headline text-2xl">Policy Updates</CardTitle>
         <CardDescription>Stay updated with the latest policy developments. Filter by category or search for specific topics.</CardDescription>
       </CardHeader>
       <CardContent>
