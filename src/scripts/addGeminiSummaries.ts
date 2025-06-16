@@ -206,6 +206,8 @@ async function main() {
         ...query,
         $or: [
           { geminiSummary: { $regex: 'Summary not available due to insufficient information.' } },
+          { geminiSummary: { $regex: 'likely' } },
+          { geminiSummary: { $regex: 'may' } },
           { $expr: { $lt: [{ $size: { $split: ['$geminiSummary', ' '] } }, 65] } }
         ]
       })
