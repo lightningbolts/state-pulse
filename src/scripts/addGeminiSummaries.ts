@@ -31,8 +31,10 @@ async function fetchPdfFromOpenStatesUrl(legUrl: string): Promise<{ text: string
       /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*Enrolled[^<]*)<\/a>/i, // Many states use "Enrolled"
       /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*Final[^<]*)<\/a>/i, // Some use "Final"
       /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*Bill Text[^<]*)<\/a>/i, // Generic
+        /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*Legislative[^<]*)<\/a>/i, // "Legislative" (for some states)
+        /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*Bills[^<]*)<\/a>/i, // "Bills" (for some states)
       /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*Act[^<]*)<\/a>/i, // "Act" (for some states)
-      /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*PDF[^<]*)<\/a>/i // fallback: any PDF link
+      /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*[^<]*)<\/a>/i // fallback: any PDF link
     ];
     let match = null;
     for (const regex of pdfRegexes) {
@@ -200,7 +202,13 @@ async function main() {
     const query = lastId ? { _id: { $gt: lastId } } : {};
     // Only process docs with insufficient summary
     const docs = await collection
-      .find({ ...query, geminiSummary: { $regex: 'Summary not available due to insufficient information.' } })
+      .find({
+        ...query,
+        $or: [
+          { geminiSummary: { $regex: 'Summary not available due to insufficient information.' } },
+          { $expr: { $lt: [{ $size: { $split: ['$geminiSummary', ' '] } }, 65] } }
+        ]
+      })
       .sort({ _id: 1 })
       .limit(batchSize)
       .toArray();
