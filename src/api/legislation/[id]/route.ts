@@ -1,4 +1,4 @@
-// src/app/api/legislation/[id]/route.ts
+// src/app/api/legislation/[jurisdictionName]/route.ts
 import { NextResponse } from 'next/server';
 import {
   getLegislationById,
@@ -8,7 +8,7 @@ import {
 import type { Legislation } from '@/types/legislation'; // Corrected path
 
 // Note: GET is used for fetching data, ensure proper authorization in production
-// Handler for GET /api/legislation/[id]
+// Handler for GET /api/legislation/[jurisdictionName]
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -27,7 +27,7 @@ export async function GET(
 }
 
 // Note: PUT is used for legislation, ensure proper validation and authorization in production
-// Handler for PUT /api/legislation/[id] (Edit)
+// Handler for PUT /api/legislation/[jurisdictionName] (Edit)
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
@@ -55,7 +55,7 @@ export async function POST(
 }
 
 // Note: DELETE is a destructive operation, ensure proper authorization and checks in production
-// Handler for DELETE /api/legislation/[id]
+// Handler for DELETE /api/legislation/[jurisdictionName]
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }

@@ -28,6 +28,8 @@ interface PolicyUpdate {
   latestActionDescription?: string;
   sources?: { url: string; note?: string | null }[];
   sponsors?: { name: string }[];
+  lastActionAt?: string | null;
+  identifier?: string;
 }
 
 // Classification tags (no descriptions)
@@ -240,6 +242,7 @@ export function PolicyUpdatesFeed() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
           {filteredUpdates.map((update, idx) => {
+            // console.log(update.id)
             const date = update.createdAt ? new Date(update.createdAt) : null;
             const formattedDate = date
               ? (typeof window !== 'undefined'
@@ -251,104 +254,106 @@ export function PolicyUpdatesFeed() {
             // Ensure unique key: fallback to idx only if update.id is missing or duplicated
             const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
             // Find last action date (if available)
-            const lastActionDate = update.latestActionDate ? new Date(update.latestActionDate) : null;
+            const lastActionDate = update.lastActionAt ? new Date(update.lastActionAt) : null;
             const formattedLastActionDate = lastActionDate
               ? (typeof window !== 'undefined'
                   ? lastActionDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
                   : lastActionDate.toISOString().slice(0, 10))
               : null;
             return (
-              <Link
-                key={uniqueKey}
-                href={`/legislation/${update.id}`}
-                className="block mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full"
-                style={{ textDecoration: 'none', color: 'inherit' }}
-                tabIndex={0}
-              >
-                <div className="flex flex-col h-full">
-                  <div>
-                    <div className="font-bold text-lg mb-1 text-left">{update.title}</div>
-                    <div className="text-sm text-muted-foreground mb-1 text-left">
-                      {update.jurisdictionName} • {update.session} {formattedDate && <>• {formattedDate}</>}
-                    </div>
-                    {update.classification && update.classification.length > 0 && (
-                      <div className="mb-1">
-                        {update.classification.map((c, i) => (
-                          <Badge
-                            key={c + i}
-                            variant={classification === c.toLowerCase() ? "default" : "secondary"}
-                            onClick={e => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setClassification(c.toLowerCase());
-                            }}
-                            className="mr-1 cursor-pointer"
-                          >
-                            {capitalize(c)}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {update.subjects && update.subjects.length > 0 && (
-                      <div className="mb-1">
-                        {update.subjects.map((s, i) => (
-                          <Badge
-                            key={s + i}
-                            variant={subject === s ? "default" : "outline"}
-                            onClick={e => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setSubject(subject === s ? "" : s);
-                            }}
-                            className="mr-1 cursor-pointer"
-                          >
-                            #{capitalize(s)}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {update.sponsors && update.sponsors.length > 0 && (
-                      <div className="mb-1 text-xs text-muted-foreground">
-                        <span className="font-semibold">Sponsors: </span>
-                        {update.sponsors.map((sp: any, i: number) => (
-                          <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < update.sponsors.length - 1 ? ', ' : ''}</span>
-                        ))}
-                      </div>
-                    )}
-                    {update.latestActionDescription && (
+                <Link
+                  key={uniqueKey}
+                  // href={`/legislation/${update.jurisdictionName}/${update.session}/${update.identifier}`}
+                  href={`/legislation/${update.id}`}
+                  className="block mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full"
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                  tabIndex={0}
+                >
+                  <div className="flex flex-col h-full">
+                    <div>
+                      <div className="font-bold text-lg mb-1 text-left">{update.title}</div>
                       <div className="text-sm text-muted-foreground mb-1 text-left">
-                        <span className="font-semibold">Last Action: </span>{update.latestActionDescription}
-                        {formattedLastActionDate && (
-                          <span className="ml-2">({formattedLastActionDate})</span>
-                        )}
+                        {update.jurisdictionName} • {update.session} {formattedDate && <>• {formattedDate}</>}
                       </div>
-                    )}
-                    {formattedDate && (
-                      <div className="text-xs text-muted-foreground mb-1">
-                        <span className="font-semibold">Date: </span>{formattedDate}
-                      </div>
-                    )}
-                    {update.geminiSummary && (
-                      <div className="mt-2 text-sm text-left">{update.geminiSummary}</div>
-                    )}
-                    {!update.geminiSummary && update.summary && (
-                      <div className="mt-2 text-sm text-left">{update.summary}</div>
-                    )}
+                      {update.classification && update.classification.length > 0 && (
+                        <div className="mb-1">
+                          {update.classification.map((c, i) => (
+                            <Badge
+                              key={c + i}
+                              variant={classification === c.toLowerCase() ? "default" : "secondary"}
+                              onClick={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setClassification(c.toLowerCase());
+                              }}
+                              className="mr-1 cursor-pointer"
+                            >
+                              {capitalize(c)}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {update.subjects && update.subjects.length > 0 && (
+                        <div className="mb-1">
+                          {update.subjects.map((s, i) => (
+                            <Badge
+                              key={s + i}
+                              variant={subject === s ? "default" : "outline"}
+                              onClick={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSubject(subject === s ? "" : s);
+                              }}
+                              className="mr-1 cursor-pointer"
+                            >
+                              #{capitalize(s)}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {update.latestActionDescription && (
+                        <div className="text-sm text-muted-foreground mb-1 text-left">
+                          <span className="font-semibold">Last Action: </span>{update.latestActionDescription}
+                          {formattedLastActionDate && (
+                            <span className="ml-2">({formattedLastActionDate})</span>
+                          )}
+                        </div>
+                      )}
+                      {formattedDate && (
+                        <div className="text-sm text-muted-foreground mb-1">
+                          <span className="font-semibold">Date: </span>{formattedDate}
+                        </div>
+                      )}
+                      {update.sponsors && update.sponsors.length > 0 && (
+                          <div className="mb-1 text-xs text-muted-foreground">
+                            <span className="font-semibold">Sponsors: </span>
+                            {update.sponsors.map((sp: any, i: number) => (
+                                <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < update.sponsors.length - 1 ? ', ' : ''}</span>
+                            ))}
+                          </div>
+                      )}
+                      {update.geminiSummary && (
+                        <div className="mt-2 text-sm text-left">{update.geminiSummary}</div>
+                      )}
+                      {!update.geminiSummary && update.summary && (
+                        <div className="mt-2 text-sm text-left">{update.summary}</div>
+                      )}
+                    </div>
+                    <div className="mt-auto pt-4 flex justify-start">
+                      <button
+                        type="button"
+                        className="px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.open(stateUrl, '_blank', 'noopener');
+                        }}
+                      >
+                        {update.sources && update.sources.length > 0 ? 'Official State Link' : 'OpenStates Link'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-auto pt-4 flex justify-start">
-                    <button
-                      type="button"
-                      className="px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      onClick={e => {
-                        e.stopPropagation();
-                        window.open(stateUrl, '_blank', 'noopener');
-                      }}
-                    >
-                      {update.sources && update.sources.length > 0 ? 'Official State Link' : 'OpenStates Link'}
-                    </button>
-                  </div>
-                </div>
-              </Link>
+                </Link>
             );
           })}
         </div>

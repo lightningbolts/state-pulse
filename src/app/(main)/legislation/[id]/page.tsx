@@ -16,7 +16,7 @@ const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['hi
       </h3>
       <ul className="list-none p-0 space-y-3">
         {historyEvents.map((event, index) => (
-          <li key={index} className="border-l-2 border-primary pl-4 py-2 bg-card rounded-md shadow-sm hover:shadow-md transition-shadow">
+          <li key={index} className="border-l-2 border-primary pl-0 py-0 bg-card rounded-md shadow-sm hover:shadow-md transition-shadow">
             <p className="font-medium text-primary-foreground bg-primary px-3 py-1.5 rounded-t-md text-sm flex justify-between items-center">
               <span>{event.date ? event.date.toLocaleDateString() : 'Date N/A'}</span>
               <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
@@ -34,6 +34,7 @@ const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['hi
 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const id = params.id;
+  console.log(params, "Params in LegislationDetailPage");
   const legislation = await getLegislationById(id);
 
   if (!legislation) {
@@ -73,14 +74,14 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     firstActionAt,
     latestActionAt,
     latestActionDescription,
-    aiSummary,
+    geminiSummary,
     tags,
   } = legislation;
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
       <Card className="w-full max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-primary to-primary-focus text-primary-foreground p-6">
+        <CardHeader className="bg-gray-700 text-primary-foreground p-6">
           <CardTitle className="text-3xl font-bold tracking-tight">{identifier}: {title}</CardTitle>
           <CardDescription className="text-primary-foreground/80 text-sm mt-1">
             {session} - {jurisdictionName} {chamber && `(${chamber})`}
@@ -92,11 +93,11 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
               <h3 className="text-lg font-semibold text-foreground flex items-center">
                 <Info className="mr-2 h-5 w-5 text-primary" /> Key Details
               </h3>
-              {statusText && <p><Badge variant="secondary" className="text-sm">{statusText}</Badge></p>}
+              {statusText && <div><Badge variant="secondary" className="text-sm">{statusText}</Badge></div>}
               {classification && classification.length > 0 && (
-                <p className="text-sm text-muted-foreground">
+                <div className="text-sm text-muted-foreground">
                   Type: {classification.map(c => <Badge key={c} variant="outline" className="mr-1">{c}</Badge>)}
-                </p>
+                </div>
               )}
               {firstActionAt && (
                 <p className="text-sm text-muted-foreground flex items-center">
@@ -168,32 +169,10 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </div>
           )}
 
-          {aiSummary && (
+          {geminiSummary && (
             <div className="mt-6 p-4 border border-primary/30 rounded-lg bg-primary/5">
-              <h3 className="text-xl font-semibold text-primary mb-3">AI Generated Summaries</h3>
-              {aiSummary.short && (
-                <div className="mb-2">
-                  <h4 className="font-semibold text-foreground">Short Summary (Tweet-length):</h4>
-                  <p className="text-sm text-muted-foreground italic">{aiSummary.short}</p>
-                </div>
-              )}
-              {aiSummary.medium && (
-                <div className="mb-2">
-                  <h4 className="font-semibold text-foreground">Medium Summary:</h4>
-                  <p className="text-sm text-muted-foreground">{aiSummary.medium}</p>
-                </div>
-              )}
-              {aiSummary.long && (
-                <div className="mb-2">
-                  <h4 className="font-semibold text-foreground">Detailed Summary (Legal Analysis):</h4>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiSummary.long}</p>
-                </div>
-              )}
-              {aiSummary.lastGeneratedAt && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Last generated: {aiSummary.lastGeneratedAt.toLocaleString()}
-                </p>
-              )}
+              <h3 className="text-xl font-semibold text-primary mb-3">AI Generated Summary</h3>
+              <p className="text-sm text-muted-foreground italic">{geminiSummary}</p>
             </div>
           )}
 
