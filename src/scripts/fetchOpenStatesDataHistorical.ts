@@ -4,7 +4,8 @@ import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl } from '../lib/geminiSummaryUtil';
+import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/geminiSummaryUtil';
+import { getCollection } from '../lib/mongodb';
 
 config();
 
@@ -367,93 +368,58 @@ async function fetchAndStoreBillsForSessionPage(
 }
 
 /**
- * Main function to fetch and process bill data
+ * Updates Gemini summaries for documents with insufficient or missing summaries
  */
-async function main() {
-  if (!OPENSTATES_API_KEY) {
-    console.error('OPENSTATES_API_KEY is not set in the environment variables.');
-    process.exit(1);
+async function updateInsufficientGeminiSummaries() {
+  const collection = await getCollection('legislation');
+  const batchSize = 50;
+  let lastId = undefined;
+  let count = 0;
+  let insufficientCount = 0;
+
+  async function generateSummary(text: string): Promise<string> {
+    const { ai } = await import('../ai/genkit');
+    const prompt = `Summarize the following legislation in about 100 words, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.'\n\n${text}`;
+    const response = await ai.generate({ prompt });
+    return response.text.trim();
   }
 
-  const minYear = 2024;
-  console.log(`--- Starting historical data import for sessions from ${minYear} and later ---`);
-  console.log(`Fetching data for sessions active since ${minYear}`);
-
-  for (const state of STATE_OCD_IDS) {
-    console.log(`\n--- Processing State: ${state.abbr} (${state.ocdId}) ---`);
-    const sessions = await fetchSessionsForJurisdiction(state.ocdId);
-    await delay(500);
-
-    const relevantSessions = sessions.filter(s => {
-      // Use start_date or end_date to determine if session is from minYear or later
-      const startYear = s.start_date ? new Date(s.start_date).getFullYear() : 0;
-      const endYear = s.end_date ? new Date(s.end_date).getFullYear() : 0;
-      return startYear >= minYear || endYear >= minYear;
-    });
-
-    if (relevantSessions.length > 0) {
-      console.log(
-        `Found ${relevantSessions.length} relevant session(s) for ${state.abbr}: ${relevantSessions
-          .map(s => `${s.name} (${s.identifier})`)
-          .join(', ')}`
-      );
-      for (const session of relevantSessions) {
-        const sessionIdentifier = session.identifier;
-        const sessionName = session.name;
-
-        let currentPage = 1; // page 33 for AL 2024 session
-        const perPage = 20;
-        let hasMorePages = true;
-
-        while (hasMorePages) {
-          const pagination = await fetchAndStoreBillsForSessionPage(
-            state.ocdId,
-            state.abbr,
-            sessionIdentifier,
-            sessionName,
-            currentPage,
-            perPage
-          );
-
-          if (pagination && pagination.page < pagination.max_page) {
-            currentPage++;
-            await delay(1000);
-          } else {
-            hasMorePages = false;
-          }
-        }
-        await delay(2000);
+  while (true) {
+    const query = lastId ? { _id: { $gt: lastId } } : {};
+    // Only process docs with insufficient summary
+    const docs = await collection
+      .find({
+        ...query,
+        $or: [
+          { geminiSummary: { $regex: 'Summary not available due to insufficient information.' } },
+          { $expr: { $lt: [{ $size: { $split: ['$geminiSummary', ' '] } }, 65] } }
+        ]
+      })
+      .sort({ _id: 1 })
+      .limit(batchSize)
+      .toArray();
+    if (docs.length === 0) break;
+    for (const doc of docs) {
+      const { text, debug } = extractBestTextForSummary(doc);
+      if (!text || text.length < 50) {
+        console.warn(`[GeminiSummary] Skipping doc ${doc._id} due to insufficient extracted text. Debug:`, debug);
+        lastId = doc._id;
+        continue;
       }
-    } else {
-      console.log(
-        `No relevant recent sessions found for ${state.abbr} since ${minYear}.`
-      );
+      try {
+        const summary = await generateGeminiSummary(text);
+        await collection.updateOne(
+          { _id: doc._id },
+          { $set: { geminiSummary: summary, geminiSummaryDebug: debug } }
+        );
+        count++;
+        if (summary.includes('Summary not available')) insufficientCount++;
+        console.log(`Updated legislation ${doc._id} | Debug:`, debug);
+      } catch (err) {
+        console.error(`Failed to summarize ${doc._id}:`, err, debug);
+      }
+      lastId = doc._id;
     }
   }
-  console.log('\n--- Historical data import process finished ---');
-}
-
-main().catch(err => {
-  console.error('Unhandled error in main execution:', err);
-  process.exit(1);
-});
-
-/**
- * Test function for legislation collection
- */
-export async function testLegislationCollectionScript(): Promise<void> {
-  try {
-    const { getCollection } = await import('../lib/mongodb');
-    const collection = await getCollection('legislation');
-    const count = await collection.countDocuments();
-    console.log(`[Script] Legislation collection has ${count} documents.`);
-    const oneDoc = await collection.findOne();
-    if (oneDoc) {
-      console.log('[Script] Sample document:', oneDoc);
-    } else {
-      console.log('[Script] No documents found in legislation collection.');
-    }
-  } catch (error) {
-    console.error('[Script] Failed to connect to legislation collection:', error);
-  }
+  console.log(`\n--- Gemini summary update complete. Updated: ${count}, Insufficient: ${insufficientCount} ---`);
 }

@@ -5,7 +5,7 @@ import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl } from '../lib/geminiSummaryUtil';
+import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/geminiSummaryUtil';
 
 config({ path: '../../.env' });
 
@@ -167,13 +167,6 @@ function getUpdatedSinceString(minutesAgo: number): string {
   return updatedSinceDate.toISOString(); // Use full ISO for more precise legislation
 }
 
-// Generate Gemini summary
-async function generateGeminiSummary(text: string): Promise<string> {
-  const prompt = `Summarize the following legislation in about 100 words, focusing on the main points and specific impact.\n\n${text}`;
-  const response = await ai.generate({ prompt });
-  return response.text.trim();
-}
-
 async function fetchAndStoreUpdatedBills(
   ocdId: string,
   jurisdictionAbbr: string,
@@ -203,13 +196,14 @@ async function fetchAndStoreUpdatedBills(
           try {
             const legislationData = transformOpenStatesBill(osBill, jurisdictionAbbr);
             legislationData.id = displayOpenStatesId(osBill.id);
-            // --- Scrape full text and generate Gemini summary using util ---
+            // --- Scrape full text and generate Gemini summary using robust extraction logic ---
             let fullText = '';
             if (osBill.sources && osBill.sources.length > 0) {
               // Use the first non-PDF source as the state legislature page
               const stateSource = osBill.sources.find((s:any) => s.url && !s.url.endsWith('.pdf'));
               const stateLegUrl = stateSource ? stateSource.url : osBill.sources[0].url;
               legislationData.stateLegislatureUrl = stateLegUrl;
+              // Use robust extraction logic (PDF or HTML fallback)
               fullText = (await fetchPdfTextFromOpenStatesUrl(stateLegUrl)) || legislationData.title || '';
             } else {
               fullText = legislationData.title || '';
