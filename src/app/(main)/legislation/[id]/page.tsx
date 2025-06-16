@@ -5,6 +5,7 @@ import { ExternalLink, CalendarDays, Users, FileText, Tag, Info, ListChecks } fr
 import Link from 'next/link';
 
 // Placeholder for a more sophisticated timeline component
+// This component displays the history of legislation events in a timeline format.
 const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['history'] }) => {
   if (!historyEvents || historyEvents.length === 0) {
     return <p className="text-muted-foreground">No history events available for this legislation.</p>;

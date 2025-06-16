@@ -90,10 +90,11 @@ export async function fetchPdfTextFromOpenStatesUrl(openstatesUrl: string): Prom
           }
         } catch (e) {
           console.warn('[Bill Text Extraction] Failed to fetch or parse <iframe>:', e);
+        }
+      }
     }
   } catch (e) {
     console.error('Failed to fetch or parse PDF or bill text from OpenStates page:', e);
   }
   return null;
 }
-

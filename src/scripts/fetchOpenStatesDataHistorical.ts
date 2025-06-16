@@ -1,5 +1,10 @@
 import { upsertLegislation } from '@/services/legislationService';
 import { config } from 'dotenv';
+import { ai } from '../ai/genkit';
+import fetch from 'node-fetch';
+import pdf from 'pdf-parse';
+import * as cheerio from 'cheerio';
+import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl } from '../lib/geminiSummaryUtil';
 
 config();
 
@@ -102,6 +107,20 @@ function toMongoDate(
   return null;
 }
 
+// Utility to convert OpenStates IDs to display format
+function displayOpenStatesId(id: string): string {
+  // Replace the first dash with an underscore, and remove 'ocd-bill/' prefix
+  if (id.startsWith('ocd-bill/')) {
+    const rest = id.replace('ocd-bill/', '');
+    const idx = rest.indexOf('-');
+    if (idx !== -1) {
+      return 'ocd-bill_' + rest.slice(idx + 1);
+    }
+    return 'ocd-bill_' + rest;
+  }
+  return id;
+}
+
 /**
  * Transforms an OpenStates bill to a MongoDB-compatible document
  */
@@ -195,7 +214,7 @@ export function transformOpenStatesBillToMongoDB(osBill: any): any {
   const now = new Date();
 
   return {
-    id: osBill.id,
+    id: displayOpenStatesId(osBill.id),
     identifier: osBill.identifier,
     title: osBill.title,
     session: osBill.session,
@@ -315,6 +334,16 @@ async function fetchAndStoreBillsForSessionPage(
     for (const osBill of bills) {
       try {
         const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
+        // --- Scrape full text and generate Gemini summary using util ---
+        let fullText = '';
+        const openstatesUrl = legislationToStore.openstatesUrl || (legislationToStore.sources && legislationToStore.sources[0]?.url);
+        if (openstatesUrl) {
+          fullText = (await fetchPdfTextFromOpenStatesUrl(openstatesUrl)) || legislationToStore.title || '';
+        } else {
+          fullText = legislationToStore.title || '';
+        }
+        legislationToStore.fullText = fullText;
+        legislationToStore.geminiSummary = fullText ? await generateGeminiSummary(fullText) : null;
         await upsertLegislation(legislationToStore);
       } catch (error) {
         console.error(
@@ -369,7 +398,7 @@ async function main() {
         const sessionIdentifier = session.identifier;
         const sessionName = session.name;
 
-        let currentPage = 32;
+        let currentPage = 1;
         const perPage = 20;
         let hasMorePages = true;
 

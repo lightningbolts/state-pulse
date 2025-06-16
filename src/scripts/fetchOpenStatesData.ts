@@ -1,6 +1,11 @@
 import { upsertLegislationBySourceId } from '../services/legislationService';
 import type { Legislation, LegislationHistoryEvent, LegislationSponsor } from '../types/legislation';
 import { config } from 'dotenv';
+import { ai } from '../ai/genkit';
+import fetch from 'node-fetch';
+import pdf from 'pdf-parse';
+import * as cheerio from 'cheerio';
+import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl } from '../lib/geminiSummaryUtil';
 
 config({ path: '../../.env' });
 
@@ -64,16 +69,22 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Utility to convert OpenStates IDs to display format
+function displayOpenStatesId(id: string): string {
+  if (id.startsWith('ocd-bill/')) {
+    const rest = id.replace('ocd-bill/', '');
+    const idx = rest.indexOf('-');
+    if (idx !== -1) {
+      return 'ocd-bill_' + rest.slice(idx + 1);
+    }
+    return 'ocd-bill_' + rest;
+  }
+  return id;
+}
+
 // Helper to transform OpenStates bill data to our Legislation type
 // This function remains largely the same, ensure sourceId is correctly populated
-function transformOpenStatesBill(osBill: any, jurisdictionAbbr: string): Omit<Legislation, 'id' | 'lastActionDate' | 'introductionDate' | 'history' | 'effectiveDate' | 'versions'> & {
-  sourceId: string; // Ensure sourceId is part of the return type and non-optional for the data passed to upsert
-  introductionDate?: Date;
-  lastActionDate?: Date;
-  effectiveDate?: Date; 
-  history?: Array<Omit<LegislationHistoryEvent, 'date'> & { date: Date }>;
-  versions?: Array<{ date: Date; url: string; name: string }>;
-} {
+function transformOpenStatesBill(osBill: any, jurisdictionAbbr: string): any {
   const sponsors: LegislationSponsor[] = osBill.sponsorships?.map((sp: any) => ({
     name: sp.name,
     id: sp.person_id || null,
@@ -156,6 +167,13 @@ function getUpdatedSinceString(minutesAgo: number): string {
   return updatedSinceDate.toISOString(); // Use full ISO for more precise legislation
 }
 
+// Generate Gemini summary
+async function generateGeminiSummary(text: string): Promise<string> {
+  const prompt = `Summarize the following legislation in about 100 words, focusing on the main points and specific impact.\n\n${text}`;
+  const response = await ai.generate({ prompt });
+  return response.text.trim();
+}
+
 async function fetchAndStoreUpdatedBills(
   ocdId: string,
   jurisdictionAbbr: string,
@@ -184,6 +202,18 @@ async function fetchAndStoreUpdatedBills(
         for (const osBill of data.results) {
           try {
             const legislationData = transformOpenStatesBill(osBill, jurisdictionAbbr);
+            legislationData.id = displayOpenStatesId(osBill.id);
+            // --- Scrape full text and generate Gemini summary using util ---
+            let fullText = '';
+            if (osBill.sources && osBill.sources.length > 0) {
+              const openstatesUrl = osBill.sources[0].url;
+              legislationData.openstatesUrl = openstatesUrl;
+              fullText = (await fetchPdfTextFromOpenStatesUrl(openstatesUrl)) || legislationData.title || '';
+            } else {
+              fullText = legislationData.title || '';
+            }
+            legislationData.fullText = fullText;
+            legislationData.geminiSummary = fullText ? await generateGeminiSummary(fullText) : null;
             await upsertLegislationBySourceId(legislationData);
             console.log(`Upserted: ${legislationData.billNumber} (${jurisdictionAbbr}) - OS ID: ${legislationData.sourceId}`);
             billsProcessed++;
