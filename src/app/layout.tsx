@@ -6,6 +6,8 @@ import { Analytics } from "@vercel/analytics/next"
 import { ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Button } from "@/components/ui/button";
+import { UserSyncComponent } from '@/components/auth/UserSyncComponent';
+
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -36,6 +38,10 @@ export default function RootLayout({
           <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
         </head>
         <body className={`${geistSans.variable} ${geistMono.variable} font-body antialiased min-h-screen w-full`}>
+          <SignedIn>
+            {/* This component will run when a user is signed in and sync their data with MongoDB */}
+            <UserSyncComponent />
+          </SignedIn>
           {children}
           <Toaster />
           <SpeedInsights />
