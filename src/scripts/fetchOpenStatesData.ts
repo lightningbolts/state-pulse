@@ -206,9 +206,11 @@ async function fetchAndStoreUpdatedBills(
             // --- Scrape full text and generate Gemini summary using util ---
             let fullText = '';
             if (osBill.sources && osBill.sources.length > 0) {
-              const openstatesUrl = osBill.sources[0].url;
-              legislationData.openstatesUrl = openstatesUrl;
-              fullText = (await fetchPdfTextFromOpenStatesUrl(openstatesUrl)) || legislationData.title || '';
+              // Use the first non-PDF source as the state legislature page
+              const stateSource = osBill.sources.find((s:any) => s.url && !s.url.endsWith('.pdf'));
+              const stateLegUrl = stateSource ? stateSource.url : osBill.sources[0].url;
+              legislationData.stateLegislatureUrl = stateLegUrl;
+              fullText = (await fetchPdfTextFromOpenStatesUrl(stateLegUrl)) || legislationData.title || '';
             } else {
               fullText = legislationData.title || '';
             }

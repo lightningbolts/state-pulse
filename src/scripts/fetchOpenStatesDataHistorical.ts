@@ -24,55 +24,55 @@ interface OpenStatesApiBillListResponse {
 
 // State IDs for fetching data
 const STATE_OCD_IDS: { ocdId: string; abbr: string }[] = [
-  // { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:az/government', abbr: 'AZ' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ar/government', abbr: 'AR' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'CO' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ct/government', abbr: 'CT' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:fl/government', abbr: 'FL' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:id/government', abbr: 'ID' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:in/government', abbr: 'IN' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ky/government', abbr: 'KY' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:la/government', abbr: 'LA' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:md/government', abbr: 'MD' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:mm/government', abbr: 'MI'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ms/government', abbr: 'MS' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:mo/government', abbr: 'MO' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:mt/government', abbr: 'MT' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:nv/government', abbr: 'NV' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:nm/government', abbr: 'NM' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:nd/government', abbr: 'ND' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:oh/government', abbr: 'OH' },
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ok/government', abbr: 'OK'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:pa/government', abbr: 'PA'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ri/government', abbr: 'RI'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:sc/government', abbr: 'SC'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:sd/government', abbr: 'SD'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:tn/government', abbr: 'TN'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ut/government', abbr: 'UT'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:vt/government', abbr: 'VT'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:va/government', abbr: 'VA'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:wa/government', abbr: 'WA'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:wv/government', abbr: 'WV'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:wi/government', abbr: 'WI'},
-  // { ocdId: 'ocd-jurisdiction/country:us/state:wy/government', abbr: 'WY'}
+  { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:az/government', abbr: 'AZ' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ar/government', abbr: 'AR' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'CO' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ct/government', abbr: 'CT' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:fl/government', abbr: 'FL' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:id/government', abbr: 'ID' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:in/government', abbr: 'IN' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ky/government', abbr: 'KY' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:la/government', abbr: 'LA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:md/government', abbr: 'MD' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:mm/government', abbr: 'MI'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ms/government', abbr: 'MS' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:mo/government', abbr: 'MO' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:mt/government', abbr: 'MT' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nv/government', abbr: 'NV' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nm/government', abbr: 'NM' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:nd/government', abbr: 'ND' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:oh/government', abbr: 'OH' },
+  { ocdId: 'ocd-jurisdiction/country:us/state:ok/government', abbr: 'OK'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:pa/government', abbr: 'PA'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:ri/government', abbr: 'RI'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:sc/government', abbr: 'SC'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:sd/government', abbr: 'SD'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:tn/government', abbr: 'TN'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:ut/government', abbr: 'UT'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:vt/government', abbr: 'VT'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:va/government', abbr: 'VA'},
+  // { ocdId: 'ocd-jurisdiction/country:us/state:wa/government', abbr: 'WA'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:wv/government', abbr: 'WV'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:wi/government', abbr: 'WI'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:wy/government', abbr: 'WY'}
 ];
 
 function delay(ms: number): Promise<void> {
@@ -336,9 +336,12 @@ async function fetchAndStoreBillsForSessionPage(
         const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
         // --- Scrape full text and generate Gemini summary using util ---
         let fullText = '';
-        const openstatesUrl = legislationToStore.openstatesUrl || (legislationToStore.sources && legislationToStore.sources[0]?.url);
-        if (openstatesUrl) {
-          fullText = (await fetchPdfTextFromOpenStatesUrl(openstatesUrl)) || legislationToStore.title || '';
+        if (osBill.sources && osBill.sources.length > 0) {
+          // Use the first non-PDF source as the state legislature page
+          const stateSource = osBill.sources.find((s:any) => s.url && !s.url.endsWith('.pdf'));
+          const stateLegUrl = stateSource ? stateSource.url : osBill.sources[0].url;
+          legislationToStore.stateLegislatureUrl = stateLegUrl;
+          fullText = (await fetchPdfTextFromOpenStatesUrl(stateLegUrl)) || legislationToStore.title || '';
         } else {
           fullText = legislationToStore.title || '';
         }
@@ -382,10 +385,10 @@ async function main() {
     await delay(500);
 
     const relevantSessions = sessions.filter(s => {
-      const sessionIdentifierStr = s.identifier;
-      const sessionYearMatch = sessionIdentifierStr.match(/\b(20[1-9][0-9])\b/);
-      const sessionYear = sessionYearMatch ? parseInt(sessionYearMatch[1], 10) : 0;
-      return sessionYear >= minYear;
+      // Use start_date or end_date to determine if session is from minYear or later
+      const startYear = s.start_date ? new Date(s.start_date).getFullYear() : 0;
+      const endYear = s.end_date ? new Date(s.end_date).getFullYear() : 0;
+      return startYear >= minYear || endYear >= minYear;
     });
 
     if (relevantSessions.length > 0) {
