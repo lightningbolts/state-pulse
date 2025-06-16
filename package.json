@@ -64,6 +64,7 @@
     "react-hook-form": "^7.54.2",
     "react-leaflet": "^4.2.1",
     "recharts": "^2.15.1",
+    "svix": "^1.67.0",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "vitest": "^3.2.2",
