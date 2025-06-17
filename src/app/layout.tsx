@@ -7,6 +7,7 @@ import { ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserBut
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Button } from "@/components/ui/button";
 import { UserSyncComponent } from '@/components/auth/UserSyncComponent';
+import { ThemeProvider } from '@/components/theme/theme-provider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -38,14 +39,21 @@ export default function RootLayout({
           <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
         </head>
         <body className={`${geistSans.variable} ${geistMono.variable} font-body antialiased min-h-screen w-full`}>
-          <SignedIn>
-            {/* This component will run when a user is signed in and sync their data with MongoDB */}
-            <UserSyncComponent />
-          </SignedIn>
-          {children}
-          <Toaster />
-          <SpeedInsights />
-          <Analytics />
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <SignedIn>
+              {/* This component will run when a user is signed in and sync their data with MongoDB */}
+              <UserSyncComponent />
+            </SignedIn>
+            {children}
+            <Toaster />
+            <SpeedInsights />
+            <Analytics />
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

@@ -2,6 +2,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Gavel } from "lucide-react";
 import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export function StatePulseHeader() {
   return (
@@ -15,6 +16,7 @@ export function StatePulseHeader() {
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <SignedOut>
           <div className="flex items-center gap-2 h-10">
             <SignInButton mode="modal">
