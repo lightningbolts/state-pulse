@@ -53,6 +53,9 @@
             if (searchParams.get('session')) {
               filter.session = searchParams.get('session');
             }
+            if (searchParams.get('identifier')) {
+              filter.identifier = searchParams.get('identifier');
+            }
             if (searchParams.get('jurisdiction')) {
               filter.jurisdictionId = searchParams.get('jurisdiction');
             }

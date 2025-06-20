@@ -263,7 +263,7 @@
                             >
                               <div className="flex flex-col h-full">
                                 <div>
-                                  <div className="font-bold text-lg mb-1 text-left">{update.title}</div>
+                                  <div className="font-bold text-lg mb-1 text-left">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
                                   <div className="text-sm text-muted-foreground mb-1 text-left">
                                     {update.jurisdictionName} • {update.session} {formattedDate && <>• {formattedDate}</>}
                                   </div>
