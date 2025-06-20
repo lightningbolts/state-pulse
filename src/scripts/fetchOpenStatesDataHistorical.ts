@@ -423,3 +423,4 @@ async function updateInsufficientGeminiSummaries() {
   }
   console.log(`\n--- Gemini summary update complete. Updated: ${count}, Insufficient: ${insufficientCount} ---`);
 }
+
