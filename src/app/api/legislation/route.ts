@@ -42,6 +42,7 @@
               filter.$or = [
                 { title: { $regex: searchValue, $options: 'i' } },
                 { summary: { $regex: searchValue, $options: 'i' } },
+                { identifier: { $regex: searchValue, $options: 'i' } },
                 { classification: searchValue },
                 { classification: { $regex: searchValue, $options: 'i' } },
                 { subjects: searchValue },
