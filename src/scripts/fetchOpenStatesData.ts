@@ -1,5 +1,4 @@
-import { upsertLegislationBySourceId } from '../services/legislationService';
-import type { Legislation, LegislationHistoryEvent, LegislationSponsor } from '../types/legislation';
+import { upsertLegislation } from '../services/legislationService';
 import { config } from 'dotenv';
 import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
@@ -50,18 +49,18 @@ const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   { ocdId: 'ocd-jurisdiction/country:us/state:ok/government', abbr: 'OK'},
   { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR'},
   { ocdId: 'ocd-jurisdiction/country:us/state:pa/government', abbr: 'PA'},
-  { ocdId: 'ocd-jurisdiction/country:us/state-ri/government', abbr: 'RI'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-sc/government', abbr: 'SC'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-sd/government', abbr: 'SD'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-tn/government', abbr: 'TN'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-tx/government', abbr: 'TX'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-ut/government', abbr: 'UT'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-vt/government', abbr: 'VT'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-va/government', abbr: 'VA'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-wa/government', abbr: 'WA'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-wv/government', abbr: 'WV'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-wi/government', abbr: 'WI'},
-  { ocdId: 'ocd-jurisdiction/country/US/state-wy/government', abbr: 'WY'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:ri/government', abbr: 'RI'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:sc/government', abbr: 'SC'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:sd/government', abbr: 'SD'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:tn/government', abbr: 'TN'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:tx/government', abbr: 'TX'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:ut/government', abbr: 'UT'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:vt/government', abbr: 'VT'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:va/government', abbr: 'VA'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:wa/government', abbr: 'WA'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:wv/government', abbr: 'WV'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:wi/government', abbr: 'WI'},
+  { ocdId: 'ocd-jurisdiction/country/US/state:wy/government', abbr: 'WY'},
 ];
 
 // Helper function to introduce delays (milliseconds)
@@ -69,8 +68,37 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Convert date strings or timestamp objects to JavaScript Date objects
+ */
+function toMongoDate(
+  dateInput: Date | { seconds: number; nanoseconds: number } | string | null | undefined
+): Date | null {
+  if (dateInput === null || typeof dateInput === 'undefined' || dateInput === '') {
+    return null;
+  }
+
+  if (dateInput instanceof Date) {
+    return isNaN(dateInput.getTime()) ? null : dateInput;
+  }
+
+  if (typeof dateInput === 'object' && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
+    // Convert Firebase Timestamp format to Date
+    return new Date(dateInput.seconds * 1000);
+  }
+
+  // Handle string dates
+  if (typeof dateInput === 'string') {
+    const date = new Date(dateInput.split(' ')[0]);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
+}
+
 // Utility to convert OpenStates IDs to display format
 function displayOpenStatesId(id: string): string {
+  // Replace the first dash with an underscore, and remove 'ocd-bill/' prefix
   if (id.startsWith('ocd-bill/')) {
     const rest = id.replace('ocd-bill/', '');
     const idx = rest.indexOf('-');
@@ -82,51 +110,127 @@ function displayOpenStatesId(id: string): string {
   return id;
 }
 
-// Helper to transform OpenStates bill data to our Legislation type
-// This function remains largely the same, ensure sourceId is correctly populated
-function transformOpenStatesBill(osBill: any, jurisdictionAbbr: string): any {
-  const sponsors: LegislationSponsor[] = osBill.sponsorships?.map((sp: any) => ({
-    name: sp.name,
-    id: sp.person_id || null,
-  })) || [];
+/**
+ * Transforms an OpenStates bill to a MongoDB-compatible document
+ */
+export function transformOpenStatesBillToMongoDB(osBill: any): any {
+  // Process sponsors
+  const sponsors = (osBill.sponsorships || []).map((sp: any) => {
+    let sponsorId: string | null = null;
+    let entityType: string | null = sp.entity_type || null;
+    let personId: string | null = null;
+    let organizationId: string | null = null;
 
-  const history: Array<Omit<LegislationHistoryEvent, 'date'> & { date: Date }> = osBill.actions?.map((act: any) => ({
-    date: new Date(act.date.split(' ')[0]), 
-    action: act.description,
-    actor: act.organization_id || 'Unknown', 
-    details: act.classification?.join(', ') || null,
-  })) || [];
+    if (sp.person) {
+      sponsorId = sp.person.id;
+      personId = sp.person.id;
+      if (!entityType) entityType = 'person';
+    } else if (sp.organization) {
+      sponsorId = sp.organization.id;
+      organizationId = sp.organization.id;
+      if (!entityType) entityType = 'organization';
+    }
 
-  const versions: Array<{ date: Date; url: string; name: string }> = osBill.versions?.map((ver: any) => ({
-    date: new Date(ver.date.split(' ')[0]),
-    name: ver.note,
-    url: ver.links?.find((link: any) => link.media_type === 'application/pdf')?.url || ver.links?.[0]?.url || '',
-  })) || [];
+    return {
+      name: sp.name,
+      id: sponsorId,
+      entityType: entityType,
+      primary: sp.primary || false,
+      classification: sp.classification || null,
+      personId: personId,
+      organizationId: organizationId,
+    };
+  });
 
-  let summary = '';
-  if (osBill.abstracts && osBill.abstracts.length > 0) {
-    summary = osBill.abstracts[0].abstract;
+  // Process bill action history
+  const history = (osBill.actions || [])
+    .map((act: any) => {
+      const eventDate = toMongoDate(act.date);
+      if (!eventDate) return null;
+      return {
+        date: eventDate,
+        action: act.description,
+        actor: act.organization.name,
+        classification: Array.isArray(act.classification) ? act.classification : [],
+        order: act.order,
+      };
+    })
+    .filter((h: any): h is NonNullable<typeof h> => h !== null);
+
+  // Process bill versions
+  const versions = (osBill.versions || [])
+    .map((ver: any) => {
+      const versionDate = toMongoDate(ver.date);
+      if (!versionDate) return null;
+      return {
+        note: ver.note,
+        date: versionDate,
+        classification: ver.classification || null,
+        links: (ver.links || []).map((l: any) => ({
+          url: l.url,
+          media_type: l.media_type || null,
+        })),
+      };
+    })
+    .filter((v: any): v is NonNullable<typeof v> => v !== null);
+
+  // Process sources
+  const sources = (osBill.sources || []).map((s: any) => ({
+    url: s.url,
+    note: s.note || null,
+  }));
+
+  // Process abstracts
+  const abstracts = (osBill.abstracts || []).map((a: any) => ({
+    abstract: a.abstract,
+    note: a.note || null,
+  }));
+
+  // Get summary from first abstract if available
+  const summary = abstracts.length > 0 ? abstracts[0].abstract : null;
+
+  // Process extras
+  let processedExtras: Record<string, any> | null = null;
+  if (osBill.extras && Object.keys(osBill.extras).length > 0) {
+    try {
+      processedExtras = JSON.parse(JSON.stringify(osBill.extras));
+    } catch (e) {
+      console.warn(`Could not process extras for bill ${osBill.id}: ${e}`);
+      processedExtras = null;
+    }
   }
 
-  // Crucially, ensure osBill.id is mapped to sourceId
-  const legislationData = {
+  const now = new Date();
+
+  return {
+    id: displayOpenStatesId(osBill.id),
+    identifier: osBill.identifier,
     title: osBill.title,
-    billNumber: osBill.identifier,
-    jurisdiction: jurisdictionAbbr,
-    status: osBill.status?.length > 0 ? osBill.status[0] : (osBill.actions?.[osBill.actions.length -1]?.description || 'Unknown'),
-    summary: summary || null,
-    fullTextUrl: osBill.sources?.find((s:any) => s.url.includes('.html') || s.url.includes('.pdf'))?.url || osBill.sources?.[0]?.url || null,
+    session: osBill.session,
+    jurisdictionId: osBill.jurisdiction.id,
+    jurisdictionName: osBill.jurisdiction.name,
+    chamber:
+      osBill.from_organization?.classification ||
+      osBill.jurisdiction?.classification ||
+      null,
+    classification: Array.isArray(osBill.classification) ? osBill.classification : [],
+    subjects: Array.isArray(osBill.subject) ? osBill.subject : [],
+    statusText: osBill.latest_action_description || null,
     sponsors,
-    introductionDate: osBill.first_action_date ? new Date(osBill.first_action_date.split(' ')[0]) : null,
-    lastActionDate: osBill.latest_action_date ? new Date(osBill.latest_action_date.split(' ')[0]) : null,
     history,
-    tags: osBill.subject || [],
-    sourceId: osBill.id, // This is the OpenStates bill ID, used for deduplication
-    chamber: osBill.from_organization?.classification || null,
-    versions: versions.length > 0 ? versions : null,
+    versions: versions || [],
+    sources: sources || [],
+    abstracts: abstracts || [],
+    openstatesUrl: osBill.openstates_url,
+    firstActionAt: toMongoDate(osBill.first_action_date),
+    latestActionAt: toMongoDate(osBill.latest_action_date),
+    latestActionDescription: osBill.latest_action_description || null,
+    latestPassageAt: toMongoDate(osBill.latest_passage_date),
+    createdAt: toMongoDate(osBill.created_at) || now,
+    updatedAt: toMongoDate(osBill.updated_at) || now,
+    summary: summary,
+    extras: processedExtras,
   };
-   // Type assertion needed if TS can't infer sourceId presence strictly from the object literal
-  return legislationData as ReturnType<typeof transformOpenStatesBill>;
 }
 
 interface OpenStatesSession {
@@ -164,7 +268,7 @@ const UPDATE_INTERVAL_MINUTES = 30;
 function getUpdatedSinceString(minutesAgo: number): string {
   const now = new Date();
   const updatedSinceDate = new Date(now.getTime() - (minutesAgo * 60 * 1000));
-  return updatedSinceDate.toISOString(); // Use full ISO for more precise legislation
+  return updatedSinceDate.toISOString().split('.')[0];
 }
 
 async function fetchAndStoreUpdatedBills(
@@ -174,14 +278,23 @@ async function fetchAndStoreUpdatedBills(
   updatedSince: string
 ) {
   let page = 1;
-  const perPage = 50;
+  const perPage = 20;
   let hasMore = true;
   let billsProcessed = 0;
 
   console.log(`Fetching bills updated since ${updatedSince} for ${jurisdictionAbbr} - Session: ${sessionIdentifier}`);
 
   while (hasMore) {
-    const url = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=${page}&per_page=${perPage}&apikey=${OPENSTATES_API_KEY}&include=sponsorships&include=abstracts&include=versions&include=actions&sort=updated_desc&updated_since=${updatedSince}`;
+    const includes = [
+      'sponsorships',
+      'abstracts',
+      'versions',
+      'actions',
+      'sources',
+    ];
+    const includeParams = includes.map(inc => `include=${inc}`).join('&');
+    const url = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=${page}&per_page=${perPage}&apikey=${OPENSTATES_API_KEY}&${includeParams}&sort=updated_desc&updated_since=${updatedSince}`;
+
     console.log(`Fetching page ${page} from: ${url.replace(OPENSTATES_API_KEY as string, 'REDACTED_KEY')}`);
     try {
       const response = await fetch(url);
@@ -194,24 +307,22 @@ async function fetchAndStoreUpdatedBills(
       if (data.results && data.results.length > 0) {
         for (const osBill of data.results) {
           try {
-            const legislationData = transformOpenStatesBill(osBill, jurisdictionAbbr);
-            legislationData.id = displayOpenStatesId(osBill.id);
-            // --- Scrape full text and generate Gemini summary using robust extraction logic ---
+            const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
+            // --- Scrape full text and generate Gemini summary using util ---
             let fullText = '';
             if (osBill.sources && osBill.sources.length > 0) {
               // Use the first non-PDF source as the state legislature page
               const stateSource = osBill.sources.find((s:any) => s.url && !s.url.endsWith('.pdf'));
               const stateLegUrl = stateSource ? stateSource.url : osBill.sources[0].url;
-              legislationData.stateLegislatureUrl = stateLegUrl;
-              // Use robust extraction logic (PDF or HTML fallback)
-              fullText = (await fetchPdfTextFromOpenStatesUrl(stateLegUrl)) || legislationData.title || '';
+              legislationToStore.stateLegislatureUrl = stateLegUrl;
+              fullText = (await fetchPdfTextFromOpenStatesUrl(stateLegUrl)) || legislationToStore.title || '';
             } else {
-              fullText = legislationData.title || '';
+              fullText = legislationToStore.title || '';
             }
-            legislationData.fullText = fullText;
-            legislationData.geminiSummary = fullText ? await generateGeminiSummary(fullText) : null;
-            await upsertLegislationBySourceId(legislationData);
-            console.log(`Upserted: ${legislationData.billNumber} (${jurisdictionAbbr}) - OS ID: ${legislationData.sourceId}`);
+            legislationToStore.fullText = fullText;
+            legislationToStore.geminiSummary = fullText ? await generateGeminiSummary(fullText) : null;
+            await upsertLegislation(legislationToStore);
+            console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id}`);
             billsProcessed++;
           } catch (transformError) {
             console.error(`Error transforming or upserting bill ${osBill.identifier} (OS ID: ${osBill.id}):`, transformError);
@@ -277,7 +388,7 @@ async function runUpdateCycle() {
     } else {
       console.log(`No sessions found for ${state.abbr}. Skipping.`);
     }
-    await delay(5000);
+    await delay(6000);
   }
   console.log("\n--- Finished processing all states for legislation. ---");
   console.log("--- This script is designed for frequent legislation (e.g., every 30 minutes). ---");
