@@ -89,12 +89,12 @@
             const legislationCollection = (await import('@/lib/mongodb')).getCollection ? await (await import('@/lib/mongodb')).getCollection('legislation') : null;
             if (legislationCollection) {
               const sample = await (await legislationCollection).findOne(filter);
-              console.log('[API] Sample matching document:', sample);
+              // console.log('[API] Sample matching document:', sample);
             }
             // Debug: log a sample document from the collection with no filter
             if (legislationCollection) {
               const sampleAny = await (await legislationCollection).findOne();
-              console.log('[API] Sample ANY document:', sampleAny);
+              // console.log('[API] Sample ANY document:', sampleAny);
             }
 
             // Get legislation with the constructed parameters

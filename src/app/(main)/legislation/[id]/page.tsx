@@ -35,7 +35,7 @@ const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['hi
 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const id = params.id;
-  console.log(params, "Params in LegislationDetailPage");
+  // console.log(params, "Params in LegislationDetailPage");
   const legislation = await getLegislationById(id);
 
   if (!legislation) {

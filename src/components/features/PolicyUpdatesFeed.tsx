@@ -4,7 +4,7 @@
             import { Input } from "@/components/ui/input";
             import { Button } from "@/components/ui/button";
             import { Bookmark, Search } from "lucide-react";
-            import React, { useEffect, useState, useRef, useCallback } from "react";
+            import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
             import {
               DropdownMenu,
               DropdownMenuTrigger,
@@ -45,6 +45,7 @@
 
             let cardNumber = 20;
 
+            // Fetch updates with optional filters and sorting
             async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc", classification = "" }: { skip?: number; limit?: number; search?: string; subject?: string; sortField?: string; sortDir?: string; classification?: string }) {
               const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
               if (search) params.append("search", search);
@@ -55,7 +56,6 @@
               const res = await fetch(`/api/legislation?${params.toString()}`);
               if (!res.ok) throw new Error("Failed to fetch updates");
               const data = await res.json();
-              console.log('[PolicyUpdatesFeed] Fetched updates:', data);
               return data;
             }
 
@@ -97,8 +97,35 @@
                 setHasMore(true);
               }, [searchInput, search, setUpdates]);
 
-              // Effect that fetches only when search/subject/classification/sort changes
+              // --- Seamless state/scroll restore ---
+              // Use a ref to block the initial fetch until state/scroll is restored
+              const didRestore = useRef(false);
+
+              useLayoutEffect(() => {
+                if (didRestore.current) return;
+                const saved = localStorage.getItem('policyUpdatesFeedState');
+                if (saved) {
+                  const state = JSON.parse(saved);
+                  setSearch(state.search || "");
+                  setSubject(state.subject || "");
+                  setClassification(state.classification || "");
+                  setSort(state.sort || { field: 'createdAt', dir: 'desc' });
+                  setSkip(state.skip || 0);
+                  setSearchInput(state.searchInput || "");
+                  setUpdates(state.updates || []);
+                  setHasMore(state.hasMore !== undefined ? state.hasMore : true);
+                }
+                // Restore scroll position *before* paint for seamlessness
+                const scrollY = localStorage.getItem('policyUpdatesFeedScrollY');
+                if (scrollY) {
+                  window.scrollTo(0, parseInt(scrollY, 10));
+                }
+                didRestore.current = true;
+              }, []);
+
+              // Block the initial fetch until after restore
               useEffect(() => {
+                if (!didRestore.current) return;
                 let isMounted = true;
                 const fetchAndSet = async () => {
                   setLoading(true);
@@ -126,7 +153,7 @@
                 };
                 fetchAndSet();
                 return () => { isMounted = false; };
-              }, [search, subject, classification, sort]);
+              }, [search, subject, classification, sort, didRestore.current]);
 
               useEffect(() => {
                 if (!loader.current) return;
@@ -154,6 +181,23 @@
                   if (timer) clearInterval(timer);
                 };
               }, [loading, isFetchingMore]);
+
+
+              // Save state to localStorage on change
+              useEffect(() => {
+                localStorage.setItem('policyUpdatesFeedState', JSON.stringify({
+                  search, subject, classification, sort, skip, searchInput, updates, hasMore
+                }));
+              }, [search, subject, classification, sort, skip, searchInput, updates, hasMore]);
+
+              // Save scroll position
+              useEffect(() => {
+                const handleScroll = () => {
+                  localStorage.setItem('policyUpdatesFeedScrollY', String(window.scrollY));
+                };
+                window.addEventListener('scroll', handleScroll);
+                return () => window.removeEventListener('scroll', handleScroll);
+              }, []);
 
               return (
                 <Card className="shadow-lg">
