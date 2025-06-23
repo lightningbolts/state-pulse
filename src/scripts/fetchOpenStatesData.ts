@@ -262,12 +262,12 @@ async function fetchSessionsForJurisdiction(ocdId: string): Promise<OpenStatesSe
   }
 }
 
-// --- NEW: 30-minute update system ---
-const UPDATE_INTERVAL_MINUTES = 30;
+// --- NEW: 12-hour update system ---
+const UPDATE_INTERVAL_HOURS = 12;
 
-function getUpdatedSinceString(minutesAgo: number): string {
+function getUpdatedSinceString(hoursAgo: number): string {
   const now = new Date();
-  const updatedSinceDate = new Date(now.getTime() - (minutesAgo * 60 * 1000));
+  const updatedSinceDate = new Date(now.getTime() - (hoursAgo * 60 * 60 * 1000));
   return updatedSinceDate.toISOString().split('.')[0];
 }
 
@@ -355,7 +355,7 @@ async function runUpdateCycle() {
   if (STATE_OCD_IDS.length === 0 || (STATE_OCD_IDS[0].abbr === 'AL' && STATE_OCD_IDS.length <= 5 && STATE_OCD_IDS.length > 0 && STATE_OCD_IDS.every(s => s.ocdId.startsWith('ocd-jurisdiction/country:us/state:')))) {
       console.warn("Warning: STATE_OCD_IDS list in src/scripts/fetchOpenStatesData.ts is not fully populated with all 50 states. Please add all state OCD-IDs and abbreviations for complete data fetching.");
   }
-  const updatedSinceString = getUpdatedSinceString(UPDATE_INTERVAL_MINUTES);
+  const updatedSinceString = getUpdatedSinceString(UPDATE_INTERVAL_HOURS);
   console.log(`--- Starting fetch for legislation updated since ${updatedSinceString} ---`);
   for (const state of STATE_OCD_IDS) {
     console.log(`\n--- Processing State: ${state.abbr} (${state.ocdId}) ---`);
@@ -391,14 +391,14 @@ async function runUpdateCycle() {
     await delay(6000);
   }
   console.log("\n--- Finished processing all states for legislation. ---");
-  console.log("--- This script is designed for frequent legislation (e.g., every 30 minutes). ---");
+  console.log("--- This script is designed for frequent legislation (e.g., every 12 hours). ---");
 }
 
 async function main() {
   while (true) {
     await runUpdateCycle();
-    console.log(`Waiting ${UPDATE_INTERVAL_MINUTES} minutes before next update cycle...`);
-    await delay(UPDATE_INTERVAL_MINUTES * 60 * 1000);
+    console.log(`Waiting ${UPDATE_INTERVAL_HOURS} hours before next update cycle...`);
+    await delay(UPDATE_INTERVAL_HOURS * 60 * 60 * 1000);
   }
 }
 
