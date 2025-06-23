@@ -117,7 +117,7 @@ import { getCollection } from '../lib/mongodb';
 
     function convertDocumentToLegislation(doc: LegislationMongoDbDocument): Legislation {
       const { _id, ...rest } = doc;
-      return { id: rest.id, ...rest };
+      return rest as Legislation;
     }
 
     export async function getLegislationByMongoId(mongoId: string): Promise<Legislation | null> {
@@ -152,8 +152,9 @@ import { getCollection } from '../lib/mongodb';
         const legislationCollection = await getCollection('legislation');
         const document = await legislationCollection.findOne({ id });
         if (document) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { _id, ...restOfDoc } = document;
-          return { id: document.id, ...restOfDoc };
+          return restOfDoc as Legislation;
         } else {
           return null;
         }
@@ -203,4 +204,3 @@ import { getCollection } from '../lib/mongodb';
         console.error('[Service] Failed to connect to legislation collection:', error);
       }
     }
-

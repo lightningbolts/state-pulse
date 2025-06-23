@@ -1,166 +1,148 @@
-import { upsertLegislation } from '../services/legislationService';
 import { config } from 'dotenv';
-import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
-import { generateGeminiSummary } from '../services/geminiSummaryUtil';
+import fs from 'fs/promises';
+import path from 'path';
+import { getCollection, connectToDatabase } from '../lib/mongodb';
+import { Legislation } from '../types/legislation';
 
-config({ path: '../../.env' });
+config({ path: path.resolve(__dirname, '../../.env') });
 
-const PLURAL_POLICY_BASE_URL = 'https://open.pluralpolicy.com/data/session-json/';
-
-/**
- * Fetches the list of JSON file URLs from the PluralPolicy data page.
- */
-async function getJsonFileUrls(): Promise<string[]> {
-  console.log('Fetching list of historical data files from PluralPolicy...');
-  try {
-    const response = await fetch(PLURAL_POLICY_BASE_URL);
-    if (!response.ok) {
-      console.error(`Failed to fetch file list: ${response.statusText}`);
-      return [];
-    }
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const urls: string[] = [];
-    $('a').each((i, element) => {
-      const href = $(element).attr('href');
-      if (href && href.endsWith('.json')) {
-        urls.push(PLURAL_POLICY_BASE_URL + href);
-      }
-    });
-    console.log(`Found ${urls.length} data files.`);
-    return urls;
-  } catch (error) {
-    console.error('Error fetching file list:', error);
-    return [];
-  }
-}
+const DATA_DIR = path.join(__dirname, '../data');
 
 /**
- * Transforms a bill from the PluralPolicy format to our database format.
- * NOTE: This function is based on an assumed data structure for PluralPolicy data.
- * You may need to adjust field names based on the actual structure of the JSON files.
+ * Processes all JSON files in a directory and its subdirectories and upserts them into MongoDB.
  */
-function transformPluralPolicyBill(bill: any, session: any): any {
-  const {
-    bill_id,
-    title,
-    sponsors,
-    actions,
-    versions,
-    sources,
-    subjects,
-    chamber,
-    status,
-    summary,
-    full_text,
-  } = bill;
+async function processDirectory(directory: string, legislationCollection: any) {
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await processDirectory(fullPath, legislationCollection);
+    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
+      console.log(`Processing file: ${fullPath}`);
+      try {
+        const fileContent = await fs.readFile(fullPath, 'utf-8');
+        const bills: any[] = JSON.parse(fileContent);
 
-  const {
-      jurisdiction_id,
-      jurisdiction: jurisdictionName,
-      name: sessionName
-  } = session;
+        if (Array.isArray(bills) && bills.length > 0) {
+          const operations = bills
+            .filter(bill => bill.id) // Ensure bill has an id
+            .map(bill => {
+              const legislation: Partial<Legislation> = {
+                id: bill.id.replace('/', '_'),
+                identifier: bill.identifier,
+                title: bill.title,
+                session: bill.session,
+                jurisdictionId: bill.jurisdiction?.id,
+                jurisdictionName: bill.jurisdiction?.name,
+                chamber: bill.from_organization?.classification,
+                classification: bill.classification,
+                subjects: bill.subject,
+                sponsors: bill.sponsors,
+                versions: bill.versions,
+                sources: bill.sources,
+                abstracts: bill.abstracts,
+                openstatesUrl: bill.openstates_url,
+                firstActionAt: bill.first_action_date ? new Date(bill.first_action_date) : null,
+                latestActionAt: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+                latestActionDescription: bill.latest_action_description,
+                latestPassageAt: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+                createdAt: bill.created_at ? new Date(bill.created_at) : undefined,
+                updatedAt: bill.updated_at ? new Date(bill.updated_at) : undefined,
+              };
 
-  const transformedSponsors = (sponsors || []).map((s: any) => ({
-    name: s.name,
-    id: s.id,
-    entityType: s.entity_type,
-    primary: s.primary,
-  }));
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { id, ...updateData } = legislation;
 
-  const transformedHistory = (actions || []).map((a: any) => ({
-    date: new Date(a.date),
-    action: a.description,
-    actor: a.actor,
-    classification: a.classification,
-  }));
+              const updateOperation: any = { $set: updateData };
+              if (bill.actions && bill.actions.length > 0) {
+                const historyWithDates = bill.actions.map((action: any) => ({
+                  ...action,
+                  date: new Date(action.date),
+                }));
+                updateOperation.$addToSet = { history: { $each: historyWithDates } };
+              }
 
-  const transformedVersions = (versions || []).map((v: any) => ({
-      note: v.note,
-      date: new Date(v.date),
-      url: v.links && v.links.length > 0 ? v.links[0].url : null
-  }));
+              return {
+                updateOne: {
+                  filter: { id: legislation.id },
+                  update: updateOperation,
+                  upsert: true,
+                },
+              };
+            });
 
-  const id = `${jurisdiction_id}_${sessionName}_${bill_id}`.replace(/[^a-zA-Z0-9_]/g, '_');
-  const now = new Date();
-
-  return {
-    id,
-    identifier: bill_id,
-    title,
-    session: sessionName,
-    jurisdictionId: jurisdiction_id,
-    jurisdictionName: jurisdictionName,
-    chamber,
-    classification: bill.classification || [],
-    subjects: subjects || [],
-    statusText: status,
-    sponsors: transformedSponsors,
-    history: transformedHistory,
-    versions: transformedVersions,
-    sources: sources || [],
-    abstracts: summary ? [{ abstract: summary, note: 'From PluralPolicy' }] : [],
-    openstatesUrl: null, // Not available in PluralPolicy data
-    firstActionAt: transformedHistory.length > 0 ? transformedHistory[0].date : null,
-    latestActionAt: transformedHistory.length > 0 ? transformedHistory[transformedHistory.length - 1].date : null,
-    latestActionDescription: transformedHistory.length > 0 ? transformedHistory[transformedHistory.length - 1].action : null,
-    latestPassageAt: null, // Not available in PluralPolicy data
-    createdAt: now,
-    updatedAt: now,
-    summary: summary,
-    fullText: full_text,
-    extras: {}, // Not available in PluralPolicy data
-  };
-}
-
-/**
- * Fetches, transforms, and stores historical legislation data from PluralPolicy.
- */
-async function importHistoricalData() {
-  const fileUrls = await getJsonFileUrls();
-
-  for (const url of fileUrls) {
-    console.log(`\nProcessing file: ${url}`);
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error(`Failed to download ${url}: ${response.statusText}`);
-        continue;
-      }
-      const data: any = await response.json();
-
-      // Assuming the JSON structure is { session: {...}, bills: [...] }
-      const bills = data.bills || [];
-      const session = data.session || {};
-
-      if (bills.length === 0) {
-        console.log('No bills found in this file.');
-        continue;
-      }
-
-      console.log(`Found ${bills.length} bills for session: ${session.name}`);
-
-      for (const bill of bills) {
-        try {
-          const legislationData = transformPluralPolicyBill(bill, session);
-
-          const textForSummary = legislationData.fullText || legislationData.summary || legislationData.title;
-          if (textForSummary) {
-              legislationData.geminiSummary = "AI Summary is currently not available.";
+          if (operations.length > 0) {
+            await legislationCollection.bulkWrite(operations);
+            console.log(`Upserted ${operations.length} bills from ${entry.name}`);
           }
+        } else if (bills && typeof bills === 'object' && !Array.isArray(bills)) {
+          const bill = bills as any;
+          if (bill.id) {
+            const legislation: Partial<Legislation> = {
+                id: bill.id.replace('/', '_'),
+                identifier: bill.identifier,
+                title: bill.title,
+                session: bill.session,
+                jurisdictionId: bill.jurisdiction?.id,
+                jurisdictionName: bill.jurisdiction?.name,
+                chamber: bill.from_organization?.classification,
+                classification: bill.classification,
+                subjects: bill.subject,
+                sponsors: bill.sponsors,
+                versions: bill.versions,
+                sources: bill.sources,
+                abstracts: bill.abstracts,
+                openstatesUrl: bill.openstates_url,
+                firstActionAt: bill.first_action_date ? new Date(bill.first_action_date) : null,
+                latestActionAt: bill.latest_action_date ? new Date(bill.latest_action_date) : null,
+                latestActionDescription: bill.latest_action_description,
+                latestPassageAt: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
+                createdAt: bill.created_at ? new Date(bill.created_at) : undefined,
+                updatedAt: bill.updated_at ? new Date(bill.updated_at) : undefined,
+              };
 
-          await upsertLegislation(legislationData);
-          console.log(`  - Upserted bill: ${legislationData.identifier}`);
-        } catch (e) {
-          console.error(`  - Error processing bill ${bill.bill_id}:`, e);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id, ...updateData } = legislation;
+
+            const updateOperation: any = { $set: updateData };
+            if (bill.actions && bill.actions.length > 0) {
+                const historyWithDates = bill.actions.map((action: any) => ({
+                  ...action,
+                  date: new Date(action.date),
+                }));
+                updateOperation.$addToSet = { history: { $each: historyWithDates } };
+            }
+
+            await legislationCollection.updateOne(
+              { id: legislation.id },
+              updateOperation,
+              { upsert: true }
+            );
+            console.log(`Upserted 1 bill from ${entry.name}`);
+          }
         }
+      } catch (e) {
+        console.error(`Error processing file ${fullPath}:`, e);
       }
-    } catch (error) {
-      console.error(`Error processing file ${url}:`, error);
     }
   }
-  console.log('\nHistorical data import from PluralPolicy is complete.');
 }
 
-importHistoricalData().catch(console.error);
+async function processHistoricalData() {
+  console.log('Connecting to database...');
+  await connectToDatabase();
+  const legislationCollection = await getCollection('legislation');
+  console.log('Starting to process historical data from local JSON files...');
+  await processDirectory(DATA_DIR, legislationCollection);
+  console.log('Finished processing all historical data.');
+}
+
+processHistoricalData()
+  .then(() => {
+    console.log('Script finished successfully.');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('Script failed:', error);
+    process.exit(1);
+  });

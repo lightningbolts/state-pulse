@@ -58,51 +58,31 @@ export interface FirestoreLegislationAbstract {
   note?: string | null; // from BillAbstract.note
 }
 
-export interface FirestoreLegislation {
-  id: string; // OpenStates bill ID (ocd-bill/...) from Bill.id
-  identifier: string; // Human-readable bill identifier (e.g., "HB 101") from Bill.identifier
-  title: string; // from Bill.title
-  session: string; // Session identifier (e.g., "2023rs") from Bill.session
-
-  jurisdictionId: string; // OCD ID of the jurisdiction from Bill.jurisdiction.id
-  jurisdictionName: string; // Name of the jurisdiction from Bill.jurisdiction.name
-
-  chamber?: string | null; // Deduced from Bill.from_organization.classification or Bill.jurisdiction.classification
-
-  classification?: string[] | null; // Bill type, e.g., ["bill", "resolution"] from Bill.classification
-  subjects?: string[] | null; // Topics/subjects of the bill from Bill.subject
-
-  statusText?: string | null; // Potentially derived from latest_action_description or a custom logic
-
-  sponsors: FirestoreLegislationSponsor[];
-  history: FirestoreLegislationHistoryEvent[];
-  versions?: FirestoreLegislationVersion[] | null;
-  sources?: FirestoreLegislationSourceLink[] | null; // from Bill.sources
-  abstracts?: FirestoreLegislationAbstract[] | null; // from Bill.abstracts
-
-  openstatesUrl: string; // URL to the bill on OpenStates.org from Bill.openstates_url
-
-  firstActionAt: Timestamp | null; // from Bill.first_action_date
-  latestActionAt: Timestamp | null; // from Bill.latest_action_date
-  latestActionDescription: string | null; // from Bill.latest_action_description
-  latestPassageAt?: Timestamp | null; // from Bill.latest_passage_date
-
-  createdAt: Timestamp; // Firestore Timestamp from Bill.created_at
-  updatedAt: Timestamp; // Firestore Timestamp from Bill.updated_at
-
-  // Optional fields for additional data
-  summary?: string | null; // This can be one of the abstracts or an AI-generated summary
-  aiSummary?: {
-    short?: string;
-    medium?: string;
-    long?: string;
-    lastGeneratedAt?: Timestamp;
-  } | null;
-  tags?: string[] | null; // Could be same as subjects or enhanced
-  fiscalNoteUrl?: string | null; // Not directly in OpenStates Bill, might be in extras or links
-  committee?: string | null; // Name of the primary committee, might need to be derived
-
-  extras?: Record<string, any> | null; // For any other data from Bill.extras
+export interface Legislation {
+  id: string;
+  identifier?: string;
+  title?: string;
+  session?: string;
+  jurisdictionId?: string;
+  jurisdictionName?: string;
+  chamber?: string | null;
+  classification?: string[];
+  subjects?: string[];
+  statusText?: string | null;
+  sponsors?: any[];
+  history?: any[];
+  versions?: any[];
+  sources?: any[];
+  abstracts?: any[];
+  openstatesUrl?: string;
+  firstActionAt?: Date | null;
+  latestActionAt?: Date | null;
+  latestActionDescription?: string | null;
+  latestPassageAt?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  summary?: string | null;
+  extras?: Record<string, any> | null;
 }
 
 // --- Person Types (Example, if you were to store People) ---
