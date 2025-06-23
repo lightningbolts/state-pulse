@@ -19,7 +19,7 @@ const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['hi
         {historyEvents.map((event, index) => (
           <li key={index} className="border-l-2 border-primary pl-0 py-0 bg-card rounded-md shadow-sm hover:shadow-md transition-shadow">
             <p className="font-medium text-primary-foreground bg-primary px-3 py-1.5 rounded-t-md text-sm flex justify-between items-center">
-              <span>{event.date ? event.date.toLocaleDateString() : 'Date N/A'}</span>
+              <span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}</span>
               <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
             </p>
             <div className="p-3 bg-background rounded-b-md">
