@@ -103,7 +103,7 @@
 
               useLayoutEffect(() => {
                 if (didRestore.current) return;
-                const saved = localStorage.getItem('policyUpdatesFeedState');
+                const saved = sessionStorage.getItem('policyUpdatesFeedState'); // switched to sessionStorage
                 if (saved) {
                   const state = JSON.parse(saved);
                   setSearch(state.search || "");
@@ -116,16 +116,17 @@
                   setHasMore(state.hasMore !== undefined ? state.hasMore : true);
                 }
                 // Restore scroll position *before* paint for seamlessness
-                const scrollY = localStorage.getItem('policyUpdatesFeedScrollY');
+                const scrollY = sessionStorage.getItem('policyUpdatesFeedScrollY');
                 if (scrollY) {
                   window.scrollTo(0, parseInt(scrollY, 10));
                 }
                 didRestore.current = true;
               }, []);
 
-              // Block the initial fetch until after restore
+              // Block the initial fetch until after restore, and only fetch if updates are empty
               useEffect(() => {
                 if (!didRestore.current) return;
+                if (updates.length > 0) return; // Don't fetch if updates already restored
                 let isMounted = true;
                 const fetchAndSet = async () => {
                   setLoading(true);
@@ -183,9 +184,9 @@
               }, [loading, isFetchingMore]);
 
 
-              // Save state to localStorage on change
+              // Save state to sessionStorage on change
               useEffect(() => {
-                localStorage.setItem('policyUpdatesFeedState', JSON.stringify({
+                sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
                   search, subject, classification, sort, skip, searchInput, updates, hasMore
                 }));
               }, [search, subject, classification, sort, skip, searchInput, updates, hasMore]);
@@ -193,7 +194,7 @@
               // Save scroll position
               useEffect(() => {
                 const handleScroll = () => {
-                  localStorage.setItem('policyUpdatesFeedScrollY', String(window.scrollY));
+                  sessionStorage.setItem('policyUpdatesFeedScrollY', String(window.scrollY));
                 };
                 window.addEventListener('scroll', handleScroll);
                 return () => window.removeEventListener('scroll', handleScroll);
