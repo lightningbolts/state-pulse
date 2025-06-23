@@ -388,7 +388,7 @@ async function runUpdateCycle() {
     } else {
       console.log(`No sessions found for ${state.abbr}. Skipping.`);
     }
-    await delay(6000);
+    await delay(10000);
   }
   console.log("\n--- Finished processing all states for legislation. ---");
   console.log("--- This script is designed for frequent legislation (e.g., every 12 hours). ---");
