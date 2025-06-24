@@ -10,14 +10,25 @@ const DATA_DIR = path.join(__dirname, '../data');
 
 /**
  * Processes all JSON files in a directory and its subdirectories and upserts them into MongoDB.
+ * Supports starting at a specific file if startAtFile is provided.
  */
-async function processDirectory(directory: string, legislationCollection: any) {
+async function processDirectory(directory: string, legislationCollection: any, startAtFile?: string, state?: { skipping: boolean }) {
   const entries = await fs.readdir(directory, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      await processDirectory(fullPath, legislationCollection);
+      await processDirectory(fullPath, legislationCollection, startAtFile, state);
     } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
+      // If skipping, check if this is the start file
+      if (state && state.skipping) {
+        // Compare relative path from DATA_DIR for flexibility
+        const relPath = path.relative(DATA_DIR, fullPath);
+        if (relPath === startAtFile || entry.name === startAtFile) {
+          state.skipping = false;
+        } else {
+          continue;
+        }
+      }
       console.log(`Processing file: ${fullPath}`);
       try {
         const fileContent = await fs.readFile(fullPath, 'utf-8');
@@ -226,7 +237,10 @@ async function processHistoricalData() {
   await connectToDatabase();
   const legislationCollection = await getCollection('legislation');
   console.log('Starting to process historical data from local JSON files...');
-  await processDirectory(DATA_DIR, legislationCollection);
+  // Support CLI arg for start file
+  const startAtFile = process.argv[2];
+  const state = { skipping: !!startAtFile };
+  await processDirectory(DATA_DIR, legislationCollection, startAtFile, state);
   console.log('Finished processing all historical data.');
 }
 
