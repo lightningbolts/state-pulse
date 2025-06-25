@@ -1,4 +1,4 @@
-import { upsertLegislation } from '../services/legislationService';
+import { upsertLegislationSelective } from '../services/legislationService';
 import { config } from 'dotenv';
 import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
@@ -320,8 +320,14 @@ async function fetchAndStoreUpdatedBills(
               fullText = legislationToStore.title || '';
             }
             legislationToStore.fullText = fullText;
-            legislationToStore.geminiSummary = fullText ? await generateGeminiSummary(fullText) : null;
-            await upsertLegislation(legislationToStore);
+            // Only update geminiSummary if it is missing or is the default unavailable message
+            if (
+              !legislationToStore.geminiSummary ||
+              legislationToStore.geminiSummary === 'Summary not available due to insufficient information.'
+            ) {
+              legislationToStore.geminiSummary = fullText ? await generateGeminiSummary(fullText) : null;
+            }
+            await upsertLegislationSelective(legislationToStore);
             console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id}`);
             billsProcessed++;
           } catch (transformError) {

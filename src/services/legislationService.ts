@@ -115,6 +115,75 @@ import { getCollection } from '../lib/mongodb';
       }
     }
 
+    export async function upsertLegislationSelective(legislationData: Legislation): Promise<void> {
+      if (!legislationData.id) {
+        console.error('Legislation ID is required to upsert legislation.');
+        throw new Error('Legislation ID is required to upsert legislation.');
+      }
+      try {
+        const { id, ...dataToUpsert } = legislationData;
+        let cleanedData = cleanupDataForMongoDB(dataToUpsert);
+        const { createdAt, ...dataForSet } = cleanedData;
+        dataForSet.updatedAt = new Date();
+        if (dataForSet.firstActionAt) {
+          dataForSet.firstActionAt = new Date(dataForSet.firstActionAt);
+        }
+        if (dataForSet.latestActionAt) {
+          dataForSet.latestActionAt = new Date(dataForSet.latestActionAt);
+        }
+        if (dataForSet.latestPassageAt) {
+          dataForSet.latestPassageAt = new Date(dataForSet.latestPassageAt);
+        }
+        const legislationCollection = await getCollection('legislation');
+        // Fetch the existing document
+        const existing = await legislationCollection.findOne({ id });
+        if (!existing) {
+          // Insert as new if not found
+          await legislationCollection.insertOne({
+            _id: new ObjectId(),
+            id,
+            ...dataForSet,
+            createdAt: createdAt || new Date(),
+          });
+          console.log(`Inserted new legislation ${id}`);
+          return;
+        }
+        // Only update fields that have changed
+        const updateFields: Record<string, any> = {};
+        for (const key of Object.keys(dataForSet)) {
+          if (key === 'updatedAt') continue;
+          const newValue = dataForSet[key];
+          const oldValue = existing[key];
+          // Compare arrays and objects by JSON.stringify, primitives by ===
+          if (Array.isArray(newValue) || typeof newValue === 'object') {
+            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
+              updateFields[key] = newValue;
+            }
+          } else {
+            if (newValue !== oldValue) {
+              updateFields[key] = newValue;
+            }
+          }
+        }
+        if (Object.keys(updateFields).length > 0) {
+          updateFields.updatedAt = new Date();
+          await legislationCollection.updateOne(
+            { id },
+            { $set: updateFields }
+          );
+          console.log(`Updated fields for legislation ${id}:`, Object.keys(updateFields));
+        } else {
+          // No changes
+          // Optionally update updatedAt if you want to track polling
+          // await legislationCollection.updateOne({ id }, { $set: { updatedAt: new Date() } });
+          console.log(`No changes for legislation ${id}`);
+        }
+      } catch (error) {
+        console.error(`Error selectively upserting legislation document with id ${legislationData.id}: `, error);
+        throw new Error('Failed to upsert legislation selectively.');
+      }
+    }
+
     function convertDocumentToLegislation(doc: LegislationMongoDbDocument): Legislation {
       const { _id, ...rest } = doc;
       return rest as Legislation;
