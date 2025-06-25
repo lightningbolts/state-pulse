@@ -30,6 +30,8 @@
               sponsors?: { name: string }[];
               lastActionAt?: string | null;
               identifier?: string;
+              history?: { date: string; action: string }[];
+              firstActionAt?: string | null;
             }
 
             // Classification tags (no descriptions)
@@ -351,21 +353,60 @@
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                       {updates.map((update, idx) => {
-                        const date = update.createdAt ? new Date(update.createdAt) : null;
-                        const formattedDate = date
-                          ? (typeof window !== 'undefined'
-                              ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                              : date.toISOString().slice(0, 10))
-                          : '';
+                        const getFormattedDate = (dateString: string | null | undefined) => {
+                            if (!dateString) return '';
+                            const date = new Date(dateString);
+                            if (isNaN(date.getTime())) return ''; // Invalid date check
+                            return typeof window !== 'undefined'
+                                ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                : date.toISOString().slice(0, 10);
+                        };
+
+                        // --- Introduction Date Logic ---
+                        let introDate: Date | null = null;
+                        if (update.firstActionAt) {
+                            introDate = new Date(update.firstActionAt);
+                        } else if (Array.isArray(update.history) && update.history.length > 0) {
+                            const sortedHistory = [...update.history]
+                                .filter(h => h.date)
+                                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // sort ascending for earliest
+                            if (sortedHistory.length > 0 && sortedHistory[0].date) {
+                                introDate = new Date(sortedHistory[0].date);
+                            }
+                        }
+                        if ((!introDate || isNaN(introDate.getTime())) && update.createdAt) {
+                            introDate = new Date(update.createdAt);
+                        }
+                        const formattedIntroDate = introDate && !isNaN(introDate.getTime()) ? getFormattedDate(introDate.toISOString()) : '';
+
+
+                        // --- Last Action Date & Description Logic ---
+                        let lastActionDate: Date | null = update.lastActionAt ? new Date(update.lastActionAt) : null;
+                        let lastActionDescription = update.latestActionDescription;
+
+                        if (Array.isArray(update.history) && update.history.length > 0) {
+                            const sortedHistory = [...update.history]
+                                .filter(h => h.date && h.action)
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                            if (sortedHistory.length > 0) {
+                                const latestHistoryAction = sortedHistory[0];
+                                const latestHistoryDate = new Date(latestHistoryAction.date);
+
+                                if (latestHistoryDate && !isNaN(latestHistoryDate.getTime())) {
+                                    if (!lastActionDate || isNaN(lastActionDate.getTime()) || latestHistoryDate > lastActionDate) {
+                                        lastActionDate = latestHistoryDate;
+                                        lastActionDescription = latestHistoryAction.action;
+                                    }
+                                }
+                            }
+                        }
+                        const formattedLastActionDate = lastActionDate && !isNaN(lastActionDate.getTime()) ? getFormattedDate(lastActionDate.toISOString()) : null;
+
                         const stateUrl = update.sources && update.sources.length > 0 ? update.sources[0].url : update.openstatesUrl;
                         const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
                         const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
-                        const lastActionDate = update.lastActionAt ? new Date(update.lastActionAt) : null;
-                        const formattedLastActionDate = lastActionDate
-                          ? (typeof window !== 'undefined'
-                              ? lastActionDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                              : lastActionDate.toISOString().slice(0, 10))
-                          : null;
+
                         return (
                             <Link
                               key={uniqueKey}
@@ -378,7 +419,7 @@
                                 <div>
                                   <div className="font-bold text-lg mb-1 text-left">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
                                   <div className="text-sm text-muted-foreground mb-1 text-left">
-                                    {update.jurisdictionName} • {update.session} {formattedDate && <>• {formattedDate}</>}
+                                    {update.jurisdictionName} • {update.session}
                                   </div>
                                   {update.classification && update.classification.length > 0 && (
                                     <div className="mb-1">
@@ -431,17 +472,17 @@
                                       ))}
                                     </div>
                                   )}
-                                  {update.latestActionDescription && (
+                                  {formattedIntroDate && (
+                                    <div className="text-sm text-muted-foreground mb-1">
+                                        <span className="font-semibold">Introduced: </span>{formattedIntroDate}
+                                    </div>
+                                  )}
+                                  {(lastActionDescription || formattedLastActionDate) && (
                                     <div className="text-sm text-muted-foreground mb-1 text-left">
-                                      <span className="font-semibold">Last Action: </span>{update.latestActionDescription}
+                                      <span className="font-semibold">Last Action: </span>{lastActionDescription || 'N/A'}
                                       {formattedLastActionDate && (
                                         <span className="ml-2">({formattedLastActionDate})</span>
                                       )}
-                                    </div>
-                                  )}
-                                  {formattedDate && (
-                                    <div className="text-sm text-muted-foreground mb-1">
-                                      <span className="font-semibold">Date: </span>{formattedDate}
                                     </div>
                                   )}
                                   {update.sponsors && update.sponsors.length > 0 && (
