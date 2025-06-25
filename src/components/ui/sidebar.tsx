@@ -4,13 +4,14 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -18,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { ThemeToggle } from "@/components/theme/theme-toggle"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -206,6 +208,7 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            <SheetTitle className="sr-only">Sidebar</SheetTitle>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
@@ -379,6 +382,25 @@ const SidebarFooter = React.forwardRef<
   )
 })
 SidebarFooter.displayName = "SidebarFooter"
+
+const SidebarAuthAndTheme = () => (
+  <div className="flex flex-row items-center gap-2">
+    <SignedIn>
+      <UserButton afterSignOutUrl="/" />
+    </SignedIn>
+    <SignedOut>
+      <div className="flex flex-row gap-2">
+        <SignInButton mode="modal">
+          <Button>Sign In</Button>
+        </SignInButton>
+        <SignUpButton mode="modal">
+          <Button variant="outline">Sign Up</Button>
+        </SignUpButton>
+      </div>
+    </SignedOut>
+    <ThemeToggle />
+  </div>
+);
 
 const SidebarSeparator = React.forwardRef<
   React.ElementRef<typeof Separator>,
@@ -760,4 +782,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  SidebarAuthAndTheme
 }

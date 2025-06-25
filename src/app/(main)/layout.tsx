@@ -15,6 +15,7 @@ import {
   SidebarInset,
   SidebarFooter,
   SidebarSeparator,
+  SidebarAuthAndTheme,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
@@ -86,6 +87,7 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-4">
+          <SidebarAuthAndTheme />
           <SidebarSeparator className="my-2" />
           <p className="text-xs text-sidebar-foreground/70 text-center">
             © {new Date().getFullYear()} StatePulse
