@@ -1,9 +1,16 @@
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
+import * as fs from 'fs';
+import * as path from 'path';
 import { getAllLegislation, upsertLegislationSelective } from '../services/legislationService';
 import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl } from '../services/geminiSummaryUtil';
 import { getCollection } from '../lib/mongodb';
+
+function getStateAbbrFromJuriId(jurisdictionId: string): string | null {
+  const match = jurisdictionId.match(/state:([a-z]{2})/);
+  return match ? match[1].toUpperCase() : null;
+}
 
 async function main() {
   const batchSize = 1000; // MongoDB's default max batch size for .find() is 1000
@@ -24,8 +31,33 @@ async function main() {
         if (bill.geminiSummary && bill.geminiSummary !== 'Summary not available due to insufficient information.' && bill.geminiSummary.trim().length > 40 && geminiSummarySentences.length <= 6) {
           continue;
         }
-        // Use fullText if available, otherwise try to fetch PDF text
+
         let textToSummarize = bill.fullText;
+
+        // Try fetching full text from local JSON files
+        if (!textToSummarize && bill.jurisdictionId && bill.session && bill.identifier) {
+          const stateAbbr = getStateAbbrFromJuriId(bill.jurisdictionId);
+          if (stateAbbr) {
+            const jsonFilePath = path.join(process.cwd(), 'src', 'data', stateAbbr, bill.session, `${stateAbbr}_${bill.session}_bills.json`);
+            try {
+              if (fs.existsSync(jsonFilePath)) {
+                const fileContent = fs.readFileSync(jsonFilePath, 'utf-8');
+                const jsonData = JSON.parse(fileContent);
+                // Assuming jsonData is an array of bill objects
+                if (Array.isArray(jsonData)) {
+                    const billData = jsonData.find(b => b.identifier === bill.identifier);
+                    if (billData && billData.full_text) {
+                        textToSummarize = billData.full_text;
+                    }
+                }
+              }
+            } catch (e) {
+                console.error(`[Ollama] Error reading or parsing ${jsonFilePath}`, e);
+            }
+          }
+        }
+
+        // Use fullText if available, otherwise try to fetch PDF text
         if (!textToSummarize && bill.stateLegislatureUrl) {
           const pdfText = await fetchPdfTextFromOpenStatesUrl(bill.stateLegislatureUrl);
           if (pdfText && pdfText.length > 100) {
