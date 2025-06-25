@@ -148,10 +148,11 @@ import { getCollection } from '../lib/mongodb';
           console.log(`Inserted new legislation ${id}`);
           return;
         }
-        // Only update fields that have changed
+        // Only update fields that have changed, but ignore updatedAt and createdAt in comparison
+        const ignoreFields = ['updatedAt', 'createdAt'];
         const updateFields: Record<string, any> = {};
         for (const key of Object.keys(dataForSet)) {
-          if (key === 'updatedAt') continue;
+          if (ignoreFields.includes(key)) continue;
           const newValue = dataForSet[key];
           const oldValue = existing[key];
           // Compare arrays and objects by JSON.stringify, primitives by ===
@@ -174,8 +175,6 @@ import { getCollection } from '../lib/mongodb';
           console.log(`Updated fields for legislation ${id}:`, Object.keys(updateFields));
         } else {
           // No changes
-          // Optionally update updatedAt if you want to track polling
-          // await legislationCollection.updateOne({ id }, { $set: { updatedAt: new Date() } });
           console.log(`No changes for legislation ${id}`);
         }
       } catch (error) {
