@@ -72,21 +72,27 @@
               const [isFetchingMore, setIsFetchingMore] = useState(false);
               const [searchInput, setSearchInput] = useState("");
               const loader = useRef<HTMLDivElement | null>(null);
+              const skipRef = useRef(0);
 
               const loadMore = useCallback(async () => {
                 if (loading || !hasMore) return;
                 setLoading(true);
                 try {
-                  const newUpdates = await fetchUpdatesFeed({ skip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification });
+                  const currentSkip = skipRef.current;
+                  console.log('[FEED] loadMore: skip', currentSkip, 'updates.length', updates.length);
+                  const newUpdates = await fetchUpdatesFeed({ skip: currentSkip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification });
+                  console.log('[FEED] loadMore: newUpdates.length', newUpdates.length);
                   setUpdates((prev) => [...prev, ...newUpdates]);
-                  setSkip((prev) => prev + newUpdates.length);
+                  skipRef.current = currentSkip + newUpdates.length;
+                  setSkip(skipRef.current);
                   setHasMore(newUpdates.length === 20);
-                } catch {
+                } catch (e) {
+                  console.error('[FEED] loadMore error', e);
                   setHasMore(false);
                 } finally {
                   setLoading(false);
                 }
-              }, [skip, loading, hasMore, search, subject, sort, classification]);
+              }, [loading, hasMore, search, subject, sort, classification, updates.length]);
 
               // Search handler for button/enter
               const handleSearch = useCallback(() => {
@@ -94,6 +100,7 @@
                 setSearch(searchInput);
                 setUpdates([]);
                 setSkip(0);
+                skipRef.current = 0;
                 setHasMore(true);
               }, [searchInput, search, setUpdates]);
 
@@ -142,6 +149,7 @@
                     });
                     if (!isMounted) return;
                     setUpdates(newUpdates);
+                    skipRef.current = newUpdates.length;
                     setSkip(newUpdates.length);
                     setHasMore(newUpdates.length === 20);
                   } catch {
@@ -165,8 +173,18 @@
                   }
                 });
                 observer.observe(loader.current);
-                return () => observer.disconnect();
-              }, [loadMore, hasMore, loading, isFetchingMore]);
+                // Cleanup observer on unmount or when loader changes
+                return () => {
+                  observer.disconnect();
+                };
+              }, [loader, hasMore, loading, isFetchingMore, loadMore]);
+
+              // Hide loading text if no more data and not loading
+              useEffect(() => {
+                if (!hasMore && !loading && !isFetchingMore) {
+                  setShowLoadingText(false);
+                }
+              }, [hasMore, loading, isFetchingMore]);
 
               useEffect(() => {
                 let timer: NodeJS.Timeout | null = null;
