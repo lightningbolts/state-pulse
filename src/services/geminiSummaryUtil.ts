@@ -189,3 +189,32 @@ export const fetchPdfTextFromOpenStatesUrl = async (legUrl: string): Promise<str
   const result = await fetchPdfFromOpenStatesUrl(legUrl);
   return result.text;
 };
+
+/**
+ * Summarize text using Ollama's phi model (local LLM)
+ * @param text The text to summarize
+ * @returns The summary string
+ */
+export async function generatePhiSummary(text: string): Promise<string> {
+  if (!text || text.trim().length === 0) return 'Summary not available due to insufficient information.';
+  try {
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'phi',
+        prompt: `Summarize the following text in 3-5 sentences for a general audience, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.' \n\n${text}`,
+        stream: false
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Ollama phi API error: ${response.status}`);
+    }
+    const data = await response.json();
+    // Ollama returns { response: string, ... }
+    return data.response?.trim() || 'Summary not available due to insufficient information.';
+  } catch (err) {
+    console.error('Error generating phi summary:', err);
+    return 'Summary not available due to insufficient information.';
+  }
+}

@@ -4,7 +4,7 @@ import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/geminiSummaryUtil';
+import { generatePhiSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/geminiSummaryUtil';
 
 config({ path: '../../.env' });
 
@@ -325,7 +325,7 @@ async function fetchAndStoreUpdatedBills(
               !legislationToStore.geminiSummary ||
               legislationToStore.geminiSummary === 'Summary not available due to insufficient information.'
             ) {
-              legislationToStore.geminiSummary = fullText ? await generateGeminiSummary(fullText) : null;
+              legislationToStore.geminiSummary = fullText ? await generatePhiSummary(fullText) : null;
             }
             await upsertLegislationSelective(legislationToStore);
             console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id}`);
