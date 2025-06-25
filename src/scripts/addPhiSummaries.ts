@@ -15,7 +15,8 @@ async function main() {
     if (!batch.length) break;
     for (const bill of batch) {
       try {
-        if (!bill.fullText || (bill.geminiSummary && bill.geminiSummary !== 'Summary not available due to insufficient information.')) {
+        // Only update if geminiSummary is missing or is the fallback message (not if it already contains a real summary)
+        if (!bill.fullText || (bill.geminiSummary && bill.geminiSummary !== 'Summary not available due to insufficient information.' && bill.geminiSummary.trim().length > 40)) {
           continue;
         }
         const summary = await generatePhiSummary(bill.fullText);
@@ -36,4 +37,3 @@ async function main() {
 main().catch(err => {
   console.error('[Phi] Unhandled error:', err);
 });
-
