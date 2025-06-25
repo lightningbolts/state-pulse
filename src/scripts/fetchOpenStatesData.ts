@@ -4,7 +4,7 @@ import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import { generatePhiSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/geminiSummaryUtil';
+import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/geminiSummaryUtil';
 
 config({ path: '../../.env' });
 
@@ -335,7 +335,7 @@ async function fetchAndStoreUpdatedBills(
               }
             }
             if (shouldGenerateSummary) {
-              legislationToStore.geminiSummary = fullText ? await generatePhiSummary(fullText) : null;
+              legislationToStore.geminiSummary = fullText ? await generateOllamaSummary(fullText, "mistral") : null;
               geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
             }
             // Only upsert if geminiSummary is less than 20 words or is the default unavailable message

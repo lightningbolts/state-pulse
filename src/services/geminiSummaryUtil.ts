@@ -195,20 +195,20 @@ export const fetchPdfTextFromOpenStatesUrl = async (legUrl: string): Promise<str
  * @param text The text to summarize
  * @returns The summary string
  */
-export async function generatePhiSummary(text: string): Promise<string> {
+export async function generateOllamaSummary(text: string, model: string): Promise<string> {
   if (!text || text.trim().length === 0) return 'Summary not available due to insufficient information.';
   try {
     const response = await fetch('http://localhost:11434/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'phi',
-        prompt: `Instructions: (Summarize the following text in 3-5 sentences for a general audience, focusing on the main points and specific impact. Remove all fluff and filler. Don't say "this is a summary for a general audience:"; dive right in. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.)' \n\n${text}`,
+        model: model,
+        prompt: `Summarize this legislative bill for a general audience in 3–5 sentences. Focus on what the bill does, who it affects, and any key impacts. If no content is available, respond: 'Summary not available due to insufficient information.'\n\n${text}`,
         stream: false
       })
     });
     if (!response.ok) {
-      throw new Error(`Ollama phi API error: ${response.status}`);
+      throw new Error(`Ollama ${model} API error: ${response.status}`);
     }
     const data = await response.json();
     // Ollama returns { response: string, ... }
