@@ -31,7 +31,7 @@ async function main() {
           if (pdfText && pdfText.length > 100) {
             textToSummarize = pdfText;
           } else {
-            console.warn(`[Phi] No valid PDF text found for ${bill.identifier || bill.id}. Using fullText.`);
+            console.warn(`[Ollama] No valid PDF text found for ${bill.identifier || bill.id}. Using fullText.`);
           }
         }
         const summary = await generateOllamaSummary(textToSummarize, "mistral");
@@ -40,18 +40,18 @@ async function main() {
         processed++;
         const current = skip + i + 1;
         const percent = ((current / total) * 100).toFixed(2);
-        console.log(`[Phi] Updated summary for ${bill.identifier || bill.id} (${current} / ${total}, ${percent}%)`);
+        console.log(`[Ollama] Updated summary for ${bill.identifier || bill.id} (${current} / ${total}, ${percent}%)`);
       } catch (err) {
-        console.error(`[Phi] Error processing ${bill.identifier || bill.id}:`, err);
+        console.error(`[Ollama] Error processing ${bill.identifier || bill.id}:`, err);
       }
     }
     skip += batch.length;
     hasMore = batch.length === batchSize;
-    console.log(`[Phi] Batch progress: ${Math.min(skip, total)} / ${total} (${((Math.min(skip, total) / total) * 100).toFixed(2)}%)`);
+    console.log(`[Ollama] Batch progress: ${Math.min(skip, total)} / ${total} (${((Math.min(skip, total) / total) * 100).toFixed(2)}%)`);
   }
-  console.log(`[Phi] Finished. Processed ${processed} bills.`);
+  console.log(`[Ollama] Finished. Processed ${processed} bills.`);
 }
 
 main().catch(err => {
-  console.error('[Phi] Unhandled error:', err);
+  console.error('[Ollama] Unhandled error:', err);
 });
