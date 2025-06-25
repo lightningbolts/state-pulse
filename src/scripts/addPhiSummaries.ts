@@ -29,6 +29,8 @@ async function main() {
           const pdfText = await fetchPdfTextFromOpenStatesUrl(bill.stateLegislatureUrl);
           if (pdfText && pdfText.length > 100) {
             textToSummarize = pdfText;
+          } else {
+            console.warn(`[Phi] No valid PDF text found for ${bill.identifier || bill.id}. Using fullText.`);
           }
         }
         const summary = await generatePhiSummary(textToSummarize);
