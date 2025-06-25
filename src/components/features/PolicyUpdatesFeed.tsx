@@ -73,13 +73,17 @@
               const [searchInput, setSearchInput] = useState("");
               const loader = useRef<HTMLDivElement | null>(null);
               const skipRef = useRef(0);
+              const loadingRef = useRef(false); // Ref to prevent concurrent loads
+              const hasRestored = useRef(false);
+              const prevDeps = useRef<{search: string, subject: string, classification: string, sort: any} | null>(null);
 
               const loadMore = useCallback(async () => {
-                if (loading || !hasMore) return;
+                if (loadingRef.current || !hasMore) return;
+                loadingRef.current = true;
                 setLoading(true);
                 try {
                   const currentSkip = skipRef.current;
-                  console.log('[FEED] loadMore: skip', currentSkip, 'updates.length', updates.length);
+                  console.log('[FEED] loadMore: skip', currentSkip);
                   const newUpdates = await fetchUpdatesFeed({ skip: currentSkip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification });
                   console.log('[FEED] loadMore: newUpdates.length', newUpdates.length);
                   setUpdates((prev) => [...prev, ...newUpdates]);
@@ -90,9 +94,10 @@
                   console.error('[FEED] loadMore error', e);
                   setHasMore(false);
                 } finally {
+                  loadingRef.current = false;
                   setLoading(false);
                 }
-              }, [loading, hasMore, search, subject, sort, classification, updates.length]);
+              }, [hasMore, search, subject, sort, classification]); // Removed loading and updates.length
 
               // Search handler for button/enter
               const handleSearch = useCallback(() => {
@@ -112,15 +117,29 @@
                 if (didRestore.current) return;
                 const saved = sessionStorage.getItem('policyUpdatesFeedState'); // switched to sessionStorage
                 if (saved) {
-                  const state = JSON.parse(saved);
-                  setSearch(state.search || "");
-                  setSubject(state.subject || "");
-                  setClassification(state.classification || "");
-                  setSort(state.sort || { field: 'createdAt', dir: 'desc' });
-                  setSkip(state.skip || 0);
-                  setSearchInput(state.searchInput || "");
-                  setUpdates(state.updates || []);
-                  setHasMore(state.hasMore !== undefined ? state.hasMore : true);
+                  try {
+                    const state = JSON.parse(saved);
+                    setSearch(state.search || "");
+                    setSubject(state.subject || "");
+                    setClassification(state.classification || "");
+                    setSort(state.sort || { field: 'createdAt', dir: 'desc' });
+                    setSkip(state.skip || 0);
+                    skipRef.current = state.skip || 0; // Ensure skipRef is correctly set to match state.skip
+                    setSearchInput(state.searchInput || "");
+                    if (state.updates && Array.isArray(state.updates)) {
+                      setUpdates(state.updates);
+                      // Crucial fix: set skipRef to actual length of updates
+                      skipRef.current = state.updates.length;
+                    } else {
+                      setUpdates([]);
+                    }
+                    setHasMore(state.hasMore !== undefined ? state.hasMore : true);
+                  } catch (e) {
+                    console.error('Error parsing feed state:', e);
+                    setUpdates([]);
+                    skipRef.current = 0;
+                    setSkip(0);
+                  }
                 }
                 // Restore scroll position *before* paint for seamlessness
                 const scrollY = sessionStorage.getItem('policyUpdatesFeedScrollY');
@@ -128,6 +147,8 @@
                   window.scrollTo(0, parseInt(scrollY, 10));
                 }
                 didRestore.current = true;
+                hasRestored.current = true;
+                prevDeps.current = {search, subject, classification, sort};
               }, []);
 
               // Block the initial fetch until after restore, and only fetch if updates are empty
@@ -164,20 +185,29 @@
                 return () => { isMounted = false; };
               }, [search, subject, classification, sort, didRestore.current]);
 
+
+              // Intersection Observer for infinite scroll
               useEffect(() => {
                 if (!loader.current) return;
-                const observer = new IntersectionObserver((entries) => {
-                  if (entries[0].isIntersecting && hasMore && !loading && !isFetchingMore) {
-                    setIsFetchingMore(true);
-                    loadMore().finally(() => setIsFetchingMore(false));
+                const observer = new window.IntersectionObserver(
+                  (entries) => {
+                    if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+                      loadMore();
+                    }
+                  },
+                  {
+                    threshold: 0.1,
+                    rootMargin: '100px'
                   }
-                });
-                observer.observe(loader.current);
-                // Cleanup observer on unmount or when loader changes
+                );
+                const currentLoader = loader.current;
+                observer.observe(currentLoader);
                 return () => {
-                  observer.disconnect();
+                  if (currentLoader) {
+                    observer.unobserve(currentLoader);
+                  }
                 };
-              }, [loader, hasMore, loading, isFetchingMore, loadMore]);
+              }, [loadMore, hasMore]); // Simplified dependencies
 
               // Hide loading text if no more data and not loading
               useEffect(() => {
@@ -217,6 +247,7 @@
                 window.addEventListener('scroll', handleScroll);
                 return () => window.removeEventListener('scroll', handleScroll);
               }, []);
+
 
               return (
                 <Card className="shadow-lg">
@@ -258,7 +289,7 @@
                             onValueChange={val => {
                               const [field, dir] = val.split(":");
                               setSort({ field, dir: dir as 'asc' | 'desc' });
-                              setUpdates([]); setSkip(0); setHasMore(true);
+                              setUpdates([]); setSkip(0); skipRef.current = 0; setHasMore(true);
                             }}
                           >
                             <DropdownMenuRadioItem value="createdAt:desc">Most Recent</DropdownMenuRadioItem>
@@ -280,7 +311,16 @@
                         <Badge
                           key={opt.value}
                           variant={classification === opt.value ? "default" : "secondary"}
-                          onClick={() => setClassification(opt.value)}
+                          onClick={() => {
+                            if (classification !== opt.value) {
+                              setClassification(opt.value);
+                              setUpdates([]);
+                              setSkip(0);
+                              skipRef.current = 0;
+                              setHasMore(true);
+                              setLoading(true); // Set loading to trigger fetchAndSet in the useEffect
+                            }
+                          }}
                           className="cursor-pointer"
                         >
                           {opt.label}
@@ -292,7 +332,17 @@
                         <Badge
                           key={cat}
                           variant={subject === cat ? "default" : "secondary"}
-                          onClick={() => setSubject(subject === cat ? "" : cat)}
+                          onClick={() => {
+                            const newSubject = subject === cat ? "" : cat;
+                            if (subject !== newSubject) {
+                              setSubject(newSubject);
+                              setUpdates([]);
+                              setSkip(0);
+                              skipRef.current = 0;
+                              setHasMore(true);
+                              setLoading(true); // Set loading to trigger fetchAndSet in the useEffect
+                            }
+                          }}
                           className="cursor-pointer"
                         >
                           #{cat}
@@ -339,7 +389,14 @@
                                           onClick={e => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            setClassification(c.toLowerCase());
+                                            if (classification !== c.toLowerCase()) {
+                                              setClassification(c.toLowerCase());
+                                              setUpdates([]);
+                                              setSkip(0);
+                                              skipRef.current = 0;
+                                              setHasMore(true);
+                                              setLoading(true);
+                                            }
                                           }}
                                           className="mr-1 cursor-pointer"
                                         >
@@ -357,7 +414,15 @@
                                           onClick={e => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            setSubject(subject === s ? "" : s);
+                                            const newSubject = subject === s ? "" : s;
+                                            if (subject !== newSubject) {
+                                              setSubject(newSubject);
+                                              setUpdates([]);
+                                              setSkip(0);
+                                              skipRef.current = 0;
+                                              setHasMore(true);
+                                              setLoading(true);
+                                            }
                                           }}
                                           className="mr-1 cursor-pointer"
                                         >
