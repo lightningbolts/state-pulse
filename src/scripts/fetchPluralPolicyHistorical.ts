@@ -33,11 +33,16 @@ async function processDirectory(directory: string, legislationCollection: any, s
       try {
         const fileContent = await fs.readFile(fullPath, 'utf-8');
         const bills: any[] = JSON.parse(fileContent);
-
         if (Array.isArray(bills) && bills.length > 0) {
-          const operations = bills
+          console.log(`Found ${bills.length} bills in ${entry.name}`);
+          let processed = 0;
+          const batchSize = 100;
+          for (let i = 0; i < bills.length; i += batchSize) {
+            const batch = bills.slice(i, i + batchSize);
+            const operations = batch
               .filter(bill => {
                 if (!bill.id) {
+                  console.warn(`Skipping bill with missing id at index ${i}`);
                   return false;
                 }
 
@@ -69,7 +74,10 @@ async function processDirectory(directory: string, legislationCollection: any, s
 
                 return false; // Exclude if no session year or action dates
               })
-              .map(bill => {
+              .map((bill, idx) => {
+                if (i % 10 === 0) {
+                  console.log(`Processing bill ${i + idx + 1} / ${bills.length} (id: ${bill.id})`);
+                }
                 const historyWithDates = (bill.actions || []).map((action: any) => ({
                   date: action.date ? new Date(action.date) : null,
                   action: action.description || '',
@@ -156,11 +164,17 @@ async function processDirectory(directory: string, legislationCollection: any, s
                   },
                 };
               });
-
-          if (operations.length > 0) {
-            await legislationCollection.bulkWrite(operations);
-            console.log(`Upserted ${operations.length} bills from ${entry.name}`);
+            if (operations.length > 0) {
+              try {
+                await legislationCollection.bulkWrite(operations);
+                console.log(`Upserted ${operations.length} bills from ${entry.name} (batch ${i / batchSize + 1})`);
+              } catch (err) {
+                console.error(`Error in bulkWrite for batch starting at index ${i}:`, err);
+              }
+            }
+            processed += batch.length;
           }
+          console.log(`Finished processing ${processed} bills from ${entry.name}`);
         } else if (bills && typeof bills === 'object' && !Array.isArray(bills)) {
           const bill = bills as any;
           if (bill.id) {
