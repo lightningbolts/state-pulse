@@ -320,16 +320,35 @@ async function fetchAndStoreUpdatedBills(
               fullText = legislationToStore.title || '';
             }
             legislationToStore.fullText = fullText;
-            // Only update geminiSummary if it is missing or is the default unavailable message
-            if (
-              !legislationToStore.geminiSummary ||
-              legislationToStore.geminiSummary === 'Summary not available due to insufficient information.'
-            ) {
-              legislationToStore.geminiSummary = fullText ? await generatePhiSummary(fullText) : null;
+            // Only generate a new summary if the existing summary is less than 20 words or is the unavailable message
+            let shouldGenerateSummary = false;
+            let geminiSummaryWordCount = 0;
+            if (!legislationToStore.geminiSummary) {
+              shouldGenerateSummary = true;
+            } else {
+              geminiSummaryWordCount = legislationToStore.geminiSummary.trim().split(/\s+/).length;
+              if (
+                geminiSummaryWordCount < 20 ||
+                legislationToStore.geminiSummary === 'Summary not available due to insufficient information.'
+              ) {
+                shouldGenerateSummary = true;
+              }
             }
-            await upsertLegislationSelective(legislationToStore);
-            console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id}`);
-            billsProcessed++;
+            if (shouldGenerateSummary) {
+              legislationToStore.geminiSummary = fullText ? await generatePhiSummary(fullText) : null;
+              geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
+            }
+            // Only upsert if geminiSummary is less than 20 words or is the default unavailable message
+            const shouldUpsert =
+              geminiSummaryWordCount < 20 ||
+              legislationToStore.geminiSummary === 'Summary not available due to insufficient information.';
+            if (shouldUpsert) {
+              await upsertLegislationSelective(legislationToStore);
+              console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id}`);
+              billsProcessed++;
+            } else {
+              console.log(`Skipped upsert for: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id} (geminiSummary too long)`);
+            }
           } catch (transformError) {
             console.error(`Error transforming or upserting bill ${osBill.identifier} (OS ID: ${osBill.id}):`, transformError);
           }
