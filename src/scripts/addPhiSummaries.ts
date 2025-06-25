@@ -2,11 +2,11 @@ import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
 import { getAllLegislation, upsertLegislationSelective } from '../services/legislationService';
-import { generatePhiSummary } from '../services/geminiSummaryUtil';
+import { generatePhiSummary, fetchPdfTextFromOpenStatesUrl } from '../services/geminiSummaryUtil';
 import { getCollection } from '../lib/mongodb';
 
 async function main() {
-  const batchSize = 20;
+  const batchSize = 1000; // MongoDB's default max batch size for .find() is 1000
   let skip = 0;
   let hasMore = true;
   let processed = 0;
@@ -23,7 +23,15 @@ async function main() {
         if (!bill.fullText || (bill.geminiSummary && bill.geminiSummary !== 'Summary not available due to insufficient information.' && bill.geminiSummary.trim().length > 40)) {
           continue;
         }
-        const summary = await generatePhiSummary(bill.fullText);
+        // Always try to fetch the best PDF text for summarization
+        let textToSummarize = bill.fullText;
+        if (bill.stateLegislatureUrl) {
+          const pdfText = await fetchPdfTextFromOpenStatesUrl(bill.stateLegislatureUrl);
+          if (pdfText && pdfText.length > 100) {
+            textToSummarize = pdfText;
+          }
+        }
+        const summary = await generatePhiSummary(textToSummarize);
         bill.geminiSummary = summary;
         await upsertLegislationSelective(bill);
         processed++;
