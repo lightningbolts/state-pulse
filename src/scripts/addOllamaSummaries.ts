@@ -19,18 +19,23 @@ async function main() {
     if (!batch.length) break;
     for (const [i, bill] of batch.entries()) {
       try {
+        // Only update if geminiSummary is missing or is the fallback message (not if it already contains a real summary)
         if (!bill.fullText || (bill.geminiSummary && bill.geminiSummary !== 'Summary not available due to insufficient information.' && bill.geminiSummary.trim().length > 40)) {
           continue;
         }
-        // Always try to fetch the best PDF text for summarization
+        // Use fullText if available, otherwise try to fetch PDF text
         let textToSummarize = bill.fullText;
-        if (bill.stateLegislatureUrl) {
+        if (!textToSummarize && bill.stateLegislatureUrl) {
           const pdfText = await fetchPdfTextFromOpenStatesUrl(bill.stateLegislatureUrl);
           if (pdfText && pdfText.length > 100) {
             textToSummarize = pdfText;
           } else {
-            console.warn(`[Ollama] No valid PDF text found for ${bill.identifier || bill.id}. Using fullText.`);
+            console.warn(`[Ollama] No valid PDF text found for ${bill.identifier || bill.id}.`);
           }
+        }
+        if (!textToSummarize) {
+          console.warn(`[Ollama] No text available to summarize for ${bill.identifier || bill.id}.`);
+          continue;
         }
         const summary = await generateOllamaSummary(textToSummarize, "mistral");
         bill.geminiSummary = summary;
