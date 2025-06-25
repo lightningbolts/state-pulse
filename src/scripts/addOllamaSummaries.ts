@@ -19,8 +19,9 @@ async function main() {
     if (!batch.length) break;
     for (const [i, bill] of batch.entries()) {
       try {
-        // Only update if geminiSummary is missing or is the fallback message (not if it already contains a real summary)
-        if (!bill.fullText || (bill.geminiSummary && bill.geminiSummary !== 'Summary not available due to insufficient information.' && bill.geminiSummary.trim().length > 40)) {
+        // Only update if geminiSummary is missing, is the fallback message, or is longer than 6 sentences
+        const geminiSummarySentences = bill.geminiSummary ? bill.geminiSummary.split(/[.!?]+/).filter(s => s.trim().length > 0) : [];
+        if (bill.geminiSummary && bill.geminiSummary !== 'Summary not available due to insufficient information.' && bill.geminiSummary.trim().length > 40 && geminiSummarySentences.length <= 6) {
           continue;
         }
         // Use fullText if available, otherwise try to fetch PDF text
