@@ -203,7 +203,7 @@ export async function generatePhiSummary(text: string): Promise<string> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'phi',
-        prompt: `Summarize the following text in 3-5 sentences for a general audience, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.' \n\n${text}`,
+        prompt: `Summarize the following text in 3-5 sentences for a general audience, focusing on the main points and specific impact. Remove fluff and filler. Don't say "this is a summary for a general audience:"; dive right in. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.' \n\n${text}`,
         stream: false
       })
     });
