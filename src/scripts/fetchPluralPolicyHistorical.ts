@@ -36,7 +36,39 @@ async function processDirectory(directory: string, legislationCollection: any, s
 
         if (Array.isArray(bills) && bills.length > 0) {
           const operations = bills
-            .filter(bill => bill.id) // Ensure bill has an id
+            .filter(bill => {
+              if (!bill.id) {
+                return false;
+              }
+
+              const session = bill.legislative_session || bill.session;
+              const jurisdiction = bill.jurisdiction_name || bill.jurisdiction?.name;
+
+              if (jurisdiction === 'Washington' && session === '2025-2026') {
+                return false;
+              }
+
+              if (session) {
+                const yearMatch = String(session).match(/\d{4}/);
+                if (yearMatch) {
+                  const year = parseInt(yearMatch[0], 10);
+                  if (year >= 2020) return true;
+                }
+              }
+
+              // Fallback to checking action dates
+              if (Array.isArray(bill.actions) && bill.actions.length > 0) {
+                return bill.actions.some((action: any) => {
+                  if (action.date) {
+                    const year = new Date(action.date).getFullYear();
+                    return year >= 2020;
+                  }
+                  return false;
+                });
+              }
+
+              return false; // Exclude if no session year or action dates
+            })
             .map(bill => {
               const historyWithDates = (bill.actions || []).map((action: any) => ({
                 date: action.date ? new Date(action.date) : null,
