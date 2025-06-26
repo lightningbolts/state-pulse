@@ -191,10 +191,11 @@ async function processDirectory(directory: string, legislationCollection: any, s
                   },
                 };
               });
-            if (operations.length > 0) {
+            const resolvedOperations = await Promise.all(operations);
+            if (resolvedOperations.length > 0) {
               try {
-                await legislationCollection.bulkWrite(operations);
-                console.log(`Upserted ${operations.length} bills from ${entry.name} (batch ${i / batchSize + 1})`);
+                await legislationCollection.bulkWrite(resolvedOperations);
+                console.log(`Upserted ${resolvedOperations.length} bills from ${entry.name} (batch ${i / batchSize + 1})`);
               } catch (err) {
                 console.error(`Error in bulkWrite for batch starting at index ${i}:`, err);
               }
