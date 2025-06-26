@@ -146,6 +146,10 @@ async function processDirectory(directory: string, legislationCollection: any, s
                       console.warn(`Failed to fetch raw_text_url for bill ${bill.id}`);
                     }
                   }
+                  if (textToSummarize) {
+                    console.log(`[DEBUG] Bill ${bill.id} textToSummarize length:`, textToSummarize.length);
+                    console.log(`[DEBUG] Bill ${bill.id} textToSummarize preview:`, textToSummarize.slice(0, 200));
+                  }
                   if (textToSummarize && textToSummarize.length > 100) {
                     try {
                       geminiSummary = await generateOllamaSummary(textToSummarize, "mistral");
@@ -283,6 +287,7 @@ async function processDirectory(directory: string, legislationCollection: any, s
               latestPassageAt: bill.latest_passage_date ? new Date(bill.latest_passage_date) : null,
               createdAt: bill.created_at ? new Date(bill.created_at) : undefined,
               updatedAt: bill.updated_at ? new Date(bill.updated_at) : undefined,
+              geminiSummary: bill.geminiSummary || null,
               summary: bill.summary || null,
               extras: bill.extras || null,
             };
