@@ -214,7 +214,8 @@ export async function generateOllamaSummary(text: string, model: string): Promis
       throw new Error(`Ollama ${model} API error: ${response.status}`);
     }
     const data = await response.json();
-    console.log('[Ollama] Raw response:', data);
+    console.log('Valid Ollama summary generated.')
+    // console.log('[Ollama] Raw response:', data);
     return data.response?.trim() || 'Summary not available due to insufficient information.';
   } catch (err) {
     console.error('Error generating ollama summary:', err);
