@@ -199,7 +199,7 @@ export async function generateOllamaSummary(text: string, model: string): Promis
   if (!text || text.trim().length === 0) return 'Summary not available due to insufficient information.';
   try {
     const prompt = `Summarize this legislative bill for a general audience in 3–5 sentences. Focus on what the bill does, who it affects, and any key impacts. If no content is available, respond: 'Summary not available due to insufficient information.'\n\n${text}`;
-    console.log('[Ollama] Prompt:', prompt.slice(0, 500));
+    // console.log('[Ollama] Prompt:', prompt.slice(0, 500));
     const response = await fetch('http://localhost:11434/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
