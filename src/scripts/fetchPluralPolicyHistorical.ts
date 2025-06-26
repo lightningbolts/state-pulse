@@ -9,6 +9,7 @@ import fetch from 'node-fetch';
 config({ path: path.resolve(__dirname, '../../.env') });
 
 const DATA_DIR = path.join(__dirname, '../data');
+console.log('DATA_DIR:', DATA_DIR);
 
 /**
  * Processes all JSON files in a directory and its subdirectories and upserts them into MongoDB.
@@ -16,8 +17,10 @@ const DATA_DIR = path.join(__dirname, '../data');
  */
 async function processDirectory(directory: string, legislationCollection: any, startAtFile?: string, state?: { skipping: boolean }) {
   const entries = await fs.readdir(directory, { withFileTypes: true });
+  console.log('Directory entries for', directory, ':', entries.map(e => e.name));
   for (const entry of entries) {
     const fullPath = path.join(directory, entry.name);
+    console.log('Processing entry:', fullPath, 'isDirectory:', entry.isDirectory(), 'isFile:', entry.isFile());
     if (entry.isDirectory()) {
       await processDirectory(fullPath, legislationCollection, startAtFile, state);
     } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
