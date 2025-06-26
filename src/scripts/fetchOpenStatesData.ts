@@ -4,7 +4,7 @@ import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/geminiSummaryUtil';
+import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/aiSummaryUtil';
 
 config({ path: '../../.env' });
 

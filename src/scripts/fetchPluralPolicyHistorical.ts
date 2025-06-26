@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getCollection, connectToDatabase } from '../lib/mongodb';
 import { Legislation } from '../types/legislation';
+import { generateOllamaSummary } from '../services/aiSummaryUtil';
+import fetch from 'node-fetch';
 
 config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -53,28 +55,29 @@ async function processDirectory(directory: string, legislationCollection: any, s
                   return false;
                 }
 
+                // Only process legislation from one year ago (2024) to now
+                const currentYear = new Date().getFullYear();
+                const minYear = currentYear - 1;
+                let billYear: number | null = null;
                 if (session) {
                   const yearMatch = String(session).match(/\d{4}/);
                   if (yearMatch) {
-                    const year = parseInt(yearMatch[0], 10);
-                    if (year >= 2020) return true;
+                    billYear = parseInt(yearMatch[0], 10);
                   }
                 }
-
-                // Fallback to checking action dates
-                if (Array.isArray(bill.actions) && bill.actions.length > 0) {
-                  return bill.actions.some((action: any) => {
+                // Fallback to checking action dates if session year is not available
+                if (!billYear && Array.isArray(bill.actions) && bill.actions.length > 0) {
+                  for (const action of bill.actions) {
                     if (action.date) {
                       const year = new Date(action.date).getFullYear();
-                      return year >= 2020;
+                      if (!billYear || year > billYear) billYear = year;
                     }
-                    return false;
-                  });
+                  }
                 }
-
-                return false; // Exclude if no session year or action dates
+                if (!billYear) return false;
+                return billYear >= minYear && billYear <= currentYear;
               })
-              .map((bill, idx) => {
+              .map(async (bill, idx) => {
                 if (i % 10 === 0) {
                   console.log(`Processing bill ${i + idx + 1} / ${bills.length} (id: ${bill.id})`);
                 }
@@ -125,6 +128,29 @@ async function processDirectory(directory: string, legislationCollection: any, s
                   note: a.note || null,
                 }));
 
+                // AI summary logic
+                let geminiSummary = bill.geminiSummary || null;
+                if (!geminiSummary) {
+                  let textToSummarize = bill.raw_text || null;
+                  if (!textToSummarize && bill.raw_text_url) {
+                    try {
+                      const resp = await fetch(bill.raw_text_url);
+                      if (resp.ok) {
+                        textToSummarize = await resp.text();
+                      }
+                    } catch (e) {
+                      console.warn(`Failed to fetch raw_text_url for bill ${bill.id}`);
+                    }
+                  }
+                  if (textToSummarize) {
+                    try {
+                      geminiSummary = await generateOllamaSummary(textToSummarize);
+                    } catch (e) {
+                      console.warn(`Failed to generate summary for bill ${bill.id}`);
+                    }
+                  }
+                }
+
                 const legislation: Partial<Legislation> = {
                   id: bill.id.replace('/', '_'),
                   identifier: bill.identifier,
@@ -140,6 +166,7 @@ async function processDirectory(directory: string, legislationCollection: any, s
                   documents,
                   sources,
                   abstracts,
+                  geminiSummary,
                   openstatesUrl: bill.openstates_url,
                   firstActionAt: bill.first_action_date ? new Date(bill.first_action_date) : null,
                   latestActionAt: bill.latest_action_date ? new Date(bill.latest_action_date) : null,

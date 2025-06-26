@@ -4,7 +4,7 @@ import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getAllLegislation, upsertLegislationSelective } from '../services/legislationService';
-import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl } from '../services/geminiSummaryUtil';
+import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl } from '../services/aiSummaryUtil';
 import { getCollection } from '../lib/mongodb';
 
 function getStateAbbrFromJuriId(jurisdictionId: string): string | null {
