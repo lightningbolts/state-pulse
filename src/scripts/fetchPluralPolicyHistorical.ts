@@ -147,8 +147,8 @@ async function processDirectory(directory: string, legislationCollection: any, s
                     }
                   }
                   if (textToSummarize) {
-                    console.log(`[DEBUG] Bill ${bill.id} textToSummarize length:`, textToSummarize.length);
-                    console.log(`[DEBUG] Bill ${bill.id} textToSummarize preview:`, textToSummarize.slice(0, 200));
+                    // console.log(`[DEBUG] Bill ${bill.id} textToSummarize length:`, textToSummarize.length);
+                    // console.log(`[DEBUG] Bill ${bill.id} textToSummarize preview:`, textToSummarize.slice(0, 200));
                     try {
                       geminiSummary = await generateOllamaSummary(textToSummarize, "mistral");
                       generatedNewSummary = true;
