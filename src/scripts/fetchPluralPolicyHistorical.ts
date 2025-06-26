@@ -133,7 +133,8 @@ async function processDirectory(directory: string, legislationCollection: any, s
 
                 // AI summary logic
                 let geminiSummary = bill.geminiSummary || null;
-                if (!geminiSummary) {
+                let generatedNewSummary = false;
+                if (!geminiSummary || geminiSummary.length < 100) {
                   let textToSummarize = bill.raw_text || null;
                   if (!textToSummarize && bill.raw_text_url) {
                     try {
@@ -145,13 +146,17 @@ async function processDirectory(directory: string, legislationCollection: any, s
                       console.warn(`Failed to fetch raw_text_url for bill ${bill.id}`);
                     }
                   }
-                  if (textToSummarize) {
+                  if (textToSummarize && textToSummarize.length > 100) {
                     try {
                       geminiSummary = await generateOllamaSummary(textToSummarize, "mistral");
+                      generatedNewSummary = true;
                     } catch (e) {
                       console.warn(`Failed to generate summary for bill ${bill.id}`);
                     }
                   }
+                }
+                if (generatedNewSummary) {
+                  console.log(`[SUMMARY] New summary generated for bill ${bill.id}`);
                 }
 
                 const legislation: Partial<Legislation> = {
