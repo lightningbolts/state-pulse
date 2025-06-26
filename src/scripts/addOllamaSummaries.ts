@@ -46,8 +46,8 @@ async function main() {
                 // Assuming jsonData is an array of bill objects
                 if (Array.isArray(jsonData)) {
                     const billData = jsonData.find(b => b.identifier === bill.identifier);
-                    if (billData && billData.full_text) {
-                        textToSummarize = billData.full_text;
+                    if (billData && (billData.full_text || billData.raw_text)) {
+                      textToSummarize = billData.full_text || billData.raw_text;
                     }
                 }
               }
