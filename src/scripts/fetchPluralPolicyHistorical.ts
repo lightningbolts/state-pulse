@@ -144,7 +144,7 @@ async function processDirectory(directory: string, legislationCollection: any, s
                   }
                   if (textToSummarize) {
                     try {
-                      geminiSummary = await generateOllamaSummary(textToSummarize);
+                      geminiSummary = await generateOllamaSummary(textToSummarize, "mistral");
                     } catch (e) {
                       console.warn(`Failed to generate summary for bill ${bill.id}`);
                     }
