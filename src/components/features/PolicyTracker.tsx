@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BellRing, X } from "lucide-react";
+import { BellRing, X, Pencil, Check, Ban } from "lucide-react";
 
 export function PolicyTracker() {
 	const { user, isLoaded, isSignedIn } = useUser();
@@ -23,6 +23,8 @@ export function PolicyTracker() {
 		message: string;
 		date: string;
 	}[]>([]);
+	const [editingTopic, setEditingTopic] = useState<string | null>(null);
+	const [newTopicValue, setNewTopicValue] = useState("");
 
 	// Fetch topics and updates from backend
 	const fetchUpdates = async () => {
@@ -59,10 +61,46 @@ export function PolicyTracker() {
 		}
 	};
 
-	const handleUnsubscribe = (topic: string) => {
-		// Optionally implement unsubscribe logic in backend
-		setTopics(topics.filter((t) => t !== topic));
-		setUpdates(updates.filter((u) => u.topic !== topic));
+	const handleUnsubscribe = async (topic: string) => {
+		if (!isSignedIn) {
+			return;
+		}
+		const res = await fetch("/api/policy-tracker", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ topic }),
+		});
+
+		if (res.ok) {
+			fetchUpdates();
+		}
+	};
+
+	const handleEdit = (topic: string) => {
+		setEditingTopic(topic);
+		setNewTopicValue(topic);
+	};
+
+	const handleCancelEdit = () => {
+		setEditingTopic(null);
+		setNewTopicValue("");
+	};
+
+	const handleUpdateTopic = async () => {
+		if (!isSignedIn || !editingTopic || !newTopicValue) {
+			return;
+		}
+		const res = await fetch("/api/policy-tracker", {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ oldTopic: editingTopic, newTopic: newTopicValue }),
+		});
+
+		if (res.ok) {
+			setEditingTopic(null);
+			setNewTopicValue("");
+			fetchUpdates();
+		}
 	};
 
 	return (
@@ -105,29 +143,56 @@ export function PolicyTracker() {
 						)}
 						{topics.map((topic) => (
 							<li key={topic} className="flex items-center justify-between">
-								<span>{topic}</span>
-								<div className="flex items-center gap-2">
-									<Button
-										variant="outline"
-										size="icon"
-										className="text-primary border-primary hover:bg-primary/10"
-										aria-label={`Simulate update for ${topic}`}
-										data-testid={`policy-tracker-simulate-update-${topic}`}
-									>
-										<BellRing className="w-4 h-4" />
-									</Button>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="ml-2 text-destructive hover:text-destructive/80"
-										onClick={() => handleUnsubscribe(topic)}
-										aria-label={`Unsubscribe from ${topic}`}
-										data-testid={`policy-tracker-unsubscribe-${topic}`}
-									>
-										<X className="w-4 h-4" />
-										<span className="sr-only">Unsubscribe</span>
-									</Button>
-								</div>
+								{editingTopic === topic ? (
+									<div className="flex items-center gap-2 flex-grow">
+										<Input
+											type="text"
+											value={newTopicValue}
+											onChange={(e) => setNewTopicValue(e.target.value)}
+											className="flex-grow"
+										/>
+										<Button size="icon" onClick={handleUpdateTopic}>
+											<Check className="w-4 h-4" />
+										</Button>
+										<Button size="icon" variant="ghost" onClick={handleCancelEdit}>
+											<Ban className="w-4 h-4" />
+										</Button>
+									</div>
+								) : (
+									<>
+										<span>{topic}</span>
+										<div className="flex items-center gap-2">
+											<Button
+												variant="outline"
+												size="icon"
+												className="text-primary border-primary hover:bg-primary/10"
+												aria-label={`Simulate update for ${topic}`}
+												data-testid={`policy-tracker-simulate-update-${topic}`}
+											>
+												<BellRing className="w-4 h-4" />
+											</Button>
+											<Button
+												variant="ghost"
+												size="icon"
+												onClick={() => handleEdit(topic)}
+												aria-label={`Edit ${topic}`}
+											>
+												<Pencil className="w-4 h-4" />
+											</Button>
+											<Button
+												variant="ghost"
+												size="sm"
+												className="ml-2 text-destructive hover:text-destructive/80"
+												onClick={() => handleUnsubscribe(topic)}
+												aria-label={`Unsubscribe from ${topic}`}
+												data-testid={`policy-tracker-unsubscribe-${topic}`}
+											>
+												<X className="w-4 h-4" />
+												<span className="sr-only">Unsubscribe</span>
+											</Button>
+										</div>
+									</>
+								)}
 							</li>
 						))}
 					</ul>

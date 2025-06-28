@@ -40,3 +40,55 @@ export async function GET(req: NextRequest) {
     .toArray();
   return NextResponse.json({ updates });
 }
+
+// DELETE /api/policy-tracker
+export async function DELETE(req: NextRequest) {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { topic } = await req.json();
+  if (!topic) {
+    return NextResponse.json({ error: 'Missing topic' }, { status: 400 });
+  }
+
+  const db = await getDb();
+  const result = await db
+    .collection('users')
+    .deleteOne({ userId: auth.userId, topic });
+
+  if (result.deletedCount === 0) {
+    return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+// PUT /api/policy-tracker
+export async function PUT(req: NextRequest) {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { oldTopic, newTopic } = await req.json();
+  if (!oldTopic || !newTopic) {
+    return NextResponse.json(
+      { error: 'Missing oldTopic or newTopic' },
+      { status: 400 }
+    );
+  }
+
+  const db = await getDb();
+  const result = await db.collection('users').updateOne(
+    { userId: auth.userId, topic: oldTopic },
+    { $set: { topic: newTopic } }
+  );
+
+  if (result.matchedCount === 0) {
+    return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true });
+}
