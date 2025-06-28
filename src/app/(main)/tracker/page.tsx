@@ -1,9 +1,16 @@
-import { PolicyTracker } from "@/components/features/PolicyTracker";
-import { getCurrentUser } from "@/lib/clerkMongoIntegration";
+"use client";
 
-export default async function TrackerPage() {
-  const user = await getCurrentUser();
-  if (!user) {
+import { PolicyTracker } from "@/components/features/PolicyTracker";
+import { useUser } from "@clerk/nextjs";
+
+export default function TrackerPage() {
+  const { isSignedIn, isLoaded } = useUser();
+
+  if (!isLoaded) {
+    return <div>Loading...</div>; // Or a spinner component
+  }
+
+  if (!isSignedIn) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh]">
         <h2 className="text-xl font-semibold mb-2">Sign in required</h2>
@@ -11,5 +18,6 @@ export default async function TrackerPage() {
       </div>
     );
   }
-  return <PolicyTracker userId={user.id} />;
+
+  return <PolicyTracker />;
 }

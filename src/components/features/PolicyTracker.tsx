@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BellRing, X } from "lucide-react";
 
-export function PolicyTracker({ userId }: { userId: string }) {
+export function PolicyTracker() {
+  const { user } = useUser();
+  const userId = user?.id;
   const [input, setInput] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
   const [updates, setUpdates] = useState<{ topic: string; message: string; date: string }[]>([]);
