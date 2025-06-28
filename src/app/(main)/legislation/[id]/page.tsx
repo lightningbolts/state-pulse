@@ -15,19 +15,32 @@ const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['hi
       <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
         <ListChecks className="mr-2 h-6 w-6 text-primary" /> Timeline
       </h3>
-      <ul className="list-none p-0 space-y-3">
-        {historyEvents.map((event, index) => (
-          <li key={index} className="border-l-2 border-primary pl-0 py-0 bg-card rounded-md shadow-sm hover:shadow-md transition-shadow">
-            <p className="font-medium text-primary-foreground bg-primary px-3 py-1.5 rounded-t-md text-sm flex justify-between items-center">
-              <span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}</span>
-              <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
-            </p>
-            <div className="p-3 bg-background rounded-b-md">
-              <p className="text-sm text-foreground">{event.action}</p>
-              {event.details && <p className="text-xs text-muted-foreground mt-1">Details: {event.details}</p>}
-            </div>
-          </li>
-        ))}
+      <ul className="list-none p-0 m-0">
+        {historyEvents.map((event, index) => {
+          const isFirst = index === 0;
+          const isLast = index === historyEvents.length - 1;
+
+          return (
+            <li key={index} className="relative pl-8 pb-8">
+              {/* Vertical Connector Line - now correctly spans the full height */}
+              {!isLast && (
+                <div className="absolute left-[11px] top-3 h-full w-0.5 bg-primary" />
+              )}
+
+              {/* Timeline Dot */}
+              <div className="absolute left-[6px] top-3 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+
+              <div className="bg-card p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                <div className="font-medium text-primary-foreground bg-primary px-3 py-2 rounded-t-md text-sm flex justify-between items-center -m-4 mb-3">
+                  <span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}</span>
+                  <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
+                </div>
+                <p className="text-sm text-foreground m-0">{event.action}</p>
+                {event.details && <p className="text-xs text-muted-foreground mt-1 mb-0">Details: {event.details}</p>}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
