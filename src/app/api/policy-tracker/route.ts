@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoClient } from '@/lib/mongodb';
+import { getDb } from '@/lib/mongodb';
+import { getAuth } from '@clerk/nextjs/server';
 
 // POST /api/policy-tracker
 export async function POST(req: NextRequest) {
-  const { topic, userId } = await req.json();
-  if (!topic || !userId) {
-    return NextResponse.json({ error: 'Missing topic or userId' }, { status: 400 });
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    return NextResponse.json({ error: 'Missing userId' }, { status: 401 });
   }
-  const client = await getMongoClient();
-  const db = client.db();
+  const { topic } = await req.json();
+  if (!topic) {
+    return NextResponse.json({ error: 'Missing topic' }, { status: 400 });
+  }
+  const db = await getDb();
   // Store subscriptions in users collection
   await db.collection('users').updateOne(
-    { userId, topic },
-    { $set: { userId, topic }, $setOnInsert: { createdAt: new Date() } },
+    { userId: auth.userId, topic },
+    { $set: { userId: auth.userId, topic }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
   );
   return NextResponse.json({ success: true });
@@ -24,8 +28,7 @@ export async function GET(req: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
   }
-  const client = await getMongoClient();
-  const db = client.db();
+  const db = await getDb();
   // Find all topics user is subscribed to
   const subs = await db.collection('users').find({ userId }).toArray();
   const topics = subs.map((s) => s.topic);
