@@ -165,24 +165,25 @@ export function PolicyTracker() {
 											<Button
 												variant="outline"
 												size="icon"
-												className="text-primary border-primary hover:bg-primary/10"
+												className="text-primary border-primary hover:bg-primary hover:text-white"
 												aria-label={`Simulate update for ${topic}`}
 												data-testid={`policy-tracker-simulate-update-${topic}`}
 											>
 												<BellRing className="w-4 h-4" />
 											</Button>
 											<Button
-												variant="ghost"
+												variant="outline"
 												size="icon"
+												className="text-blue-500 border-blue-500 hover:bg-blue-500 hover:text-white"
 												onClick={() => handleEdit(topic)}
 												aria-label={`Edit ${topic}`}
 											>
 												<Pencil className="w-4 h-4" />
 											</Button>
 											<Button
-												variant="ghost"
-												size="sm"
-												className="ml-2 text-destructive hover:text-destructive/80"
+												variant="outline"
+												size="icon"
+												className="text-red-500 border-red-500 hover:bg-red-500 hover:text-white"
 												onClick={() => handleUnsubscribe(topic)}
 												aria-label={`Unsubscribe from ${topic}`}
 												data-testid={`policy-tracker-unsubscribe-${topic}`}
