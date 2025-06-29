@@ -56,6 +56,9 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
   }
 
   try {
+    // Check if user already exists in MongoDB
+    const existingUser = await getUserById(clerkUser.id);
+
     // Extract relevant data from Clerk user
     const userData: User = {
       id: clerkUser.id,
@@ -63,14 +66,23 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
       name: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim(),
       email: clerkUser.emailAddresses?.[0]?.emailAddress ||
              clerkUser.email_addresses?.[0]?.email_address,
-      savedLegislation: [],
-      trackingTopics: [],
+      // Preserve existing arrays or initialize as empty if user is new
+      savedLegislation: existingUser?.savedLegislation || [],
+      trackingTopics: existingUser?.trackingTopics || [],
       updatedAt: new Date(),
       // Additional fields from Clerk that might be useful
       preferences: {
         imageUrl: clerkUser.imageUrl || clerkUser.image_url,
+        // Preserve existing preferences
+        ...existingUser?.preferences,
       }
     };
+
+    console.log('syncUserToMongoDB - preserving existing data:', {
+      userId: userData.id,
+      savedLegislation: userData.savedLegislation,
+      trackingTopics: userData.trackingTopics
+    });
 
     // Update user in MongoDB or create if doesn't exist
     await upsertUser(userData);

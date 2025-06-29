@@ -9,8 +9,8 @@ export interface User {
     createdAt?: Date;
     updatedAt?: Date;
     preferences?: Record<string, any>;
-    savedLegislation: [],
-    trackingTopics: [],
+    savedLegislation: string[];
+    trackingTopics: string[];
     clerkId?: string;
     // Other fields as needed
 }
@@ -61,12 +61,33 @@ export async function upsertUser(userData: User): Promise<void> {
         let cleanedData = cleanupDataForMongoDB(dataToUpsert);
         cleanedData.updatedAt = new Date();
 
+        // Ensure savedLegislation and trackingTopics are always arrays
+        if (!cleanedData.savedLegislation) {
+            cleanedData.savedLegislation = [];
+        }
+        if (!cleanedData.trackingTopics) {
+            cleanedData.trackingTopics = [];
+        }
+
+        console.log('Upserting user with data:', { id, ...cleanedData });
+
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
-        await collection.updateOne(
+        const result = await collection.updateOne(
             { id },
             { $set: cleanedData },
             { upsert: true }
         );
+
+        console.log('Upsert result:', result);
+
+        // Verify the user was created/updated correctly
+        const verifyUser = await collection.findOne({ id });
+        console.log('User after upsert:', {
+            id: verifyUser?.id,
+            savedLegislation: verifyUser?.savedLegislation,
+            trackingTopics: verifyUser?.trackingTopics
+        });
+
     } catch (error) {
         console.error('Error upserting user:', error);
         throw error;
@@ -81,7 +102,28 @@ export async function getUserById(userId: string): Promise<User | null> {
     try {
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
         const userDoc = await collection.findOne({ id: userId });
-        return userDoc ? { ...userDoc, id: userDoc.id } : null;
+
+        console.log('getUserById - Raw MongoDB document:', userDoc);
+
+        if (!userDoc) {
+            return null;
+        }
+
+        // Ensure savedLegislation and trackingTopics are arrays
+        const user: User = {
+            ...userDoc,
+            id: userDoc.id,
+            savedLegislation: Array.isArray(userDoc.savedLegislation) ? userDoc.savedLegislation : [],
+            trackingTopics: Array.isArray(userDoc.trackingTopics) ? userDoc.trackingTopics : [],
+        };
+
+        console.log('getUserById - Processed user object:', {
+            id: user.id,
+            savedLegislation: user.savedLegislation,
+            trackingTopics: user.trackingTopics
+        });
+
+        return user;
     } catch (error) {
         console.error('Error getting user by ID:', error);
         throw error;
@@ -137,13 +179,37 @@ export async function addSavedLegislation(userId: string, legislationId: string)
     }
     try {
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
-        await collection.updateOne(
+
+        // First check if user exists
+        const existingUser = await collection.findOne({ id: userId });
+        if (!existingUser) {
+            console.error(`User with ID ${userId} not found when trying to add saved legislation`);
+            throw new Error(`User not found: ${userId}`);
+        }
+
+        console.log(`Adding legislation ${legislationId} to user ${userId}`);
+
+        const result = await collection.updateOne(
             { id: userId },
             {
                 $addToSet: { savedLegislation: legislationId },
                 $set: { updatedAt: new Date() }
             }
         );
+
+        console.log(`Update result:`, result);
+
+        if (result.matchedCount === 0) {
+            throw new Error(`User not found for update: ${userId}`);
+        }
+
+        // Verify the bookmark was added
+        const updatedUser = await collection.findOne({ id: userId });
+        console.log(`User after update:`, {
+            id: updatedUser?.id,
+            savedLegislation: updatedUser?.savedLegislation
+        });
+
     } catch (error) {
         console.error('Error adding saved legislation:', error);
         throw error;
