@@ -1,50 +1,10 @@
 import { getLegislationById, type Legislation } from '@/services/legislationService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, CalendarDays, Users, FileText, Tag, Info, ListChecks } from 'lucide-react';
+import { ExternalLink, CalendarDays, FileText, Tag, Info } from 'lucide-react';
 import Link from 'next/link';
-
-// Placeholder for a more sophisticated timeline component
-// This component displays the history of legislation events in a timeline format.
-const LegislationTimeline = ({ historyEvents }: { historyEvents: Legislation['history'] }) => {
-  if (!historyEvents || historyEvents.length === 0) {
-    return <p className="text-muted-foreground">No history events available for this legislation.</p>;
-  }
-  return (
-    <div className="space-y-4 mt-6">
-      <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
-        <ListChecks className="mr-2 h-6 w-6 text-primary" /> Timeline
-      </h3>
-      <ul className="list-none p-0 m-0">
-        {historyEvents.map((event, index) => {
-          const isFirst = index === 0;
-          const isLast = index === historyEvents.length - 1;
-
-          return (
-            <li key={index} className="relative pl-8 pb-8">
-              {/* Vertical Connector Line - now correctly spans the full height */}
-              {!isLast && (
-                <div className="absolute left-[11px] top-3 h-full w-0.5 bg-primary" />
-              )}
-
-              {/* Timeline Dot */}
-              <div className="absolute left-[6px] top-3 h-3 w-3 rounded-full bg-primary border-2 border-background" />
-
-              <div className="bg-card p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div className="font-medium text-primary-foreground bg-primary px-3 py-2 rounded-t-md text-sm flex justify-between items-center -m-4 mb-3">
-                  <span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}</span>
-                  <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
-                </div>
-                <p className="text-sm text-foreground m-0">{event.action}</p>
-                {event.details && <p className="text-xs text-muted-foreground mt-1 mb-0">Details: {event.details}</p>}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-};
+import { CollapsibleSponsors } from '@/components/features/CollapsibleSponsors';
+import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const id = params.id;
@@ -89,7 +49,6 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     latestActionAt,
     latestActionDescription,
     geminiSummary,
-    tags,
   } = legislation;
 
   return (
@@ -128,20 +87,15 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
 
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-foreground flex items-center">
-                <Tag className="mr-2 h-5 w-5 text-primary" /> Subjects & Tags
+                <Tag className="mr-2 h-5 w-5 text-primary" /> Subjects
               </h3>
               {subjects && subjects.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {subjects.map(subject => <Badge key={subject} variant="default">{subject}</Badge>)}
                 </div>
               )}
-              {tags && tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {tags.map((tag: string) => <Badge key={tag} variant="secondary" className="italic">{tag}</Badge>)}
-                </div>
-              )}
-              {(!subjects || subjects.length === 0) && (!tags || tags.length === 0) && (
-                <p className="text-sm text-muted-foreground">No subjects or tags available.</p>
+              {(!subjects || subjects.length === 0) && (
+                <p className="text-sm text-muted-foreground">No subjects available.</p>
               )}
             </div>
           </div>
@@ -154,20 +108,8 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </div>
           )}
 
-          {sponsors && sponsors.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
-                <Users className="mr-2 h-6 w-6 text-primary" /> Sponsors
-              </h3>
-              <ul className="space-y-2">
-                {sponsors.map(sponsor => (
-                  <li key={sponsor.id || sponsor.name} className="text-sm p-2 bg-muted/50 rounded-md">
-                    {sponsor.name} ({sponsor.primary ? 'Primary' : 'Co-sponsor'}) - {sponsor.entityType}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Sponsors Section with Collapsible Functionality */}
+          <CollapsibleSponsors sponsors={sponsors} />
 
           {abstracts && abstracts.length > 0 && (
             <div className="mt-6">
@@ -228,7 +170,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </div>
           )}
 
-          <LegislationTimeline historyEvents={history} />
+          <CollapsibleTimeline historyEvents={history} />
         </CardContent>
       </Card>
     </div>
