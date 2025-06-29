@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { StatePulseHeader } from "@/components/StatePulseHeader";
+import { BookmarksProvider } from "@/components/features/BookmarkButton";
 import {
   SidebarProvider,
   Sidebar,
@@ -96,7 +97,9 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
       <SidebarInset>
         <StatePulseHeader />
         <main className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 bg-background">
-          {children}
+          <BookmarksProvider>
+            {children}
+          </BookmarksProvider>
         </main>
       </SidebarInset>
     </SidebarProvider>

@@ -1,10 +1,61 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext, createContext } from 'react';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@clerk/nextjs';
+
+// Create a context to share bookmarks data across all BookmarkButton instances
+const BookmarksContext = createContext<{
+  bookmarks: string[];
+  updateBookmarks: (bookmarks: string[]) => void;
+  loading: boolean;
+}>({
+  bookmarks: [],
+  updateBookmarks: () => {},
+  loading: true,
+});
+
+// Provider component to wrap the app/page
+export function BookmarksProvider({ children }: { children: React.ReactNode }) {
+  const [bookmarks, setBookmarks] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user, isLoaded } = useUser();
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      fetchBookmarks();
+    } else if (isLoaded && !user) {
+      setLoading(false);
+      setBookmarks([]);
+    }
+  }, [isLoaded, user]);
+
+  const fetchBookmarks = async () => {
+    try {
+      const response = await fetch('/api/bookmarks');
+      if (response.ok) {
+        const data = await response.json();
+        setBookmarks(data.bookmarks || []);
+      }
+    } catch (error) {
+      console.error('Error fetching bookmarks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateBookmarks = (newBookmarks: string[]) => {
+    setBookmarks(newBookmarks);
+  };
+
+  return (
+    <BookmarksContext.Provider value={{ bookmarks, updateBookmarks, loading }}>
+      {children}
+    </BookmarksContext.Provider>
+  );
+}
 
 interface BookmarkButtonProps {
   legislationId: string;
@@ -12,29 +63,12 @@ interface BookmarkButtonProps {
 }
 
 export function BookmarkButton({ legislationId, className = '' }: BookmarkButtonProps) {
-  const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { user, isLoaded } = useUser();
+  const { bookmarks, updateBookmarks, loading } = useContext(BookmarksContext);
 
-  // Check if legislation is bookmarked on component mount
-  useEffect(() => {
-    if (isLoaded && user) {
-      checkBookmarkStatus();
-    }
-  }, [isLoaded, user, legislationId]);
-
-  const checkBookmarkStatus = async () => {
-    try {
-      const response = await fetch('/api/bookmarks');
-      if (response.ok) {
-        const data = await response.json();
-        setIsBookmarked(data.bookmarks.includes(legislationId));
-      }
-    } catch (error) {
-      console.error('Error checking bookmark status:', error);
-    }
-  };
+  const isBookmarked = bookmarks.includes(legislationId);
 
   const handleBookmarkToggle = async () => {
     if (!user) {
@@ -59,7 +93,12 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
       });
 
       if (response.ok) {
-        setIsBookmarked(!isBookmarked);
+        // Update the shared bookmarks state
+        const newBookmarks = isBookmarked
+          ? bookmarks.filter(id => id !== legislationId)
+          : [...bookmarks, legislationId];
+        updateBookmarks(newBookmarks);
+
         toast({
           title: isBookmarked ? "Bookmark removed" : "Bookmarked",
           description: isBookmarked
@@ -82,7 +121,7 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
     }
   };
 
-  if (!isLoaded) {
+  if (!isLoaded || loading) {
     return (
       <Button variant="outline" size="sm" disabled className={className}>
         <Bookmark className="h-4 w-4" />

@@ -4,6 +4,7 @@
             import { Input } from "@/components/ui/input";
             import { Button } from "@/components/ui/button";
             import { Bookmark, Search } from "lucide-react";
+            import { BookmarkButton } from "@/components/features/BookmarkButton";
             import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
             import {
               DropdownMenu,
@@ -408,102 +409,108 @@
                         const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
 
                         return (
-                            <Link
+                            <div
                               key={uniqueKey}
-                              href={`/legislation/${update.id}`}
-                              className="block mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full"
-                              style={{ textDecoration: 'none', color: 'inherit' }}
-                              tabIndex={0}
+                              className="mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full relative"
                             >
                               <div className="flex flex-col h-full">
-                                <div>
-                                  <div className="font-bold text-lg mb-1 text-left">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
-                                  <div className="text-sm text-muted-foreground mb-1 text-left">
-                                    {update.jurisdictionName} • {update.session}
-                                  </div>
-                                  {update.classification && update.classification.length > 0 && (
-                                    <div className="mb-1">
-                                      {update.classification.map((c, i) => (
-                                        <Badge
-                                          key={c + i}
-                                          variant={classification === c.toLowerCase() ? "default" : "secondary"}
-                                          onClick={e => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            if (classification !== c.toLowerCase()) {
-                                              setClassification(c.toLowerCase());
-                                              setUpdates([]);
-                                              setSkip(0);
-                                              skipRef.current = 0;
-                                              setHasMore(true);
-                                              setLoading(true);
-                                            }
-                                          }}
-                                          className="mr-1 cursor-pointer"
-                                        >
-                                          {capitalize(c)}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {update.subjects && update.subjects.length > 0 && (
-                                    <div className="mb-1">
-                                      {update.subjects.map((s, i) => (
-                                        <Badge
-                                          key={s + i}
-                                          variant={subject === s ? "default" : "outline"}
-                                          onClick={e => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            const newSubject = subject === s ? "" : s;
-                                            if (subject !== newSubject) {
-                                              setSubject(newSubject);
-                                              setUpdates([]);
-                                              setSkip(0);
-                                              skipRef.current = 0;
-                                              setHasMore(true);
-                                              setLoading(true);
-                                            }
-                                          }}
-                                          className="mr-1 cursor-pointer"
-                                        >
-                                          #{capitalize(s)}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {formattedIntroDate && (
-                                    <div className="text-sm text-muted-foreground mb-1">
-                                        <span className="font-semibold">Introduced: </span>{formattedIntroDate}
-                                    </div>
-                                  )}
-                                  {(lastActionDescription || formattedLastActionDate) && (
+                                {/* Clickable area for navigation */}
+                                <Link
+                                  href={`/legislation/${update.id}`}
+                                  className="block flex-1"
+                                  style={{ textDecoration: 'none', color: 'inherit' }}
+                                >
+                                  <div>
+                                    <div className="font-bold text-lg mb-1 text-left">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
                                     <div className="text-sm text-muted-foreground mb-1 text-left">
-                                      <span className="font-semibold">Last Action: </span>{lastActionDescription || 'N/A'}
-                                      {formattedLastActionDate && (
-                                        <span className="ml-2">({formattedLastActionDate})</span>
-                                      )}
+                                      {update.jurisdictionName} • {update.session}
                                     </div>
-                                  )}
-                                  {update.sponsors && update.sponsors.length > 0 && (
-                                      <div className="mb-1 text-xs text-muted-foreground">
-                                        <span className="font-semibold">Sponsors: </span>
-                                        {update.sponsors.map((sp: any, i: number) => (
-                                            <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < update.sponsors.length - 1 ? ', ' : ''}</span>
+                                    {update.classification && update.classification.length > 0 && (
+                                      <div className="mb-1">
+                                        {update.classification.map((c, i) => (
+                                          <Badge
+                                            key={c + i}
+                                            variant={classification === c.toLowerCase() ? "default" : "secondary"}
+                                            onClick={e => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              if (classification !== c.toLowerCase()) {
+                                                setClassification(c.toLowerCase());
+                                                setUpdates([]);
+                                                setSkip(0);
+                                                skipRef.current = 0;
+                                                setHasMore(true);
+                                                setLoading(true);
+                                              }
+                                            }}
+                                            className="mr-1 cursor-pointer"
+                                          >
+                                            {capitalize(c)}
+                                          </Badge>
                                         ))}
                                       </div>
-                                  )}
-                                  {update.geminiSummary && (
-                                    <div className="mt-2 text-sm text-left">{update.geminiSummary}</div>
-                                  )}
-                                  {!update.geminiSummary && update.summary && (
-                                    <div className="mt-2 text-sm text-left">{update.summary}</div>
-                                  )}
-                                </div>
-                                <div className="mt-auto pt-4 flex justify-start">
+                                    )}
+                                    {update.subjects && update.subjects.length > 0 && (
+                                      <div className="mb-1">
+                                        {update.subjects.map((s, i) => (
+                                          <Badge
+                                            key={s + i}
+                                            variant={subject === s ? "default" : "outline"}
+                                            onClick={e => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              const newSubject = subject === s ? "" : s;
+                                              if (subject !== newSubject) {
+                                                setSubject(newSubject);
+                                                setUpdates([]);
+                                                setSkip(0);
+                                                skipRef.current = 0;
+                                                setHasMore(true);
+                                                setLoading(true);
+                                              }
+                                            }}
+                                            className="mr-1 cursor-pointer"
+                                          >
+                                            #{capitalize(s)}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {formattedIntroDate && (
+                                      <div className="text-sm text-muted-foreground mb-1">
+                                          <span className="font-semibold">Introduced: </span>{formattedIntroDate}
+                                      </div>
+                                    )}
+                                    {(lastActionDescription || formattedLastActionDate) && (
+                                      <div className="text-sm text-muted-foreground mb-1 text-left">
+                                        <span className="font-semibold">Last Action: </span>{lastActionDescription || 'N/A'}
+                                        {formattedLastActionDate && (
+                                          <span className="ml-2">({formattedLastActionDate})</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {update.sponsors && update.sponsors.length > 0 && (
+                                        <div className="mb-1 text-xs text-muted-foreground">
+                                          <span className="font-semibold">Sponsors: </span>
+                                          {update.sponsors.map((sp: any, i: number) => (
+                                              <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < update.sponsors.length - 1 ? ', ' : ''}</span>
+                                          ))}
+                                        </div>
+                                    )}
+                                    {update.geminiSummary && (
+                                      <div className="mt-2 text-sm text-left">{update.geminiSummary}</div>
+                                    )}
+                                    {!update.geminiSummary && update.summary && (
+                                      <div className="mt-2 text-sm text-left">{update.summary}</div>
+                                    )}
+                                  </div>
+                                </Link>
+
+                                {/* Bottom buttons section */}
+                                <div className="mt-auto pt-4 flex justify-between items-center gap-2">
                                   <button
                                     type="button"
-                                    className="px-3 py-1 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    className="px-3 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1"
                                     onClick={e => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -512,9 +519,16 @@
                                   >
                                     {update.sources && update.sources.length > 0 ? 'Official State Link' : 'OpenStates Link'}
                                   </button>
+
+                                  <div onClick={e => e.stopPropagation()}>
+                                    <BookmarkButton
+                                      legislationId={update.id}
+                                      className="h-10 px-3"
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                            </Link>
+                            </div>
                         );
                       })}
                     </div>

@@ -139,7 +139,10 @@ export async function addSavedLegislation(userId: string, legislationId: string)
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
         await collection.updateOne(
             { id: userId },
-            { $addToSet: { savedLegislation: legislationId, updatedAt: new Date() } }
+            {
+                $addToSet: { savedLegislation: legislationId },
+                $set: { updatedAt: new Date() }
+            }
         );
     } catch (error) {
         console.error('Error adding saved legislation:', error);
@@ -156,7 +159,10 @@ export async function removeSavedLegislation(userId: string, legislationId: stri
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
         await collection.updateOne(
             { id: userId },
-            { $pull: { savedLegislation: legislationId, updatedAt: new Date() } }
+            {
+                $pull: { savedLegislation: legislationId },
+                $set: { updatedAt: new Date() }
+            }
         );
     } catch (error) {
         console.error('Error removing saved legislation:', error);
@@ -173,7 +179,10 @@ export async function addTrackingTopic(userId: string, topic: string): Promise<v
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
         await collection.updateOne(
             { id: userId },
-            { $addToSet: { trackingTopics: topic, updatedAt: new Date() } }
+            {
+                $addToSet: { trackingTopics: topic },
+                $set: { updatedAt: new Date() }
+            }
         );
     } catch (error) {
         console.error('Error adding tracking topic:', error);
@@ -190,7 +199,10 @@ export async function removeTrackingTopic(userId: string, topic: string): Promis
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
         await collection.updateOne(
             { id: userId },
-            { $pull: { trackingTopics: topic, updatedAt: new Date() } }
+            {
+                $pull: { trackingTopics: topic },
+                $set: { updatedAt: new Date() }
+            }
         );
     } catch (error) {
         console.error('Error removing tracking topic:', error);
