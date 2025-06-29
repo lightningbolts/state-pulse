@@ -5,6 +5,7 @@ import { ExternalLink, CalendarDays, FileText, Tag, Info } from 'lucide-react';
 import Link from 'next/link';
 import { CollapsibleSponsors } from '@/components/features/CollapsibleSponsors';
 import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
+import { BookmarkButton } from '@/components/features/BookmarkButton';
 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -55,10 +56,15 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     <div className="container mx-auto py-8 px-4 md:px-6">
       <Card className="w-full max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden">
         <CardHeader className="bg-gray-700 text-primary-foreground p-6">
-          <CardTitle className="text-3xl font-bold tracking-tight">{identifier}: {title}</CardTitle>
-          <CardDescription className="text-primary-foreground/80 text-sm mt-1">
-            {session} - {jurisdictionName} {chamber && `(${chamber})`}
-          </CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-3xl font-bold tracking-tight">{identifier}: {title}</CardTitle>
+              <CardDescription className="text-primary-foreground/80 text-sm mt-1">
+                {session} - {jurisdictionName} {chamber && `(${chamber})`}
+              </CardDescription>
+            </div>
+            <BookmarkButton legislationId={id} className="ml-4 flex-shrink-0" />
+          </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6 bg-background">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
