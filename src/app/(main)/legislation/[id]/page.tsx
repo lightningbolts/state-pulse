@@ -7,7 +7,7 @@ import { CollapsibleSponsors } from '@/components/features/CollapsibleSponsors';
 import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
-  const id = params.id;
+  const { id } = await params;
   // console.log(params, "Params in LegislationDetailPage");
   const legislation = await getLegislationById(id);
 
