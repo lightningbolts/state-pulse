@@ -19,7 +19,7 @@ export function CollapsibleTimeline({ historyEvents }: CollapsibleTimelineProps)
     <div className="space-y-4 mt-6">
       <button
         onClick={() => setTimelineOpen(!timelineOpen)}
-        className="flex justify-between items-center w-full cursor-pointer hover:bg-muted/50 p-3 rounded-md transition-colors"
+        className="flex justify-between items-center w-full cursor-pointer hover:bg-muted/50 py-2 px-0 rounded-md transition-colors"
         aria-expanded={timelineOpen}
         aria-controls="timeline-content"
       >

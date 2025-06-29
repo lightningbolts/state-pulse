@@ -19,7 +19,7 @@ export function CollapsibleSponsors({ sponsors }: CollapsibleSponsorsProps) {
     <div className="mt-6">
       <button
         onClick={() => setSponsorsOpen(!sponsorsOpen)}
-        className="flex justify-between items-center w-full cursor-pointer hover:bg-muted/50 p-3 rounded-md transition-colors"
+        className="flex justify-between items-center w-full cursor-pointer hover:bg-muted/50 py-2 px-0 rounded-md transition-colors"
         aria-expanded={sponsorsOpen}
         aria-controls="sponsors-content"
       >
