@@ -5,6 +5,7 @@ import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@clerk/nextjs';
+import { cn } from '@/lib/utils';
 
 // Create a context to share bookmarks data across all BookmarkButton instances
 const BookmarksContext = createContext<{
@@ -135,7 +136,13 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
       size="sm"
       onClick={handleBookmarkToggle}
       disabled={isLoading}
-      className={className}
+      className={cn(
+        "transition-all duration-200",
+        isBookmarked
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+        className
+      )}
     >
       {isBookmarked ? (
         <BookmarkCheck className="h-4 w-4 mr-1" />

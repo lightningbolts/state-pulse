@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addSavedLegislation, removeSavedLegislation, getUserById } from '@/services/usersService';
+import { addSavedLegislation, removeSavedLegislation, getUserById, upsertUser } from '@/services/usersService';
 import { auth } from '@clerk/nextjs/server';
 
 // POST /api/bookmarks - Add a bookmark
@@ -15,6 +15,19 @@ export async function POST(request: NextRequest) {
 
     if (!legislationId) {
       return NextResponse.json({ error: 'Legislation ID is required' }, { status: 400 });
+    }
+
+    // Ensure user exists in database before bookmarking
+    let user = await getUserById(userId);
+    if (!user) {
+      // Create user if doesn't exist
+      await upsertUser({
+        id: userId,
+        savedLegislation: [],
+        trackingTopics: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     }
 
     await addSavedLegislation(userId, legislationId);
@@ -59,10 +72,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await getUserById(userId);
+    let user = await getUserById(userId);
 
+    // If user doesn't exist, create them and return empty bookmarks
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      await upsertUser({
+        id: userId,
+        savedLegislation: [],
+        trackingTopics: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      return NextResponse.json({ bookmarks: [] });
     }
 
     return NextResponse.json({ bookmarks: user.savedLegislation || [] });

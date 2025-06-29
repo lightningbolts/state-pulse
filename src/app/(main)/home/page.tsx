@@ -20,8 +20,8 @@ export default function HomePage() {
               Explore Legislation <ArrowRight className="ml-2.5 h-5 w-5" />
             </Link>
           </Button>
-          <Button asChild size="lg" variant="outline" className="border-primary-foreground/25 text-primary-foreground hover:bg-primary-foreground/5 hover:border-primary-foreground shadow-md hover:shadow-lg transition-shadow px-8 py-3 rounded-lg">
-            <Link href="/about" className="text-black">
+          <Button asChild size="lg" variant="outline" className="border-primary-foreground/25 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground hover:border-primary-foreground shadow-md hover:shadow-lg transition-shadow px-8 py-3 rounded-lg">
+            <Link href="/about">
               Learn More
             </Link>
           </Button>
