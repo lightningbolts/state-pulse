@@ -17,12 +17,12 @@ import {
   SidebarFooter,
   SidebarSeparator,
   SidebarAuthAndTheme,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
   Newspaper,
   Eye,
-  GitMerge,
   BrainCircuit,
   Users,
   Gavel,
@@ -54,6 +54,38 @@ const menuItems: MenuItem[] = [
   { id: "civic", path: "/civic", label: "Civic Tools", icon: Users },
 ];
 
+function SidebarContentWithAutoClose() {
+  const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleMenuItemClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
+  return (
+    <SidebarContent>
+      <SidebarMenu>
+        {menuItems.map((item) => (
+          <SidebarMenuItem key={item.id}>
+            <Link href={item.path} onClick={handleMenuItemClick}>
+              <SidebarMenuButton
+                isActive={pathname === item.path}
+                tooltip={item.label}
+                className="justify-start"
+              >
+                <item.icon className="h-5 w-5" />
+                <span>{item.label}</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </SidebarContent>
+  );
+}
+
 export default function MainAppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
@@ -68,24 +100,7 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
             </h2>
           </div>
         </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            {menuItems.map((item) => (
-              <SidebarMenuItem key={item.id}>
-                <Link href={item.path}>
-                  <SidebarMenuButton
-                    isActive={pathname === item.path}
-                    tooltip={item.label}
-                    className="justify-start"
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
+        <SidebarContentWithAutoClose />
         <SidebarFooter className="p-4">
           <SidebarAuthAndTheme />
           <SidebarSeparator className="my-2" />
