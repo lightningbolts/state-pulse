@@ -90,11 +90,13 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
 
       if (isBookmarked) {
         // DELETE request - pass legislationId as query parameter
-        response = await fetch(`/api/bookmarks?legislationId=${legislationId}`, {
+        console.log('Removing bookmark for:', legislationId);
+        response = await fetch(`/api/bookmarks?legislationId=${encodeURIComponent(legislationId)}`, {
           method: 'DELETE',
         });
       } else {
         // POST request - pass legislationId in body
+        console.log('Adding bookmark for:', legislationId);
         response = await fetch('/api/bookmarks', {
           method: 'POST',
           headers: {
@@ -104,11 +106,21 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
         });
       }
 
+      console.log('Response status:', response.status);
+
       if (response.ok) {
         // Update the shared bookmarks state
         const newBookmarks = isBookmarked
           ? bookmarks.filter(id => id !== legislationId)
           : [...bookmarks, legislationId];
+
+        console.log('Updating bookmarks state:', {
+          isBookmarked,
+          legislationId,
+          oldBookmarks: bookmarks,
+          newBookmarks
+        });
+
         updateBookmarks(newBookmarks);
 
         toast({
@@ -119,6 +131,8 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
         });
       } else {
         const error = await response.json();
+        console.error('API Error:', response.status, error);
+
         // Handle 409 (already bookmarked) as a success case
         if (response.status === 409 && !isBookmarked) {
           // Item is already bookmarked, just update the UI
@@ -127,6 +141,14 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
           toast({
             title: "Already bookmarked",
             description: "This legislation was already in your bookmarks.",
+          });
+        } else if (response.status === 404 && isBookmarked) {
+          // Item not found when trying to remove, update UI anyway
+          const newBookmarks = bookmarks.filter(id => id !== legislationId);
+          updateBookmarks(newBookmarks);
+          toast({
+            title: "Bookmark removed",
+            description: "Bookmark was already removed or not found.",
           });
         } else {
           throw new Error(error.error || 'Failed to update bookmark');

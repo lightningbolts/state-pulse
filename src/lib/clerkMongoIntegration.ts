@@ -3,7 +3,8 @@ import {
   User,
   addUser,
   upsertUser,
-  getUserById
+  getUserById,
+  cleanupLegacySavedLegislation
 } from '@/services/usersService';
 import { migrateUserBookmarks } from '@/services/bookmarksService';
 
@@ -61,8 +62,11 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
 
     // Handle migration of savedLegislation to bookmarks collection
     let legacySavedLegislation: string[] = [];
+    let shouldMigrate = false;
+
     if (existingUser && (existingUser as any).savedLegislation) {
       legacySavedLegislation = (existingUser as any).savedLegislation;
+      shouldMigrate = legacySavedLegislation.length > 0;
       console.log('Found legacy savedLegislation to migrate:', legacySavedLegislation);
     }
 
@@ -93,9 +97,13 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
     await upsertUser(userData);
 
     // Migrate legacy savedLegislation to bookmarks collection if needed
-    if (legacySavedLegislation.length > 0) {
+    if (shouldMigrate) {
       console.log('Migrating legacy savedLegislation to bookmarks collection');
       await migrateUserBookmarks(clerkUser.id, legacySavedLegislation);
+
+      // Clean up the legacy savedLegislation array from the user document
+      console.log('Cleaning up legacy savedLegislation array from user document');
+      await cleanupLegacySavedLegislation(clerkUser.id);
     }
 
     return { success: true };

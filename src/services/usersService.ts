@@ -220,6 +220,28 @@ export async function getUserByClerkId(clerkId: string): Promise<User | null> {
     }
 }
 
+// Clean up legacy savedLegislation array from user document after migration
+export async function cleanupLegacySavedLegislation(userId: string): Promise<void> {
+    if (!userId) {
+        console.error('User ID is required to cleanup legacy savedLegislation.');
+        throw new Error('User ID is required to cleanup legacy savedLegislation.');
+    }
+    try {
+        const collection: Collection<UserMongoDbDocument> = await getCollection('users');
+        await collection.updateOne(
+            { id: userId },
+            {
+                $unset: { savedLegislation: "" },
+                $set: { updatedAt: new Date() }
+            }
+        );
+        console.log('Successfully removed savedLegislation array from user document');
+    } catch (error) {
+        console.error('Error cleaning up legacy savedLegislation:', error);
+        throw error;
+    }
+}
+
 // This code provides a service for managing users in a MongoDB database.
 // It includes functions to add, upsert, retrieve, delete users, and manage user preferences,
 // saved legislation, and tracking topics. It also includes error handling and data cleanup

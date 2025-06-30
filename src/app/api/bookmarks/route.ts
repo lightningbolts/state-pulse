@@ -93,11 +93,16 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const legislationId = searchParams.get('legislationId');
 
+    console.log('DELETE request - userId:', userId);
+    console.log('DELETE request - legislationId:', legislationId);
+
     if (!legislationId) {
       return NextResponse.json({ error: 'Legislation ID is required' }, { status: 400 });
     }
 
     const removed = await removeBookmark(userId, legislationId);
+
+    console.log('DELETE result - removed:', removed);
 
     if (!removed) {
       return NextResponse.json({ error: 'Bookmark not found' }, { status: 404 });

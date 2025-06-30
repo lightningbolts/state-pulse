@@ -55,7 +55,19 @@ export async function addBookmark(
 export async function removeBookmark(userId: string, legislationId: string): Promise<boolean> {
     try {
         const collection: Collection<BookmarkMongoDbDocument> = await getCollection('bookmarks');
+
+        console.log('removeBookmark - query:', { userId, legislationId });
+
+        // First, let's see if the bookmark exists
+        const existingBookmark = await collection.findOne({ userId, legislationId });
+        console.log('removeBookmark - existing bookmark found:', existingBookmark);
+
         const result = await collection.deleteOne({ userId, legislationId });
+        console.log('removeBookmark - delete result:', {
+            deletedCount: result.deletedCount,
+            acknowledged: result.acknowledged
+        });
+
         return result.deletedCount > 0;
     } catch (error) {
         console.error('Error removing bookmark:', error);
@@ -216,18 +228,35 @@ export async function migrateUserBookmarks(userId: string, legislationIds: strin
         const collection: Collection<BookmarkMongoDbDocument> = await getCollection('bookmarks');
         const now = new Date();
 
-        // Create bookmark documents for each legislation ID
-        const bookmarkDocs = legislationIds.map(legislationId => ({
-            _id: new ObjectId(),
-            id: randomUUID(),
-            userId,
-            legislationId,
-            createdAt: now,
-            updatedAt: now
-        }));
+        console.log('Starting migration for user:', userId, 'with legislation IDs:', legislationIds);
 
-        if (bookmarkDocs.length > 0) {
+        // Check which bookmarks already exist to avoid duplicates
+        const existingBookmarks = await collection.find({
+            userId,
+            legislationId: { $in: legislationIds }
+        }).toArray();
+
+        const existingLegislationIds = existingBookmarks.map(bookmark => bookmark.legislationId);
+        const newLegislationIds = legislationIds.filter(id => !existingLegislationIds.includes(id));
+
+        console.log('Existing bookmarks found:', existingLegislationIds);
+        console.log('New bookmarks to create:', newLegislationIds);
+
+        // Only create bookmark documents for legislation that doesn't already exist
+        if (newLegislationIds.length > 0) {
+            const bookmarkDocs = newLegislationIds.map(legislationId => ({
+                _id: new ObjectId(),
+                id: randomUUID(),
+                userId,
+                legislationId,
+                createdAt: now,
+                updatedAt: now
+            }));
+
             await collection.insertMany(bookmarkDocs);
+            console.log('Successfully migrated', newLegislationIds.length, 'new bookmarks');
+        } else {
+            console.log('No new bookmarks to migrate - all already exist');
         }
     } catch (error) {
         console.error('Error migrating user bookmarks:', error);
