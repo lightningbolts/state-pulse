@@ -65,7 +65,7 @@ export async function upsertUser(userData: User): Promise<void> {
             cleanedData.trackingTopics = [];
         }
 
-        console.log('Upserting user with data:', { id, ...cleanedData });
+        // console.log('Upserting user with data:', { id, ...cleanedData });
 
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
         const result = await collection.updateOne(
@@ -74,14 +74,14 @@ export async function upsertUser(userData: User): Promise<void> {
             { upsert: true }
         );
 
-        console.log('Upsert result:', result);
+        // console.log('Upsert result:', result);
 
         // Verify the user was created/updated correctly
         const verifyUser = await collection.findOne({ id });
-        console.log('User after upsert:', {
-            id: verifyUser?.id,
-            trackingTopics: verifyUser?.trackingTopics
-        });
+        // console.log('User after upsert:', {
+        //     id: verifyUser?.id,
+        //     trackingTopics: verifyUser?.trackingTopics
+        // });
 
     } catch (error) {
         console.error('Error upserting user:', error);
@@ -98,7 +98,7 @@ export async function getUserById(userId: string): Promise<User | null> {
         const collection: Collection<UserMongoDbDocument> = await getCollection('users');
         const userDoc = await collection.findOne({ id: userId });
 
-        console.log('getUserById - Raw MongoDB document:', userDoc);
+        // console.log('getUserById - Raw MongoDB document:', userDoc);
 
         if (!userDoc) {
             return null;
@@ -111,10 +111,10 @@ export async function getUserById(userId: string): Promise<User | null> {
             trackingTopics: Array.isArray(userDoc.trackingTopics) ? userDoc.trackingTopics : [],
         };
 
-        console.log('getUserById - Processed user object:', {
-            id: user.id,
-            trackingTopics: user.trackingTopics
-        });
+        // console.log('getUserById - Processed user object:', {
+        //     id: user.id,
+        //     trackingTopics: user.trackingTopics
+        // });
 
         return user;
     } catch (error) {

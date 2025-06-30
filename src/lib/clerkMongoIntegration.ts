@@ -88,10 +88,10 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
       }
     };
 
-    console.log('syncUserToMongoDB - preserving existing data:', {
-      userId: userData.id,
-      trackingTopics: userData.trackingTopics
-    });
+    // console.log('syncUserToMongoDB - preserving existing data:', {
+    //   userId: userData.id,
+    //   trackingTopics: userData.trackingTopics
+    // });
 
     // Update user in MongoDB or create if doesn't exist
     await upsertUser(userData);

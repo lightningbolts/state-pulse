@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     }
 
     // If userId exists, proceed with original implementation
-    console.log("User authenticated with ID:", userId);
+    // console.log("User authenticated with ID:", userId);
 
     // Fetch user data from Clerk
     const clerkUserResponse = await fetch(

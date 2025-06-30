@@ -86,9 +86,9 @@
                 setLoading(true);
                 try {
                   const currentSkip = skipRef.current;
-                  console.log('[FEED] loadMore: skip', currentSkip);
+                  // console.log('[FEED] loadMore: skip', currentSkip);
                   const newUpdates = await fetchUpdatesFeed({ skip: currentSkip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification });
-                  console.log('[FEED] loadMore: newUpdates.length', newUpdates.length);
+                  // console.log('[FEED] loadMore: newUpdates.length', newUpdates.length);
                   setUpdates((prev) => [...prev, ...newUpdates]);
                   skipRef.current = currentSkip + newUpdates.length;
                   setSkip(skipRef.current);

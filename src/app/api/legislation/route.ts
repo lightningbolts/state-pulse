@@ -84,7 +84,7 @@
             }
             // Add more filters as needed
 
-            console.log('[API] GET /api/legislation filter:', JSON.stringify(filter));
+            // console.log('[API] GET /api/legislation filter:', JSON.stringify(filter));
             // Debug: log a sample document matching the filter
             const legislationCollection = (await import('@/lib/mongodb')).getCollection ? await (await import('@/lib/mongodb')).getCollection('legislation') : null;
             if (legislationCollection) {
