@@ -136,9 +136,9 @@ export function BookmarksList() {
       {bookmarkedLegislation.map((legislation) => (
         <Card key={legislation.id} className="hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <CardTitle className="text-xl mb-2">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3 md:gap-4">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg md:text-xl mb-2 break-words">
                   <Link
                     href={`/legislation/${legislation.id}`}
                     className="hover:text-primary transition-colors"
@@ -148,20 +148,20 @@ export function BookmarksList() {
                 </CardTitle>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {legislation.statusText && (
-                    <Badge variant="secondary">{legislation.statusText}</Badge>
+                    <Badge variant="secondary" className="text-xs">{legislation.statusText}</Badge>
                   )}
                   {legislation.classification?.map((type) => (
-                    <Badge key={type} variant="outline">{type}</Badge>
+                    <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
                   ))}
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   {legislation.session} - {legislation.jurisdictionName}
                   {legislation.chamber && ` (${legislation.chamber})`}
                 </p>
               </div>
               <BookmarkButton
                 legislationId={legislation.id}
-                className="ml-4"
+                className="flex-shrink-0 self-start"
               />
             </div>
           </CardHeader>
