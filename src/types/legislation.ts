@@ -98,3 +98,28 @@ export interface Legislation {
 // We can keep these for simpler import if desired, but they are essentially wrappers now.
 export type OpenStatesApiBillListResponse = components["schemas"]["BillList"];
 export type OpenStatesApiPersonListResponse = components["schemas"]["PersonList"];
+
+// Bookmark/SavedLegislation Types
+export interface BookmarkMetadata {
+  tags?: string[];
+  notes?: string;
+  priority?: 'low' | 'medium' | 'high';
+  customTitle?: string;
+}
+
+export interface LegislationBookmark {
+  id: string; // Unique bookmark ID
+  userId: string; // Clerk user ID
+  legislationId: string; // ID of the saved legislation
+  createdAt: Date;
+  updatedAt: Date;
+  metadata?: BookmarkMetadata;
+}
+
+// MongoDB document type for bookmarks
+export interface BookmarkMongoDbDocument extends Omit<LegislationBookmark, 'id' | 'createdAt' | 'updatedAt'> {
+  _id: import('mongodb').ObjectId;
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

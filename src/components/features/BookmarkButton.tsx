@@ -38,7 +38,9 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch('/api/bookmarks');
       if (response.ok) {
         const data = await response.json();
-        setBookmarks(data.bookmarks || []);
+        // Extract legislation IDs from bookmark objects
+        const legislationIds = data.bookmarks.map((bookmark: any) => bookmark.legislationId);
+        setBookmarks(legislationIds);
       }
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
@@ -84,14 +86,23 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
     setIsLoading(true);
 
     try {
-      const method = isBookmarked ? 'DELETE' : 'POST';
-      const response = await fetch('/api/bookmarks', {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ legislationId }),
-      });
+      let response;
+
+      if (isBookmarked) {
+        // DELETE request - pass legislationId as query parameter
+        response = await fetch(`/api/bookmarks?legislationId=${legislationId}`, {
+          method: 'DELETE',
+        });
+      } else {
+        // POST request - pass legislationId in body
+        response = await fetch('/api/bookmarks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ legislationId }),
+        });
+      }
 
       if (response.ok) {
         // Update the shared bookmarks state
@@ -108,7 +119,18 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
         });
       } else {
         const error = await response.json();
-        throw new Error(error.error);
+        // Handle 409 (already bookmarked) as a success case
+        if (response.status === 409 && !isBookmarked) {
+          // Item is already bookmarked, just update the UI
+          const newBookmarks = [...bookmarks, legislationId];
+          updateBookmarks(newBookmarks);
+          toast({
+            title: "Already bookmarked",
+            description: "This legislation was already in your bookmarks.",
+          });
+        } else {
+          throw new Error(error.error || 'Failed to update bookmark');
+        }
       }
     } catch (error) {
       console.error('Error toggling bookmark:', error);

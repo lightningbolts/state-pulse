@@ -28,34 +28,51 @@ export function BookmarksList() {
     try {
       setLoading(true);
 
-      // First get the user's bookmarked legislation IDs
+      // Fetch the user's bookmarks from the new API
       const bookmarksResponse = await fetch('/api/bookmarks');
       if (!bookmarksResponse.ok) {
         throw new Error('Failed to fetch bookmarks');
       }
 
       const bookmarksData = await bookmarksResponse.json();
-      const bookmarkIds = bookmarksData.bookmarks;
+      const bookmarks = bookmarksData.bookmarks; // Array of bookmark objects with legislationId
 
-      if (bookmarkIds.length === 0) {
+      if (bookmarks.length === 0) {
         setBookmarkedLegislation([]);
         setLoading(false);
         return;
       }
 
-      // Then fetch the details for each bookmarked legislation
-      const legislationPromises = bookmarkIds.map(async (id: string) => {
-        const response = await fetch(`/api/legislation/${id}`);
-        if (response.ok) {
-          return response.json();
+      // Extract unique legislation IDs from bookmark objects
+      const uniqueLegislationIds = [...new Set(bookmarks.map((bookmark: any) => bookmark.legislationId))];
+
+      console.log('Fetching legislation for IDs:', uniqueLegislationIds);
+
+      // Then fetch the details for each unique bookmarked legislation
+      const legislationPromises = uniqueLegislationIds.map(async (id: string) => {
+        try {
+          const response = await fetch(`/api/legislation/${id}`);
+          if (response.ok) {
+            return response.json();
+          }
+          console.warn(`Failed to fetch legislation ${id}:`, response.status);
+          return null;
+        } catch (error) {
+          console.error(`Error fetching legislation ${id}:`, error);
+          return null;
         }
-        return null;
       });
 
       const legislationResults = await Promise.all(legislationPromises);
       const validLegislation = legislationResults.filter(item => item !== null);
 
-      setBookmarkedLegislation(validLegislation);
+      // Remove any duplicates based on legislation ID
+      const uniqueLegislation = validLegislation.filter((item, index, self) =>
+        index === self.findIndex(t => t.id === item.id)
+      );
+
+      console.log('Fetched unique legislation:', uniqueLegislation.length, 'items');
+      setBookmarkedLegislation(uniqueLegislation);
     } catch (err) {
       console.error('Error fetching bookmarked legislation:', err);
       setError('Failed to load bookmarked legislation');

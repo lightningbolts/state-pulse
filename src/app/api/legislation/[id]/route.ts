@@ -11,9 +11,9 @@ import type { Legislation } from '@/types/legislation'; // Corrected path
 // Handler for GET /api/legislation/[jurisdictionName]
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = params.id;
+  const { id } = await params;
   try {
     const legislation = await getLegislationById(id);
     if (!legislation) {
@@ -30,9 +30,9 @@ export async function GET(
 // Handler for PUT /api/legislation/[jurisdictionName] (Edit)
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = params.id;
+  const { id } = await params;
   try {
     const body = await request.json() as Partial<Legislation>; // Or a specific update DTO
     // Add validation for the body here
@@ -49,7 +49,7 @@ export async function PUT(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return NextResponse.json({ message: 'POST method not allowed for this endpoint' }, { status: 405 });
 }
@@ -58,9 +58,9 @@ export async function POST(
 // Handler for DELETE /api/legislation/[jurisdictionName]
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = params.id;
+  const { id } = await params;
   try {
     await deleteLegislation(id);
     return NextResponse.json({ message: 'Legislation deleted successfully' }, { status: 200 });

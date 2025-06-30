@@ -9,7 +9,6 @@ export interface User {
     createdAt?: Date;
     updatedAt?: Date;
     preferences?: Record<string, any>;
-    savedLegislation: string[];
     trackingTopics: string[];
     clerkId?: string;
     // Other fields as needed
@@ -61,10 +60,7 @@ export async function upsertUser(userData: User): Promise<void> {
         let cleanedData = cleanupDataForMongoDB(dataToUpsert);
         cleanedData.updatedAt = new Date();
 
-        // Ensure savedLegislation and trackingTopics are always arrays
-        if (!cleanedData.savedLegislation) {
-            cleanedData.savedLegislation = [];
-        }
+        // Ensure trackingTopics are always arrays
         if (!cleanedData.trackingTopics) {
             cleanedData.trackingTopics = [];
         }
@@ -84,7 +80,6 @@ export async function upsertUser(userData: User): Promise<void> {
         const verifyUser = await collection.findOne({ id });
         console.log('User after upsert:', {
             id: verifyUser?.id,
-            savedLegislation: verifyUser?.savedLegislation,
             trackingTopics: verifyUser?.trackingTopics
         });
 
@@ -109,17 +104,15 @@ export async function getUserById(userId: string): Promise<User | null> {
             return null;
         }
 
-        // Ensure savedLegislation and trackingTopics are arrays
+        // Ensure trackingTopics are arrays
         const user: User = {
             ...userDoc,
             id: userDoc.id,
-            savedLegislation: Array.isArray(userDoc.savedLegislation) ? userDoc.savedLegislation : [],
             trackingTopics: Array.isArray(userDoc.trackingTopics) ? userDoc.trackingTopics : [],
         };
 
         console.log('getUserById - Processed user object:', {
             id: user.id,
-            savedLegislation: user.savedLegislation,
             trackingTopics: user.trackingTopics
         });
 
@@ -168,70 +161,6 @@ export async function updateUserPreferences(userId: string, preferences: Record<
         );
     } catch (error) {
         console.error('Error updating user preferences:', error);
-        throw error;
-    }
-}
-
-export async function addSavedLegislation(userId: string, legislationId: string): Promise<void> {
-    if (!userId || !legislationId) {
-        console.error('User ID and legislation ID are required to save legislation.');
-        throw new Error('User ID and legislation ID are required to save legislation.');
-    }
-    try {
-        const collection: Collection<UserMongoDbDocument> = await getCollection('users');
-
-        // First check if user exists
-        const existingUser = await collection.findOne({ id: userId });
-        if (!existingUser) {
-            console.error(`User with ID ${userId} not found when trying to add saved legislation`);
-            throw new Error(`User not found: ${userId}`);
-        }
-
-        console.log(`Adding legislation ${legislationId} to user ${userId}`);
-
-        const result = await collection.updateOne(
-            { id: userId },
-            {
-                $addToSet: { savedLegislation: legislationId },
-                $set: { updatedAt: new Date() }
-            }
-        );
-
-        console.log(`Update result:`, result);
-
-        if (result.matchedCount === 0) {
-            throw new Error(`User not found for update: ${userId}`);
-        }
-
-        // Verify the bookmark was added
-        const updatedUser = await collection.findOne({ id: userId });
-        console.log(`User after update:`, {
-            id: updatedUser?.id,
-            savedLegislation: updatedUser?.savedLegislation
-        });
-
-    } catch (error) {
-        console.error('Error adding saved legislation:', error);
-        throw error;
-    }
-}
-
-export async function removeSavedLegislation(userId: string, legislationId: string): Promise<void> {
-    if (!userId || !legislationId) {
-        console.error('User ID and legislation ID are required to remove saved legislation.');
-        throw new Error('User ID and legislation ID are required to remove saved legislation.');
-    }
-    try {
-        const collection: Collection<UserMongoDbDocument> = await getCollection('users');
-        await collection.updateOne(
-            { id: userId },
-            {
-                $pull: { savedLegislation: legislationId },
-                $set: { updatedAt: new Date() }
-            }
-        );
-    } catch (error) {
-        console.error('Error removing saved legislation:', error);
         throw error;
     }
 }

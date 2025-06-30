@@ -5,6 +5,7 @@ import {
   upsertUser,
   getUserById
 } from '@/services/usersService';
+import { migrateUserBookmarks } from '@/services/bookmarksService';
 
 /**
  * Get the current authenticated user from Clerk and their data from MongoDB
@@ -28,7 +29,6 @@ export async function getCurrentUser(): Promise<User | null> {
         clerkId: userId, // Store both as id and clerkId for compatibility
         email: '',
         name: '',
-        savedLegislation: [],
         trackingTopics: [],
         preferences: {},
         createdAt: new Date(),
@@ -59,6 +59,13 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
     // Check if user already exists in MongoDB
     const existingUser = await getUserById(clerkUser.id);
 
+    // Handle migration of savedLegislation to bookmarks collection
+    let legacySavedLegislation: string[] = [];
+    if (existingUser && (existingUser as any).savedLegislation) {
+      legacySavedLegislation = (existingUser as any).savedLegislation;
+      console.log('Found legacy savedLegislation to migrate:', legacySavedLegislation);
+    }
+
     // Extract relevant data from Clerk user
     const userData: User = {
       id: clerkUser.id,
@@ -67,7 +74,6 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
       email: clerkUser.emailAddresses?.[0]?.emailAddress ||
              clerkUser.email_addresses?.[0]?.email_address,
       // Preserve existing arrays or initialize as empty if user is new
-      savedLegislation: existingUser?.savedLegislation || [],
       trackingTopics: existingUser?.trackingTopics || [],
       updatedAt: new Date(),
       // Additional fields from Clerk that might be useful
@@ -80,12 +86,17 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
 
     console.log('syncUserToMongoDB - preserving existing data:', {
       userId: userData.id,
-      savedLegislation: userData.savedLegislation,
       trackingTopics: userData.trackingTopics
     });
 
     // Update user in MongoDB or create if doesn't exist
     await upsertUser(userData);
+
+    // Migrate legacy savedLegislation to bookmarks collection if needed
+    if (legacySavedLegislation.length > 0) {
+      console.log('Migrating legacy savedLegislation to bookmarks collection');
+      await migrateUserBookmarks(clerkUser.id, legacySavedLegislation);
+    }
 
     return { success: true };
   } catch (error) {
@@ -125,42 +136,6 @@ export async function saveUserPreferences(userId: string, preferences: any): Pro
     return { success: true };
   } catch (error) {
     console.error('Error saving user preferences:', error);
-    throw error;
-  }
-}
-
-/**
- * Save legislation to user's saved list
- * @param userId Clerk user ID
- * @param legislationId ID of legislation to save
- */
-export async function saveUserLegislation(userId: string, legislationId: string): Promise<{success: boolean}> {
-  if (!userId || !legislationId) {
-    throw new Error('User ID and legislation ID are required');
-  }
-
-  try {
-    const user = await getUserById(userId);
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    // Check if legislation is already saved
-    const savedLegislation = user.savedLegislation || [];
-    if (!savedLegislation.includes(legislationId)) {
-      const updatedUser: User = {
-        ...user,
-        savedLegislation: [...savedLegislation, legislationId],
-        updatedAt: new Date()
-      };
-
-      await upsertUser(updatedUser);
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error saving legislation to user:', error);
     throw error;
   }
 }
