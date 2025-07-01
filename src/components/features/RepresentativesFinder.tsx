@@ -427,7 +427,7 @@ export function RepresentativesFinder() {
     if (!showAllMode) {
       // Switch to "Show All" mode
       setShowAllMode(true);
-      setShowMap(false); // Hide map when showing all
+      // Keep map visible when switching to show all mode
       await fetchPaginatedRepresentatives(userLocation, 1);
     } else {
       // Switch back to proximity mode
@@ -659,7 +659,7 @@ export function RepresentativesFinder() {
               </div>
 
               {/* Show All Toggle Button - Always visible when we have representatives */}
-              {userLocation && !showMap && (
+              {userLocation && (
                 <div className="flex justify-center">
                   <button
                     onClick={handleShowAllToggle}

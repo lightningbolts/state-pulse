@@ -573,7 +573,13 @@ Sincerely,
                 <Input
                   value={billSearchQuery}
                   onChange={(e) => setBillSearchQuery(e.target.value)}
-                  placeholder="Enter bill number or keywords..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      searchBills();
+                    }
+                  }}
+                  placeholder="Enter sponsor last name, bill number or keywords... (Press Enter to search)"
                   className="flex-1"
                 />
                 <Button
