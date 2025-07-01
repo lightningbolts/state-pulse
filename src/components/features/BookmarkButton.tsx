@@ -8,7 +8,7 @@ import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 
 // Create a context to share bookmarks data across all BookmarkButton instances
-const BookmarksContext = createContext<{
+export const BookmarksContext = createContext<{
   bookmarks: string[];
   updateBookmarks: (bookmarks: string[]) => void;
   loading: boolean;

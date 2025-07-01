@@ -4,8 +4,8 @@
             import { Input } from "@/components/ui/input";
             import { Button } from "@/components/ui/button";
             import { Bookmark, Search } from "lucide-react";
-            import { BookmarkButton } from "@/components/features/BookmarkButton";
-            import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
+            import { BookmarkButton, BookmarksContext } from "@/components/features/BookmarkButton";
+            import React, { useEffect, useState, useRef, useCallback, useLayoutEffect, useContext } from "react";
             import {
               DropdownMenu,
               DropdownMenuTrigger,
@@ -14,6 +14,7 @@
               DropdownMenuRadioItem,
             } from "@/components/ui/dropdown-menu";
             import Link from "next/link";
+            import { useUser } from "@clerk/nextjs";
 
             interface PolicyUpdate {
               id: string;
@@ -74,11 +75,16 @@
               const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
               const [showLoadingText, setShowLoadingText] = useState(true);
               const [searchInput, setSearchInput] = useState("");
+              const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false);
               const loader = useRef<HTMLDivElement | null>(null);
               const skipRef = useRef(0);
               const loadingRef = useRef(false); // Ref to prevent concurrent loads
               const hasRestored = useRef(false);
               const prevDeps = useRef<{search: string, subject: string, classification: string, sort: any} | null>(null);
+
+              // Access bookmark context
+              const { bookmarks, loading: bookmarksLoading } = useContext(BookmarksContext);
+              const { user } = useUser();
 
               const loadMore = useCallback(async () => {
                 if (loadingRef.current || !hasMore) return;
@@ -86,10 +92,14 @@
                 setLoading(true);
                 try {
                   const currentSkip = skipRef.current;
-                  // console.log('[FEED] loadMore: skip', currentSkip);
                   const newUpdates = await fetchUpdatesFeed({ skip: currentSkip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification });
-                  // console.log('[FEED] loadMore: newUpdates.length', newUpdates.length);
-                  setUpdates((prev) => [...prev, ...newUpdates]);
+
+                  // Filter to only bookmarked items if showOnlyBookmarked is true
+                  const filteredNewUpdates = showOnlyBookmarked
+                    ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
+                    : newUpdates;
+
+                  setUpdates((prev) => [...prev, ...filteredNewUpdates]);
                   skipRef.current = currentSkip + newUpdates.length;
                   setSkip(skipRef.current);
                   setHasMore(newUpdates.length === 20);
@@ -100,7 +110,7 @@
                   loadingRef.current = false;
                   setLoading(false);
                 }
-              }, [hasMore, search, subject, sort, classification]); // Removed loading and updates.length
+              }, [hasMore, search, subject, sort, classification, showOnlyBookmarked, bookmarks]);
 
               // Search handler for button/enter
               const handleSearch = useCallback(() => {
@@ -172,10 +182,16 @@
                       classification
                     });
                     if (!isMounted) return;
-                    setUpdates(newUpdates);
-                    skipRef.current = newUpdates.length;
-                    setSkip(newUpdates.length);
-                    setHasMore(newUpdates.length === 20);
+
+                    // Filter to only bookmarked items if showOnlyBookmarked is true
+                    const filteredUpdates = showOnlyBookmarked
+                      ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
+                      : newUpdates;
+
+                    setUpdates(filteredUpdates);
+                    skipRef.current = filteredUpdates.length;
+                    setSkip(filteredUpdates.length);
+                    setHasMore(newUpdates.length === 20 && (!showOnlyBookmarked || filteredUpdates.length === 20));
                   } catch {
                     if (!isMounted) return;
                     setHasMore(false);
@@ -186,7 +202,7 @@
                 };
                 fetchAndSet();
                 return () => { isMounted = false; };
-              }, [search, subject, classification, sort, didRestore.current]);
+              }, [search, subject, classification, sort, showOnlyBookmarked, bookmarks, didRestore.current]);
 
 
               // Intersection Observer for infinite scroll
@@ -259,8 +275,6 @@
                   case "createdAt:asc": return "Oldest";
                   case "title:asc": return "Alphabetical (A-Z)";
                   case "title:desc": return "Alphabetical (Z-A)";
-                  case "lastAction:desc": return "Last Action (Latest)";
-                  case "lastAction:asc": return "Last Action (Earliest)";
                   default: return "Custom";
                 }
               };
@@ -312,14 +326,25 @@
                             <DropdownMenuRadioItem value="createdAt:asc">Oldest</DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="title:asc">Alphabetical (A-Z)</DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="title:desc">Alphabetical (Z-A)</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="lastAction:desc">Last Action (Latest)</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="lastAction:asc">Last Action (Earliest)</DropdownMenuRadioItem>
                           </DropdownMenuRadioGroup>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <Button variant="outline" className="w-full sm:w-auto">
+                      <Button
+                        variant={showOnlyBookmarked ? "default" : "outline"}
+                        className="w-full sm:w-auto"
+                        disabled={bookmarksLoading || !user}
+                        onClick={() => {
+                          if (!user) return;
+                          setShowOnlyBookmarked(!showOnlyBookmarked);
+                          setUpdates([]);
+                          setSkip(0);
+                          skipRef.current = 0;
+                          setHasMore(true);
+                          setLoading(true);
+                        }}
+                      >
                         <Bookmark className="mr-2 h-4 w-4" />
-                        Bookmarked (0)
+                        {showOnlyBookmarked ? "Show All" : `Bookmarked (${bookmarksLoading ? '...' : bookmarks.length})`}
                       </Button>
                     </div>
                     <div className="mb-4 flex flex-wrap gap-2">
@@ -364,6 +389,25 @@
                           #{cat}
                         </Badge>
                       ))}
+                    </div>
+                    <div className="flex items-center mb-4">
+                      <input
+                        id="show-bookmarked"
+                        type="checkbox"
+                        checked={showOnlyBookmarked}
+                        onChange={e => {
+                          setShowOnlyBookmarked(e.target.checked);
+                          setUpdates([]);
+                          setSkip(0);
+                          skipRef.current = 0;
+                          setHasMore(true);
+                          setLoading(true);
+                        }}
+                        className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      />
+                      <label htmlFor="show-bookmarked" className="ml-2 text-sm text-muted-foreground cursor-pointer">
+                        Show only bookmarked updates
+                      </label>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                       {updates.map((update, idx) => {
