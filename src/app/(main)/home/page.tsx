@@ -41,7 +41,7 @@ export default function HomePage() {
                 <div className="flex items-center mb-3">
                   <Newspaper className="h-10 w-10 text-primary mr-4" />
                   <div>
-                    <CardTitle className="text-2xl font-semibold">Real-Time Updates</CardTitle>
+                    <CardTitle className="text-2xl font-semibold">Quick Updates</CardTitle>
                   </div>
                 </div>
               </CardHeader>

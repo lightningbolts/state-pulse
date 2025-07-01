@@ -675,41 +675,35 @@ export function RepresentativesFinder() {
           <p className="text-sm text-muted-foreground mb-4">Quick access to other civic information.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button
-              className={`p-3 border rounded-lg hover:bg-muted transition-colors text-left ${activeCivicTool === 'voting' ? 'bg-muted border-primary' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveCivicTool(activeCivicTool === 'voting' ? null : 'voting');
-              }}
+              className={`p-3 border rounded-lg transition-colors text-left opacity-60 cursor-not-allowed`}
+              disabled
             >
               <h5 className="font-medium flex items-center">
                 <Vote className="mr-2 h-5 w-5 text-primary" />
                 Voting Dates & Deadlines
+                <span className="ml-2 text-xs text-muted-foreground">(coming soon)</span>
               </h5>
               <p className="text-xs text-muted-foreground">Find important election dates</p>
             </button>
             <button
-              className={`p-3 border rounded-lg hover:bg-muted transition-colors text-left ${activeCivicTool === 'hearings' ? 'bg-muted border-primary' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveCivicTool(activeCivicTool === 'hearings' ? null : 'hearings');
-              }}
+              className={`p-3 border rounded-lg transition-colors text-left opacity-60 cursor-not-allowed`}
+              disabled
             >
               <h5 className="font-medium flex items-center">
                 <Calendar className="mr-2 h-5 w-5 text-primary" />
                 Public Hearing Schedules
+                <span className="ml-2 text-xs text-muted-foreground">(coming soon)</span>
               </h5>
               <p className="text-xs text-muted-foreground">Stay informed on upcoming hearings</p>
             </button>
             <button
-              className={`p-3 border rounded-lg hover:bg-muted transition-colors text-left ${activeCivicTool === 'ballot' ? 'bg-muted border-primary' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveCivicTool(activeCivicTool === 'ballot' ? null : 'ballot');
-              }}
+              className={`p-3 border rounded-lg transition-colors text-left opacity-60 cursor-not-allowed`}
+              disabled
             >
               <h5 className="font-medium flex items-center">
                 <FileText className="mr-2 h-5 w-5 text-primary" />
                 Ballot Information
+                <span className="ml-2 text-xs text-muted-foreground">(coming soon)</span>
               </h5>
               <p className="text-xs text-muted-foreground">View your local ballot measures</p>
             </button>
