@@ -119,12 +119,12 @@ export function PolicyTracker() {
 				</CardHeader>
 				<CardContent className="overflow-hidden">
 					<Tabs defaultValue="topics" className="w-full">
-						<TabsList className="grid w-full grid-cols-1 md:grid-cols-2 h-auto md:h-10">
-							<TabsTrigger value="topics" className="flex items-center gap-2 py-3 md:py-2 text-xs md:text-sm">
+						<TabsList className="grid w-full grid-cols-2 gap-0">
+							<TabsTrigger value="topics" className="flex items-center justify-center gap-2 text-sm">
 								<BellRing className="h-4 w-4 flex-shrink-0" />
 								<span className="truncate">Topic Tracking</span>
 							</TabsTrigger>
-							<TabsTrigger value="bookmarks" className="flex items-center gap-2 py-3 md:py-2 mt-1 md:mt-0 text-xs md:text-sm">
+							<TabsTrigger value="bookmarks" className="flex items-center justify-center gap-2 text-sm">
 								<Bookmark className="h-4 w-4 flex-shrink-0" />
 								<span className="truncate">Bookmarked Legislation</span>
 							</TabsTrigger>
