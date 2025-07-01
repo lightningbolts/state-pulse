@@ -12,16 +12,23 @@ async function clearRepresentativesCache() {
     const db = client.db('statepulse');
     const representativesCollection = db.collection('representatives');
 
-    // Clear Washington state representatives cache
-    const result = await representativesCollection.deleteMany({
-      jurisdiction: { $regex: /Washington|WA/i }
+    // Clear Louisiana state representatives cache
+    const laResult = await representativesCollection.deleteMany({
+      jurisdiction: { $regex: /Louisiana|LA/i }
     });
 
-    console.log(`Deleted ${result.deletedCount} cached representatives for Washington state`);
+    console.log(`Deleted ${laResult.deletedCount} cached representatives for Louisiana state`);
 
-    // Optional: Clear all cached representatives if you want to refresh everything
-    // const allResult = await representativesCollection.deleteMany({});
-    // console.log(`Deleted ${allResult.deletedCount} total cached representatives`);
+    // Clear Alabama state representatives cache
+    const alResult = await representativesCollection.deleteMany({
+      jurisdiction: { $regex: /Alabama|AL/i }
+    });
+
+    console.log(`Deleted ${alResult.deletedCount} cached representatives for Alabama state`);
+
+    // Clear all cached representatives to ensure clean state
+    const allResult = await representativesCollection.deleteMany({});
+    console.log(`Deleted ${allResult.deletedCount} total cached representatives`);
 
   } catch (error) {
     console.error('Error clearing cache:', error);

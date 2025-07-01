@@ -501,10 +501,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // For proximity-based searches, limit to first 10 representatives
+    const limitedReps = representatives.slice(0, 10);
+
     return NextResponse.json({
-      representatives,
+      representatives: limitedReps,
       source: 'api',
-      count: representatives.length
+      count: limitedReps.length
     });
 
   } catch (error) {

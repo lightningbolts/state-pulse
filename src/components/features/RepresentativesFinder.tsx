@@ -85,6 +85,23 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// State name to abbreviation mapping - centralized constant
+const STATE_MAP: Record<string, string> = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+  'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
+};
+
 export function RepresentativesFinder() {
   const [representatives, setRepresentatives] = useState<Representative[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,25 +133,8 @@ export function RepresentativesFinder() {
 
       // If no structured state, try to extract from display_name
       if (!state) {
-        // Look for state names and convert to abbreviations
-        const stateMap: Record<string, string> = {
-          'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-          'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-          'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-          'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-          'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-          'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-          'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-          'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-          'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-          'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-          'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-          'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-          'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-        };
-
         // Check if display_name contains a full state name
-        for (const [fullName, abbrev] of Object.entries(stateMap)) {
+        for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
           if (location.display_name.includes(fullName)) {
             state = abbrev;
             break;
@@ -154,6 +154,8 @@ export function RepresentativesFinder() {
         throw new Error('Unable to determine state from the selected address.');
       }
 
+      console.log('Searching for representatives in state:', state, 'for location:', location.display_name);
+
       const response = await fetch(`/api/representatives?address=${encodeURIComponent(state)}`);
 
       if (!response.ok) {
@@ -163,6 +165,12 @@ export function RepresentativesFinder() {
 
       const data: ApiResponse = await response.json();
       let reps = data.representatives || [];
+
+      console.log('Received representatives:', reps.length, 'for state:', state);
+      if (reps.length > 0) {
+        console.log('First rep jurisdiction:', reps[0].jurisdiction);
+        console.log('Sample reps:', reps.slice(0, 3).map(r => ({ name: r.name, jurisdiction: r.jurisdiction })));
+      }
 
       // Calculate distances and add coordinates for representatives
       if (reps.length > 0 && location.lat !== 0 && location.lon !== 0) {
@@ -226,34 +234,23 @@ export function RepresentativesFinder() {
             'DC': { lat: 38.9072, lon: -77.0369 } // Washington, DC
           };
 
-          // Get state abbreviation from jurisdiction
-          const stateAbbrev = rep.jurisdiction?.match(/\b([A-Z]{2})\b/)?.[1] ||
-                             Object.keys(stateCapitols).find(key =>
-                               rep.jurisdiction?.toLowerCase().includes(key.toLowerCase()));
+          // Use the state we searched for instead of trying to parse from jurisdiction
+          const stateAbbrev = state;
 
-          if (stateAbbrev && stateCapitols[stateAbbrev]) {
-            const capitol = stateCapitols[stateAbbrev];
+          // Convert full state name to abbreviation if needed
+          const finalStateAbbrev = STATE_MAP[stateAbbrev] || stateAbbrev;
 
-            // Use district-based positioning for more accurate locations
-            if (rep.district) {
-              // Create consistent positioning based on district number
-              const districtNum = typeof rep.district === 'string' ?
-                parseInt(rep.district.replace(/\D/g, ''), 10) || 1 :
-                rep.district;
+          console.log('State for coordinates:', stateAbbrev, '-> Final abbrev:', finalStateAbbrev, 'Available in stateCapitols:', !!stateCapitols[finalStateAbbrev]);
 
-              // Use a deterministic offset based on district number
-              const angle = (districtNum * 137.508) % 360; // Golden angle distribution
-              const radius = 0.3 + (districtNum % 5) * 0.1; // 0.3 to 0.7 degrees (~20-50 miles)
+          if (finalStateAbbrev && stateCapitols[finalStateAbbrev]) {
+            const capitol = stateCapitols[finalStateAbbrev];
+            console.log('Using capitol coordinates for', finalStateAbbrev, ':', capitol);
 
-              const radians = (angle * Math.PI) / 180;
-              repLat = capitol.lat + radius * Math.cos(radians);
-              repLon = capitol.lon + radius * Math.sin(radians);
-            } else {
-              // For offices without districts, use capitol coordinates directly
-              repLat = capitol.lat;
-              repLon = capitol.lon;
-            }
+            // Place all representatives at the state capitol
+            repLat = capitol.lat;
+            repLon = capitol.lon;
           } else {
+            console.log('Fallback: No state found or not in capitol list. State:', stateAbbrev, 'Final:', finalStateAbbrev);
             // Fallback: use user location with small offset if state not found
             const fallbackVariation = 0.1;
             repLat = location.lat + (Math.random() - 0.5) * fallbackVariation;
@@ -298,29 +295,15 @@ export function RepresentativesFinder() {
 
       // Extract state logic (same as before)
       if (!state) {
-        const stateMap: Record<string, string> = {
-          'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-          'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-          'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-          'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-          'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-          'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-          'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-          'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-          'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-          'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-          'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-          'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-          'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-        };
-
-        for (const [fullName, abbrev] of Object.entries(stateMap)) {
+        // Check if display_name contains a full state name
+        for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
           if (location.display_name.includes(fullName)) {
             state = abbrev;
             break;
           }
         }
 
+        // Last resort: try to find 2-letter state code in display_name
         if (!state) {
           const stateMatch = location.display_name.match(/\b([A-Z]{2})\b/);
           if (stateMatch) {
@@ -372,25 +355,8 @@ export function RepresentativesFinder() {
     // Create a location object for manual search with improved state extraction
     let state: string | undefined;
 
-    // Use the same state mapping logic as in fetchRepresentatives
-    const stateMap: Record<string, string> = {
-      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-      'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-      'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-      'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-      'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-      'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-      'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-      'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-      'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-      'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-      'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-      'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-      'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-    };
-
     // Check if query contains a full state name
-    for (const [fullName, abbrev] of Object.entries(stateMap)) {
+    for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
       if (query.toLowerCase().includes(fullName.toLowerCase())) {
         state = abbrev;
         break;
