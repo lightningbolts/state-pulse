@@ -32,6 +32,12 @@ interface Representative {
   lat?: number;
   lon?: number;
   distance?: number;
+  addresses?: Array<{
+    type: string;
+    address: string;
+    phone?: string;
+    fax?: string;
+  }>;
   lastUpdated: Date;
 }
 
@@ -594,16 +600,44 @@ export function RepresentativesFinder() {
                         )}
                       </div>
 
-                      {!rep.phone && !rep.email && !rep.website && (
-                        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                          <div className="text-sm">
-                            <p className="text-amber-800 dark:text-amber-200 font-medium mb-1">
-                              Contact information not available
-                            </p>
-                            <p className="text-amber-700 dark:text-amber-300 text-xs">
-                              Try searching for "{rep.name}" online or contact your local government office for current information.
-                            </p>
+                      {/* Address Information */}
+                      {rep.addresses && rep.addresses.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-border">
+                          <h6 className="text-sm font-medium text-muted-foreground mb-2">Office Addresses</h6>
+                          <div className="space-y-3">
+                            {rep.addresses.map((office, idx) => (
+                              <div key={idx} className="text-sm">
+                                <div className="flex items-start gap-2">
+                                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                  <div className="flex-1">
+                                    <div className="font-medium text-muted-foreground text-xs uppercase tracking-wide mb-1">
+                                      {office.type}
+                                    </div>
+                                    <div className="text-sm leading-relaxed">
+                                      {office.address}
+                                    </div>
+                                    {(office.phone || office.fax) && (
+                                      <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                                        {office.phone && (
+                                          <div className="flex items-center gap-1">
+                                            <Phone className="h-3 w-3" />
+                                            <a href={`tel:${office.phone}`} className="text-primary hover:underline">
+                                              {office.phone}
+                                            </a>
+                                          </div>
+                                        )}
+                                        {office.fax && (
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-muted-foreground">Fax:</span>
+                                            {office.fax}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}

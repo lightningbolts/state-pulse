@@ -80,7 +80,6 @@ interface Representative {
   office: string;
   district?: string;
   jurisdiction: string;
-  phone?: string;
   email?: string;
   website?: string;
   photo?: string;
@@ -88,11 +87,9 @@ interface Representative {
   lon?: number;
   addresses?: Array<{
     type: string;
-    line1: string;
-    line2?: string;
-    city: string;
-    state: string;
-    zip: string;
+    address: string;
+    phone?: string;
+    fax?: string;
   }>;
   lastUpdated: Date;
 }
@@ -326,14 +323,26 @@ export async function GET(request: NextRequest) {
         const role = person.current_role!;
 
         // Extract contact information from offices array - more comprehensive extraction
-        let phone: string | undefined;
         let email: string | undefined;
         let website: string | undefined;
+        let addresses: Array<{
+          type: string;
+          address: string;
+          phone?: string;
+          fax?: string;
+        }> = [];
 
-        // Get phone from offices array (voice field)
+        // Get phone and addresses from offices array
         if (person.offices && person.offices.length > 0) {
-          const primaryOffice = person.offices[0];
-          phone = primaryOffice.voice;
+          // Extract addresses from all offices
+          addresses = person.offices
+            .filter(office => office.address) // Only include offices with addresses
+            .map(office => ({
+              type: office.name || office.classification || 'Office',
+              address: office.address!,
+              phone: office.voice,
+              fax: office.fax
+            }));
         }
 
         // Get email - can be at person level or in offices
@@ -418,10 +427,10 @@ export async function GET(request: NextRequest) {
           office: officeTitle,
           district: districtInfo,
           jurisdiction: person.jurisdiction?.name || `${stateCode} State Legislature`,
-          phone,
           email,
           website,
           photo: person.image,
+          addresses, // Add the extracted addresses array
           lastUpdated: new Date()
         };
       });
