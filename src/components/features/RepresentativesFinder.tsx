@@ -4,8 +4,13 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, MapPin, Phone, Mail, ExternalLink, AlertCircle, Database, Map, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, MapPin, Phone, Mail, ExternalLink, AlertCircle, Database, Map, Info, Calendar, FileText, MessageSquare, Vote } from "lucide-react";
 import { AddressSearch } from "./AddressSearch";
+import { VotingInfo } from "./VotingInfo";
+import { PublicHearings } from "./PublicHearings";
+import { BallotInformation } from "./BallotInformation";
+import { MessageGenerator } from "./MessageGenerator";
 
 // Dynamically import the map component to avoid SSR issues
 const RepresentativesMap = dynamic(() => import('./RepresentativesMap').then(mod => ({ default: mod.RepresentativesMap })), {
@@ -86,6 +91,9 @@ export function RepresentativesFinder() {
   const [showAllMode, setShowAllMode] = useState(false);
   const [pagination, setPagination] = useState<ApiResponse['pagination'] | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Civic tools state
+  const [activeCivicTool, setActiveCivicTool] = useState<'voting' | 'hearings' | 'ballot' | 'message' | null>(null);
 
   const fetchRepresentatives = async (location: AddressSuggestion) => {
     setLoading(true);
@@ -666,24 +674,112 @@ export function RepresentativesFinder() {
           <h4 className="font-semibold mb-2 text-lg">Civic Tools</h4>
           <p className="text-sm text-muted-foreground mb-4">Quick access to other civic information.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="p-3 border rounded-lg hover:bg-muted transition-colors text-left">
-              <h5 className="font-medium">Voting Dates & Deadlines</h5>
+            <button
+              className={`p-3 border rounded-lg hover:bg-muted transition-colors text-left ${activeCivicTool === 'voting' ? 'bg-muted border-primary' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveCivicTool(activeCivicTool === 'voting' ? null : 'voting');
+              }}
+            >
+              <h5 className="font-medium flex items-center">
+                <Vote className="mr-2 h-5 w-5 text-primary" />
+                Voting Dates & Deadlines
+              </h5>
               <p className="text-xs text-muted-foreground">Find important election dates</p>
             </button>
-            <button className="p-3 border rounded-lg hover:bg-muted transition-colors text-left">
-              <h5 className="font-medium">Public Hearing Schedules</h5>
+            <button
+              className={`p-3 border rounded-lg hover:bg-muted transition-colors text-left ${activeCivicTool === 'hearings' ? 'bg-muted border-primary' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveCivicTool(activeCivicTool === 'hearings' ? null : 'hearings');
+              }}
+            >
+              <h5 className="font-medium flex items-center">
+                <Calendar className="mr-2 h-5 w-5 text-primary" />
+                Public Hearing Schedules
+              </h5>
               <p className="text-xs text-muted-foreground">Stay informed on upcoming hearings</p>
             </button>
-            <button className="p-3 border rounded-lg hover:bg-muted transition-colors text-left">
-              <h5 className="font-medium">Ballot Information</h5>
+            <button
+              className={`p-3 border rounded-lg hover:bg-muted transition-colors text-left ${activeCivicTool === 'ballot' ? 'bg-muted border-primary' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveCivicTool(activeCivicTool === 'ballot' ? null : 'ballot');
+              }}
+            >
+              <h5 className="font-medium flex items-center">
+                <FileText className="mr-2 h-5 w-5 text-primary" />
+                Ballot Information
+              </h5>
               <p className="text-xs text-muted-foreground">View your local ballot measures</p>
             </button>
-            <button className="p-3 border rounded-lg hover:bg-muted transition-colors text-left">
-              <h5 className="font-medium">Generate Message to Legislator</h5>
+            <button
+              className={`p-3 border rounded-lg hover:bg-muted transition-colors text-left ${activeCivicTool === 'message' ? 'bg-muted border-primary' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveCivicTool(activeCivicTool === 'message' ? null : 'message');
+              }}
+            >
+              <h5 className="font-medium flex items-center">
+                <MessageSquare className="mr-2 h-5 w-5 text-primary" />
+                Generate Message to Legislator
+              </h5>
               <p className="text-xs text-muted-foreground">Create personalized messages</p>
             </button>
           </div>
         </div>
+
+        {/* Civic Tools Components */}
+        {activeCivicTool === 'voting' && (
+          <div className="mt-6">
+            <VotingInfo
+              userLocation={{
+                state: userLocation?.address?.state,
+                city: userLocation?.address?.city,
+              }}
+              onClose={() => setActiveCivicTool(null)}
+            />
+          </div>
+        )}
+
+        {activeCivicTool === 'hearings' && (
+          <div className="mt-6">
+            <PublicHearings
+              userLocation={{
+                state: userLocation?.address?.state,
+                city: userLocation?.address?.city,
+                county: userLocation?.address?.state, // Fallback to state if no county
+              }}
+              onClose={() => setActiveCivicTool(null)}
+            />
+          </div>
+        )}
+
+        {activeCivicTool === 'ballot' && (
+          <div className="mt-6">
+            <BallotInformation
+              userLocation={{
+                state: userLocation?.address?.state,
+                city: userLocation?.address?.city,
+                county: userLocation?.address?.state, // Fallback to state if no county
+              }}
+              onClose={() => setActiveCivicTool(null)}
+            />
+          </div>
+        )}
+
+        {activeCivicTool === 'message' && (
+          <div className="mt-6">
+            <MessageGenerator
+              representatives={representatives}
+              userLocation={{
+                state: userLocation?.address?.state,
+                city: userLocation?.address?.city,
+              }}
+              onClose={() => setActiveCivicTool(null)}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
