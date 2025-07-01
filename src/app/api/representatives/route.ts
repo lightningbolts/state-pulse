@@ -27,26 +27,50 @@ interface OpenStatesPerson {
   current_role?: {
     title: string;
     org_classification: string;
-    district?: {
-      name: string;
-      division_id: string;
-    };
+    district?: number;
+    division_id?: string;
   };
-  contact_details?: Array<{
-    type: string;
-    value: string;
+  jurisdiction?: {
+    id: string;
+    name: string;
+    classification: string;
+  };
+  given_name?: string;
+  family_name?: string;
+  image?: string;
+  email?: string;
+  gender?: string;
+  birth_date?: string;
+  death_date?: string;
+  extras?: {
+    profession?: string;
+  };
+  created_at?: string;
+  updated_at?: string;
+  openstates_url?: string;
+  other_identifiers?: Array<{
+    identifier: string;
+    scheme: string;
+  }>;
+  other_names?: Array<{
+    name: string;
+    note?: string;
   }>;
   links?: Array<{
     url: string;
     note?: string;
   }>;
-  image?: string;
-  given_name?: string;
-  family_name?: string;
-  jurisdiction?: {
+  sources?: Array<{
+    url: string;
+    note?: string;
+  }>;
+  offices?: Array<{
     name: string;
-    classification: string;
-  };
+    fax?: string;
+    voice?: string;
+    address?: string;
+    classification?: string;
+  }>;
 }
 
 interface Representative {
@@ -78,6 +102,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const address = searchParams.get('address');
     const state = searchParams.get('state');
+    const forceRefresh = searchParams.get('refresh') === 'true';
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = parseInt(searchParams.get('pageSize') || '10');
+    const showAll = searchParams.get('showAll') === 'true'; // New parameter to get all reps
 
     if (!address && !state) {
       return NextResponse.json(
@@ -154,21 +182,64 @@ export async function GET(request: NextRequest) {
     const representativesCollection = db.collection<Representative>('representatives');
 
     // Check if we have cached representatives for this state (within last 24 hours)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Skip cache check if forceRefresh is true
+    if (!forceRefresh) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
 
-    const cachedReps = await representativesCollection
-      .find({
+      const totalCachedReps = await representativesCollection.countDocuments({
         jurisdiction: { $regex: new RegExp(stateCode, 'i') },
         lastUpdated: { $gte: yesterday }
-      })
-      .toArray();
+      });
 
-    if (cachedReps.length > 0) {
-      console.log(`Returning ${cachedReps.length} cached representatives for ${stateCode}`);
-      return NextResponse.json({
-        representatives: cachedReps,
-        source: 'cache'
+      if (totalCachedReps > 0) {
+        console.log(`Found ${totalCachedReps} cached representatives for ${stateCode}`);
+
+        if (showAll) {
+          // Return paginated results
+          const skip = (page - 1) * pageSize;
+          const cachedReps = await representativesCollection
+            .find({
+              jurisdiction: { $regex: new RegExp(stateCode, 'i') },
+              lastUpdated: { $gte: yesterday }
+            })
+            .skip(skip)
+            .limit(pageSize)
+            .toArray();
+
+          return NextResponse.json({
+            representatives: cachedReps,
+            source: 'cache',
+            pagination: {
+              page,
+              pageSize,
+              total: totalCachedReps,
+              totalPages: Math.ceil(totalCachedReps / pageSize),
+              hasNext: skip + pageSize < totalCachedReps,
+              hasPrev: page > 1
+            }
+          });
+        } else {
+          // Return first 10 for proximity-based search
+          const cachedReps = await representativesCollection
+            .find({
+              jurisdiction: { $regex: new RegExp(stateCode, 'i') },
+              lastUpdated: { $gte: yesterday }
+            })
+            .limit(10)
+            .toArray();
+
+          return NextResponse.json({
+            representatives: cachedReps,
+            source: 'cache'
+          });
+        }
+      }
+    } else {
+      console.log(`Force refresh requested for ${stateCode}, clearing cache`);
+      // Clear old representatives for this state when force refresh is requested
+      await representativesCollection.deleteMany({
+        jurisdiction: { $regex: new RegExp(stateCode, 'i') }
       });
     }
 
@@ -250,27 +321,103 @@ export async function GET(request: NextRequest) {
 
     // Transform OpenStates data to our Representative format
     const representatives: Representative[] = people
-      .filter(person => person.current_role) // Only include people with current roles
+      .filter(person => person.current_role && !person.death_date) // Only include people with current roles who are alive
       .map(person => {
         const role = person.current_role!;
 
-        // Extract contact information
-        const contacts = person.contact_details || [];
-        const phone = contacts.find(c => c.type === 'voice')?.value;
-        const email = contacts.find(c => c.type === 'email')?.value;
+        // Extract contact information from offices array - more comprehensive extraction
+        let phone: string | undefined;
+        let email: string | undefined;
+        let website: string | undefined;
 
-        // Extract website
-        const website = person.links?.find(link =>
-          link.url.includes('.gov') || link.note?.toLowerCase().includes('official')
-        )?.url;
+        // Get phone from offices array (voice field)
+        if (person.offices && person.offices.length > 0) {
+          const primaryOffice = person.offices[0];
+          phone = primaryOffice.voice;
+        }
+
+        // Get email - can be at person level or in offices
+        email = person.email;
+        if (!email && person.offices && person.offices.length > 0) {
+          // Check if email is in office data (some APIs might store it there)
+          const officeWithEmail = person.offices.find(office => (office as any).email);
+          if (officeWithEmail) {
+            email = (officeWithEmail as any).email;
+          }
+        }
+
+        // Extract website - prioritize official government links
+        if (person.links && person.links.length > 0) {
+          // First try to find homepage
+          const homepage = person.links.find(link =>
+            link.note?.toLowerCase().includes('homepage')
+          );
+          if (homepage) {
+            website = homepage.url;
+          } else {
+            // Then try .gov domains
+            const govSite = person.links.find(link =>
+              link.url.includes('.gov')
+            );
+            if (govSite) {
+              website = govSite.url;
+            } else {
+              // Then try state legislature domains (common patterns)
+              const stateLegSite = person.links.find(link =>
+                link.url.includes('legislature') ||
+                link.url.includes('senate') ||
+                link.url.includes('house') ||
+                link.url.includes('assembly') ||
+                link.url.includes('capitol')
+              );
+              if (stateLegSite) {
+                website = stateLegSite.url;
+              } else {
+                // Fallback to any official link that's NOT openstates
+                const officialLink = person.links.find(link =>
+                  link.note?.toLowerCase().includes('official') &&
+                  !link.url.includes('openstates.org')
+                );
+                if (officialLink) {
+                  website = officialLink.url;
+                } else {
+                  // Last resort - first link that's NOT openstates
+                  const nonOpenStatesLink = person.links.find(link =>
+                    !link.url.includes('openstates.org')
+                  );
+                  if (nonOpenStatesLink) {
+                    website = nonOpenStatesLink.url;
+                  }
+                  // Only use openstates_url if absolutely no other links exist
+                  // Don't set website to openstates_url at all - let it be undefined
+                }
+              }
+            }
+          }
+        }
+        // Don't use person.openstates_url as fallback - leave website undefined if no official site found
+
+        // Create office title with proper formatting
+        let officeTitle = role.title;
+        if (role.org_classification === 'upper') {
+          officeTitle = 'State Senator';
+        } else if (role.org_classification === 'lower') {
+          officeTitle = 'State Representative';
+        }
+
+        // Format district information
+        let districtInfo = '';
+        if (role.district) {
+          districtInfo = `District ${role.district}`;
+        }
 
         return {
           id: person.id,
           name: person.name,
           party: person.party || 'Unknown',
-          office: role.title,
-          district: role.district?.name,
-          jurisdiction: person.jurisdiction?.name || stateCode.toUpperCase(),
+          office: officeTitle,
+          district: districtInfo,
+          jurisdiction: person.jurisdiction?.name || `${stateCode} State Legislature`,
           phone,
           email,
           website,
@@ -289,6 +436,26 @@ export async function GET(request: NextRequest) {
       // Insert new representatives
       await representativesCollection.insertMany(representatives);
       console.log(`Stored ${representatives.length} representatives for ${stateCode}`);
+    }
+
+    // Return paginated response if showAll is true
+    if (showAll) {
+      const total = representatives.length;
+      const skip = (page - 1) * pageSize;
+      const paginatedReps = representatives.slice(skip, skip + pageSize);
+
+      return NextResponse.json({
+        representatives: paginatedReps,
+        source: 'api',
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+          hasNext: skip + pageSize < total,
+          hasPrev: page > 1
+        }
+      });
     }
 
     return NextResponse.json({

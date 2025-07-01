@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, MapPin, Phone, Mail, ExternalLink, AlertCircle, Database, Map } from "lucide-react";
+import { Users, MapPin, Phone, Mail, ExternalLink, AlertCircle, Database, Map, Info } from "lucide-react";
 import { AddressSearch } from "./AddressSearch";
 
 // Dynamically import the map component to avoid SSR issues
@@ -33,7 +33,15 @@ interface Representative {
 interface ApiResponse {
   representatives: Representative[];
   source: 'cache' | 'api';
-  count: number;
+  count?: number;
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 interface AddressSuggestion {
@@ -74,6 +82,10 @@ export function RepresentativesFinder() {
   const [userLocation, setUserLocation] = useState<AddressSuggestion | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [closestReps, setClosestReps] = useState<Representative[]>([]);
+  // New pagination state
+  const [showAllMode, setShowAllMode] = useState(false);
+  const [pagination, setPagination] = useState<ApiResponse['pagination'] | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchRepresentatives = async (location: AddressSuggestion) => {
     setLoading(true);
@@ -139,7 +151,6 @@ export function RepresentativesFinder() {
       if (reps.length > 0 && location.lat !== 0 && location.lon !== 0) {
         reps = reps.map((rep, index) => {
           // Use actual representative office locations when available
-          // For now, we'll use known state capitol and major city coordinates
           let repLat: number;
           let repLon: number;
 
@@ -206,21 +217,22 @@ export function RepresentativesFinder() {
           if (stateAbbrev && stateCapitols[stateAbbrev]) {
             const capitol = stateCapitols[stateAbbrev];
 
-            // For state-level offices, use capitol coordinates with small realistic variations
-            if (rep.office?.toLowerCase().includes('senate') ||
-                rep.office?.toLowerCase().includes('house') ||
-                rep.office?.toLowerCase().includes('assembly') ||
-                rep.office?.toLowerCase().includes('representative')) {
+            // Use district-based positioning for more accurate locations
+            if (rep.district) {
+              // Create consistent positioning based on district number
+              const districtNum = typeof rep.district === 'string' ?
+                parseInt(rep.district.replace(/\D/g, ''), 10) || 1 :
+                rep.district;
 
-              // Add small variation for different districts/offices (within ~5 miles of capitol)
-              const variation = 0.05; // approximately 3-5 miles
-              const offsetLat = (Math.random() - 0.5) * variation;
-              const offsetLon = (Math.random() - 0.5) * variation;
+              // Use a deterministic offset based on district number
+              const angle = (districtNum * 137.508) % 360; // Golden angle distribution
+              const radius = 0.3 + (districtNum % 5) * 0.1; // 0.3 to 0.7 degrees (~20-50 miles)
 
-              repLat = capitol.lat + offsetLat;
-              repLon = capitol.lon + offsetLon;
+              const radians = (angle * Math.PI) / 180;
+              repLat = capitol.lat + radius * Math.cos(radians);
+              repLon = capitol.lon + radius * Math.sin(radians);
             } else {
-              // For other offices, use capitol coordinates directly
+              // For offices without districts, use capitol coordinates directly
               repLat = capitol.lat;
               repLon = capitol.lon;
             }
@@ -249,6 +261,82 @@ export function RepresentativesFinder() {
 
       setRepresentatives(reps);
       setDataSource(data.source);
+      setPagination(data.pagination || null);
+
+    } catch (err) {
+      console.error('Error fetching representatives:', err);
+      setError(err instanceof Error ? err.message : 'Unable to find representatives for this address.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // New function to fetch paginated representatives
+  const fetchPaginatedRepresentatives = async (location: AddressSuggestion, page: number = 1) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      let state = location.address.state;
+
+      // Extract state logic (same as before)
+      if (!state) {
+        const stateMap: Record<string, string> = {
+          'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+          'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+          'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+          'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+          'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+          'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+          'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+          'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+          'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+          'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+          'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+          'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+          'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
+        };
+
+        for (const [fullName, abbrev] of Object.entries(stateMap)) {
+          if (location.display_name.includes(fullName)) {
+            state = abbrev;
+            break;
+          }
+        }
+
+        if (!state) {
+          const stateMatch = location.display_name.match(/\b([A-Z]{2})\b/);
+          if (stateMatch) {
+            state = stateMatch[1];
+          }
+        }
+      }
+
+      if (!state) {
+        throw new Error('Unable to determine state from the selected address.');
+      }
+
+      // Build API URL with pagination parameters
+      const params = new URLSearchParams({
+        address: state,
+        showAll: 'true',
+        page: page.toString(),
+        pageSize: '10'
+      });
+
+      const response = await fetch(`/api/representatives?${params}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch representatives');
+      }
+
+      const data: ApiResponse = await response.json();
+
+      setRepresentatives(data.representatives || []);
+      setDataSource(data.source);
+      setPagination(data.pagination || null);
+      setCurrentPage(page);
 
     } catch (err) {
       console.error('Error fetching representatives:', err);
@@ -318,6 +406,33 @@ export function RepresentativesFinder() {
     fetchRepresentatives(manualLocation);
   };
 
+  // Pagination handlers
+  const handleShowAllToggle = async () => {
+    if (!userLocation) return;
+
+    if (!showAllMode) {
+      // Switch to "Show All" mode
+      setShowAllMode(true);
+      setShowMap(false); // Hide map when showing all
+      await fetchPaginatedRepresentatives(userLocation, 1);
+    } else {
+      // Switch back to proximity mode
+      setShowAllMode(false);
+      setPagination(null);
+      setCurrentPage(1);
+      await fetchRepresentatives(userLocation); // This will show proximity-based results
+    }
+  };
+
+  const handlePageChange = async (page: number) => {
+    if (!userLocation || !pagination) return;
+
+    const newPage = Math.min(Math.max(page, 1), pagination.totalPages);
+    if (newPage !== currentPage) {
+      await fetchPaginatedRepresentatives(userLocation, newPage);
+    }
+  };
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -371,7 +486,7 @@ export function RepresentativesFinder() {
           </div>
 
           {error && (
-            <div className="flex items-center p-4 mb-4 text-sm text-red-800 border border-red-300 rounded-lg bg-red-50">
+            <div className="flex items-center p-4 mb-4 text-sm text-red-800 dark:text-red-200 border border-red-300 dark:border-red-700 rounded-lg bg-red-50 dark:bg-red-900/20">
               <AlertCircle className="flex-shrink-0 w-4 h-4 mr-2" />
               <span>{error}</span>
             </div>
@@ -472,9 +587,17 @@ export function RepresentativesFinder() {
                       </div>
 
                       {!rep.phone && !rep.email && !rep.website && (
-                        <p className="text-xs text-muted-foreground italic">
-                          Contact information not available
-                        </p>
+                        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div className="text-sm">
+                            <p className="text-amber-800 dark:text-amber-200 font-medium mb-1">
+                              Contact information not available
+                            </p>
+                            <p className="text-amber-700 dark:text-amber-300 text-xs">
+                              Try searching for "{rep.name}" online or contact your local government office for current information.
+                            </p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -484,12 +607,57 @@ export function RepresentativesFinder() {
           </div>
 
           {representatives.length > 0 && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Found {representatives.length} representatives</strong> from OpenStates data.
-                {showMap && userLocation && ` Showing top 10 closest to your location.`}
-                {dataSource === 'cache' && ' This data is cached and refreshed daily.'}
-              </p>
+            <div className="mt-4 space-y-3">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Found {pagination ? pagination.total : representatives.length} representatives</strong> from OpenStates data.
+                  {showMap && userLocation && ` Showing top 10 closest to your location.`}
+                  {dataSource === 'cache' && ' This data is cached and refreshed daily.'}
+                </p>
+              </div>
+
+              {/* Show All Toggle Button - Always visible when we have representatives */}
+              {userLocation && !showMap && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={handleShowAllToggle}
+                    disabled={loading}
+                    className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {showAllMode ? 'Show Closest Representatives' : 'Show All State Representatives'}
+                  </button>
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {pagination && showAllMode && (
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-4 bg-muted/50 dark:bg-muted/20 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground">
+                      Showing {((pagination.page - 1) * pagination.pageSize) + 1}-{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} representatives
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Page {pagination.page} of {pagination.totalPages}
+                    </span>
+                    <button
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={!pagination.hasPrev || loading}
+                      className="px-3 py-1 text-sm rounded-md border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={!pagination.hasNext || loading}
+                      className="px-3 py-1 text-sm rounded-md border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
