@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     const address = searchParams.get('address');
     const state = searchParams.get('state');
     const forceRefresh = searchParams.get('refresh') === 'true';
-    const page = parseInt(searchParams.get('page') || '1');
+    const pageParam = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '10');
     const showAll = searchParams.get('showAll') === 'true'; // New parameter to get all reps
 
@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
 
         if (showAll) {
           // Return paginated results
-          const skip = (page - 1) * pageSize;
+          const skip = (pageParam - 1) * pageSize;
           const cachedReps = await representativesCollection
             .find({
               jurisdiction: { $regex: new RegExp(stateCode, 'i') },
@@ -208,12 +208,12 @@ export async function GET(request: NextRequest) {
             representatives: cachedReps,
             source: 'cache',
             pagination: {
-              page,
+              page: pageParam,
               pageSize,
               total: totalCachedReps,
               totalPages: Math.ceil(totalCachedReps / pageSize),
               hasNext: skip + pageSize < totalCachedReps,
-              hasPrev: page > 1
+              hasPrev: pageParam > 1
             }
           });
         } else {
@@ -252,26 +252,21 @@ export async function GET(request: NextRequest) {
 
     console.log(`Fetching representatives for state: ${stateCode}`);
 
-    // Try different OpenStates API endpoints - the jurisdiction format might need adjustment
-    let openStatesUrl: string;
-    let response: Response;
+    // Fetch all pages of representatives from OpenStates API
+    let allPeople: OpenStatesPerson[] = [];
+    let currentPage = 1;
+    let hasMorePages = true;
+    const perPage = 50; // OpenStates API maximum is 50 per page
 
-    // First try with lowercase state abbreviation (fix per_page limit)
-    openStatesUrl = `https://v3.openstates.org/people?jurisdiction=${stateCode.toLowerCase()}&per_page=50`;
+    while (hasMorePages) {
+      console.log(`Fetching page ${currentPage} for ${stateCode}...`);
 
-    response = await fetch(openStatesUrl, {
-      headers: {
-        'X-API-KEY': openStatesApiKey,
-        'Accept': 'application/json'
-      }
-    });
+      // Try different OpenStates API endpoints - the jurisdiction format might need adjustment
+      let openStatesUrl: string;
+      let response: Response;
 
-    // If that fails, try with the full state name format
-    if (!response.ok && response.status === 400) {
-      console.log(`First attempt failed, trying alternative format for ${stateCode}`);
-
-      // Try with ocd-division format (also fix per_page limit)
-      openStatesUrl = `https://v3.openstates.org/people?jurisdiction=ocd-division/country:us/state:${stateCode.toLowerCase()}&per_page=50`;
+      // First try with lowercase state abbreviation
+      openStatesUrl = `https://v3.openstates.org/people?jurisdiction=${stateCode.toLowerCase()}&per_page=${perPage}&page=${currentPage}`;
 
       response = await fetch(openStatesUrl, {
         headers: {
@@ -279,45 +274,84 @@ export async function GET(request: NextRequest) {
           'Accept': 'application/json'
         }
       });
+
+      // If that fails, try with the ocd-division format
+      if (!response.ok && response.status === 400) {
+        console.log(`First attempt failed for page ${currentPage}, trying alternative format for ${stateCode}`);
+
+        // Try with ocd-division format
+        openStatesUrl = `https://v3.openstates.org/people?jurisdiction=ocd-division/country:us/state:${stateCode.toLowerCase()}&per_page=${perPage}&page=${currentPage}`;
+
+        response = await fetch(openStatesUrl, {
+          headers: {
+            'X-API-KEY': openStatesApiKey,
+            'Accept': 'application/json'
+          }
+        });
+      }
+
+      if (!response.ok) {
+        console.error('OpenStates API error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+
+        if (response.status === 401) {
+          return NextResponse.json(
+            { error: 'API authentication failed. Please check your OpenStates API key.' },
+            { status: 401 }
+          );
+        }
+
+        if (response.status === 400) {
+          return NextResponse.json(
+            { error: `Invalid request for state ${stateCode}. The OpenStates API may not have data for this jurisdiction.` },
+            { status: 400 }
+          );
+        }
+
+        if (response.status === 404) {
+          return NextResponse.json(
+            { error: `No data found for state ${stateCode}. This state may not be available in OpenStates.` },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json(
+          { error: `Unable to fetch representative data for ${stateCode}. Please try again later.` },
+          { status: 500 }
+        );
+      }
+
+      const data = await response.json();
+      const pagePeople: OpenStatesPerson[] = data.results || [];
+
+      console.log(`Fetched ${pagePeople.length} representatives from page ${currentPage} for ${stateCode}`);
+
+      // Add this page's results to our collection
+      allPeople = allPeople.concat(pagePeople);
+
+      // Check if we have more pages
+      // OpenStates API typically returns fewer results than per_page when we've reached the end
+      if (pagePeople.length < perPage) {
+        hasMorePages = false;
+        console.log(`Reached end of results for ${stateCode}. Total fetched: ${allPeople.length}`);
+      } else {
+        currentPage++;
+        // Add a small delay to be respectful to the API
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Safety check to prevent infinite loops
+      if (currentPage > 10) {
+        console.warn(`Stopping pagination after ${currentPage - 1} pages for ${stateCode} to prevent infinite loop`);
+        hasMorePages = false;
+      }
     }
 
-    if (!response.ok) {
-      console.error('OpenStates API error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('Error response body:', errorText);
-
-      if (response.status === 401) {
-        return NextResponse.json(
-          { error: 'API authentication failed. Please check your OpenStates API key.' },
-          { status: 401 }
-        );
-      }
-
-      if (response.status === 400) {
-        return NextResponse.json(
-          { error: `Invalid request for state ${stateCode}. The OpenStates API may not have data for this jurisdiction.` },
-          { status: 400 }
-        );
-      }
-
-      if (response.status === 404) {
-        return NextResponse.json(
-          { error: `No data found for state ${stateCode}. This state may not be available in OpenStates.` },
-          { status: 404 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: `Unable to fetch representative data for ${stateCode}. Please try again later.` },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-    const people: OpenStatesPerson[] = data.results || [];
+    console.log(`Total representatives fetched for ${stateCode}: ${allPeople.length}`);
 
     // Transform OpenStates data to our Representative format
-    const representatives: Representative[] = people
+    const representatives: Representative[] = allPeople
       .filter(person => person.current_role && !person.death_date) // Only include people with current roles who are alive
       .map(person => {
         const role = person.current_role!;
@@ -450,19 +484,19 @@ export async function GET(request: NextRequest) {
     // Return paginated response if showAll is true
     if (showAll) {
       const total = representatives.length;
-      const skip = (page - 1) * pageSize;
+      const skip = (pageParam - 1) * pageSize;
       const paginatedReps = representatives.slice(skip, skip + pageSize);
 
       return NextResponse.json({
         representatives: paginatedReps,
         source: 'api',
         pagination: {
-          page,
+          page: pageParam,
           pageSize,
           total,
           totalPages: Math.ceil(total / pageSize),
           hasNext: skip + pageSize < total,
-          hasPrev: page > 1
+          hasPrev: pageParam > 1
         }
       });
     }
