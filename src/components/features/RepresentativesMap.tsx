@@ -101,8 +101,8 @@ export function RepresentativesMap({ center, zoom, representatives, userLocation
   }, [center, zoom, representatives, userLocation]);
 
   return (
-    <Card className="w-full h-80 overflow-hidden">
-      <div ref={mapRef} className="w-full h-full" />
+    <Card className="w-full h-80 overflow-hidden relative z-0">
+      <div ref={mapRef} className="w-full h-full [&_.leaflet-control-container]:z-[100] [&_.leaflet-popup]:z-[200] [&_.leaflet-tooltip]:z-[200]" />
     </Card>
   );
 }
