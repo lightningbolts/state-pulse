@@ -53,13 +53,14 @@
               const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
               if (search) params.append("search", search);
               if (subject) params.append("subject", subject);
-              if (sortField) params.append("sortBy", sortField);
+              // Map lastAction to the correct field name for the API
+              const apiSortField = sortField === "lastAction" ? "lastActionAt" : sortField;
+              if (apiSortField) params.append("sortBy", apiSortField);
               if (sortDir) params.append("sortDir", sortDir);
               if (classification) params.append("classification", classification);
               const res = await fetch(`/api/legislation?${params.toString()}`);
               if (!res.ok) throw new Error("Failed to fetch updates");
-              const data = await res.json();
-              return data;
+              return await res.json();
             }
 
             export function PolicyUpdatesFeed() {
@@ -72,7 +73,6 @@
               const [classification, setClassification] = useState("");
               const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
               const [showLoadingText, setShowLoadingText] = useState(true);
-              const [isFetchingMore, setIsFetchingMore] = useState(false);
               const [searchInput, setSearchInput] = useState("");
               const loader = useRef<HTMLDivElement | null>(null);
               const skipRef = useRef(0);
@@ -214,14 +214,14 @@
 
               // Hide loading text if no more data and not loading
               useEffect(() => {
-                if (!hasMore && !loading && !isFetchingMore) {
+                if (!hasMore && !loading) {
                   setShowLoadingText(false);
                 }
-              }, [hasMore, loading, isFetchingMore]);
+              }, [hasMore, loading]);
 
               useEffect(() => {
                 let timer: NodeJS.Timeout | null = null;
-                if (loading || isFetchingMore) {
+                if (loading) {
                   setShowLoadingText(true);
                   timer = setInterval(() => {
                     setShowLoadingText(prev => !prev);
@@ -232,7 +232,7 @@
                 return () => {
                   if (timer) clearInterval(timer);
                 };
-              }, [loading, isFetchingMore]);
+              }, [loading]);
 
 
               // Save state to sessionStorage on change
@@ -251,6 +251,19 @@
                 return () => window.removeEventListener('scroll', handleScroll);
               }, []);
 
+
+              // Helper function to get sort label
+              const getSortLabel = (field: string, dir: string) => {
+                switch (`${field}:${dir}`) {
+                  case "createdAt:desc": return "Most Recent";
+                  case "createdAt:asc": return "Oldest";
+                  case "title:asc": return "Alphabetical (A-Z)";
+                  case "title:desc": return "Alphabetical (Z-A)";
+                  case "lastAction:desc": return "Last Action (Latest)";
+                  case "lastAction:asc": return "Last Action (Earliest)";
+                  default: return "Custom";
+                }
+              };
 
               return (
                 <Card className="shadow-lg">
@@ -283,7 +296,7 @@
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" className="w-full sm:w-auto">
-                            Sort: {sort.field === "createdAt" ? "Most Recent" : sort.field === "title" ? "Alphabetical" : "Custom"}
+                            Sort: {getSortLabel(sort.field, sort.dir)}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -492,8 +505,8 @@
                                     {update.sponsors && update.sponsors.length > 0 && (
                                         <div className="mb-1 text-xs text-muted-foreground">
                                           <span className="font-semibold">Sponsors: </span>
-                                          {update.sponsors.map((sp: any, i: number) => (
-                                              <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < update.sponsors.length - 1 ? ', ' : ''}</span>
+                                          {update.sponsors.map((sp, i) => (
+                                              <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < (update.sponsors?.length || 0) - 1 ? ', ' : ''}</span>
                                           ))}
                                         </div>
                                     )}
@@ -533,7 +546,7 @@
                       })}
                     </div>
                     <div ref={loader} />
-                    {showLoadingText && (loading || isFetchingMore) && (
+                    {showLoadingText && (loading) && (
                       <p className="mt-6 text-center text-muted-foreground">Loading more updates...</p>
                     )}
                     {!hasMore && !loading && <p className="mt-6 text-center text-muted-foreground">No more updates.</p>}
