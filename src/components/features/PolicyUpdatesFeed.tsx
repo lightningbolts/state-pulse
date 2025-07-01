@@ -369,7 +369,7 @@
                       ))}
                     </div>
                     <div className="mb-6 space-x-2">
-                      {["Education", "Healthcare", "Policing", "Climate", "Labor", "Tech"].map((cat) => (
+                      {["Education", "Healthcare", "Policing", "Climate", "Labor", "Tech", "Housing", "Transportation", "Immigration", "Criminal Justice", "Budget", "Taxation", "Energy", "Agriculture", "Veterans", "Civil Rights", "Gun Control", "Privacy", "Ethics", "Environment"].map((cat) => (
                         <Badge
                           key={cat}
                           variant={subject === cat ? "default" : "secondary"}
