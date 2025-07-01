@@ -101,6 +101,9 @@ export function RepresentativesFinder() {
   // Civic tools state
   const [activeCivicTool, setActiveCivicTool] = useState<'voting' | 'hearings' | 'ballot' | 'message' | null>(null);
 
+  // Computed value for currently displayed representatives
+  const displayedRepresentatives = showAllMode ? representatives : (showMap ? closestReps : representatives);
+
   const fetchRepresentatives = async (location: AddressSuggestion) => {
     setLoading(true);
     setError(null);
@@ -530,7 +533,7 @@ export function RepresentativesFinder() {
           )}
 
           <div className="space-y-4">
-            {(showMap ? closestReps : representatives).map((rep, index) => (
+            {(showAllMode ? representatives : (showMap ? closestReps : representatives)).map((rep, index) => (
               <Card key={rep.id} className="border-l-4 border-l-primary">
                 <CardContent className="p-4">
                   <div className="flex flex-col md:flex-row md:items-start gap-4">
@@ -567,11 +570,11 @@ export function RepresentativesFinder() {
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        {rep.phone && (
+                        {rep.addresses && rep.addresses.length > 0 && rep.addresses[0].phone && (
                           <div className="flex items-center">
                             <Phone className="mr-2 h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <a href={`tel:${rep.phone}`} className="text-primary hover:underline break-all">
-                              {rep.phone}
+                            <a href={`tel:${rep.addresses[0].phone}`} className="text-primary hover:underline break-all">
+                              {rep.addresses[0].phone}
                             </a>
                           </div>
                         )}
@@ -646,6 +649,7 @@ export function RepresentativesFinder() {
                 </CardContent>
               </Card>
             ))}
+
           </div>
 
           {representatives.length > 0 && (
@@ -799,7 +803,7 @@ export function RepresentativesFinder() {
         {activeCivicTool === 'message' && (
           <div className="mt-6">
             <MessageGenerator
-              representatives={representatives}
+              representatives={displayedRepresentatives}
               userLocation={{
                 state: userLocation?.address?.state,
                 city: userLocation?.address?.city,
