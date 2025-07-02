@@ -47,6 +47,12 @@ export function StatePulseFooter() {
                 Community Posts
               </Link>
               <Link
+                href="/summaries"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+              >
+                AI Summaries
+              </Link>
+              <Link
                 href="/civic"
                 className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
               >
