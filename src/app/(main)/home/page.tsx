@@ -12,7 +12,7 @@ export default function HomePage() {
           Welcome to StatePulse
         </h1>
         <p className="text-lg md:text-xl text-primary-foreground/90 mb-10 max-w-3xl mx-auto leading-relaxed">
-          Your comprehensive source for real-time legislative tracking and policy analysis. Stay informed, make impactful decisions.
+          Your comprehensive source for fast legislative tracking and policy analysis. Stay informed, make impactful decisions.
         </p>
         <div className="space-x-2 sm:space-x-4">
           <Button asChild size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-md hover:shadow-lg transition-shadow px-8 py-3 rounded-lg">
