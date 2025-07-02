@@ -121,7 +121,7 @@ const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' },
   { ocdId: 'ocd-jurisdiction/country:us/state:md/government', abbr: 'MD' },
   { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:mm/government', abbr: 'MI'},
+  { ocdId: 'ocd-jurisdiction/country:us/state:mi/government', abbr: 'MI'},
   { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' },
   { ocdId: 'ocd-jurisdiction/country:us/state:ms/government', abbr: 'MS' },
   { ocdId: 'ocd-jurisdiction/country:us/state:mo/government', abbr: 'MO' },
