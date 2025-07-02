@@ -4,9 +4,97 @@ import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/aiSummaryUtil';
+import {
+  generateOllamaSummary,
+  fetchPdfTextFromOpenStatesUrl,
+  extractBestTextForSummary,
+  generateGeminiSummary
+} from '../services/aiSummaryUtil';
 
 config({ path: '../../.env' });
+
+// Gemini 2.0 Flash rate limiting: 10 RPM, 1,000,000 TPM, 200 RPD
+class GeminiRateLimiter {
+  private requestsPerMinute: number[] = [];
+  private requestsPerDay: number[] = [];
+  private tokensPerMinute: number[] = [];
+  private readonly MAX_RPM = 10;
+  private readonly MAX_TPM = 1000000;
+  private readonly MAX_RPD = 200;
+
+  async waitForRateLimit(estimatedTokens: number = 1000): Promise<void> {
+    const now = Date.now();
+
+    // Clean old entries
+    this.requestsPerMinute = this.requestsPerMinute.filter(time => now - time < 60000);
+    this.requestsPerDay = this.requestsPerDay.filter(time => now - time < 86400000);
+    this.tokensPerMinute = this.tokensPerMinute.filter(time => now - time < 60000);
+
+    // Check daily limit
+    if (this.requestsPerDay.length >= this.MAX_RPD) {
+      const oldestRequest = Math.min(...this.requestsPerDay);
+      const waitTime = 86400000 - (now - oldestRequest);
+      console.log(`Daily request limit reached. Waiting ${Math.ceil(waitTime / 1000 / 60)} minutes...`);
+      await this.sleep(waitTime);
+      return this.waitForRateLimit(estimatedTokens);
+    }
+
+    // Check requests per minute
+    if (this.requestsPerMinute.length >= this.MAX_RPM) {
+      const oldestRequest = Math.min(...this.requestsPerMinute);
+      const waitTime = 60000 - (now - oldestRequest) + 1000; // Add 1 second buffer
+      console.log(`RPM limit reached. Waiting ${Math.ceil(waitTime / 1000)} seconds...`);
+      await this.sleep(waitTime);
+      return this.waitForRateLimit(estimatedTokens);
+    }
+
+    // Check tokens per minute (rough estimation)
+    const currentTokens = this.tokensPerMinute.length * 1000; // Rough estimate
+    if (currentTokens + estimatedTokens > this.MAX_TPM) {
+      const oldestToken = Math.min(...this.tokensPerMinute);
+      const waitTime = 60000 - (now - oldestToken) + 1000;
+      console.log(`TPM limit approaching. Waiting ${Math.ceil(waitTime / 1000)} seconds...`);
+      await this.sleep(waitTime);
+      return this.waitForRateLimit(estimatedTokens);
+    }
+
+    // Record this request
+    this.requestsPerMinute.push(now);
+    this.requestsPerDay.push(now);
+    this.tokensPerMinute.push(now);
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  getStats() {
+    const now = Date.now();
+    const activeRequestsPerMinute = this.requestsPerMinute.filter(time => now - time < 60000).length;
+    const activeRequestsPerDay = this.requestsPerDay.filter(time => now - time < 86400000).length;
+    const activeTokensPerMinute = this.tokensPerMinute.filter(time => now - time < 60000).length;
+
+    return {
+      rpm: `${activeRequestsPerMinute}/${this.MAX_RPM}`,
+      rpd: `${activeRequestsPerDay}/${this.MAX_RPD}`,
+      tpm: `~${activeTokensPerMinute * 1000}/${this.MAX_TPM}`
+    };
+  }
+}
+
+const geminiRateLimiter = new GeminiRateLimiter();
+
+// Rate-limited wrapper for generateGeminiSummary
+async function generateGeminiSummaryWithRateLimit(text: string): Promise<string> {
+  // Estimate tokens (rough approximation: 4 chars per token)
+  const estimatedTokens = Math.ceil(text.length / 4) + 100; // +100 for response
+
+  await geminiRateLimiter.waitForRateLimit(estimatedTokens);
+  const stats = geminiRateLimiter.getStats();
+  console.log(`Calling Gemini API. Current usage - RPM: ${stats.rpm}, RPD: ${stats.rpd}, TPM: ${stats.tpm}`);
+
+  return await generateGeminiSummary(text);
+}
 
 const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
 const OPENSTATES_API_BASE_URL = 'https://v3.openstates.org';
@@ -337,7 +425,7 @@ async function fetchAndStoreUpdatedBills(
               }
             }
             if (shouldGenerateSummary) {
-              legislationToStore.geminiSummary = fullText ? await generateOllamaSummary(fullText, "mistral") : null;
+              legislationToStore.geminiSummary = fullText ? await generateGeminiSummaryWithRateLimit(fullText) : null;
               geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
             }
             // Only upsert if geminiSummary is less than 20 words or is the default unavailable message
