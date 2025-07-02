@@ -33,8 +33,10 @@ export async function getCollection(collectionName: string) {
 // Connect to the database
 export async function connectToDatabase() {
   try {
-    await clientPromise;
+    const client = await clientPromise;
+    const db = client.db(MONGODB_DB_NAME);
     console.log('Connected to MongoDB');
+    return { client, db };
   } catch (error) {
     console.error('Failed to connect to MongoDB:', error);
     throw error;

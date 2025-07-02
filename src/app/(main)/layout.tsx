@@ -26,6 +26,7 @@ import {
   BrainCircuit,
   Users,
   Gavel,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import {StatePulseFooter} from "@/components/StatePulseFooter";
@@ -35,6 +36,7 @@ type ActiveView =
   // | "dashboard"
   | "updates"
   | "tracker"
+  | "posts"
   | "timeline"
   | "summaries"
   | "civic";
@@ -51,6 +53,7 @@ const menuItems: MenuItem[] = [
   // { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "updates", path: "/legislation", label: "Policy Updates", icon: Newspaper },
   { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },
+  { id: "posts", path: "/posts", label: "Community Posts", icon: MessageSquare },
   { id: "summaries", path: "/summaries", label: "AI Summaries", icon: BrainCircuit },
   { id: "civic", path: "/civic", label: "Civic Tools", icon: Users },
 ];

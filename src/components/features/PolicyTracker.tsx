@@ -12,8 +12,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BellRing, X, Pencil, Check, Ban, Bookmark } from "lucide-react";
+import { BellRing, X, Pencil, Check, Ban, Bookmark, MessageSquare } from "lucide-react";
 import { BookmarksList } from "@/components/features/BookmarksList";
+import { PostsFeed } from "@/components/features/PostsFeed";
 
 export function PolicyTracker() {
 	const { user, isLoaded, isSignedIn } = useUser();
