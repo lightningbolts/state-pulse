@@ -28,6 +28,7 @@ import {
   Gavel,
   type LucideIcon,
 } from "lucide-react";
+import {StatePulseFooter} from "@/components/StatePulseFooter";
 
 type ActiveView =
     | "home"
@@ -116,6 +117,7 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
             {children}
           </BookmarksProvider>
         </main>
+        <StatePulseFooter />
       </SidebarInset>
     </SidebarProvider>
   );

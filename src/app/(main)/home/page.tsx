@@ -103,15 +103,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-background border-t border-border/50 py-10 px-6 md:px-10 text-center">
-        <p className="text-muted-foreground/80 text-sm">&copy; {new Date().getFullYear()} StatePulse. All rights reserved.</p>
-        <div className="mt-4 space-x-4">
-          <Link href="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>
-          <span className="text-muted-foreground/50">|</span>
-          <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link>
-        </div>
-      </footer>
+      {/*/!* Footer *!/*/}
+      {/*<footer className="bg-background border-t border-border/50 py-10 px-6 md:px-10 text-center">*/}
+      {/*  <p className="text-muted-foreground/80 text-sm">&copy; {new Date().getFullYear()} StatePulse. All rights reserved.</p>*/}
+      {/*  <div className="mt-4 space-x-4">*/}
+      {/*    <Link href="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>*/}
+      {/*    <span className="text-muted-foreground/50">|</span>*/}
+      {/*    <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link>*/}
+      {/*  </div>*/}
+      {/*</footer>*/}
     </div>
   );
 }
