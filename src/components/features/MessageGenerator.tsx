@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, Copy, Send, User, Building, AlertCircle, CheckCircle, Wand2, Search, FileText, X } from "lucide-react";
+import { MessageSquare, Copy, Send, User, Building, AlertCircle, CheckCircle, Wand2 } from "lucide-react";
+import { BillSearch } from "./BillSearch";
+import { SelectedBills } from "./SelectedBills";
 
 interface Representative {
   id: string;
@@ -64,11 +66,8 @@ export function MessageGenerator({ representatives = [], userLocation, onClose }
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Bill search state
-  const [billSearchQuery, setBillSearchQuery] = useState('');
-  const [billSearchResults, setBillSearchResults] = useState<Bill[]>([]);
+  // Bill search state - simplified to only track selected bills
   const [selectedBills, setSelectedBills] = useState<Bill[]>([]);
-  const [billSearchLoading, setBillSearchLoading] = useState(false);
   const [showBillSearch, setShowBillSearch] = useState(false);
 
   const messageTemplates: MessageTemplate[] = [
@@ -292,47 +291,7 @@ Sincerely,
     window.open(mailtoLink);
   };
 
-  // Bill search functions
-  const searchBills = async () => {
-    if (!billSearchQuery.trim()) return;
-
-    setBillSearchLoading(true);
-    try {
-      const response = await fetch('/api/search-bills', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: billSearchQuery.trim(),
-          userLocation
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Search bills API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorData
-        });
-        throw new Error(`Failed to search bills: ${response.status} ${response.statusText}. ${errorData.error || ''}`);
-      }
-
-      const data = await response.json();
-      console.log('Bill search results:', data);
-      setBillSearchResults(data.bills || []);
-
-    } catch (error) {
-      console.error('Error searching bills:', error);
-      // Show user-friendly error message
-      setBillSearchResults([]);
-    } finally {
-      setBillSearchLoading(false);
-    }
-  };
-
-  const selectBill = (bill: Bill) => {
+  const handleBillSelect = (bill: Bill) => {
     setSelectedBills(prevSelected => {
       if (prevSelected.find(b => b.id === bill.id)) {
         // Bill already selected, remove it
@@ -503,55 +462,12 @@ Sincerely,
           </div>
         </div>
 
-        {/* Selected Bills Box - Outside of search section */}
-        {selectedBills.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium mb-2">Selected Bills ({selectedBills.length})</label>
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="space-y-3">
-                {selectedBills.map((bill) => (
-                  <div key={bill.id} className="flex items-start justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <FileText className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-sm">{bill.title}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mb-2">
-                        {bill.identifier} - {bill.latest_action_date}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {bill.abstract}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedBills(prev => prev.filter(b => b.id !== bill.id))}
-                      className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-blue-700 dark:text-blue-300">
-                    These bills will be referenced in your message
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedBills([])}
-                    className="text-xs"
-                  >
-                    Clear All
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Selected Bills Box - Now using modular component */}
+        <SelectedBills
+          selectedBills={selectedBills}
+          onRemoveBill={(billId) => setSelectedBills(prev => prev.filter(b => b.id !== billId))}
+          onClearAll={() => setSelectedBills([])}
+        />
 
         {/* Bill Search */}
         <div>
@@ -569,76 +485,11 @@ Sincerely,
 
           {showBillSearch && (
             <div className="p-4 bg-muted rounded-lg">
-              <div className="flex gap-2 mb-4">
-                <Input
-                  value={billSearchQuery}
-                  onChange={(e) => setBillSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      searchBills();
-                    }
-                  }}
-                  placeholder="Enter sponsor last name, bill number or keywords... (Press Enter to search)"
-                  className="flex-1"
-                />
-                <Button
-                  onClick={searchBills}
-                  disabled={billSearchLoading}
-                  className="whitespace-nowrap"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  Search Bills
-                </Button>
-              </div>
-
-              {billSearchResults.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Bill Search Results (Click to add/remove)</h4>
-                  <div className="space-y-2">
-                    {billSearchResults.map((bill) => {
-                      const isSelected = selectedBills.find(b => b.id === bill.id);
-                      return (
-                        <div
-                          key={bill.id}
-                          onClick={() => selectBill(bill)}
-                          className={`p-3 rounded-lg border cursor-pointer transition ${
-                            isSelected 
-                              ? 'bg-primary/10 border-primary ring-1 ring-primary' 
-                              : 'bg-background hover:bg-muted'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 pr-4">
-                              <div className="flex items-center gap-2">
-                                <div className="text-sm font-medium">{bill.title}</div>
-                                {isSelected && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Selected
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {bill.identifier} - {bill.latest_action_date}
-                              </div>
-                            </div>
-                            <FileText className={`h-5 w-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
-                          </div>
-                          <div className="mt-2 text-sm text-muted-foreground">
-                            {bill.abstract}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {billSearchResults.length === 0 && billSearchQuery && !billSearchLoading && (
-                <div className="text-sm text-muted-foreground py-2">
-                  No bills found for your search query. Please try different keywords or check back later.
-                </div>
-              )}
+              <BillSearch
+                selectedBills={selectedBills}
+                onBillSelect={handleBillSelect}
+                userLocation={userLocation}
+              />
             </div>
           )}
         </div>
