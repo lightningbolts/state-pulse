@@ -1,5 +1,7 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Gavel } from "lucide-react";
+import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
 
 export function StatePulseHeader() {
   return (
@@ -13,9 +15,20 @@ export function StatePulseHeader() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 flex-wrap min-w-0">
-        {/* ThemeToggle and Auth buttons moved to sidebar */}
+        <SignedIn>
+          <UserButton afterSignOutUrl="/" />
+        </SignedIn>
+        <SignedOut>
+          <div className="flex flex-row gap-2">
+            <SignInButton mode="modal">
+              <Button>Sign In</Button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <Button variant="outline">Sign Up</Button>
+            </SignUpButton>
+          </div>
+        </SignedOut>
       </div>
-      {/* Add other header elements like user profile, settings, etc. here */}
     </header>
   );
 }

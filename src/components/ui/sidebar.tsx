@@ -4,7 +4,6 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
-import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -385,19 +384,6 @@ SidebarFooter.displayName = "SidebarFooter"
 
 const SidebarAuthAndTheme = () => (
   <div className="flex flex-row items-center gap-2">
-    <SignedIn>
-      <UserButton afterSignOutUrl="/" />
-    </SignedIn>
-    <SignedOut>
-      <div className="flex flex-row gap-2">
-        <SignInButton mode="modal">
-          <Button>Sign In</Button>
-        </SignInButton>
-        <SignUpButton mode="modal">
-          <Button variant="outline">Sign Up</Button>
-        </SignUpButton>
-      </div>
-    </SignedOut>
     <ThemeToggle />
   </div>
 );
