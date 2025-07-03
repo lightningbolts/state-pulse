@@ -18,9 +18,9 @@ class GeminiRateLimiter {
   private requestsPerMinute: number[] = [];
   private requestsPerDay: number[] = [];
   private tokensPerMinute: number[] = [];
-  private readonly MAX_RPM = 50;
+  private readonly MAX_RPM = 25;
   private readonly MAX_TPM = 2000000;
-  private readonly MAX_RPD = 1000;
+  private readonly MAX_RPD = 500;
 
   async waitForRateLimit(estimatedTokens: number = 1000): Promise<void> {
     const now = Date.now();
