@@ -20,7 +20,7 @@ export default function HomePage() {
               Explore Legislation <ArrowRight className="ml-2.5 h-5 w-5" />
             </Link>
           </Button>
-          <Button asChild size="lg" variant="outline" className="border-primary-foreground/25 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground hover:border-primary-foreground shadow-md hover:shadow-lg transition-shadow px-8 py-3 rounded-lg">
+          <Button asChild size="lg" variant="outline" className="border-2 border-white/80 text-white bg-white/10 hover:bg-white/20 hover:text-white hover:border-white shadow-md hover:shadow-lg transition-all duration-200 px-8 py-3 rounded-lg backdrop-blur-sm">
             <Link href="/about">
               Learn More
             </Link>
