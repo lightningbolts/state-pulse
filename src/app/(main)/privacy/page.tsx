@@ -106,7 +106,7 @@ export default function PrivacyPolicy() {
             If you have any questions about this Privacy Policy or our data practices, please contact us at:
           </p>
           <p className="mb-2">
-            <strong>Email:</strong> privacy@statepulse.com
+            <strong>Email:</strong> timberlake2025@gmail.com
           </p>
         </section>
       </div>
