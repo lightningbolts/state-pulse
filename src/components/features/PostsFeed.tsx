@@ -508,6 +508,7 @@ export function PostsFeed() {
                       onClearAll={() => {}} // Read-only
                       title="Referenced Bills"
                       description="Bills discussed in this post"
+                      readOnly={true}
                     />
                   </div>
                 )}

@@ -24,6 +24,7 @@ interface SelectedBillsProps {
   className?: string;
   title?: string;
   description?: string;
+  readOnly?: boolean;
 }
 
 export function SelectedBills({
@@ -32,7 +33,8 @@ export function SelectedBills({
   onClearAll,
   className,
   title = "Selected Bills",
-  description = "These bills will be referenced in your message"
+  description = "These bills will be referenced in your message",
+  readOnly = false
 }: SelectedBillsProps) {
   if (selectedBills.length === 0) {
     return null;
@@ -64,15 +66,17 @@ export function SelectedBills({
                   </div>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onRemoveBill(bill.id)}
-                className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                aria-label={`Remove ${bill.identifier}`}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              {!readOnly && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemoveBill(bill.id)}
+                  className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  aria-label={`Remove ${bill.identifier}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           ))}
         </div>
@@ -82,14 +86,16 @@ export function SelectedBills({
             <span className="text-blue-700 dark:text-blue-300">
               {description}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onClearAll}
-              className="text-xs"
-            >
-              Clear All
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClearAll}
+                className="text-xs"
+              >
+                Clear All
+              </Button>
+            )}
           </div>
         </div>
       </div>
