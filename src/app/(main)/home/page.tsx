@@ -95,11 +95,18 @@ export default function HomePage() {
           <p className="text-muted-foreground text-lg mb-10 max-w-xl mx-auto leading-relaxed">
             Start exploring legislation now or sign up for personalized alerts and features.
           </p>
-          <Button asChild size="lg" className="px-10 py-3 shadow-md hover:shadow-lg transition-shadow rounded-lg">
-            <Link href="/legislation">
-              View All Legislation
-            </Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button asChild size="lg" className="px-10 py-3 shadow-md hover:shadow-lg transition-shadow rounded-lg">
+              <Link href="/sign-up">
+                Create a Free Account
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="px-10 py-3 shadow-md hover:shadow-lg transition-shadow rounded-lg">
+              <Link href="/legislation">
+                View All Legislation
+              </Link>
+            </Button>
+          </div>
         </div>
       </section>
 
