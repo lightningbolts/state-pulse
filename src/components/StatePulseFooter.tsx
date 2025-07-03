@@ -66,6 +66,12 @@ export function StatePulseFooter() {
             <h3 className="font-medium text-xs sm:text-sm text-foreground">Legal</h3>
             <div className="flex flex-col space-y-1 sm:space-y-2">
               <Link
+                href="/about"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+              >
+                About
+              </Link>
+              <Link
                 href="/privacy"
                 className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
               >
