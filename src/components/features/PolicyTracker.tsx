@@ -12,9 +12,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BellRing, X, Pencil, Check, Ban, Bookmark, ChevronDown, ChevronUp, ExternalLink, CalendarDays, Users, FileText } from "lucide-react";
+import { BellRing, X, Pencil, Check, Ban, Bookmark, ChevronDown, ChevronUp, ExternalLink, CalendarDays, Users, FileText, Eye } from "lucide-react";
 import { BookmarksList } from "@/components/features/BookmarksList";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import Link from 'next/link';
 
 interface RelatedLegislation {
@@ -146,7 +147,9 @@ export function PolicyTracker() {
 			if (res.ok) {
 				const data = await res.json();
 				console.log('Search results for topic:', topic, data);
-				setRelatedLegislation((prev) => ({ ...prev, [topic]: data.legislation }));
+				console.log('Legislation array length:', data.legislation?.length);
+				console.log('Sample legislation:', data.legislation?.[0]);
+				setRelatedLegislation((prev) => ({ ...prev, [topic]: data.legislation || [] }));
 			} else {
 				console.error('Failed to fetch related legislation:', res.statusText);
 				setRelatedLegislation((prev) => ({ ...prev, [topic]: [] }));
@@ -321,8 +324,11 @@ export function PolicyTracker() {
 																	<div className="flex items-center gap-2">
 																		<div className="w-2 h-2 bg-green-500 rounded-full"></div>
 																		<p className="text-sm font-medium text-foreground">
-																			Recent legislation:
+																			Recent legislation from {relatedLegislation[topic][0]?.jurisdictionName || 'this jurisdiction'}:
 																		</p>
+																	</div>
+																	<div className="text-xs text-muted-foreground mb-2 bg-blue-50 p-2 rounded">
+																		Note: Showing general legislation from the detected location since no specific topic matches were found.
 																	</div>
 																	{relatedLegislation[topic].map((legislation) => (
 																		<Card key={legislation.id} className="hover:shadow-md transition-shadow">
@@ -375,16 +381,16 @@ export function PolicyTracker() {
 																						Recent legislation
 																					</div>
 																					<div className="flex gap-2">
-																						{legislation.stateLegislatureUrl && (
+																						<Link href={`/legislation/${legislation.id}`}>
 																							<Button
 																								variant="outline"
 																								size="sm"
-																								onClick={() => window.open(legislation.stateLegislatureUrl, "_blank")}
+																								className="text-blue-600 border-blue-600 hover:bg-blue-600 hover:text-white"
 																							>
-																								<ExternalLink className="mr-2 h-4 w-4" />
-																								View Bill
+																								<FileText className="mr-2 h-4 w-4" />
+																								View Details
 																							</Button>
-																						)}
+																						</Link>
 																					</div>
 																				</div>
 																			</CardContent>
