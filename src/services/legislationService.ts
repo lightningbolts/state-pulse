@@ -279,23 +279,109 @@ export async function testLegislationCollectionService(): Promise<void> {
 export async function searchLegislationByTopic(topic: string, daysBack: number = 7): Promise<Legislation[]> {
   try {
     const legislationCollection = await getCollection('legislation');
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
 
-    // Just get the 10 most recent pieces of legislation from the past 7 days
-    const query = {
-      $or: [
-        { latestActionAt: { $gte: cutoffDate } },
-        { createdAt: { $gte: cutoffDate } },
-        { updatedAt: { $gte: cutoffDate } }
-      ]
-    };
+    // Extract location keywords from the topic (state names, cities, etc.)
+    const locationKeywords = [
+      'ohio', 'california', 'texas', 'florida', 'new york', 'pennsylvania',
+      'illinois', 'georgia', 'north carolina', 'michigan', 'new jersey',
+      'virginia', 'washington', 'arizona', 'massachusetts', 'tennessee',
+      'indiana', 'maryland', 'missouri', 'wisconsin', 'colorado',
+      'minnesota', 'south carolina', 'alabama', 'louisiana', 'kentucky',
+      'oregon', 'oklahoma', 'connecticut', 'utah', 'iowa', 'nevada',
+      'arkansas', 'mississippi', 'kansas', 'new mexico', 'nebraska',
+      'west virginia', 'idaho', 'hawaii', 'new hampshire', 'maine',
+      'montana', 'rhode island', 'delaware', 'south dakota', 'north dakota',
+      'alaska', 'vermont', 'wyoming'
+    ];
 
-    const docs = await legislationCollection
-      .find(query)
-      .sort({ latestActionAt: -1, createdAt: -1 })
-      .limit(10)
-      .toArray();
+    const topicLower = topic.toLowerCase();
+    const detectedStates = locationKeywords.filter(state => topicLower.includes(state));
+
+    // Create search terms from the topic (excluding location words for content search)
+    const searchTerms = topic.toLowerCase()
+      .split(' ')
+      .filter(term => term.length > 2 && !locationKeywords.includes(term))
+      .filter(term => !['in', 'of', 'the', 'and', 'or', 'laws', 'law', 'bill', 'bills'].includes(term));
+
+    console.log('Search debug:', { topic, detectedStates, searchTerms });
+
+    let docs = [];
+
+    // Try specific search first (location + content)
+    if (detectedStates.length > 0 && searchTerms.length > 0) {
+      const statePatterns = detectedStates.map(state => new RegExp(state, 'i'));
+      const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
+
+      const query = {
+        $and: [
+          { jurisdictionName: { $in: statePatterns } },
+          {
+            $or: [
+              { title: { $in: regexPatterns } },
+              { subjects: { $in: regexPatterns } },
+              { summary: { $in: regexPatterns } },
+              { geminiSummary: { $in: regexPatterns } },
+              { latestActionDescription: { $in: regexPatterns } }
+            ]
+          }
+        ]
+      };
+
+      docs = await legislationCollection
+        .find(query)
+        .sort({ latestActionAt: -1, createdAt: -1 })
+        .limit(10)
+        .toArray();
+
+      console.log('Specific search results:', docs.length);
+    }
+
+    // Fallback to location-only search if no results
+    if (docs.length === 0 && detectedStates.length > 0) {
+      const statePatterns = detectedStates.map(state => new RegExp(state, 'i'));
+      const query = { jurisdictionName: { $in: statePatterns } };
+
+      docs = await legislationCollection
+        .find(query)
+        .sort({ latestActionAt: -1, createdAt: -1 })
+        .limit(10)
+        .toArray();
+
+      console.log('Location-only search results:', docs.length);
+    }
+
+    // Fallback to content-only search if no results
+    if (docs.length === 0 && searchTerms.length > 0) {
+      const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
+      const query = {
+        $or: [
+          { title: { $in: regexPatterns } },
+          { subjects: { $in: regexPatterns } },
+          { summary: { $in: regexPatterns } },
+          { geminiSummary: { $in: regexPatterns } },
+          { latestActionDescription: { $in: regexPatterns } }
+        ]
+      };
+
+      docs = await legislationCollection
+        .find(query)
+        .sort({ latestActionAt: -1, createdAt: -1 })
+        .limit(10)
+        .toArray();
+
+      console.log('Content-only search results:', docs.length);
+    }
+
+    // Final fallback - just get any recent legislation
+    if (docs.length === 0) {
+      docs = await legislationCollection
+        .find({})
+        .sort({ latestActionAt: -1, createdAt: -1 })
+        .limit(10)
+        .toArray();
+
+      console.log('Fallback search results:', docs.length);
+    }
 
     return docs.map(convertDocumentToLegislation);
   } catch (error) {

@@ -142,9 +142,10 @@ export function PolicyTracker() {
 		setLoadingLegislation((prev) => new Set(prev).add(topic));
 
 		try {
-			const res = await fetch(`/api/search-legislation-by-topic?topic=${encodeURIComponent(topic)}&daysBack=7`);
+			const res = await fetch(`/api/search-legislation-by-topic?topic=${encodeURIComponent(topic)}`);
 			if (res.ok) {
 				const data = await res.json();
+				console.log('Search results for topic:', topic, data);
 				setRelatedLegislation((prev) => ({ ...prev, [topic]: data.legislation }));
 			} else {
 				console.error('Failed to fetch related legislation:', res.statusText);
@@ -313,14 +314,14 @@ export function PolicyTracker() {
 														) : relatedLegislation[topic] ? (
 															relatedLegislation[topic].length === 0 ? (
 																<div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-																	No recent legislation found in the past 7 days.
+																	No recent legislation found.
 																</div>
 															) : (
 																<div className="space-y-3">
 																	<div className="flex items-center gap-2">
 																		<div className="w-2 h-2 bg-green-500 rounded-full"></div>
 																		<p className="text-sm font-medium text-foreground">
-																			Recent legislation (past 7 days):
+																			Recent legislation:
 																		</p>
 																	</div>
 																	{relatedLegislation[topic].map((legislation) => (
