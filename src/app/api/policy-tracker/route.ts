@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing topic' }, { status: 400 });
   }
   const db = await getDb();
-  // Store subscriptions in users collection
-  await db.collection('users').updateOne(
+  // Store subscriptions in topic_subscriptions collection
+  await db.collection('topic_subscriptions').updateOne(
     { userId: auth.userId, topic },
     { $set: { userId: auth.userId, topic }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
@@ -30,10 +30,10 @@ export async function GET(req: NextRequest) {
   }
   const db = await getDb();
   // Find all topics user is subscribed to
-  const subs = await db.collection('users').find({ userId }).toArray();
+  const subs = await db.collection('topic_subscriptions').find({ userId }).toArray();
   const topics = subs.map((s) => s.topic);
   // Find updates for these topics
-  const updates = await db.collection('users')
+  const updates = await db.collection('topic_subscriptions')
     .find({ topic: { $in: topics } })
     .sort({ date: -1 })
     .limit(20)
@@ -55,7 +55,7 @@ export async function DELETE(req: NextRequest) {
 
   const db = await getDb();
   const result = await db
-    .collection('users')
+    .collection('topic_subscriptions')
     .deleteOne({ userId: auth.userId, topic });
 
   if (result.deletedCount === 0) {
@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest) {
   }
 
   const db = await getDb();
-  const result = await db.collection('users').updateOne(
+  const result = await db.collection('topic_subscriptions').updateOne(
     { userId: auth.userId, topic: oldTopic },
     { $set: { topic: newTopic } }
   );

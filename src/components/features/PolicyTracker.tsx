@@ -12,9 +12,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BellRing, X, Pencil, Check, Ban, Bookmark, MessageSquare } from "lucide-react";
+import { BellRing, X, Pencil, Check, Ban, Bookmark } from "lucide-react";
 import { BookmarksList } from "@/components/features/BookmarksList";
-import { PostsFeed } from "@/components/features/PostsFeed";
 
 export function PolicyTracker() {
 	const { user, isLoaded, isSignedIn } = useUser();
@@ -36,7 +35,8 @@ export function PolicyTracker() {
 		if (res.ok) {
 			const data = await res.json();
 			setUpdates(data.updates || []);
-			setTopics([...new Set((data.updates || []).map((u: any) => u.topic))]);
+			const topicStrings = (data.updates || []).map((u: any) => u.topic).filter((topic: any): topic is string => typeof topic === 'string');
+			setTopics([...new Set(topicStrings)]);
 		}
 	};
 
@@ -56,7 +56,7 @@ export function PolicyTracker() {
 		const res = await fetch("/api/policy-tracker", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ topic: trimmed, userId }),
+			body: JSON.stringify({ topic: trimmed }),
 		});
 		if (res.ok) {
 			setInput("");
