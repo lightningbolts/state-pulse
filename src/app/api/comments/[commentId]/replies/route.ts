@@ -3,39 +3,10 @@ import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-// GET - Read all comments for a post
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { id } = await params;
-    const { db } = await connectToDatabase();
-
-    const post = await db.collection('posts').findOne({ _id: new ObjectId(id) });
-    if (!post) {
-      return NextResponse.json(
-        { error: 'Post not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      comments: post.comments || []
-    });
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch comments' },
-      { status: 500 }
-    );
-  }
-}
-
-// POST - Create a new comment
+// POST - Add a reply to a comment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { commentId: string } }
 ) {
   try {
     const { userId } = await auth();
@@ -46,23 +17,27 @@ export async function POST(
       );
     }
 
-    const { id } = await params;
+    const { commentId } = await params;
     const body = await request.json();
     const { content } = body;
 
     if (!content || !content.trim()) {
       return NextResponse.json(
-        { error: 'Comment content is required' },
+        { error: 'Reply content is required' },
         { status: 400 }
       );
     }
 
     const { db } = await connectToDatabase();
 
-    const post = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+    // Find the post that contains the comment
+    const post = await db.collection('posts').findOne({
+      'comments._id': new ObjectId(commentId)
+    });
+
     if (!post) {
       return NextResponse.json(
-        { error: 'Post not found' },
+        { error: 'Comment not found' },
         { status: 404 }
       );
     }
@@ -83,7 +58,7 @@ export async function POST(
       userImage = userData.image_url;
     }
 
-    const newComment = {
+    const newReply = {
       _id: new ObjectId(),
       userId,
       username,
@@ -92,19 +67,27 @@ export async function POST(
       createdAt: new Date().toISOString(),
     };
 
+    // Add reply to the specific comment
     await db.collection('posts').updateOne(
-      { _id: new ObjectId(id) },
-      { $push: { comments: newComment } }
+      {
+        '_id': post._id,
+        'comments._id': new ObjectId(commentId)
+      },
+      {
+        $push: {
+          'comments.$.replies': newReply
+        }
+      }
     );
 
     return NextResponse.json({
-      message: 'Comment added successfully',
-      comment: newComment
+      message: 'Reply added successfully',
+      reply: newReply
     });
   } catch (error) {
-    console.error('Error adding comment:', error);
+    console.error('Error adding reply:', error);
     return NextResponse.json(
-      { error: 'Failed to add comment' },
+      { error: 'Failed to add reply' },
       { status: 500 }
     );
   }

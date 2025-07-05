@@ -16,7 +16,7 @@ export async function POST(
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const { db } = await connectToDatabase();
 
     const post = await db.collection('posts').findOne({ _id: new ObjectId(id) });

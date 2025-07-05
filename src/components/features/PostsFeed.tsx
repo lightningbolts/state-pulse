@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,10 +62,21 @@ interface Comment {
   userImage?: string;
   content: string;
   createdAt: string;
+  replies?: Reply[];
+}
+
+interface Reply {
+  _id: string;
+  userId: string;
+  username: string;
+  userImage?: string;
+  content: string;
+  createdAt: string;
 }
 
 export function PostsFeed() {
   const { user, isSignedIn } = useUser();
+  const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [editingPost, setEditingPost] = useState<string | null>(null);
@@ -82,6 +94,13 @@ export function PostsFeed() {
   // Comment state
   const [commentContent, setCommentContent] = useState<{ [postId: string]: string }>({});
   const [showComments, setShowComments] = useState<{ [postId: string]: boolean }>({});
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState<string>('');
+
+  // Reply state
+  const [replyContent, setReplyContent] = useState<{ [commentId: string]: string }>({});
+  const [showReplyForm, setShowReplyForm] = useState<{ [commentId: string]: boolean }>({});
+  const [showReplies, setShowReplies] = useState<{ [commentId: string]: boolean }>({});
 
   useEffect(() => {
     fetchPosts();
@@ -202,6 +221,107 @@ export function PostsFeed() {
       }
     } catch (error) {
       console.error('Error adding comment:', error);
+    }
+  };
+
+  const handleEditComment = async (postId: string, commentId: string) => {
+    if (!isSignedIn || !editCommentContent.trim()) return;
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments/${commentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: editCommentContent.trim()
+        })
+      });
+
+      if (response.ok) {
+        setEditingComment(null);
+        setEditCommentContent('');
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error);
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!isSignedIn || !confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments/${commentId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+    }
+  };
+
+  const handleAddReply = async (commentId: string, customContent?: string) => {
+    const content = customContent || replyContent[commentId];
+    if (!isSignedIn || !content?.trim()) return;
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}/replies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: content.trim()
+        })
+      });
+
+      if (response.ok) {
+        if (!customContent) {
+          setReplyContent(prev => ({ ...prev, [commentId]: '' }));
+        }
+        setShowReplies(prev => ({ ...prev, [commentId]: true })); // Auto-expand replies
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error('Error adding reply:', error);
+    }
+  };
+
+  const handleEditReply = async (commentId: string, replyId: string) => {
+    if (!isSignedIn || !editCommentContent.trim()) return;
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}/replies/${replyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: editCommentContent.trim()
+        })
+      });
+
+      if (response.ok) {
+        setEditingComment(null);
+        setEditCommentContent('');
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error('Error updating reply:', error);
+    }
+  };
+
+  const handleDeleteReply = async (commentId: string, replyId: string) => {
+    if (!isSignedIn || !confirm('Are you sure you want to delete this reply?')) return;
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}/replies/${replyId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error('Error deleting reply:', error);
     }
   };
 
@@ -442,12 +562,18 @@ export function PostsFeed() {
                       <img
                         src={post.userImage}
                         alt={post.username}
-                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0"
+                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => router.push(`/users/${post.userId}`)}
                       />
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm sm:text-base truncate">{post.username}</span>
+                        <span
+                          className="font-medium text-sm sm:text-base truncate cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => router.push(`/users/${post.userId}`)}
+                        >
+                          {post.username}
+                        </span>
                         <Badge variant={post.type === 'legislation' ? 'default' : 'destructive'} className="text-xs px-2 py-0.5">
                           {post.type === 'legislation' ? (
                             <>
@@ -597,17 +723,316 @@ export function PostsFeed() {
                             <img
                               src={comment.userImage}
                               alt={comment.username}
-                              className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 mt-0.5"
+                              className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => router.push(`/users/${comment.userId}`)}
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-medium text-xs sm:text-sm">{comment.username}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(comment.createdAt).toLocaleDateString()}
-                              </span>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span
+                                  className="font-medium text-xs sm:text-sm cursor-pointer hover:text-primary transition-colors"
+                                  onClick={() => router.push(`/users/${comment.userId}`)}
+                                >
+                                  {comment.username}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(comment.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              {/* Edit/Delete Comment Actions - Aligned to the right */}
+                              {isSignedIn && user?.id === comment.userId && (
+                                <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingComment(comment._id);
+                                      setEditCommentContent(comment.content);
+                                    }}
+                                    className="h-6 w-6 sm:h-7 sm:w-7 p-0"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteComment(post._id, comment._id)}
+                                    className="h-6 w-6 sm:h-7 sm:w-7 p-0"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
-                            <p className="text-xs sm:text-sm leading-relaxed">{comment.content}</p>
+
+                            {/* Comment Content */}
+                            {editingComment === comment._id ? (
+                              <div className="space-y-2">
+                                <Textarea
+                                  value={editCommentContent}
+                                  onChange={(e) => setEditCommentContent(e.target.value)}
+                                  placeholder="Edit your comment..."
+                                  rows={2}
+                                  className="text-sm resize-none"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    onClick={() => setEditingComment(null)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="px-3 sm:px-4"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleEditComment(post._id, comment._id)}
+                                    disabled={!editCommentContent.trim()}
+                                    size="sm"
+                                    className="px-3 sm:px-4"
+                                  >
+                                    Save
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-xs sm:text-sm leading-relaxed">{comment.content}</p>
+
+                                {/* Reply Button */}
+                                {isSignedIn && (
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setShowReplyForm(prev => ({
+                                        ...prev,
+                                        [comment._id]: !prev[comment._id]
+                                      }))}
+                                      className="text-xs text-muted-foreground hover:text-primary h-6 px-2"
+                                    >
+                                      Reply
+                                    </Button>
+
+                                    {/* Show/Hide Replies Toggle */}
+                                    {comment.replies && comment.replies.length > 0 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowReplies(prev => ({
+                                          ...prev,
+                                          [comment._id]: !prev[comment._id]
+                                        }))}
+                                        className="text-xs text-muted-foreground hover:text-primary h-6 px-2"
+                                      >
+                                        {showReplies[comment._id] ? 'Hide' : 'View'} {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Reply Form */}
+                                {showReplyForm[comment._id] && isSignedIn && (
+                                  <div className="mt-3 space-y-2">
+                                    <Textarea
+                                      value={replyContent[comment._id] || ''}
+                                      onChange={(e) => setReplyContent(prev => ({
+                                        ...prev,
+                                        [comment._id]: e.target.value
+                                      }))}
+                                      placeholder="Write a reply..."
+                                      rows={2}
+                                      className="text-sm resize-none"
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                      <Button
+                                        onClick={() => setShowReplyForm(prev => ({
+                                          ...prev,
+                                          [comment._id]: false
+                                        }))}
+                                        variant="outline"
+                                        size="sm"
+                                        className="px-3 sm:px-4"
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        onClick={() => handleAddReply(comment._id)}
+                                        disabled={!replyContent[comment._id]?.trim()}
+                                        size="sm"
+                                        className="px-3 sm:px-4"
+                                      >
+                                        Reply
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {/* Replies Section - Nested Comments */}
+                            {showReplies[comment._id] && comment.replies && comment.replies.length > 0 && (
+                              <div className="mt-3 ml-4 space-y-2 border-l-2 border-muted pl-4">
+                                {comment.replies.map((reply) => (
+                                  <div key={reply._id} className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-background rounded-lg border">
+                                    {reply.userImage && (
+                                      <img
+                                        src={reply.userImage}
+                                        alt={reply.username}
+                                        className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => router.push(`/users/${reply.userId}`)}
+                                      />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                          <span
+                                            className="font-medium text-xs cursor-pointer hover:text-primary transition-colors"
+                                            onClick={() => router.push(`/users/${reply.userId}`)}
+                                          >
+                                            {reply.username}
+                                          </span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {new Date(reply.createdAt).toLocaleDateString()}
+                                          </span>
+                                        </div>
+
+                                        {/* Edit/Delete Reply Actions */}
+                                        {isSignedIn && user?.id === reply.userId && (
+                                          <div className="flex gap-1 flex-shrink-0">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                setEditingComment(reply._id);
+                                                setEditCommentContent(reply.content);
+                                              }}
+                                              className="h-5 w-5 p-0"
+                                            >
+                                              <Edit className="h-2.5 w-2.5" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => handleDeleteReply(comment._id, reply._id)}
+                                              className="h-5 w-5 p-0"
+                                            >
+                                              <Trash2 className="h-2.5 w-2.5" />
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Reply Content */}
+                                      {editingComment === reply._id ? (
+                                        <div className="space-y-2">
+                                          <Textarea
+                                            value={editCommentContent}
+                                            onChange={(e) => setEditCommentContent(e.target.value)}
+                                            placeholder="Edit your reply..."
+                                            rows={2}
+                                            className="text-sm resize-none"
+                                          />
+                                          <div className="flex justify-end gap-2">
+                                            <Button
+                                              onClick={() => setEditingComment(null)}
+                                              variant="outline"
+                                              size="sm"
+                                              className="px-2 text-xs"
+                                            >
+                                              Cancel
+                                            </Button>
+                                            <Button
+                                              onClick={() => handleEditReply(comment._id, reply._id)}
+                                              disabled={!editCommentContent.trim()}
+                                              size="sm"
+                                              className="px-2 text-xs"
+                                            >
+                                              Save
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <p className="text-xs leading-relaxed">{reply.content}</p>
+
+                                          {/* Reply to Reply Button */}
+                                          {isSignedIn && (
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                  const replyKey = `${comment._id}-${reply._id}`;
+                                                  setShowReplyForm(prev => ({
+                                                    ...prev,
+                                                    [replyKey]: !prev[replyKey]
+                                                  }));
+                                                  // Pre-fill with @username
+                                                  setReplyContent(prev => ({
+                                                    ...prev,
+                                                    [replyKey]: `@${reply.username} `
+                                                  }));
+                                                }}
+                                                className="text-xs text-muted-foreground hover:text-primary h-5 px-1"
+                                              >
+                                                Reply
+                                              </Button>
+                                            </div>
+                                          )}
+
+                                          {/* Reply to Reply Form */}
+                                          {showReplyForm[`${comment._id}-${reply._id}`] && isSignedIn && (
+                                            <div className="mt-2 space-y-2">
+                                              <Textarea
+                                                value={replyContent[`${comment._id}-${reply._id}`] || ''}
+                                                onChange={(e) => setReplyContent(prev => ({
+                                                  ...prev,
+                                                  [`${comment._id}-${reply._id}`]: e.target.value
+                                                }))}
+                                                placeholder={`Reply to @${reply.username}...`}
+                                                rows={2}
+                                                className="text-sm resize-none"
+                                              />
+                                              <div className="flex justify-end gap-2">
+                                                <Button
+                                                  onClick={() => setShowReplyForm(prev => ({
+                                                    ...prev,
+                                                    [`${comment._id}-${reply._id}`]: false
+                                                  }))}
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="px-2 text-xs"
+                                                >
+                                                  Cancel
+                                                </Button>
+                                                <Button
+                                                  onClick={() => {
+                                                    const replyKey = `${comment._id}-${reply._id}`;
+                                                    const content = replyContent[replyKey]?.trim();
+                                                    if (content) {
+                                                      handleAddReply(comment._id, content);
+                                                      setReplyContent(prev => ({ ...prev, [replyKey]: '' }));
+                                                      setShowReplyForm(prev => ({ ...prev, [replyKey]: false }));
+                                                    }
+                                                  }}
+                                                  disabled={!replyContent[`${comment._id}-${reply._id}`]?.trim()}
+                                                  size="sm"
+                                                  className="px-2 text-xs"
+                                                >
+                                                  Reply
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
