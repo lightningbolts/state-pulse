@@ -91,7 +91,9 @@ export function StatePulseFooter() {
             <h3 className="font-medium text-xs sm:text-sm text-foreground">Connect</h3>
             <div className="flex items-center space-x-3 sm:space-x-4">
               <a
-                href="#"
+                href="https://github.com/lightningbolts/state-pulse"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors p-1"
                 aria-label="GitHub"
               >
