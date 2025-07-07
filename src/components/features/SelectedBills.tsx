@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { FileText, X } from "lucide-react";
+import { FileText, X, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface Bill {
   id: string;
@@ -36,9 +37,15 @@ export function SelectedBills({
   description = "These bills will be referenced in your message",
   readOnly = false
 }: SelectedBillsProps) {
+  const router = useRouter();
+
   if (selectedBills.length === 0) {
     return null;
   }
+
+  const handleViewDetails = (billId: string) => {
+    router.push(`/legislation/${billId}`);
+  };
 
   return (
     <div className={className}>
@@ -63,6 +70,19 @@ export function SelectedBills({
                 {bill.abstract && (
                   <div className="text-xs text-muted-foreground">
                     {bill.abstract}
+                  </div>
+                )}
+                {readOnly && (
+                  <div className="mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewDetails(bill.id)}
+                      className="text-xs flex items-center gap-1"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      View Details
+                    </Button>
                   </div>
                 )}
               </div>
