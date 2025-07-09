@@ -126,6 +126,10 @@ export function RepresentativesFinder() {
     setError(null);
     setRepresentatives([]);
     setClosestReps([]);
+    // Reset pagination state for fresh searches
+    setShowAllMode(false);
+    setPagination(null);
+    setCurrentPage(1);
 
     try {
       // Extract state from the selected address - prioritize the structured address data
