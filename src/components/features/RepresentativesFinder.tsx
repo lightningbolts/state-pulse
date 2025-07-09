@@ -154,19 +154,41 @@ export function RepresentativesFinder() {
         throw new Error('Unable to determine state from the selected address.');
       }
 
-      console.log('Searching for representatives in state:', state, 'for location:', location.display_name);
+      // Convert full state name to abbreviation if needed
+      const finalState = STATE_MAP[state] || state;
 
-      const response = await fetch(`/api/representatives?address=${encodeURIComponent(state)}`);
+      console.log('Searching for representatives in state:', finalState, 'for location:', location.display_name);
+
+      const response = await fetch(`/api/representatives?address=${encodeURIComponent(finalState)}`);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch representatives');
+        let errorMessage = 'Failed to fetch representatives';
+
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+
+          // Provide more specific error messages based on status
+          if (response.status === 503) {
+            errorMessage = 'Service temporarily unavailable. This may be due to missing API configuration or database connection issues.';
+          } else if (response.status === 500) {
+            errorMessage = `Unable to fetch representative data for ${finalState}. This might be due to API rate limits or configuration issues. Please try again in a few minutes.`;
+          } else if (response.status === 404) {
+            errorMessage = `No representative data found for ${finalState}. This state may not be available in our data source.`;
+          } else if (response.status === 400) {
+            errorMessage = `Invalid request for ${finalState}. Please try a different location.`;
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data: ApiResponse = await response.json();
       let reps = data.representatives || [];
 
-      console.log('Received representatives:', reps.length, 'for state:', state);
+      console.log('Received representatives:', reps.length, 'for state:', finalState);
       if (reps.length > 0) {
         console.log('First rep jurisdiction:', reps[0].jurisdiction);
         console.log('Sample reps:', reps.slice(0, 3).map(r => ({ name: r.name, jurisdiction: r.jurisdiction })));
@@ -279,7 +301,27 @@ export function RepresentativesFinder() {
 
     } catch (err) {
       console.error('Error fetching representatives:', err);
-      setError(err instanceof Error ? err.message : 'Unable to find representatives for this address.');
+
+      // Provide user-friendly error messages
+      let userMessage = 'Unable to find representatives for this address.';
+
+      if (err instanceof Error) {
+        if (err.message.includes('Service temporarily unavailable')) {
+          userMessage = 'The representative lookup service is temporarily unavailable. Please try again later or contact support if the issue persists.';
+        } else if (err.message.includes('API rate limits')) {
+          userMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (err.message.includes('configuration')) {
+          userMessage = 'Service configuration issue. Please contact support.';
+        } else if (err.message.includes('Unable to determine state')) {
+          userMessage = 'Please enter a complete address including the state (e.g., "123 Main St, New York, NY").';
+        } else if (err.message.includes('No representative data found')) {
+          userMessage = err.message;
+        } else {
+          userMessage = err.message;
+        }
+      }
+
+      setError(userMessage);
     } finally {
       setLoading(false);
     }
@@ -316,9 +358,14 @@ export function RepresentativesFinder() {
         throw new Error('Unable to determine state from the selected address.');
       }
 
-      // Build API URL with pagination parameters
+      // Convert full state name to abbreviation if needed
+      const finalState = STATE_MAP[state] || state;
+
+      console.log('Fetching paginated representatives for state:', finalState, 'page:', page);
+
+      // Build API URL with pagination parameters - ALWAYS use state abbreviation
       const params = new URLSearchParams({
-        address: state,
+        address: finalState.toUpperCase(), // Ensure we use the state abbreviation
         showAll: 'true',
         page: page.toString(),
         pageSize: '10'
@@ -327,11 +374,32 @@ export function RepresentativesFinder() {
       const response = await fetch(`/api/representatives?${params}`);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch representatives');
+        let errorMessage = 'Failed to fetch representatives';
+
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+
+          // Provide more specific error messages based on status
+          if (response.status === 503) {
+            errorMessage = 'Service temporarily unavailable. This may be due to missing API configuration or database connection issues.';
+          } else if (response.status === 500) {
+            errorMessage = `Unable to fetch representative data for ${finalState}. This might be due to API rate limits or configuration issues. Please try again in a few minutes.`;
+          } else if (response.status === 404) {
+            errorMessage = `No representative data found for ${finalState}. This state may not be available in our data source.`;
+          } else if (response.status === 400) {
+            errorMessage = `Invalid request for ${finalState}. Please try a different location.`;
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data: ApiResponse = await response.json();
+
+      console.log('Received paginated data:', data.representatives?.length, 'representatives, source:', data.source);
 
       setRepresentatives(data.representatives || []);
       setDataSource(data.source);
@@ -339,8 +407,28 @@ export function RepresentativesFinder() {
       setCurrentPage(page);
 
     } catch (err) {
-      console.error('Error fetching representatives:', err);
-      setError(err instanceof Error ? err.message : 'Unable to find representatives for this address.');
+      console.error('Error fetching paginated representatives:', err);
+
+      // Provide user-friendly error messages
+      let userMessage = 'Unable to find representatives for this address.';
+
+      if (err instanceof Error) {
+        if (err.message.includes('Service temporarily unavailable')) {
+          userMessage = 'The representative lookup service is temporarily unavailable. Please try again later or contact support if the issue persists.';
+        } else if (err.message.includes('API rate limits')) {
+          userMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (err.message.includes('configuration')) {
+          userMessage = 'Service configuration issue. Please contact support.';
+        } else if (err.message.includes('Unable to determine state')) {
+          userMessage = 'Please enter a complete address including the state (e.g., "123 Main St, New York, NY").';
+        } else if (err.message.includes('No representative data found')) {
+          userMessage = err.message;
+        } else {
+          userMessage = err.message;
+        }
+      }
+
+      setError(userMessage);
     } finally {
       setLoading(false);
     }
@@ -396,8 +484,44 @@ export function RepresentativesFinder() {
     if (!showAllMode) {
       // Switch to "Show All" mode
       setShowAllMode(true);
-      // Keep map visible when switching to show all mode
-      await fetchPaginatedRepresentatives(userLocation, 1);
+
+      // First, try to fetch paginated data from cache
+      try {
+        await fetchPaginatedRepresentatives(userLocation, 1);
+      } catch (error) {
+        console.log('Error during pagination attempt:', error);
+
+        // If cached data is not available, fetch fresh data first
+        if (error instanceof Error &&
+            (error.message.includes('No representative data found') ||
+             error.message.includes('No cached data available'))) {
+          console.log('No cached data for pagination, fetching fresh data first...');
+
+          // Reset error state
+          setError(null);
+
+          // Temporarily switch back to non-paginated mode to fetch fresh data
+          setShowAllMode(false);
+
+          try {
+            // Fetch fresh data (this will cache it)
+            await fetchRepresentatives(userLocation);
+
+            // Now switch back to show all mode and try pagination again
+            setShowAllMode(true);
+            await fetchPaginatedRepresentatives(userLocation, 1);
+          } catch (freshDataError) {
+            console.error('Failed to fetch fresh data:', freshDataError);
+            // Reset to non-paginated mode if fresh data fetch fails
+            setShowAllMode(false);
+            throw freshDataError;
+          }
+        } else {
+          // For other errors, reset to non-paginated mode
+          setShowAllMode(false);
+          throw error;
+        }
+      }
     } else {
       // Switch back to proximity mode
       setShowAllMode(false);
