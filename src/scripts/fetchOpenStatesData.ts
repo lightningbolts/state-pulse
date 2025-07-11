@@ -100,57 +100,62 @@ const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
 const OPENSTATES_API_BASE_URL = 'https://v3.openstates.org';
 
 const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
-  { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:az/government', abbr: 'AZ' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ar/government', abbr: 'AR' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'CO' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ct/government', abbr: 'CT' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:fl/government', abbr: 'FL' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:id/government', abbr: 'ID' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:in/government', abbr: 'IN' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ky/government', abbr: 'KY' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:la/government', abbr: 'LA' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:md/government', abbr: 'MD' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:mi/government', abbr: 'MI'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ms/government', abbr: 'MS' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:mo/government', abbr: 'MO' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:mt/government', abbr: 'MT' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:nv/government', abbr: 'NV' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:nm/government', abbr: 'NM' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:nd/government', abbr: 'ND' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:oh/government', abbr: 'OH' },
-  { ocdId: 'ocd-jurisdiction/country:us/state:ok/government', abbr: 'OK'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:pa/government', abbr: 'PA'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:ri/government', abbr: 'RI'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:sc/government', abbr: 'SC'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:sd/government', abbr: 'SD'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:tn/government', abbr: 'TN'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:ut/government', abbr: 'UT'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:vt/government', abbr: 'VT'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:va/government', abbr: 'VA'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:wa/government', abbr: 'WA'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:wv/government', abbr: 'WV'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:wi/government', abbr: 'WI'},
-  { ocdId: 'ocd-jurisdiction/country:us/state:wy/government', abbr: 'WY'},
-    // Add congress
+  // --- ACTIVE SESSIONS (Currently in session as of July 2025) ---
+  { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' }, // Alaska
+  { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' }, // California
+  { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' }, // Delaware
+  { ocdId: 'ocd-jurisdiction/country:us/district:dc/government', abbr: 'DC' }, // District of Columbia
+  { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' }, // Georgia
+  { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' }, // Hawaii
+  { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' }, // Illinois
+  { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' }, // Iowa
+  { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' }, // Kansas
+  { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' }, // Maine
+  { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' }, // Massachusetts
+  { ocdId: 'ocd-jurisdiction/country:us/state:mi/government', abbr: 'MI' }, // Michigan
+  { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' }, // Minnesota
+  { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' }, // Nebraska
+  { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' }, // New Hampshire
+  { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' }, // New Jersey
+  { ocdId: 'ocd-jurisdiction/country:us/state:ny/government', abbr: 'NY' }, // New York
+  { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' }, // North Carolina
+  { ocdId: 'ocd-jurisdiction/country:us/state:oh/government', abbr: 'OH' }, // Ohio
+  { ocdId: 'ocd-jurisdiction/country:us/state:ok/government', abbr: 'OK' }, // Oklahoma
+  { ocdId: 'ocd-jurisdiction/country:us/state:pa/government', abbr: 'PA' }, // Pennsylvania
+  { ocdId: 'ocd-jurisdiction/country:us/state:sc/government', abbr: 'SC' }, // South Carolina
+  { ocdId: 'ocd-jurisdiction/country:us/state:tn/government', abbr: 'TN' }, // Tennessee
+  { ocdId: 'ocd-jurisdiction/country:us/state:vt/government', abbr: 'VT' }, // Vermont
+  { ocdId: 'ocd-jurisdiction/country:us/state:va/government', abbr: 'VA' }, // Virginia
+  { ocdId: 'ocd-jurisdiction/country:us/state:wa/government', abbr: 'WA' }, // Washington
+  { ocdId: 'ocd-jurisdiction/country:us/state:wi/government', abbr: 'WI' }, // Wisconsin
+  // United States Congress
   { ocdId: 'ocd-jurisdiction/country:us/legislature', abbr: 'us' },
+
+  // --- INACTIVE SESSIONS (Not currently in session - commented out) ---
+  // { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' }, // Alabama
+  // { ocdId: 'ocd-jurisdiction/country:us/state:az/government', abbr: 'AZ' }, // Arizona
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ar/government', abbr: 'AR' }, // Arkansas
+  // { ocdId: 'ocd-jurisdiction/country:us/state:co/government', abbr: 'CO' }, // Colorado
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ct/government', abbr: 'CT' }, // Connecticut
+  // { ocdId: 'ocd-jurisdiction/country:us/state:fl/government', abbr: 'FL' }, // Florida
+  // { ocdId: 'ocd-jurisdiction/country:us/state:id/government', abbr: 'ID' }, // Idaho
+  // { ocdId: 'ocd-jurisdiction/country:us/state:in/government', abbr: 'IN' }, // Indiana
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ky/government', abbr: 'KY' }, // Kentucky
+  // { ocdId: 'ocd-jurisdiction/country:us/state:la/government', abbr: 'LA' }, // Louisiana
+  // { ocdId: 'ocd-jurisdiction/country:us/state:md/government', abbr: 'MD' }, // Maryland
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ms/government', abbr: 'MS' }, // Mississippi
+  // { ocdId: 'ocd-jurisdiction/country:us/state:mo/government', abbr: 'MO' }, // Missouri
+  // { ocdId: 'ocd-jurisdiction/country:us/state:mt/government', abbr: 'MT' }, // Montana
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nv/government', abbr: 'NV' }, // Nevada
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nm/government', abbr: 'NM' }, // New Mexico
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nd/government', abbr: 'ND' }, // North Dakota
+  // { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR' }, // Oregon
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ri/government', abbr: 'RI' }, // Rhode Island
+  // { ocdId: 'ocd-jurisdiction/country:us/state:sd/government', abbr: 'SD' }, // South Dakota
+  // { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX' }, // Texas
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ut/government', abbr: 'UT' }, // Utah
+  // { ocdId: 'ocd-jurisdiction/country:us/state:wv/government', abbr: 'WV' }, // West Virginia
+  // { ocdId: 'ocd-jurisdiction/country:us/state:wy/government', abbr: 'WY' }, // Wyoming
 ];
 
 // Helper function to introduce delays (milliseconds)
