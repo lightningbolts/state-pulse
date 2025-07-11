@@ -97,7 +97,9 @@ async function generateGeminiSummaryWithRateLimit(text: string): Promise<string>
 }
 
 const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY;
+const CONGRESS_API_KEY = process.env.US_CONGRESS_API_KEY; // Add Congress.gov API key
 const OPENSTATES_API_BASE_URL = 'https://v3.openstates.org';
+const CONGRESS_API_BASE_URL = 'https://api.congress.gov/v3';
 
 const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   // --- ACTIVE SESSIONS (Currently in session as of July 2025) ---
@@ -461,56 +463,167 @@ async function fetchAndStoreUpdatedBills(
   console.log(`Finished fetching updates for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}). Processed ${billsProcessed} bills.`);
 }
 
-async function runUpdateCycle() {
-  if (!OPENSTATES_API_KEY) {
-    console.error("Error: OPENSTATES_API_KEY environment variable is not set. Please add it to your .env file.");
+async function runUpdateCycle(enableOpenStates: boolean = true, enableCongress: boolean = true) {
+  if (!enableOpenStates && !enableCongress) {
+    console.error("Error: At least one API source must be enabled. Use --openstates and/or --congress flags.");
     return;
   }
-  if (STATE_OCD_IDS.length === 0 || (STATE_OCD_IDS[0].abbr === 'AL' && STATE_OCD_IDS.length <= 5 && STATE_OCD_IDS.length > 0 && STATE_OCD_IDS.every(s => s.ocdId.startsWith('ocd-jurisdiction/country:us/state:')))) {
-      console.warn("Warning: STATE_OCD_IDS list in src/scripts/fetchOpenStatesData.ts is not fully populated with all 50 states. Please add all state OCD-IDs and abbreviations for complete data fetching.");
+
+  if (enableOpenStates && !OPENSTATES_API_KEY) {
+    console.error("Error: OPENSTATES_API_KEY environment variable is not set but OpenStates is enabled. Please add it to your .env file or disable OpenStates with --no-openstates.");
+    return;
   }
+
+  if (enableCongress && !CONGRESS_API_KEY) {
+    console.error("Error: CONGRESS_API_KEY environment variable is not set but Congress API is enabled. Please add it to your .env file or disable Congress API with --no-congress.");
+    return;
+  }
+
   const updatedSinceString = getUpdatedSinceString(UPDATE_INTERVAL_HOURS);
   console.log(`--- Starting fetch for legislation updated since ${updatedSinceString} ---`);
-  for (const state of STATE_OCD_IDS) {
-    console.log(`\n--- Processing State: ${state.abbr} (${state.ocdId}) ---`);
-    const sessions = await fetchSessionsForJurisdiction(state.ocdId);
-    if (sessions.length > 0) {
-      const today = new Date();
-      let currentSessions = sessions.filter(s => {
-        const sessionStartDate = s.start_date ? new Date(s.start_date) : null;
-        const sessionEndDate = s.end_date ? new Date(s.end_date) : null;
-        if (!sessionStartDate || sessionStartDate > today) return false;
-        if (!sessionEndDate) return true;
-        const ninetyDaysAgo = new Date(today.getTime() - (90 * 24 * 60 * 60 * 1000));
-        return sessionEndDate >= ninetyDaysAgo;
-      });
-      if (currentSessions.length === 0 && sessions.length > 0) {
-        const mostRecentSession = sessions[0];
-        const mostRecentStartDate = mostRecentSession.start_date ? new Date(mostRecentSession.start_date) : null;
-        if (mostRecentStartDate && mostRecentStartDate <= today) {
-          currentSessions = [mostRecentSession];
-          console.log(`Using fallback: most recent session ${mostRecentSession.name} (${mostRecentSession.identifier})`);
-        } else {
-          console.log(`Most recent session ${mostRecentSession.name} for ${state.abbr} appears to be in the future or invalid; skipping.`);
-        }
-      }
-      console.log(`Found ${currentSessions.length} potentially current session(s) for ${state.abbr}: ${currentSessions.map(s=>`${s.name} (${s.identifier})`).join(', ')}`);
-      for (const session of currentSessions) {
-        await fetchAndStoreUpdatedBills(state.ocdId, state.abbr, session.identifier, updatedSinceString);
-        await delay(3000);
-      }
-    } else {
-      console.log(`No sessions found for ${state.abbr}. Skipping.`);
-    }
-    await delay(10000);
+  console.log(`--- OpenStates API: ${enableOpenStates ? 'ENABLED' : 'DISABLED'} ---`);
+  console.log(`--- Congress API: ${enableCongress ? 'ENABLED' : 'DISABLED'} ---`);
+
+  // Fetch from Congress.gov API for US federal legislation if enabled
+  if (enableCongress) {
+    console.log(`\n--- Processing US Congress via Congress.gov API ---`);
+    await fetchCongressBills(updatedSinceString);
+    await delay(5000);
+  } else {
+    console.log(`\n--- Skipping US Congress (Congress API disabled) ---`);
   }
-  console.log("\n--- Finished processing all states for legislation. ---");
-  console.log("--- This script is designed for frequent legislation (e.g., every 12 hours). ---");
+
+  // Process state legislatures via OpenStates API if enabled
+  if (enableOpenStates) {
+    const stateJurisdictions = STATE_OCD_IDS.filter(state => state.abbr !== 'us');
+
+    for (const state of stateJurisdictions) {
+      console.log(`\n--- Processing State: ${state.abbr} (${state.ocdId}) ---`);
+      const sessions = await fetchSessionsForJurisdiction(state.ocdId);
+      if (sessions.length > 0) {
+        const today = new Date();
+        let currentSessions = sessions.filter(s => {
+          const sessionStartDate = s.start_date ? new Date(s.start_date) : null;
+          const sessionEndDate = s.end_date ? new Date(s.end_date) : null;
+          if (!sessionStartDate || sessionStartDate > today) return false;
+          if (!sessionEndDate) return true;
+          const ninetyDaysAgo = new Date(today.getTime() - (90 * 24 * 60 * 60 * 1000));
+          return sessionEndDate >= ninetyDaysAgo;
+        });
+        if (currentSessions.length === 0 && sessions.length > 0) {
+          const mostRecentSession = sessions[0];
+          const mostRecentStartDate = mostRecentSession.start_date ? new Date(mostRecentSession.start_date) : null;
+          if (mostRecentStartDate && mostRecentStartDate <= today) {
+            currentSessions = [mostRecentSession];
+            console.log(`Using fallback: most recent session ${mostRecentSession.name} (${mostRecentSession.identifier})`);
+          } else {
+            console.log(`Most recent session ${mostRecentSession.name} for ${state.abbr} appears to be in the future or invalid; skipping.`);
+          }
+        }
+        console.log(`Found ${currentSessions.length} potentially current session(s) for ${state.abbr}: ${currentSessions.map(s=>`${s.name} (${s.identifier})`).join(', ')}`);
+        for (const session of currentSessions) {
+          await fetchAndStoreUpdatedBills(state.ocdId, state.abbr, session.identifier, updatedSinceString);
+          await delay(3000);
+        }
+      } else {
+        console.log(`No sessions found for ${state.abbr}. Skipping.`);
+      }
+      await delay(10000);
+    }
+  } else {
+    console.log(`\n--- Skipping state legislatures (OpenStates API disabled) ---`);
+  }
+
+  console.log("\n--- Finished processing selected jurisdictions for legislation. ---");
+  if (enableOpenStates && enableCongress) {
+    console.log("--- Used both Congress.gov API for federal data and OpenStates API for state data. ---");
+  } else if (enableCongress) {
+    console.log("--- Used Congress.gov API for federal data only. ---");
+  } else if (enableOpenStates) {
+    console.log("--- Used OpenStates API for state data only. ---");
+  }
+}
+
+// Parse command line arguments
+function parseArguments(): { enableOpenStates: boolean; enableCongress: boolean; runOnce: boolean } {
+  const args = process.argv.slice(2);
+  let enableOpenStates = true;
+  let enableCongress = true;
+  let runOnce = false;
+
+  for (const arg of args) {
+    switch (arg) {
+      case '--openstates-only':
+        enableOpenStates = true;
+        enableCongress = false;
+        break;
+      case '--congress-only':
+        enableOpenStates = false;
+        enableCongress = true;
+        break;
+      case '--no-openstates':
+        enableOpenStates = false;
+        break;
+      case '--no-congress':
+        enableCongress = false;
+        break;
+      case '--openstates':
+        enableOpenStates = true;
+        break;
+      case '--congress':
+        enableCongress = true;
+        break;
+      case '--once':
+        runOnce = true;
+        break;
+      case '--help':
+      case '-h':
+        console.log(`
+Usage: node fetchOpenStatesData.js [options]
+
+Options:
+  --openstates-only    Fetch only from OpenStates API (state legislatures)
+  --congress-only      Fetch only from Congress.gov API (federal legislation)
+  --no-openstates      Disable OpenStates API (default: enabled)
+  --no-congress        Disable Congress.gov API (default: enabled)
+  --openstates         Enable OpenStates API (default: enabled)
+  --congress           Enable Congress.gov API (default: enabled)
+  --once               Run once instead of continuous loop
+  --help, -h           Show this help message
+
+Examples:
+  node fetchOpenStatesData.js                    # Both APIs enabled (default)
+  node fetchOpenStatesData.js --congress-only    # Only federal legislation
+  node fetchOpenStatesData.js --openstates-only  # Only state legislatures
+  node fetchOpenStatesData.js --no-congress      # States only
+  node fetchOpenStatesData.js --once             # Run once then exit
+        `);
+        process.exit(0);
+        break;
+      default:
+        if (arg.startsWith('--')) {
+          console.warn(`Warning: Unknown argument ${arg}. Use --help for usage information.`);
+        }
+        break;
+    }
+  }
+
+  return { enableOpenStates, enableCongress, runOnce };
 }
 
 async function main() {
+  const { enableOpenStates, enableCongress, runOnce } = parseArguments();
+
+  if (runOnce) {
+    console.log("Running in single-execution mode (--once flag detected)");
+    await runUpdateCycle(enableOpenStates, enableCongress);
+    console.log("Single execution completed. Exiting.");
+    return;
+  }
+
+  // Continuous loop mode
   while (true) {
-    await runUpdateCycle();
+    await runUpdateCycle(enableOpenStates, enableCongress);
     console.log(`Waiting ${UPDATE_INTERVAL_HOURS} hours before next update cycle...`);
     await delay(UPDATE_INTERVAL_HOURS * 60 * 60 * 1000);
   }
@@ -519,3 +632,271 @@ async function main() {
 main().catch(err => {
   console.error("Unhandled error in main execution:", err);
 });
+
+/**
+ * Transforms a Congress.gov bill to a MongoDB-compatible document
+ */
+export function transformCongressBillToMongoDB(congressBill: any): any {
+  const now = new Date();
+
+  // Process sponsors
+  const sponsors = [];
+  if (congressBill.sponsors && congressBill.sponsors.length > 0) {
+    congressBill.sponsors.forEach((sponsor: any) => {
+      sponsors.push({
+        name: sponsor.fullName || `${sponsor.firstName || ''} ${sponsor.lastName || ''}`.trim(),
+        id: sponsor.bioguideId || null,
+        entityType: 'person',
+        primary: true,
+        classification: 'sponsor',
+        personId: sponsor.bioguideId || null,
+        organizationId: null,
+      });
+    });
+  }
+
+  // Process cosponsors
+  if (congressBill.cosponsors && congressBill.cosponsors.length > 0) {
+    congressBill.cosponsors.forEach((cosponsor: any) => {
+      sponsors.push({
+        name: cosponsor.fullName || `${cosponsor.firstName || ''} ${cosponsor.lastName || ''}`.trim(),
+        id: cosponsor.bioguideId || null,
+        entityType: 'person',
+        primary: false,
+        classification: 'cosponsor',
+        personId: cosponsor.bioguideId || null,
+        organizationId: null,
+      });
+    });
+  }
+
+  // Process bill action history
+  const history = (congressBill.actions?.actions || [])
+    .map((action: any) => {
+      const eventDate = toMongoDate(action.actionDate);
+      if (!eventDate) return null;
+      return {
+        date: eventDate,
+        action: action.text,
+        actor: action.sourceSystem?.name || 'Congress',
+        classification: action.type ? [action.type] : [],
+        order: action.actionCode || 0,
+      };
+    })
+    .filter((h: any): h is NonNullable<typeof h> => h !== null);
+
+  // Process bill versions/texts
+  const versions = (congressBill.textVersions?.textVersions || [])
+    .map((version: any) => {
+      const versionDate = toMongoDate(version.date);
+      if (!versionDate) return null;
+      return {
+        note: version.type,
+        date: versionDate,
+        classification: version.type || null,
+        links: version.formats ? version.formats.map((format: any) => ({
+          url: format.url,
+          media_type: format.type || null,
+        })) : [],
+      };
+    })
+    .filter((v: any): v is NonNullable<typeof v> => v !== null);
+
+  // Process sources - use Congress.gov URLs
+  const sources = [{
+    url: `https://www.congress.gov/bill/${congressBill.congress}th-congress/${congressBill.originChamber.toLowerCase()}-bill/${congressBill.number}`,
+    note: 'Congress.gov',
+  }];
+
+  // Process summary
+  const summary = congressBill.summaries?.summaries?.[0]?.text ||
+                 congressBill.title || null;
+
+  const chamber = congressBill.originChamber === 'House' ? 'lower' :
+                 congressBill.originChamber === 'Senate' ? 'upper' :
+                 congressBill.originChamber?.toLowerCase();
+
+  return {
+    id: `congress-bill-${congressBill.congress}-${congressBill.type.toLowerCase()}-${congressBill.number}`,
+    identifier: `${congressBill.type} ${congressBill.number}`,
+    title: congressBill.title,
+    session: `${congressBill.congress}th Congress`,
+    jurisdictionId: 'ocd-jurisdiction/country:us/legislature',
+    jurisdictionName: 'United States Congress',
+    chamber: chamber,
+    classification: [congressBill.type?.toLowerCase() || 'bill'],
+    subjects: congressBill.policyArea ? [congressBill.policyArea.name] : [],
+    statusText: congressBill.latestAction?.text || null,
+    sponsors,
+    history,
+    versions: versions || [],
+    sources: sources || [],
+    abstracts: summary ? [{ abstract: summary, note: 'Congress.gov summary' }] : [],
+    openstatesUrl: null,
+    congressUrl: sources[0].url,
+    firstActionAt: toMongoDate(congressBill.introducedDate),
+    latestActionAt: toMongoDate(congressBill.latestAction?.actionDate),
+    latestActionDescription: congressBill.latestAction?.text || null,
+    latestPassageAt: null, // Would need to parse from actions
+    createdAt: toMongoDate(congressBill.introducedDate) || now,
+    updatedAt: toMongoDate(congressBill.updateDate) || now,
+    summary: summary,
+    extras: {
+      congress: congressBill.congress,
+      billType: congressBill.type,
+      billNumber: congressBill.number,
+      constitutionalAuthorityStatementText: congressBill.constitutionalAuthorityStatementText,
+    },
+  };
+}
+
+/**
+ * Fetch bills from Congress.gov API
+ */
+async function fetchCongressBills(updatedSince: string) {
+  if (!CONGRESS_API_KEY) {
+    console.error("Error: CONGRESS_API_KEY environment variable is not set. Skipping Congress data.");
+    return;
+  }
+
+  let offset = 0;
+  const limit = 20;
+  let hasMore = true;
+  let billsProcessed = 0;
+
+  console.log(`Fetching Congress bills updated since ${updatedSince}`);
+
+  while (hasMore) {
+    // Get current Congress number (119th Congress for 2025-2026)
+    const currentCongress = 119;
+    const url = `${CONGRESS_API_BASE_URL}/bill/${currentCongress}?api_key=${CONGRESS_API_KEY}&format=json&offset=${offset}&limit=${limit}&sort=updateDate+desc`;
+
+    console.log(`Fetching Congress bills offset ${offset} from: ${url.replace(CONGRESS_API_KEY as string, 'REDACTED_KEY')}`);
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Error fetching Congress bills offset ${offset}: ${response.status} ${await response.text()}`);
+        hasMore = false;
+        break;
+      }
+
+      const data: any = await response.json();
+
+      if (data.bills && data.bills.length > 0) {
+        for (const bill of data.bills) {
+          try {
+            // Check if bill was updated since our cutoff
+            const billUpdateDate = new Date(bill.updateDate);
+            const cutoffDate = new Date(updatedSince);
+
+            if (billUpdateDate < cutoffDate) {
+              console.log(`Reached bills older than cutoff date. Stopping.`);
+              hasMore = false;
+              break;
+            }
+
+            // Fetch detailed bill information
+            const detailUrl = `${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}?api_key=${CONGRESS_API_KEY}&format=json`;
+            const detailResponse = await fetch(detailUrl);
+
+            if (!detailResponse.ok) {
+              console.error(`Error fetching bill details for ${bill.type} ${bill.number}: ${detailResponse.status}`);
+              continue;
+            }
+
+            const detailData: any = await detailResponse.json();
+            const congressBill = detailData.bill;
+
+            // Also fetch actions, text versions, and summaries
+            const [actionsResponse, textResponse, summariesResponse] = await Promise.all([
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}/actions?api_key=${CONGRESS_API_KEY}&format=json`),
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}/text?api_key=${CONGRESS_API_KEY}&format=json`),
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}/summaries?api_key=${CONGRESS_API_KEY}&format=json`)
+            ]);
+
+            if (actionsResponse.ok) {
+              const actionsData: any = await actionsResponse.json();
+              congressBill.actions = actionsData;
+            }
+
+            if (textResponse.ok) {
+              const textData: any = await textResponse.json();
+              congressBill.textVersions = textData;
+            }
+
+            if (summariesResponse.ok) {
+              const summariesData: any = await summariesResponse.json();
+              congressBill.summaries = summariesData;
+            }
+
+            const legislationToStore = transformCongressBillToMongoDB(congressBill);
+
+            // Get full text for summary generation
+            let fullText = '';
+            if (congressBill.textVersions?.textVersions?.[0]?.formats) {
+              const textFormat = congressBill.textVersions.textVersions[0].formats.find((f: any) => f.type === 'Formatted Text');
+              if (textFormat?.url) {
+                legislationToStore.stateLegislatureUrl = textFormat.url;
+                fullText = (await fetchPdfTextFromOpenStatesUrl(textFormat.url)) || legislationToStore.title || '';
+              }
+            }
+
+            if (!fullText) {
+              fullText = legislationToStore.title || '';
+            }
+
+            legislationToStore.fullText = fullText;
+
+            // Generate summary if needed
+            let shouldGenerateSummary = false;
+            let geminiSummaryWordCount = 0;
+            if (!legislationToStore.geminiSummary) {
+              shouldGenerateSummary = true;
+            } else {
+              geminiSummaryWordCount = legislationToStore.geminiSummary.trim().split(/\s+/).length;
+              if (
+                geminiSummaryWordCount < 20 ||
+                legislationToStore.geminiSummary === 'Summary not available due to insufficient information.'
+              ) {
+                shouldGenerateSummary = true;
+              }
+            }
+
+            if (shouldGenerateSummary) {
+              legislationToStore.geminiSummary = fullText ? await generateGeminiSummaryWithRateLimit(fullText) : null;
+              geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
+            }
+
+            // Upsert the legislation
+            await upsertLegislationSelective(legislationToStore);
+            console.log(`Upserted: ${legislationToStore.identifier} (Congress) - Summary: ${geminiSummaryWordCount} words`);
+            billsProcessed++;
+
+            // Rate limiting for Congress API
+            await delay(100); // Congress API allows higher rates but be respectful
+
+          } catch (transformError) {
+            console.error(`Error transforming or upserting Congress bill ${bill.type} ${bill.number}:`, transformError);
+          }
+        }
+
+        if (data.bills.length < limit) {
+          hasMore = false;
+        } else {
+          offset += limit;
+          await delay(1000); // Rate limiting between pages
+        }
+      } else {
+        console.log(`No more Congress bills found at offset ${offset}.`);
+        hasMore = false;
+      }
+    } catch (error) {
+      console.error(`Network error fetching Congress bills at offset ${offset}:`, error);
+      hasMore = false;
+      break;
+    }
+  }
+
+  console.log(`Finished fetching Congress bills (since ${updatedSince}). Processed ${billsProcessed} bills.`);
+}
