@@ -139,8 +139,11 @@ export function InteractiveMap() {
   const [isClient, setIsClient] = useState(false);
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<string>('legislation');
-  const [stateStats, setStateStats] = useState<Record<string, StateData>>(stateData);
+  const [stateStats, setStateStats] = useState<Record<string, StateData>>({});
+  const [stateDetails, setStateDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -150,23 +153,52 @@ export function InteractiveMap() {
 
   const fetchMapData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // In real implementation, fetch from your API
-      // const response = await fetch('/api/dashboard/map-data');
-      // const data = await response.json();
-      // setStateStats(data);
-
-      // For now, simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/dashboard/map-data');
+      if (!response.ok) {
+        throw new Error('Failed to fetch map data');
+      }
+      const result = await response.json();
+      if (result.success) {
+        setStateStats(result.data);
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
     } catch (error) {
       console.error('Error fetching map data:', error);
+      setError('Failed to load map data. Please try again.');
+      // Fallback to empty data
+      setStateStats({});
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchStateDetails = async (stateAbbr: string) => {
+    setDetailsLoading(true);
+    try {
+      const response = await fetch(`/api/dashboard/state/${stateAbbr}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch state details');
+      }
+      const result = await response.json();
+      if (result.success) {
+        setStateDetails(result.data);
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error fetching state details:', error);
+      setStateDetails(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
   const handleStateClick = (stateAbbr: string) => {
     setSelectedState(stateAbbr);
+    fetchStateDetails(stateAbbr);
   };
 
   const getStateColor = (stateAbbr: string) => {
@@ -228,17 +260,24 @@ export function InteractiveMap() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {mapModes.map((mode) => {
                 const IconComponent = mode.icon;
+                const isDisabled = mode.id !== 'legislation'; // Only legislation mode is active
                 return (
                   <Button
                     key={mode.id}
                     variant={mapMode === mode.id ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setMapMode(mode.id)}
-                    className="flex items-center gap-2 h-auto p-3"
+                    onClick={() => !isDisabled && setMapMode(mode.id)}
+                    disabled={isDisabled}
+                    className={`flex items-center gap-2 h-auto p-3 ${
+                      isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <IconComponent className="h-4 w-4" />
                     <div className="text-left">
                       <div className="font-medium text-xs">{mode.label}</div>
+                      {isDisabled && (
+                        <div className="text-xs text-muted-foreground">Coming Soon</div>
+                      )}
                     </div>
                   </Button>
                 );

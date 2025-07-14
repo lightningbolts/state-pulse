@@ -33,13 +33,13 @@ import {StatePulseFooter} from "@/components/StatePulseFooter";
 
 type ActiveView =
     | "home"
-  // | "dashboard"
-  | "updates"
-  | "tracker"
-  | "posts"
-  | "timeline"
-  | "summaries"
-  | "civic";
+    | "dashboard"
+    | "updates"
+    | "tracker"
+    | "posts"
+    | "timeline"
+    | "summaries"
+    | "civic";
 
 interface MenuItem {
   id: ActiveView;
@@ -50,12 +50,12 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
     { id: "home", path: "/home", label: "Home", icon: Gavel },
-  // { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "updates", path: "/legislation", label: "Policy Updates", icon: Newspaper },
-  { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },
-  { id: "posts", path: "/posts", label: "Community Posts", icon: MessageSquare },
-  { id: "summaries", path: "/summaries", label: "AI Summaries", icon: BrainCircuit },
-  { id: "civic", path: "/civic", label: "Civic Tools", icon: Users },
+    { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "updates", path: "/legislation", label: "Policy Updates", icon: Newspaper },
+    { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },
+    { id: "posts", path: "/posts", label: "Community Posts", icon: MessageSquare },
+    { id: "summaries", path: "/summaries", label: "AI Summaries", icon: BrainCircuit },
+    { id: "civic", path: "/civic", label: "Civic Tools", icon: Users },
 ];
 
 function SidebarContentWithAutoClose() {

@@ -29,6 +29,12 @@ export function StatePulseFooter() {
                 Home
               </Link>
               <Link
+                  href="/dashboard"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+                >
+                Dashboard
+              </Link>
+              <Link
                 href="/legislation"
                 className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
               >
