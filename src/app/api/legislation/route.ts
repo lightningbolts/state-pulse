@@ -59,6 +59,9 @@
             if (searchParams.get('jurisdiction')) {
               filter.jurisdictionId = searchParams.get('jurisdiction');
             }
+            if (searchParams.get('jurisdictionName')) {
+              filter.jurisdictionName = { $regex: searchParams.get('jurisdictionName'), $options: 'i' };
+            }
             if (searchParams.get('subject')) {
               filter.subjects = searchParams.get('subject');
             }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Bookmark, Search, Plus, X } from "lucide-react";
 import { BookmarkButton, BookmarksContext } from "@/components/features/BookmarkButton";
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect, useContext } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -50,10 +51,11 @@ const CLASSIFICATIONS = [
 let cardNumber = 20;
 
 // Fetch updates with optional filters and sorting
-async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc", classification = "" }: { skip?: number; limit?: number; search?: string; subject?: string; sortField?: string; sortDir?: string; classification?: string }) {
+async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc", classification = "", jurisdictionName = "" }: { skip?: number; limit?: number; search?: string; subject?: string; sortField?: string; sortDir?: string; classification?: string; jurisdictionName?: string }) {
   const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
   if (search) params.append("search", search);
   if (subject) params.append("subject", subject);
+  if (jurisdictionName) params.append("jurisdictionName", jurisdictionName);
   // Map lastAction to the correct field name for the API
   const apiSortField = sortField === "lastAction" ? "lastActionAt" : sortField;
   if (apiSortField) params.append("sortBy", apiSortField);
@@ -72,6 +74,7 @@ export function PolicyUpdatesFeed() {
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("");
   const [classification, setClassification] = useState("");
+  const [jurisdictionName, setJurisdictionName] = useState("");
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
   const [showLoadingText, setShowLoadingText] = useState(true);
   const [searchInput, setSearchInput] = useState("");
@@ -83,11 +86,35 @@ export function PolicyUpdatesFeed() {
   const skipRef = useRef(0);
   const loadingRef = useRef(false); // Ref to prevent concurrent loads
   const hasRestored = useRef(false);
-  const prevDeps = useRef<{search: string, subject: string, classification: string, sort: any} | null>(null);
+  const prevDeps = useRef<{search: string, subject: string, classification: string, sort: any, jurisdictionName: string} | null>(null);
 
   // Access bookmark context
   const { bookmarks, loading: bookmarksLoading } = useContext(BookmarksContext);
   const { user } = useUser();
+
+  // URL parameter handling for state filtering
+  const searchParams = useSearchParams();
+
+  // Handle URL parameters for state filtering
+  useEffect(() => {
+    const stateParam = searchParams.get('state');
+    const stateAbbrParam = searchParams.get('stateAbbr');
+
+    if (stateParam || stateAbbrParam) {
+      const stateName = stateParam ? decodeURIComponent(stateParam) : null;
+
+      if (stateName) {
+        console.log('Loading legislation for state:', stateName);
+        setJurisdictionName(stateName);
+        // Reset the feed to load fresh data for this state
+        setUpdates([]);
+        setSkip(0);
+        skipRef.current = 0;
+        setHasMore(true);
+        setLoading(true);
+      }
+    }
+  }, [searchParams]);
 
   const loadMore = useCallback(async () => {
     if (loadingRef.current || !hasMore) return;
@@ -95,7 +122,7 @@ export function PolicyUpdatesFeed() {
     setLoading(true);
     try {
       const currentSkip = skipRef.current;
-      const newUpdates = await fetchUpdatesFeed({ skip: currentSkip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification });
+      const newUpdates = await fetchUpdatesFeed({ skip: currentSkip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification, jurisdictionName });
 
       // Filter to only bookmarked items if showOnlyBookmarked is true
       const filteredNewUpdates = showOnlyBookmarked
@@ -113,7 +140,7 @@ export function PolicyUpdatesFeed() {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [hasMore, search, subject, sort, classification, showOnlyBookmarked, bookmarks]);
+  }, [hasMore, search, subject, sort, classification, jurisdictionName, showOnlyBookmarked, bookmarks]);
 
   // Search handler for button/enter
   const handleSearch = useCallback(() => {
@@ -164,7 +191,7 @@ export function PolicyUpdatesFeed() {
     }
     didRestore.current = true;
     hasRestored.current = true;
-    prevDeps.current = {search, subject, classification, sort};
+    prevDeps.current = {search, subject, classification, sort, jurisdictionName};
   }, []);
 
   // Block the initial fetch until after restore, and only fetch if updates are empty
@@ -182,7 +209,8 @@ export function PolicyUpdatesFeed() {
           subject,
           sortField: sort.field,
           sortDir: sort.dir,
-          classification
+          classification,
+          jurisdictionName
         });
         if (!isMounted) return;
 
@@ -205,7 +233,7 @@ export function PolicyUpdatesFeed() {
     };
     fetchAndSet();
     return () => { isMounted = false; };
-  }, [search, subject, classification, sort, showOnlyBookmarked, bookmarks, didRestore.current]);
+  }, [search, subject, classification, sort, jurisdictionName, showOnlyBookmarked, bookmarks, didRestore.current]);
 
 
   // Intersection Observer for infinite scroll
@@ -330,6 +358,37 @@ export function PolicyUpdatesFeed() {
         <CardDescription>Stay updated with the latest policy developments. Filter by category or search for specific topics.</CardDescription>
       </CardHeader>
       <CardContent>
+        {/* State Filter Indicator */}
+        {jurisdictionName && (
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="default" className="bg-primary">
+                  Filtered by State: {jurisdictionName}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Showing legislation from {jurisdictionName} only
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setJurisdictionName("");
+                  setUpdates([]);
+                  setSkip(0);
+                  skipRef.current = 0;
+                  setHasMore(true);
+                  setLoading(true);
+                }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filter
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
           <div className="relative flex-grow w-full sm:w-auto flex">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />

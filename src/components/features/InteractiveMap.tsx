@@ -167,10 +167,13 @@ export function InteractiveMap() {
   };
 
   const handleViewLegislation = (stateAbbr: string) => {
-    // Navigate to legislation page - filtering will need to be added to PolicyUpdatesFeed
-    // For now, just go to the general legislation page
-    router.push('/legislation');
-    // TODO: Add jurisdiction filtering to PolicyUpdatesFeed component
+    // Navigate to legislation page with state parameter for pre-filtering
+    const stateName = stateStats[stateAbbr]?.name;
+    if (stateName) {
+      router.push(`/legislation?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`);
+    } else {
+      router.push('/legislation');
+    }
   };
 
   const handleStateProfile = (stateAbbr: string) => {
