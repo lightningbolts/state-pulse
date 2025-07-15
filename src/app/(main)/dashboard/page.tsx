@@ -271,13 +271,17 @@ function DashboardContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
+                      onClick={() => {
+                        // Use the actual state data instead of URL parameters
+                        const stateName = stateData?.state || stateParam || stateAbbrParam || "";
+                        const stateAbbr = stateAbbrParam || "";
+
+                        console.log('Dashboard: Navigating to legislation with:', { stateName, stateAbbr });
+
                         router.push(
-                          `/legislation?state=${encodeURIComponent(
-                            stateParam || stateAbbrParam || ""
-                          )}&stateAbbr=${stateAbbrParam || ""}`
-                        )
-                      }
+                          `/legislation?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`
+                        );
+                      }}
                       className="w-full"
                     >
                       View All Legislation

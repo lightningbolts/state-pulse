@@ -125,11 +125,39 @@ export function PolicyUpdatesFeed() {
     const stateParam = searchParams.get('state');
     const stateAbbrParam = searchParams.get('stateAbbr');
 
+    console.log('PolicyUpdatesFeed received params:', { stateParam, stateAbbrParam });
+
     if (stateParam || stateAbbrParam) {
-      const stateName = stateParam ? decodeURIComponent(stateParam) : null;
+      let stateName = stateParam ? decodeURIComponent(stateParam) : null;
+
+      console.log('Initial stateName:', stateName);
+
+      // If we have a state abbreviation, convert it to full name
+      if (stateAbbrParam && !stateName) {
+        // Create reverse mapping from abbreviation to state name
+        const abbrToStateName = Object.entries(STATE_MAP).reduce((acc, [fullName, abbr]) => {
+          acc[abbr] = fullName;
+          return acc;
+        }, {} as Record<string, string>);
+
+        stateName = abbrToStateName[stateAbbrParam.toUpperCase()] || stateAbbrParam;
+        console.log('Converted from stateAbbrParam:', stateAbbrParam, 'to stateName:', stateName);
+      }
+
+      // If stateParam looks like an abbreviation (2 chars, all caps), convert it
+      if (stateName && stateName.length === 2 && stateName === stateName.toUpperCase()) {
+        const abbrToStateName = Object.entries(STATE_MAP).reduce((acc, [fullName, abbr]) => {
+          acc[abbr] = fullName;
+          return acc;
+        }, {} as Record<string, string>);
+
+        const originalStateName = stateName;
+        stateName = abbrToStateName[stateName] || stateName;
+        console.log('Converted abbreviation:', originalStateName, 'to full name:', stateName);
+      }
 
       if (stateName) {
-        console.log('Loading legislation for state:', stateName);
+        console.log('Final stateName being set:', stateName);
         setJurisdictionName(stateName);
         // Reset the feed to load fresh data for this state
         setUpdates([]);
@@ -183,8 +211,14 @@ export function PolicyUpdatesFeed() {
 
   useLayoutEffect(() => {
     if (didRestore.current) return;
+
+    // Check for URL parameters first - these should take precedence
+    const stateParam = searchParams.get('state');
+    const stateAbbrParam = searchParams.get('stateAbbr');
+    const hasUrlParams = stateParam || stateAbbrParam;
+
     const saved = sessionStorage.getItem('policyUpdatesFeedState');
-    if (saved) {
+    if (saved && !hasUrlParams) { // Only restore from sessionStorage if no URL params
       try {
         const state = JSON.parse(saved);
         setSearch(state.search || "");
@@ -204,16 +238,24 @@ export function PolicyUpdatesFeed() {
         skipRef.current = 0;
         setSkip(0);
       }
+    } else if (hasUrlParams) {
+      // Clear any existing state when URL params are present
+      setUpdates([]);
+      skipRef.current = 0;
+      setSkip(0);
+      console.log('URL parameters detected, clearing existing state to prioritize URL params');
     }
+
     // Restore scroll position *before* paint for seamlessness
     const scrollY = sessionStorage.getItem('policyUpdatesFeedScrollY');
-    if (scrollY) {
+    if (scrollY && !hasUrlParams) { // Only restore scroll if not coming from URL navigation
       window.scrollTo(0, parseInt(scrollY, 10));
     }
+
     didRestore.current = true;
     hasRestored.current = true;
     prevDeps.current = {search, subject, classification, sort, jurisdictionName};
-  }, []);
+  }, [searchParams]);
 
   // Block the initial fetch until after restore, and only fetch if updates are empty
   useEffect(() => {

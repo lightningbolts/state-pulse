@@ -60,7 +60,13 @@
               filter.jurisdictionId = searchParams.get('jurisdiction');
             }
             if (searchParams.get('jurisdictionName')) {
-              filter.jurisdictionName = { $regex: searchParams.get('jurisdictionName'), $options: 'i' };
+              const jurisdictionNameParam = searchParams.get('jurisdictionName');
+              console.log('[API] Filtering by jurisdictionName:', jurisdictionNameParam);
+
+              // Use exact match instead of regex to prevent partial matches
+              filter.jurisdictionName = jurisdictionNameParam;
+
+              console.log('[API] Applied filter:', JSON.stringify(filter));
             }
             if (searchParams.get('subject')) {
               filter.subjects = searchParams.get('subject');
