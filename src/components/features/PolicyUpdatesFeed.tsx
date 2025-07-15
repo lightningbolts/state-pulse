@@ -287,13 +287,19 @@ export function PolicyUpdatesFeed() {
         setSubject(state.subject || "");
         setClassification(state.classification || "");
         setJurisdictionName(state.jurisdictionName || "");
+        setShowCongress(state.showCongress || false);
         setSort(state.sort || { field: 'createdAt', dir: 'desc' });
         setSkip(state.skip || 0);
         skipRef.current = state.skip || 0;
         setSearchInput(state.searchInput || "");
+        if (state.updates && Array.isArray(state.updates)) {
+          setUpdates(state.updates);
+          // Crucial fix: set skipRef to actual length of updates
+          skipRef.current = state.updates.length;
+        } else {
+          setUpdates([]);
+        }
         setHasMore(state.hasMore !== undefined ? state.hasMore : true);
-        // Note: updates array is no longer stored in sessionStorage to prevent quota issues
-        setUpdates([]);
       } catch (e) {
         console.error('Error parsing feed state:', e);
         setUpdates([]);
@@ -359,7 +365,7 @@ export function PolicyUpdatesFeed() {
     };
     fetchAndSet();
     return () => { isMounted = false; };
-  }, [search, subject, classification, sort, jurisdictionName, showOnlyBookmarked, bookmarks, didRestore.current]);
+  }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, didRestore.current]);
 
 
   // Intersection Observer for infinite scroll
@@ -412,7 +418,7 @@ export function PolicyUpdatesFeed() {
   useEffect(() => {
     try {
       sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-        search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName
+        search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, updates
       }));
     } catch (error) {
       console.warn('Failed to save state to sessionStorage:', error);
@@ -420,13 +426,13 @@ export function PolicyUpdatesFeed() {
       try {
         sessionStorage.removeItem('policyUpdatesFeedState');
         sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-          search, subject, classification, sort
+          search, subject, classification, sort, showCongress
         }));
       } catch (retryError) {
         console.error('Failed to save even minimal state:', retryError);
       }
     }
-  }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName]);
+  }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, updates]);
 
   // Save scroll position
   useEffect(() => {
@@ -620,6 +626,9 @@ export function PolicyUpdatesFeed() {
                   if (value === "congress") {
                     setShowCongress(true);
                     setJurisdictionName("");
+                  } else if (value === "all") {
+                    setShowCongress(false);
+                    setJurisdictionName("");
                   } else {
                     setShowCongress(false);
                     setJurisdictionName(value);
@@ -631,7 +640,7 @@ export function PolicyUpdatesFeed() {
                   setLoading(true);
                 }}
               >
-                <DropdownMenuRadioItem value="">All States</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="all">All States</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="congress">U.S. Congress</DropdownMenuRadioItem>
                 {Object.keys(STATE_MAP).sort().map((state) => (
                   <DropdownMenuRadioItem key={state} value={state}>
