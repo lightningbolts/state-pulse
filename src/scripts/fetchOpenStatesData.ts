@@ -117,7 +117,7 @@ const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   // { ocdId: 'ocd-jurisdiction/country:us/state:mi/government', abbr: 'MI' }, // Michigan
   // { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' }, // Minnesota
   // { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' }, // Nebraska
-  { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' }, // New Hampshire
+  // { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' }, // New Hampshire
   { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' }, // New Jersey
   { ocdId: 'ocd-jurisdiction/country:us/state:ny/government', abbr: 'NY' }, // New York
   { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' }, // North Carolina
@@ -165,6 +165,73 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Checkpoint system for resuming interrupted runs
+interface Checkpoint {
+  lastProcessedState: string;
+  lastProcessedSession: string;
+  lastProcessedPage: number;
+  timestamp: string;
+  updatedSince: string;
+}
+
+function saveCheckpoint(stateAbbr: string, sessionIdentifier: string, page: number, updatedSince: string) {
+  const checkpoint: Checkpoint = {
+    lastProcessedState: stateAbbr,
+    lastProcessedSession: sessionIdentifier,
+    lastProcessedPage: page,
+    timestamp: new Date().toISOString(),
+    updatedSince: updatedSince
+  };
+
+  try {
+    const fs = require('fs');
+    fs.writeFileSync('./checkpoint.json', JSON.stringify(checkpoint, null, 2));
+    console.log(`💾 Saved checkpoint: ${stateAbbr} - ${sessionIdentifier} - Page ${page}`);
+  } catch (error) {
+    console.warn('Failed to save checkpoint:', error);
+  }
+}
+
+function loadCheckpoint(): Checkpoint | null {
+  try {
+    const fs = require('fs');
+    if (fs.existsSync('./checkpoint.json')) {
+      const checkpoint = JSON.parse(fs.readFileSync('./checkpoint.json', 'utf8'));
+      console.log(`📍 Found checkpoint: ${checkpoint.lastProcessedState} - ${checkpoint.lastProcessedSession} - Page ${checkpoint.lastProcessedPage}`);
+      return checkpoint;
+    }
+  } catch (error) {
+    console.warn('Failed to load checkpoint:', error);
+  }
+  return null;
+}
+
+function clearCheckpoint() {
+  try {
+    const fs = require('fs');
+    if (fs.existsSync('./checkpoint.json')) {
+      fs.unlinkSync('./checkpoint.json');
+      console.log('🗑️ Cleared checkpoint');
+    }
+  } catch (error) {
+    console.warn('Failed to clear checkpoint:', error);
+  }
+}
+
+// Utility to convert OpenStates IDs to display format
+function displayOpenStatesId(id: string): string {
+  // Replace the first dash with an underscore, and remove 'ocd-bill/' prefix
+  if (id.startsWith('ocd-bill/')) {
+    const rest = id.replace('ocd-bill/', '');
+    const idx = rest.indexOf('-');
+    if (idx !== -1) {
+      return 'ocd-bill_' + rest.slice(idx + 1);
+    }
+    return 'ocd-bill_' + rest;
+  }
+  return id;
+}
+
 /**
  * Convert date strings or timestamp objects to JavaScript Date objects
  */
@@ -193,23 +260,7 @@ function toMongoDate(
   return null;
 }
 
-// Utility to convert OpenStates IDs to display format
-function displayOpenStatesId(id: string): string {
-  // Replace the first dash with an underscore, and remove 'ocd-bill/' prefix
-  if (id.startsWith('ocd-bill/')) {
-    const rest = id.replace('ocd-bill/', '');
-    const idx = rest.indexOf('-');
-    if (idx !== -1) {
-      return 'ocd-bill_' + rest.slice(idx + 1);
-    }
-    return 'ocd-bill_' + rest;
-  }
-  return id;
-}
-
-/**
- * Transforms an OpenStates bill to a MongoDB-compatible document
- */
+// Transforms an OpenStates bill to a MongoDB-compatible document
 export function transformOpenStatesBillToMongoDB(osBill: any): any {
   // Process sponsors
   const sponsors = (osBill.sponsorships || []).map((sp: any) => {
@@ -386,16 +437,45 @@ async function fetchAndStoreUpdatedBills(
   ocdId: string,
   jurisdictionAbbr: string,
   sessionIdentifier: string,
-  updatedSince: string
+  updatedSince: string,
+  startPage: number = 1
 ) {
-  let page = 48;
+  let page = startPage;
   const perPage = 20;
   let hasMore = true;
   let billsProcessed = 0;
 
-  console.log(`Fetching bills updated since ${updatedSince} for ${jurisdictionAbbr} - Session: ${sessionIdentifier}`);
+  console.log(`Fetching bills updated since ${updatedSince} for ${jurisdictionAbbr} - Session: ${sessionIdentifier} - Starting from page ${startPage}`);
+
+  // If resuming from a high page number, first verify the page exists
+  if (startPage > 1) {
+    console.log(`🔍 Verifying that page ${startPage} still exists for ${jurisdictionAbbr}...`);
+    const testUrl = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=1&per_page=20&apikey=${OPENSTATES_API_KEY}&sort=updated_desc&updated_since=${updatedSince}`;
+
+    try {
+      const testResponse = await fetch(testUrl);
+      if (testResponse.ok) {
+        const testData = await testResponse.json();
+        const maxPage = testData.pagination?.max_page || testData.pagination?.total_pages || 1;
+        const totalItems = testData.pagination?.total_items || 0;
+
+        console.log(`📊 Current pagination: max_page=${maxPage}, total_items=${totalItems}, requested_start_page=${startPage}`);
+
+        if (startPage > maxPage) {
+          console.log(`⚠️ Checkpoint page ${startPage} is beyond current max page ${maxPage}. Data may have changed since last run.`);
+          console.log(`🔄 Falling back to start from page 1 to avoid missing any data.`);
+          page = 1;
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ Could not verify pagination, proceeding with page ${startPage}:`, error);
+    }
+  }
 
   while (hasMore) {
+    // Save checkpoint before processing each page
+    saveCheckpoint(jurisdictionAbbr, sessionIdentifier, page, updatedSince);
+
     const includes = [
       'sponsorships',
       'abstracts',
@@ -410,12 +490,41 @@ async function fetchAndStoreUpdatedBills(
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        console.error(`Error fetching updated bills page ${page} for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${response.status} ${await response.text()}`);
-        hasMore = false;
-        break;
+        if (response.status === 404) {
+          const errorText = await response.text();
+          console.log(`📄 Page ${page} not found for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${errorText}`);
+
+          // If this is the first page and it's 404, there might be no data
+          if (page === 1) {
+            console.log(`ℹ️ No data available for ${jurisdictionAbbr} session ${sessionIdentifier} with current filters.`);
+            hasMore = false;
+            break;
+          }
+
+          // If we're on a higher page, we've reached the end
+          console.log(`✅ Reached end of available pages for ${jurisdictionAbbr} at page ${page}.`);
+          hasMore = false;
+          break;
+        } else {
+          console.error(`Error fetching updated bills page ${page} for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${response.status} ${await response.text()}`);
+          hasMore = false;
+          break;
+        }
       }
+
       const data = await response.json();
+
+      // Log pagination info for debugging
+      if (data.pagination) {
+        const currentPage = data.pagination.page || page;
+        const maxPage = data.pagination.max_page || data.pagination.total_pages;
+        const totalItems = data.pagination.total_items || 0;
+        console.log(`📊 Pagination info for ${jurisdictionAbbr}: page ${currentPage}/${maxPage}, total items: ${totalItems}`);
+      }
+
       if (data.results && data.results.length > 0) {
+        console.log(`📋 Processing ${data.results.length} bills from page ${page} for ${jurisdictionAbbr}`);
+
         for (const osBill of data.results) {
           try {
             const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
@@ -459,13 +568,27 @@ async function fetchAndStoreUpdatedBills(
           }
         }
       } else {
-        console.log(`No more updated bills found for ${jurisdictionAbbr}, session ${sessionIdentifier}, page ${page} (since ${updatedSince}).`);
+        console.log(`📭 No bills found on page ${page} for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}).`);
         hasMore = false;
       }
-      if (data.pagination && page < data.pagination.max_page) {
+
+      // Check pagination more robustly
+      if (data.pagination) {
+        const currentPage = data.pagination.page || page;
+        const maxPage = data.pagination.max_page || data.pagination.total_pages;
+
+        if (maxPage && currentPage < maxPage && data.results && data.results.length > 0) {
+          page++;
+          await delay(1500);
+        } else {
+          hasMore = false;
+        }
+      } else if (data.results && data.results.length === perPage) {
+        // If no pagination info but we got a full page, try next page
         page++;
         await delay(1500);
       } else {
+        // No pagination info and partial results, or no results
         hasMore = false;
       }
     } catch (error) {
@@ -474,7 +597,13 @@ async function fetchAndStoreUpdatedBills(
       break;
     }
   }
-  console.log(`Finished fetching updates for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}). Processed ${billsProcessed} bills.`);
+
+  console.log(`✅ Finished fetching updates for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}). Processed ${billsProcessed} bills.`);
+
+  // Clear checkpoint for this session since we completed it
+  if (billsProcessed > 0 || page > 1) {
+    console.log(`🏁 Completed processing ${jurisdictionAbbr} session ${sessionIdentifier}`);
+  }
 }
 
 async function runUpdateCycle(enableOpenStates: boolean = true, enableCongress: boolean = true) {
@@ -536,7 +665,24 @@ async function runUpdateCycle(enableOpenStates: boolean = true, enableCongress: 
         }
         console.log(`Found ${currentSessions.length} potentially current session(s) for ${state.abbr}: ${currentSessions.map(s=>`${s.name} (${s.identifier})`).join(', ')}`);
         for (const session of currentSessions) {
-          await fetchAndStoreUpdatedBills(state.ocdId, state.abbr, session.identifier, updatedSinceString);
+          // Check for existing checkpoint
+          const checkpoint = loadCheckpoint();
+          let startPage = 1;
+          let sessionUpdatedSince = updatedSinceString;
+
+          if (checkpoint && checkpoint.lastProcessedState === state.abbr && checkpoint.lastProcessedSession === session.identifier) {
+            // Resume from checkpoint
+            console.log(`🔄 Resuming from checkpoint: ${checkpoint.lastProcessedState} - ${checkpoint.lastProcessedSession} - Page ${checkpoint.lastProcessedPage}`);
+            startPage = checkpoint.lastProcessedPage;
+            sessionUpdatedSince = checkpoint.updatedSince;
+          } else {
+            // No checkpoint or different session, start from beginning
+            console.log(`🆕 Starting fresh for ${state.abbr} - ${session.identifier}`);
+            startPage = 1;
+            sessionUpdatedSince = updatedSinceString;
+          }
+
+          await fetchAndStoreUpdatedBills(state.ocdId, state.abbr, session.identifier, sessionUpdatedSince, startPage);
           await delay(3000);
         }
       } else {
