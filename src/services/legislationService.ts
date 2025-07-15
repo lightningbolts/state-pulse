@@ -389,3 +389,61 @@ export async function searchLegislationByTopic(topic: string, daysBack: number =
     return [];
   }
 }
+
+export async function updateLegislation(id: string, updateData: Partial<Legislation>): Promise<Legislation | null> {
+  if (!id) {
+    console.error('ID is required to update legislation.');
+    return null;
+  }
+  try {
+    const { id: _, ...dataToUpdate } = updateData;
+    let cleanedData = cleanupDataForMongoDB(dataToUpdate);
+    cleanedData.updatedAt = new Date();
+
+    if (cleanedData.firstActionAt) {
+      cleanedData.firstActionAt = new Date(cleanedData.firstActionAt);
+    }
+    if (cleanedData.latestActionAt) {
+      cleanedData.latestActionAt = new Date(cleanedData.latestActionAt);
+    }
+    if (cleanedData.latestPassageAt) {
+      cleanedData.latestPassageAt = new Date(cleanedData.latestPassageAt);
+    }
+
+    const legislationCollection = await getCollection('legislation');
+    const result = await legislationCollection.updateOne(
+      { id },
+      { $set: cleanedData }
+    );
+
+    if (result.matchedCount === 0) {
+      return null;
+    }
+
+    // Return the updated document
+    const updatedDoc = await legislationCollection.findOne({ id });
+    if (updatedDoc) {
+      const { _id, ...restOfDoc } = updatedDoc;
+      return restOfDoc as Legislation;
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error updating legislation document with id ${id}: `, error);
+    throw new Error('Failed to update legislation.');
+  }
+}
+
+export async function deleteLegislation(id: string): Promise<boolean> {
+  if (!id) {
+    console.error('ID is required to delete legislation.');
+    return false;
+  }
+  try {
+    const legislationCollection = await getCollection('legislation');
+    const result = await legislationCollection.deleteOne({ id });
+    return result.deletedCount > 0;
+  } catch (error) {
+    console.error(`Error deleting legislation document with id ${id}: `, error);
+    throw new Error('Failed to delete legislation.');
+  }
+}

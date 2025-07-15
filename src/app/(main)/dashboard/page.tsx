@@ -2,7 +2,7 @@
 
 import { InteractiveMap } from "@/components/features/InteractiveMap";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import {
   Card,
   CardContent,
@@ -54,7 +54,7 @@ interface StateDetailData {
   }>;
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [stateData, setStateData] = useState<StateDetailData | null>(null);
@@ -384,4 +384,12 @@ export default function DashboardPage() {
 
   // Default dashboard view - show the interactive map
   return <InteractiveMap />;
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div>Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
+  );
 }
