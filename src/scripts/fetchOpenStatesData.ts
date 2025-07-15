@@ -103,21 +103,21 @@ const CONGRESS_API_BASE_URL = 'https://api.congress.gov/v3';
 
 const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   // --- ACTIVE SESSIONS (Currently in session as of July 2025) ---
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' }, // Alaska
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' }, // California
-  // { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' }, // Delaware
-  // { ocdId: 'ocd-jurisdiction/country:us/district:dc/government', abbr: 'DC' }, // District of Columbia
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' }, // Georgia
-  // { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' }, // Hawaii
-  // { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' }, // Illinois
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' }, // Iowa
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' }, // Kansas
-  // { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' }, // Maine
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' }, // Massachusetts
-  // { ocdId: 'ocd-jurisdiction/country:us/state:mi/government', abbr: 'MI' }, // Michigan
-  // { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' }, // Minnesota
-  // { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' }, // Nebraska
-  // { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' }, // New Hampshire
+  { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' }, // Alaska
+  { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' }, // California
+  { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' }, // Delaware
+  { ocdId: 'ocd-jurisdiction/country:us/district:dc/government', abbr: 'DC' }, // District of Columbia
+  { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' }, // Georgia
+  { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' }, // Hawaii
+  { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' }, // Illinois
+  { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' }, // Iowa
+  { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' }, // Kansas
+  { ocdId: 'ocd-jurisdiction/country:us/state:me/government', abbr: 'ME' }, // Maine
+  { ocdId: 'ocd-jurisdiction/country:us/state:ma/government', abbr: 'MA' }, // Massachusetts
+  { ocdId: 'ocd-jurisdiction/country:us/state:mi/government', abbr: 'MI' }, // Michigan
+  { ocdId: 'ocd-jurisdiction/country:us/state:mn/government', abbr: 'MN' }, // Minnesota
+  { ocdId: 'ocd-jurisdiction/country:us/state:ne/government', abbr: 'NE' }, // Nebraska
+  { ocdId: 'ocd-jurisdiction/country:us/state:nh/government', abbr: 'NH' }, // New Hampshire
   { ocdId: 'ocd-jurisdiction/country:us/state:nj/government', abbr: 'NJ' }, // New Jersey
   { ocdId: 'ocd-jurisdiction/country:us/state:ny/government', abbr: 'NY' }, // New York
   { ocdId: 'ocd-jurisdiction/country:us/state:nc/government', abbr: 'NC' }, // North Carolina
@@ -186,7 +186,7 @@ function saveCheckpoint(stateAbbr: string, sessionIdentifier: string, page: numb
   try {
     const fs = require('fs');
     fs.writeFileSync('./checkpoint.json', JSON.stringify(checkpoint, null, 2));
-    console.log(`💾 Saved checkpoint: ${stateAbbr} - ${sessionIdentifier} - Page ${page}`);
+    console.log(`Saved checkpoint: ${stateAbbr} - ${sessionIdentifier} - Page ${page}`);
   } catch (error) {
     console.warn('Failed to save checkpoint:', error);
   }
@@ -197,7 +197,7 @@ function loadCheckpoint(): Checkpoint | null {
     const fs = require('fs');
     if (fs.existsSync('./checkpoint.json')) {
       const checkpoint = JSON.parse(fs.readFileSync('./checkpoint.json', 'utf8'));
-      console.log(`📍 Found checkpoint: ${checkpoint.lastProcessedState} - ${checkpoint.lastProcessedSession} - Page ${checkpoint.lastProcessedPage}`);
+      console.log(`Found checkpoint: ${checkpoint.lastProcessedState} - ${checkpoint.lastProcessedSession} - Page ${checkpoint.lastProcessedPage}`);
       return checkpoint;
     }
   } catch (error) {
@@ -211,7 +211,7 @@ function clearCheckpoint() {
     const fs = require('fs');
     if (fs.existsSync('./checkpoint.json')) {
       fs.unlinkSync('./checkpoint.json');
-      console.log('🗑️ Cleared checkpoint');
+      console.log('Cleared checkpoint');
     }
   } catch (error) {
     console.warn('Failed to clear checkpoint:', error);
