@@ -177,10 +177,13 @@ export function InteractiveMap() {
   };
 
   const handleStateProfile = (stateAbbr: string) => {
-    // Navigate to dashboard but there's no state-specific filtering yet
-    // For now, go to general dashboard
-    router.push('/dashboard');
-    // TODO: Add state filtering to dashboard
+    // Navigate to dashboard with state parameter for state-specific dashboard view
+    const stateName = stateStats[stateAbbr]?.name;
+    if (stateName) {
+      router.push(`/dashboard?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`);
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   // Create custom marker icon
