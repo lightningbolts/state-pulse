@@ -254,6 +254,20 @@ export function transformOpenStatesBillToMongoDB(osBill: any): any {
     })
     .filter((h: any): h is NonNullable<typeof h> => h !== null);
 
+  // Calculate lastActionAt from the most recent action in history
+  const lastActionAt = history.length > 0
+    ? history.reduce((latest, action) => {
+        return action.date > latest ? action.date : latest;
+      }, history[0].date)
+    : null;
+
+  // Calculate firstActionAt from the earliest action in history
+  const firstActionAt = history.length > 0
+    ? history.reduce((earliest, action) => {
+        return action.date < earliest ? action.date : earliest;
+      }, history[0].date)
+    : null;
+
   // Process bill versions
   const versions = (osBill.versions || [])
     .map((ver: any) => {
@@ -319,8 +333,8 @@ export function transformOpenStatesBillToMongoDB(osBill: any): any {
     sources: sources || [],
     abstracts: abstracts || [],
     openstatesUrl: osBill.openstates_url,
-    firstActionAt: toMongoDate(osBill.first_action_date),
-    latestActionAt: toMongoDate(osBill.latest_action_date),
+    firstActionAt: firstActionAt || toMongoDate(osBill.first_action_date),
+    latestActionAt: lastActionAt || toMongoDate(osBill.latest_action_date),
     latestActionDescription: osBill.latest_action_description || null,
     latestPassageAt: toMongoDate(osBill.latest_passage_date),
     createdAt: toMongoDate(osBill.created_at) || now,

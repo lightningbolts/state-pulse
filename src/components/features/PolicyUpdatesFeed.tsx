@@ -175,14 +175,67 @@ export function PolicyUpdatesFeed() {
     setLoading(true);
     try {
       const currentSkip = skipRef.current;
-      const newUpdates = await fetchUpdatesFeed({ skip: currentSkip, limit: 20, search, subject, sortField: sort.field, sortDir: sort.dir, classification, jurisdictionName });
+      const newUpdates = await fetchUpdatesFeed({
+        skip: currentSkip,
+        limit: 20,
+        search,
+        subject,
+        sortField: sort.field,
+        sortDir: sort.dir,
+        classification,
+        jurisdictionName
+      });
 
       // Filter to only bookmarked items if showOnlyBookmarked is true
       const filteredNewUpdates = showOnlyBookmarked
         ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
         : newUpdates;
 
-      setUpdates((prev) => [...prev, ...filteredNewUpdates]);
+      // Ensure consistent sorting by applying client-side sort as backup
+      if (filteredNewUpdates.length > 0) {
+        const sortedUpdates = [...filteredNewUpdates].sort((a, b) => {
+          if (sort.field === 'createdAt') {
+            const aDate = new Date(a.createdAt || 0).getTime();
+            const bDate = new Date(b.createdAt || 0).getTime();
+            return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
+          } else if (sort.field === 'lastActionAt') {
+            const aDate = new Date(a.lastActionAt || 0).getTime();
+            const bDate = new Date(b.lastActionAt || 0).getTime();
+            return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
+          } else if (sort.field === 'title') {
+            const aTitle = (a.title || '').toLowerCase();
+            const bTitle = (b.title || '').toLowerCase();
+            return sort.dir === 'desc' ? bTitle.localeCompare(aTitle) : aTitle.localeCompare(bTitle);
+          }
+          return 0;
+        });
+
+        setUpdates((prev) => {
+          // Merge and ensure no duplicates while maintaining sort order
+          const existingIds = new Set(prev.map(update => update.id));
+          const newUniqueUpdates = sortedUpdates.filter(update => !existingIds.has(update.id));
+          const combined = [...prev, ...newUniqueUpdates];
+
+          // Re-sort the combined array to ensure consistency
+          return combined.sort((a, b) => {
+            if (sort.field === 'createdAt') {
+              const aDate = new Date(a.createdAt || 0).getTime();
+              const bDate = new Date(b.createdAt || 0).getTime();
+              return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
+            } else if (sort.field === 'lastActionAt') {
+              const aDate = new Date(a.lastActionAt || 0).getTime();
+              const bDate = new Date(b.lastActionAt || 0).getTime();
+              return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
+            } else if (sort.field === 'title') {
+              const aTitle = (a.title || '').toLowerCase();
+              const bTitle = (b.title || '').toLowerCase();
+              return sort.dir === 'desc' ? bTitle.localeCompare(aTitle) : aTitle.localeCompare(bTitle);
+            }
+            return 0;
+          });
+        });
+      }
+
       skipRef.current = currentSkip + newUpdates.length;
       setSkip(skipRef.current);
       setHasMore(newUpdates.length === 20);
@@ -380,6 +433,8 @@ export function PolicyUpdatesFeed() {
     switch (`${field}:${dir}`) {
       case "createdAt:desc": return "Most Recent";
       case "createdAt:asc": return "Oldest";
+      case "lastActionAt:desc": return "Latest Action";
+      case "lastActionAt:asc": return "Earliest Action";
       case "title:asc": return "Alphabetical (A-Z)";
       case "title:desc": return "Alphabetical (Z-A)";
       default: return "Custom";
@@ -503,6 +558,8 @@ export function PolicyUpdatesFeed() {
               >
                 <DropdownMenuRadioItem value="createdAt:desc">Most Recent</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="createdAt:asc">Oldest</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="lastActionAt:desc">Latest Action</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="lastActionAt:asc">Earliest Action</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="title:asc">Alphabetical (A-Z)</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="title:desc">Alphabetical (Z-A)</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
