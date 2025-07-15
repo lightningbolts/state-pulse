@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bookmark, Search, Plus, X } from "lucide-react";
+import { Bookmark, Search, Plus, X, MapPin } from "lucide-react";
 import { BookmarkButton, BookmarksContext } from "@/components/features/BookmarkButton";
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect, useContext } from "react";
 import { useSearchParams } from "next/navigation";
@@ -65,6 +65,31 @@ async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", sub
   if (!res.ok) throw new Error("Failed to fetch updates");
   return await res.json();
 }
+
+// State name to abbreviation mapping - centralized constant
+const STATE_MAP: Record<string, string> = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+  'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
+};
+
+// List of popular states for the dropdown
+const POPULAR_STATES = [
+  'California', 'Texas', 'Florida', 'New York', 'Pennsylvania', 'Illinois',
+  'Ohio', 'Georgia', 'North Carolina', 'Michigan', 'New Jersey', 'Virginia',
+  'Washington', 'Arizona', 'Massachusetts', 'Tennessee', 'Indiana', 'Missouri',
+  'Maryland', 'Wisconsin', 'Colorado', 'Minnesota', 'South Carolina', 'Alabama'
+];
 
 export function PolicyUpdatesFeed() {
   const [updates, setUpdates] = useState<PolicyUpdate[]>([]);
@@ -158,25 +183,21 @@ export function PolicyUpdatesFeed() {
 
   useLayoutEffect(() => {
     if (didRestore.current) return;
-    const saved = sessionStorage.getItem('policyUpdatesFeedState'); // switched to sessionStorage
+    const saved = sessionStorage.getItem('policyUpdatesFeedState');
     if (saved) {
       try {
         const state = JSON.parse(saved);
         setSearch(state.search || "");
         setSubject(state.subject || "");
         setClassification(state.classification || "");
+        setJurisdictionName(state.jurisdictionName || "");
         setSort(state.sort || { field: 'createdAt', dir: 'desc' });
         setSkip(state.skip || 0);
-        skipRef.current = state.skip || 0; // Ensure skipRef is correctly set to match state.skip
+        skipRef.current = state.skip || 0;
         setSearchInput(state.searchInput || "");
-        if (state.updates && Array.isArray(state.updates)) {
-          setUpdates(state.updates);
-          // Crucial fix: set skipRef to actual length of updates
-          skipRef.current = state.updates.length;
-        } else {
-          setUpdates([]);
-        }
         setHasMore(state.hasMore !== undefined ? state.hasMore : true);
+        // Note: updates array is no longer stored in sessionStorage to prevent quota issues
+        setUpdates([]);
       } catch (e) {
         console.error('Error parsing feed state:', e);
         setUpdates([]);
@@ -282,12 +303,25 @@ export function PolicyUpdatesFeed() {
   }, [loading]);
 
 
-  // Save state to sessionStorage on change
+  // Save state to sessionStorage on change (excluding large updates array)
   useEffect(() => {
-    sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-      search, subject, classification, sort, skip, searchInput, updates, hasMore
-    }));
-  }, [search, subject, classification, sort, skip, searchInput, updates, hasMore]);
+    try {
+      sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
+        search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName
+      }));
+    } catch (error) {
+      console.warn('Failed to save state to sessionStorage:', error);
+      // If storage fails, try to clear old data and retry with minimal state
+      try {
+        sessionStorage.removeItem('policyUpdatesFeedState');
+        sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
+          search, subject, classification, sort
+        }));
+      } catch (retryError) {
+        console.error('Failed to save even minimal state:', retryError);
+      }
+    }
+  }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName]);
 
   // Save scroll position
   useEffect(() => {
@@ -429,6 +463,34 @@ export function PolicyUpdatesFeed() {
                 <DropdownMenuRadioItem value="createdAt:asc">Oldest</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="title:asc">Alphabetical (A-Z)</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="title:desc">Alphabetical (Z-A)</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-auto">
+                <MapPin className="mr-2 h-4 w-4" />
+                {jurisdictionName || "All States"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto">
+              <DropdownMenuRadioGroup
+                value={jurisdictionName}
+                onValueChange={(value) => {
+                  setJurisdictionName(value);
+                  setUpdates([]);
+                  setSkip(0);
+                  skipRef.current = 0;
+                  setHasMore(true);
+                  setLoading(true);
+                }}
+              >
+                <DropdownMenuRadioItem value="">All States</DropdownMenuRadioItem>
+                {Object.keys(STATE_MAP).sort().map((state) => (
+                  <DropdownMenuRadioItem key={state} value={state}>
+                    {state}
+                  </DropdownMenuRadioItem>
+                ))}
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
