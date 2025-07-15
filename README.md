@@ -17,7 +17,7 @@ Our mission is to democratize access to state legislation information and empowe
 - **Bill Linking**: Connect related bills and track legislative families
 
 ### 🤖 **AI-Powered Understanding**
-- **Multiple Summary Styles**: 
+- **Multiple Summary Styles**:
   - Plain English explanations for everyday understanding
   - Legal-dense summaries for detailed analysis
   - Tweet-length summaries for quick insights
@@ -103,17 +103,17 @@ Our mission is to democratize access to state legislation information and empowe
    ```bash
    cp .env.example .env.local
    ```
-   
+
    Configure the following variables:
    ```env
    # Authentication
    CLERK_SECRET_KEY=your_clerk_secret_key
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-   
+
    # Database
    MONGODB_URI=your_mongodb_connection_string
    MONGODB_DB_NAME=statepulse-data
-   
+
    # APIs
    OPENSTATES_API_KEY=your_openstates_api_key
    GEMINI_API_KEY=your_gemini_api_key
@@ -149,24 +149,53 @@ Our mission is to democratize access to state legislation information and empowe
 ## 📁 Project Structure
 
 ```
-src/
-├── app/                    # Next.js app router pages
-│   ├── (main)/            # Main application routes
-│   │   ├── home/          # Dashboard and home page
-│   │   ├── legislation/   # Legislation browsing
-│   │   ├── posts/         # Community posts
-│   │   ├── tracker/       # Policy tracking
-│   │   ├── civic/         # Civic engagement tools
-│   │   └── summaries/     # AI summary tools
-│   └── api/               # API routes
-├── components/            # React components
-│   ├── features/         # Feature-specific components
-│   ├── ui/               # Reusable UI components
-│   └── auth/             # Authentication components
-├── lib/                  # Utility libraries
-├── services/             # Business logic services
-├── scripts/              # Data processing scripts
-└── types/                # TypeScript type definitions
+state-pulse/
+├── src/
+│   ├── app/                    # Next.js app router pages
+│   │   ├── (main)/            # Main application routes
+│   │   │   ├── about/         # About page
+│   │   │   ├── auth/          # Authentication pages
+│   │   │   ├── civic/         # Civic engagement tools
+│   │   │   ├── dashboard/     # User dashboard
+│   │   │   ├── home/          # Home page
+│   │   │   ├── legislation/   # Legislation browsing
+│   │   │   ├── posts/         # Community posts
+│   │   │   ├── privacy/       # Privacy policy
+│   │   │   ├── sign-in/       # Sign in page
+│   │   │   ├── sign-up/       # Sign up page
+│   │   │   ├── summaries/     # AI summary tools
+│   │   │   ├── terms/         # Terms of service
+│   │   │   ├── tracker/       # Policy tracking
+│   │   │   └── users/         # User management
+│   │   └── api/               # API routes
+│   │       ├── admin/         # Admin endpoints
+│   │       ├── auth/          # Authentication API
+│   │       └── ballot-info/   # Ballot information API
+│   ├── components/            # React components
+│   │   ├── auth/              # Authentication components
+│   │   ├── features/          # Feature-specific components
+│   │   ├── theme/             # Theme components
+│   │   └── ui/                # Reusable UI components
+│   ├── ai/                    # AI workflows and integrations
+│   │   └── flows/             # AI workflow definitions
+│   ├── scripts/               # Data processing scripts
+│   ├── services/              # Business logic services
+│   ├── lib/                   # Utility libraries
+│   ├── types/                 # TypeScript type definitions
+│   ├── hooks/                 # Custom React hooks
+│   └── data/                  # Static data files
+├── dataconnect/               # Firebase Data Connect
+│   ├── connector/             # Database connectors
+│   └── schema/                # Database schema
+├── dataconnect-generated/     # Generated Data Connect code
+│   └── js/                    # JavaScript bindings
+├── functions/                 # Firebase Cloud Functions
+│   └── src/
+│       └── lib/               # Function utilities
+├── docs/                      # Documentation
+├── public/                    # Static assets
+└── state-pulse-codebase/      # Additional codebase
+    └── src/
 ```
 
 ## 🤝 Contributing
