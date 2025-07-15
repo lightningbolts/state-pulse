@@ -7,6 +7,7 @@ import type { LatLngExpression } from 'leaflet';
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { MapPin, Users, FileText, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 // Import Leaflet for custom icons
 let L: any = null;
@@ -96,6 +97,7 @@ export function InteractiveMap() {
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
@@ -151,6 +153,27 @@ export function InteractiveMap() {
   const handleStateClick = (stateAbbr: string) => {
     setSelectedState(stateAbbr);
     fetchStateDetails(stateAbbr);
+  };
+
+  // Navigation handlers for the action buttons
+  const handleViewRepresentatives = (stateAbbr: string) => {
+    // TODO: Create a representatives page with state filtering
+    // For now, show a helpful message or navigate to a general page
+    alert(`Representatives page for ${stateStats[stateAbbr]?.name} is coming soon! This would show all state legislators for this jurisdiction.`);
+  };
+
+  const handleViewLegislation = (stateAbbr: string) => {
+    // Navigate to legislation page - filtering will need to be added to PolicyUpdatesFeed
+    // For now, just go to the general legislation page
+    router.push('/legislation');
+    // TODO: Add jurisdiction filtering to PolicyUpdatesFeed component
+  };
+
+  const handleStateProfile = (stateAbbr: string) => {
+    // Navigate to dashboard but there's no state-specific filtering yet
+    // For now, go to general dashboard
+    router.push('/dashboard');
+    // TODO: Add state filtering to dashboard
   };
 
   // Create custom marker icon
@@ -459,8 +482,8 @@ export function InteractiveMap() {
             <div className="mt-6">
               <h4 className="font-medium mb-2">Key Policy Areas</h4>
               <div className="flex flex-wrap gap-2">
-                {stateStats[selectedState].keyTopics.map((topic) => (
-                  <Badge key={topic} variant="secondary">
+                {[...new Set(stateStats[selectedState].keyTopics)].map((topic, index) => (
+                  <Badge key={`${topic}-${index}`} variant="secondary">
                     {topic}
                   </Badge>
                 ))}
@@ -469,13 +492,25 @@ export function InteractiveMap() {
 
             <div className="mt-6 pt-4 border-t">
               <div className="flex space-x-2">
-                <Button size="sm" variant="outline">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleViewRepresentatives(selectedState)}
+                >
                   View Representatives
                 </Button>
-                <Button size="sm" variant="outline">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleViewLegislation(selectedState)}
+                >
                   View Legislation
                 </Button>
-                <Button size="sm" variant="outline">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleStateProfile(selectedState)}
+                >
                   State Profile
                 </Button>
               </div>
