@@ -16,6 +16,19 @@ export default function AboutPage() {
 
           <div className="prose prose-lg max-w-none dark:prose-invert">
             <section className="mb-8">
+                <h2 className="text-2xl font-semibold mb-4">The Developer</h2>
+                <p className="mb-4">
+                  StatePulse was created by Kairui Cheng as a personal project to help him understand the complexities of state and local legislation. Curious about how laws are made and how they affect everyday life, Kairui set out to build a platform that would make it easier for anyone to access and understand legislative information.
+                </p>
+                <p className="mb-4">
+                  The platform is designed to empower citizens by providing them with the tools they need to stay informed about the laws that govern their communities.
+                </p>
+                <p className="mb-4">
+                  Kairui is an incoming freshman at the University of Washington - Seattle, majoring in Computer Science. In his free time, Kairui enjoys reading science fiction, coding, hiking Washington trails, running, and practicing the Alto Saxophone.
+                </p>
+            </section>
+
+            <section className="mb-8">
               <h2 className="text-2xl font-semibold mb-4">Our Mission</h2>
               <p className="mb-4">
                 StatePulse is dedicated to democratizing access to state and local legislation. We believe that every citizen deserves to understand the laws that govern their daily lives, from local zoning ordinances to state-wide policy changes.
