@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -544,6 +545,52 @@ export function RepresentativesFinder() {
       await fetchPaginatedRepresentatives(userLocation, newPage);
     }
   };
+
+  // Handle URL parameter for state selection
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const addressParam = searchParams.get('address');
+    const stateParam = searchParams.get('state');
+    const stateAbbrParam = searchParams.get('stateAbbr');
+
+    if (addressParam) {
+      // Handle the JSON-encoded address parameter (existing functionality)
+      try {
+        const parsedAddress = JSON.parse(decodeURIComponent(addressParam));
+        console.log('Parsed address from URL:', parsedAddress);
+        setUserLocation(parsedAddress);
+        fetchRepresentatives(parsedAddress);
+      } catch (error) {
+        console.error('Error parsing address from URL:', error);
+      }
+    } else if (stateParam || stateAbbrParam) {
+      // Handle simple state parameters from InteractiveMap
+      const stateName = stateParam ? decodeURIComponent(stateParam) : null;
+      const stateAbbr = stateAbbrParam || (stateName ? STATE_MAP[stateName] : null);
+
+      if (stateAbbr) {
+        console.log('Loading representatives for state:', stateName || stateAbbr, '(', stateAbbr, ')');
+
+        // Create a synthetic location object for the state
+        const stateLocation: AddressSuggestion = {
+          id: `state-${stateAbbr}`,
+          display_name: stateName || stateAbbr,
+          address: {
+            state: stateAbbr
+          },
+          lat: 0,
+          lon: 0,
+          importance: 1,
+          type: 'state',
+          class: 'state'
+        };
+
+        setUserLocation(stateLocation);
+        setShowMap(false); // Don't show map for state-only searches
+        fetchRepresentatives(stateLocation);
+      }
+    }
+  }, [searchParams]);
 
   return (
     <Card className="shadow-lg">

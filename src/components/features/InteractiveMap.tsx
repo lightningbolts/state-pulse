@@ -157,9 +157,13 @@ export function InteractiveMap() {
 
   // Navigation handlers for the action buttons
   const handleViewRepresentatives = (stateAbbr: string) => {
-    // TODO: Create a representatives page with state filtering
-    // For now, show a helpful message or navigate to a general page
-    alert(`Representatives page for ${stateStats[stateAbbr]?.name} is coming soon! This would show all state legislators for this jurisdiction.`);
+    // Navigate to civic page with state parameter for pre-filtering
+    const stateName = stateStats[stateAbbr]?.name;
+    if (stateName) {
+      router.push(`/civic?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`);
+    } else {
+      router.push('/civic');
+    }
   };
 
   const handleViewLegislation = (stateAbbr: string) => {
