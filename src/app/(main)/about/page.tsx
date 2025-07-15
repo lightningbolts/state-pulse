@@ -111,7 +111,7 @@ export default function AboutPage() {
                 We'd love to hear from you! Whether you have questions, feedback, or suggestions, don't hesitate to reach out:
               </p>
               <p className="mb-2">
-                <strong>Email:</strong> timberlake2025@gmail.com
+                <strong>Email:</strong> statepulseme@gmail.com
               </p>
               <p className="mb-4">
                 <strong>Response Time:</strong> We typically respond within 24-48 hours.

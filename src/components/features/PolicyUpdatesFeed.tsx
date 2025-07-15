@@ -51,11 +51,18 @@ const CLASSIFICATIONS = [
 let cardNumber = 20;
 
 // Fetch updates with optional filters and sorting
-async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc", classification = "", jurisdictionName = "" }: { skip?: number; limit?: number; search?: string; subject?: string; sortField?: string; sortDir?: string; classification?: string; jurisdictionName?: string }) {
+async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", subject = "", sortField = "createdAt", sortDir = "desc", classification = "", jurisdictionName = "", showCongress = false }: { skip?: number; limit?: number; search?: string; subject?: string; sortField?: string; sortDir?: string; classification?: string; jurisdictionName?: string; showCongress?: boolean }) {
   const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
   if (search) params.append("search", search);
   if (subject) params.append("subject", subject);
-  if (jurisdictionName) params.append("jurisdictionName", jurisdictionName);
+
+  // Handle Congress vs State filtering - they are mutually exclusive
+  if (showCongress) {
+    params.append("jurisdictionName", "United States Congress");
+  } else if (jurisdictionName) {
+    params.append("jurisdictionName", jurisdictionName);
+  }
+
   // Map lastAction to the correct field name for the API
   const apiSortField = sortField === "lastAction" ? "lastActionAt" : sortField;
   if (apiSortField) params.append("sortBy", apiSortField);
@@ -100,6 +107,7 @@ export function PolicyUpdatesFeed() {
   const [subject, setSubject] = useState("");
   const [classification, setClassification] = useState("");
   const [jurisdictionName, setJurisdictionName] = useState("");
+  const [showCongress, setShowCongress] = useState(false);
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
   const [showLoadingText, setShowLoadingText] = useState(true);
   const [searchInput, setSearchInput] = useState("");
@@ -183,7 +191,8 @@ export function PolicyUpdatesFeed() {
         sortField: sort.field,
         sortDir: sort.dir,
         classification,
-        jurisdictionName
+        jurisdictionName,
+        showCongress
       });
 
       // Filter to only bookmarked items if showOnlyBookmarked is true
@@ -246,7 +255,7 @@ export function PolicyUpdatesFeed() {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [hasMore, search, subject, sort, classification, jurisdictionName, showOnlyBookmarked, bookmarks]);
+  }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks]);
 
   // Search handler for button/enter
   const handleSearch = useCallback(() => {
@@ -326,7 +335,8 @@ export function PolicyUpdatesFeed() {
           sortField: sort.field,
           sortDir: sort.dir,
           classification,
-          jurisdictionName
+          jurisdictionName,
+          showCongress
         });
         if (!isMounted) return;
 
@@ -489,6 +499,37 @@ export function PolicyUpdatesFeed() {
         <CardDescription>Stay updated with the latest policy developments. Filter by category or search for specific topics.</CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Congress Filter Indicator */}
+        {showCongress && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="default" className="bg-blue-600">
+                  Filtered by: U.S. Congress
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Showing federal legislation only
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowCongress(false);
+                  setUpdates([]);
+                  setSkip(0);
+                  skipRef.current = 0;
+                  setHasMore(true);
+                  setLoading(true);
+                }}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filter
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* State Filter Indicator */}
         {jurisdictionName && (
           <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
@@ -569,14 +610,20 @@ export function PolicyUpdatesFeed() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="w-full sm:w-auto">
                 <MapPin className="mr-2 h-4 w-4" />
-                {jurisdictionName || "All States"}
+                {showCongress ? "U.S. Congress" : jurisdictionName || "All States"}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto">
               <DropdownMenuRadioGroup
-                value={jurisdictionName}
+                value={showCongress ? "congress" : jurisdictionName}
                 onValueChange={(value) => {
-                  setJurisdictionName(value);
+                  if (value === "congress") {
+                    setShowCongress(true);
+                    setJurisdictionName("");
+                  } else {
+                    setShowCongress(false);
+                    setJurisdictionName(value);
+                  }
                   setUpdates([]);
                   setSkip(0);
                   skipRef.current = 0;
@@ -585,6 +632,7 @@ export function PolicyUpdatesFeed() {
                 }}
               >
                 <DropdownMenuRadioItem value="">All States</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="congress">U.S. Congress</DropdownMenuRadioItem>
                 {Object.keys(STATE_MAP).sort().map((state) => (
                   <DropdownMenuRadioItem key={state} value={state}>
                     {state}

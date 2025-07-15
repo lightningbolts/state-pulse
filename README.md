@@ -270,7 +270,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Contact
 
 For questions, suggestions, or partnership opportunities:
-- **Email**: timberlake2025@gmail.com
+- **Email**: statepulseme@gmail.com
 - **GitHub**: [Open an issue](https://github.com/yourusername/state-pulse/issues)
 
 ---

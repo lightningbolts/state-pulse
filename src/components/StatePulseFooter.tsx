@@ -106,7 +106,7 @@ export function StatePulseFooter() {
                 <ExternalLink className="h-4 w-4 sm:h-5 sm:w-5" />
               </a>
               <a
-                href="mailto:timberlake2025@gmail.com"
+                href="mailto:statepulseme@gmail.com"
                 className="text-muted-foreground hover:text-foreground transition-colors p-1"
                 aria-label="Email"
               >
@@ -115,10 +115,10 @@ export function StatePulseFooter() {
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground">
               <a
-                href="mailto:timberlake2025@gmail.com"
+                href="mailto:statepulseme@gmail.com"
                 className="hover:text-foreground transition-colors"
               >
-                timberlake2025@gmail.com
+                statepulseme@gmail.com
               </a>
             </div>
           </div>
