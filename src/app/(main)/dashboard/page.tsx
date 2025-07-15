@@ -121,9 +121,9 @@ function DashboardContent() {
                     variant="outline"
                     size="sm"
                     onClick={clearStateFilter}
-                    className="md:hidden"
+                    className="md:hidden flex items-center gap-2"
                   >
-                    <X className="h-4 w-4 mr-1" />
+                    <X className="h-4 w-4" />
                     <span className="hidden sm:inline">Clear Filter</span>
                     <span className="sm:hidden">Clear</span>
                   </Button>
@@ -149,9 +149,9 @@ function DashboardContent() {
                 variant="outline"
                 size="sm"
                 onClick={clearStateFilter}
-                className="hidden md:block"
+                className="hidden md:flex items-center gap-2"
               >
-                <X className="h-4 w-4 mr-1" />
+                <X className="h-4 w-4" />
                 Clear Filter
               </Button>
             </div>
