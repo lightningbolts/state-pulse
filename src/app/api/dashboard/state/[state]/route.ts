@@ -3,11 +3,12 @@ import { connectToDatabase } from '@/lib/mongodb';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { state: string } }
+  { params }: { params: Promise<{ state: string }> }
 ) {
   try {
     const { db } = await connectToDatabase();
-    const stateParam = params.state.toUpperCase();
+    const resolvedParams = await params;
+    const stateParam = resolvedParams.state.toUpperCase();
 
     // Map state abbreviations to jurisdiction patterns
     const jurisdictionPatterns: Record<string, string[]> = {
