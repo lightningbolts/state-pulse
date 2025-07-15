@@ -8,6 +8,12 @@ import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { MapPin, Users, FileText, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
 
+// Import Leaflet for custom icons
+let L: any = null;
+if (typeof window !== 'undefined') {
+  L = require('leaflet');
+}
+
 // Dynamically import map components
 const MapContainer = dynamic(
   () => import('react-leaflet').then((mod) => mod.MapContainer),
@@ -53,60 +59,6 @@ interface MapMode {
 
 const DEFAULT_POSITION: LatLngExpression = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
-
-// Sample state data - in real implementation, this would come from your API
-const stateData: Record<string, StateData> = {
-  'CA': {
-    name: 'California',
-    abbreviation: 'CA',
-    legislationCount: 2847,
-    activeRepresentatives: 120,
-    recentActivity: 156,
-    keyTopics: ['Climate', 'Healthcare', 'Housing'],
-    center: [36.7783, -119.4179],
-    color: '#1f77b4'
-  },
-  'TX': {
-    name: 'Texas',
-    abbreviation: 'TX',
-    legislationCount: 1923,
-    activeRepresentatives: 181,
-    recentActivity: 98,
-    keyTopics: ['Energy', 'Education', 'Border'],
-    center: [31.9686, -99.9018],
-    color: '#ff7f0e'
-  },
-  'NY': {
-    name: 'New York',
-    abbreviation: 'NY',
-    legislationCount: 1654,
-    activeRepresentatives: 213,
-    recentActivity: 134,
-    keyTopics: ['Finance', 'Transit', 'Housing'],
-    center: [42.1657, -74.9481],
-    color: '#2ca02c'
-  },
-  'FL': {
-    name: 'Florida',
-    abbreviation: 'FL',
-    legislationCount: 1432,
-    activeRepresentatives: 160,
-    recentActivity: 87,
-    keyTopics: ['Tourism', 'Environment', 'Healthcare'],
-    center: [27.7663, -81.6868],
-    color: '#d62728'
-  },
-  'WA': {
-    name: 'Washington',
-    abbreviation: 'WA',
-    legislationCount: 1234,
-    activeRepresentatives: 147,
-    recentActivity: 76,
-    keyTopics: ['Tech', 'Environment', 'Labor'],
-    center: [47.0379, -120.8018],
-    color: '#9467bd'
-  }
-};
 
 const mapModes: MapMode[] = [
   {
@@ -201,6 +153,40 @@ export function InteractiveMap() {
     fetchStateDetails(stateAbbr);
   };
 
+  // Create custom marker icon
+  const createCustomIcon = (color: string) => {
+    if (!L) return undefined;
+
+    return L.divIcon({
+      className: 'custom-marker',
+      html: `
+        <div class="marker-pin" style="
+          width: 20px;
+          height: 20px;
+          background-color: ${color};
+          border: 2px solid hsl(var(--background));
+          border-radius: 50%;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          position: relative;
+        ">
+          <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background-color: hsl(var(--background));
+            border-radius: 50%;
+          "></div>
+        </div>
+      `,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+      popupAnchor: [0, -10],
+    });
+  };
+
   const getStateColor = (stateAbbr: string) => {
     const state = stateStats[stateAbbr];
     if (!state) return '#e0e0e0';
@@ -208,15 +194,47 @@ export function InteractiveMap() {
     switch (mapMode) {
       case 'legislation':
         const intensity = Math.min(state.legislationCount / 3000, 1);
-        return `rgba(31, 119, 180, ${0.3 + intensity * 0.7})`;
+        // Use consistent primary color scheme that matches legend
+        if (intensity >= 0.7) return 'hsl(var(--primary))'; // High activity
+        if (intensity >= 0.3) return 'hsl(var(--primary) / 0.5)'; // Medium activity
+        return 'hsl(var(--primary) / 0.2)'; // Low activity
       case 'representatives':
         const repIntensity = Math.min(state.activeRepresentatives / 250, 1);
-        return `rgba(255, 127, 14, ${0.3 + repIntensity * 0.7})`;
+        if (repIntensity >= 0.7) return 'hsl(var(--primary))';
+        if (repIntensity >= 0.3) return 'hsl(var(--primary) / 0.5)';
+        return 'hsl(var(--primary) / 0.2)';
       case 'recent':
         const recentIntensity = Math.min(state.recentActivity / 200, 1);
-        return `rgba(44, 160, 44, ${0.3 + recentIntensity * 0.7})`;
+        if (recentIntensity >= 0.7) return 'hsl(var(--primary))';
+        if (recentIntensity >= 0.3) return 'hsl(var(--primary) / 0.5)';
+        return 'hsl(var(--primary) / 0.2)';
       default:
         return state.color;
+    }
+  };
+
+  const getActivityLevel = (stateAbbr: string) => {
+    const state = stateStats[stateAbbr];
+    if (!state) return 'No Data';
+
+    switch (mapMode) {
+      case 'legislation':
+        const intensity = Math.min(state.legislationCount / 3000, 1);
+        if (intensity >= 0.7) return 'High Activity';
+        if (intensity >= 0.3) return 'Medium Activity';
+        return 'Low Activity';
+      case 'representatives':
+        const repIntensity = Math.min(state.activeRepresentatives / 250, 1);
+        if (repIntensity >= 0.7) return 'High Activity';
+        if (repIntensity >= 0.3) return 'Medium Activity';
+        return 'Low Activity';
+      case 'recent':
+        const recentIntensity = Math.min(state.recentActivity / 200, 1);
+        if (recentIntensity >= 0.7) return 'High Activity';
+        if (recentIntensity >= 0.3) return 'Medium Activity';
+        return 'Low Activity';
+      default:
+        return 'General';
     }
   };
 
@@ -311,10 +329,26 @@ export function InteractiveMap() {
                     eventHandlers={{
                       click: () => handleStateClick(abbr),
                     }}
+                    icon={createCustomIcon(getStateColor(abbr))}
                   >
                     <Popup>
                       <div className="p-2 min-w-[200px]">
-                        <h3 className="font-semibold text-lg mb-2">{state.name}</h3>
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold text-lg">{state.name}</h3>
+                          <div className="flex items-center space-x-1">
+                            <div
+                              className={`w-3 h-3 rounded-full ${
+                                getActivityLevel(abbr) === 'High Activity' ? 'bg-primary' :
+                                getActivityLevel(abbr) === 'Medium Activity' ? 'bg-primary/50' :
+                                getActivityLevel(abbr) === 'Low Activity' ? 'bg-primary/20' :
+                                'bg-gray-300'
+                              }`}
+                            ></div>
+                            <span className="text-xs text-muted-foreground">
+                              {getActivityLevel(abbr)}
+                            </span>
+                          </div>
+                        </div>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span>Legislation:</span>
@@ -331,8 +365,8 @@ export function InteractiveMap() {
                           <div className="pt-2">
                             <div className="text-xs text-muted-foreground mb-1">Key Topics:</div>
                             <div className="flex flex-wrap gap-1">
-                              {state.keyTopics.map((topic) => (
-                                <Badge key={topic} variant="outline" className="text-xs">
+                              {[...new Set(state.keyTopics)].map((topic, index) => (
+                                <Badge key={`${topic}-${index}`} variant="secondary" className="text-xs">
                                   {topic}
                                 </Badge>
                               ))}

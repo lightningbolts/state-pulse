@@ -132,11 +132,14 @@ export async function GET(request: NextRequest) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Aggregate data by jurisdiction
+    console.log('Starting map data aggregation...');
+    const startTime = Date.now();
+
+    // Simplified and optimized aggregation pipeline
     const pipeline = [
       {
         $match: {
-          jurisdictionName: { $exists: true }
+          jurisdictionName: { $exists: true, $ne: null }
         }
       },
       {
@@ -146,14 +149,21 @@ export async function GET(request: NextRequest) {
           recentBills: {
             $sum: {
               $cond: {
-                if: { $gte: ['$latestActionAt', thirtyDaysAgo] },
+                if: {
+                  $and: [
+                    { $ne: ['$latestActionAt', null] },
+                    { $gte: ['$latestActionAt', thirtyDaysAgo] }
+                  ]
+                },
                 then: 1,
                 else: 0
               }
             }
           },
-          subjects: { $addToSet: '$subjects' },
-          sponsors: { $addToSet: '$sponsors' }
+          // Simplified subject collection - just get first few subjects instead of all
+          sampleSubjects: { $push: { $arrayElemAt: ['$subjects', 0] } },
+          // Count unique sponsors more efficiently
+          sponsorCount: { $addToSet: { $arrayElemAt: ['$sponsors.name', 0] } }
         }
       },
       {
@@ -161,79 +171,85 @@ export async function GET(request: NextRequest) {
           _id: 1,
           totalBills: 1,
           recentBills: 1,
-          allSubjects: {
-            $reduce: {
-              input: '$subjects',
-              initialValue: [],
-              in: { $setUnion: ['$$value', '$$this'] }
-            }
+          topSubjects: {
+            $slice: [
+              {
+                $filter: {
+                  input: '$sampleSubjects',
+                  cond: { $ne: ['$$this', null] }
+                }
+              },
+              3
+            ]
           },
-          uniqueSponsors: {
-            $size: {
-              $reduce: {
-                input: '$sponsors',
-                initialValue: [],
-                in: { $setUnion: ['$$value', '$$this'] }
-              }
-            }
-          }
+          uniqueSponsors: { $size: '$sponsorCount' }
         }
+      },
+      {
+        $sort: { totalBills: -1 }
       }
     ];
 
-    const results = await db.collection('legislation').aggregate(pipeline).toArray();
+    const results = await db.collection('legislation').aggregate(pipeline, {
+      maxTimeMS: 10000, // 10 second timeout
+      allowDiskUse: true // Allow using disk for large operations
+    }).toArray();
 
-    // Process results into state data
+    console.log(`Aggregation completed in ${Date.now() - startTime}ms`);
+
+    // Process results into state data with better error handling
     const stateStats: Record<string, StateStats> = {};
 
     results.forEach((result: any) => {
-      const jurisdictionName = result._id;
-      let stateAbbr = '';
+      try {
+        const jurisdictionName = result._id;
+        let stateAbbr = '';
 
-      // Find state abbreviation from jurisdiction name
-      for (const [abbr, name] of Object.entries(STATE_NAMES)) {
-        if (jurisdictionName.toLowerCase().includes(name.toLowerCase()) ||
-            (abbr === 'US' && jurisdictionName.includes('Congress'))) {
-          stateAbbr = abbr;
-          break;
-        }
-      }
-
-      if (stateAbbr && STATE_COORDINATES[stateAbbr]) {
-        // Extract top 3 most common subjects
-        const subjectCounts: Record<string, number> = {};
-        result.allSubjects.forEach((subject: string) => {
-          if (subject && subject.trim()) {
-            subjectCounts[subject] = (subjectCounts[subject] || 0) + 1;
+        // More efficient state matching
+        if (jurisdictionName.includes('Congress') || jurisdictionName.includes('United States')) {
+          stateAbbr = 'US';
+        } else {
+          // Try to match by state name
+          for (const [abbr, name] of Object.entries(STATE_NAMES)) {
+            if (abbr === 'US') continue;
+            if (jurisdictionName.toLowerCase().includes(name.toLowerCase())) {
+              stateAbbr = abbr;
+              break;
+            }
           }
-        });
+        }
 
-        const topSubjects = Object.entries(subjectCounts)
-          .sort(([,a], [,b]) => b - a)
-          .slice(0, 3)
-          .map(([subject]) => subject);
+        if (stateAbbr && STATE_COORDINATES[stateAbbr]) {
+          // Use the simplified subjects
+          const topSubjects = (result.topSubjects || [])
+            .filter((s: string) => s && s.trim())
+            .slice(0, 3);
 
-        // Generate color based on activity level
-        const intensity = Math.min(result.totalBills / 1000, 1);
-        const hue = (intensity * 240); // Blue to red scale
-        const color = `hsl(${240 - hue}, 70%, 50%)`;
+          // Generate color based on activity level
+          const intensity = Math.min(result.totalBills / 1000, 1);
+          const hue = (intensity * 240); // Blue to red scale
+          const color = `hsl(${240 - hue}, 70%, 50%)`;
 
-        stateStats[stateAbbr] = {
-          name: STATE_NAMES[stateAbbr],
-          abbreviation: stateAbbr,
-          legislationCount: result.totalBills,
-          activeRepresentatives: result.uniqueSponsors,
-          recentActivity: result.recentBills,
-          keyTopics: topSubjects.length > 0 ? topSubjects : ['General'],
-          center: STATE_COORDINATES[stateAbbr],
-          color: color
-        };
+          stateStats[stateAbbr] = {
+            name: STATE_NAMES[stateAbbr],
+            abbreviation: stateAbbr,
+            legislationCount: result.totalBills || 0,
+            activeRepresentatives: result.uniqueSponsors || 0,
+            recentActivity: result.recentBills || 0,
+            keyTopics: topSubjects.length > 0 ? topSubjects : ['General'],
+            center: STATE_COORDINATES[stateAbbr],
+            color: color
+          };
+        }
+      } catch (error) {
+        console.error('Error processing result:', result, error);
       }
     });
 
-    // Add any missing active states with zero data
+    // Add missing states with zero data more efficiently
+    const existingStates = new Set(Object.keys(stateStats));
     Object.entries(STATE_NAMES).forEach(([abbr, name]) => {
-      if (!stateStats[abbr] && STATE_COORDINATES[abbr]) {
+      if (!existingStates.has(abbr) && STATE_COORDINATES[abbr]) {
         stateStats[abbr] = {
           name: name,
           abbreviation: abbr,
@@ -247,16 +263,23 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    console.log(`Map data processed for ${Object.keys(stateStats).length} states`);
+
     return NextResponse.json({
       success: true,
       data: stateStats,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      processingTime: Date.now() - startTime
     });
 
   } catch (error) {
     console.error('Error fetching map data:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch map data' },
+      {
+        success: false,
+        error: 'Failed to fetch map data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
