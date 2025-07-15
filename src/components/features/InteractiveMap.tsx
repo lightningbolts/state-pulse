@@ -499,7 +499,7 @@ export function InteractiveMap() {
             <div className="flex items-center space-x-2">
               <MapPin className="h-5 w-5 text-purple-500" />
               <div>
-                <p className="text-sm font-medium">States Tracked</p>
+                <p className="text-sm font-medium">Jurisdictions Tracked</p>
                 <p className="text-2xl font-bold">{Object.keys(stateStats).length}</p>
               </div>
             </div>
