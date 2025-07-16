@@ -597,7 +597,7 @@ async function fetchAndStoreUpdatedBills(
           }
         }
       } else {
-        console.log(`📭 No bills found on page ${page} for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}).`);
+        console.log(`No bills found on page ${page} for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}).`);
         hasMore = false;
       }
 
@@ -631,7 +631,7 @@ async function fetchAndStoreUpdatedBills(
 
   // Clear checkpoint for this session since we completed it
   if (billsProcessed > 0 || page > 1) {
-    console.log(`🏁 Completed processing ${jurisdictionAbbr} session ${sessionIdentifier}`);
+    console.log(`Completed processing ${jurisdictionAbbr} session ${sessionIdentifier}`);
   }
 }
 
