@@ -478,7 +478,7 @@ async function fetchAndStoreUpdatedBills(
 
   // If resuming from a high page number, first verify the page exists
   if (startPage > 1) {
-    console.log(`🔍 Verifying that page ${startPage} still exists for ${jurisdictionAbbr}...`);
+    console.log(`Verifying that page ${startPage} still exists for ${jurisdictionAbbr}...`);
     const testUrl = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=1&per_page=20&apikey=${OPENSTATES_API_KEY}&sort=updated_desc&updated_since=${updatedSince}`;
 
     try {
@@ -488,16 +488,16 @@ async function fetchAndStoreUpdatedBills(
         const maxPage = testData.pagination?.max_page || testData.pagination?.total_pages || 1;
         const totalItems = testData.pagination?.total_items || 0;
 
-        console.log(`📊 Current pagination: max_page=${maxPage}, total_items=${totalItems}, requested_start_page=${startPage}`);
+        console.log(`Current pagination: max_page=${maxPage}, total_items=${totalItems}, requested_start_page=${startPage}`);
 
         if (startPage > maxPage) {
-          console.log(`⚠️ Checkpoint page ${startPage} is beyond current max page ${maxPage}. Data may have changed since last run.`);
-          console.log(`🔄 Falling back to start from page 1 to avoid missing any data.`);
+          console.log(`Checkpoint page ${startPage} is beyond current max page ${maxPage}. Data may have changed since last run.`);
+          console.log(`Falling back to start from page 1 to avoid missing any data.`);
           page = 1;
         }
       }
     } catch (error) {
-      console.warn(`⚠️ Could not verify pagination, proceeding with page ${startPage}:`, error);
+      console.warn(`Could not verify pagination, proceeding with page ${startPage}:`, error);
     }
   }
 
@@ -521,17 +521,17 @@ async function fetchAndStoreUpdatedBills(
       if (!response.ok) {
         if (response.status === 404) {
           const errorText = await response.text();
-          console.log(`📄 Page ${page} not found for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${errorText}`);
+          console.log(`Page ${page} not found for ${jurisdictionAbbr}, session ${sessionIdentifier}: ${errorText}`);
 
           // If this is the first page and it's 404, there might be no data
           if (page === 1) {
-            console.log(`ℹ️ No data available for ${jurisdictionAbbr} session ${sessionIdentifier} with current filters.`);
+            console.log(`No data available for ${jurisdictionAbbr} session ${sessionIdentifier} with current filters.`);
             hasMore = false;
             break;
           }
 
           // If we're on a higher page, we've reached the end
-          console.log(`✅ Reached end of available pages for ${jurisdictionAbbr} at page ${page}.`);
+          console.log(`Reached end of available pages for ${jurisdictionAbbr} at page ${page}.`);
           hasMore = false;
           break;
         } else {
@@ -548,11 +548,11 @@ async function fetchAndStoreUpdatedBills(
         const currentPage = data.pagination.page || page;
         const maxPage = data.pagination.max_page || data.pagination.total_pages;
         const totalItems = data.pagination.total_items || 0;
-        console.log(`📊 Pagination info for ${jurisdictionAbbr}: page ${currentPage}/${maxPage}, total items: ${totalItems}`);
+        console.log(`Pagination info for ${jurisdictionAbbr}: page ${currentPage}/${maxPage}, total items: ${totalItems}`);
       }
 
       if (data.results && data.results.length > 0) {
-        console.log(`📋 Processing ${data.results.length} bills from page ${page} for ${jurisdictionAbbr}`);
+        console.log(`Processing ${data.results.length} bills from page ${page} for ${jurisdictionAbbr}`);
 
         for (const osBill of data.results) {
           try {
@@ -627,7 +627,7 @@ async function fetchAndStoreUpdatedBills(
     }
   }
 
-  console.log(`✅ Finished fetching updates for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}). Processed ${billsProcessed} bills.`);
+  console.log(`Finished fetching updates for ${jurisdictionAbbr}, session ${sessionIdentifier} (since ${updatedSince}). Processed ${billsProcessed} bills.`);
 
   // Clear checkpoint for this session since we completed it
   if (billsProcessed > 0 || page > 1) {
@@ -713,12 +713,12 @@ async function runUpdateCycle(enableOpenStates: boolean = true, enableCongress: 
 
           if (checkpoint && checkpoint.lastProcessedState === state.abbr && checkpoint.lastProcessedSession === session.identifier) {
             // Resume from checkpoint
-            console.log(`🔄 Resuming from checkpoint: ${checkpoint.lastProcessedState} - ${checkpoint.lastProcessedSession} - Page ${checkpoint.lastProcessedPage}`);
+            console.log(`Resuming from checkpoint: ${checkpoint.lastProcessedState} - ${checkpoint.lastProcessedSession} - Page ${checkpoint.lastProcessedPage}`);
             startPage = checkpoint.lastProcessedPage;
             sessionUpdatedSince = checkpoint.updatedSince;
           } else {
             // No checkpoint or different session, start from beginning
-            console.log(`🆕 Starting fresh for ${state.abbr} - ${session.identifier}`);
+            console.log(`Starting fresh for ${state.abbr} - ${session.identifier}`);
             startPage = 1;
             sessionUpdatedSince = updatedSinceString;
           }
