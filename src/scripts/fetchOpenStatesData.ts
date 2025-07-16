@@ -218,6 +218,35 @@ function clearCheckpoint() {
   }
 }
 
+// --- Congress.gov cutoff persistence helpers ---
+const CONGRESS_CUTOFF_PATH = './congress-cutoff.json';
+
+function getDefaultCongressCutoffDate(): string {
+  // Always return ISO string for 24 hours before now
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  return oneDayAgo.toISOString().split('.')[0];
+}
+
+function saveCongressCutoffDate(dateStr: string) {
+  const fs = require('fs');
+  fs.writeFileSync(CONGRESS_CUTOFF_PATH, JSON.stringify({ cutoff: dateStr }, null, 2));
+  console.log(`Saved Congress cutoff date: ${dateStr}`);
+}
+
+function loadCongressCutoffDate(): string | null {
+  const fs = require('fs');
+  if (fs.existsSync(CONGRESS_CUTOFF_PATH)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(CONGRESS_CUTOFF_PATH, 'utf8'));
+      if (data.cutoff) return data.cutoff;
+    } catch (e) {
+      console.warn('Could not parse Congress cutoff file:', e);
+    }
+  }
+  return null;
+}
+
 // Utility to convert OpenStates IDs to display format
 function displayOpenStatesId(id: string): string {
   // Replace the first dash with an underscore, and remove 'ocd-bill/' prefix
@@ -627,10 +656,22 @@ async function runUpdateCycle(enableOpenStates: boolean = true, enableCongress: 
   console.log(`--- OpenStates API: ${enableOpenStates ? 'ENABLED' : 'DISABLED'} ---`);
   console.log(`--- Congress API: ${enableCongress ? 'ENABLED' : 'DISABLED'} ---`);
 
+  let congressUpdatedSince = getDefaultCongressCutoffDate();
+  if (enableCongress) {
+    // Try to load last cutoff date
+    const loadedCutoff = loadCongressCutoffDate();
+    if (loadedCutoff) {
+      congressUpdatedSince = loadedCutoff;
+      console.log(`Loaded Congress cutoff date from file: ${congressUpdatedSince}`);
+    } else {
+      console.log(`No Congress cutoff file found. Using default: ${congressUpdatedSince}`);
+    }
+  }
+
   // Fetch from Congress.gov API for US federal legislation if enabled
   if (enableCongress) {
     console.log(`\n--- Processing US Congress via Congress.gov API ---`);
-    await fetchCongressBills(updatedSinceString);
+    await fetchCongressBills(congressUpdatedSince);
     await delay(5000);
   } else {
     console.log(`\n--- Skipping US Congress (Congress API disabled) ---`);
