@@ -66,7 +66,7 @@
             // Handle Congress vs State filtering
             const showCongressParam = searchParams.get('showCongress');
             if (showCongressParam === 'true') {
-              // console.log('[API] Filtering for ALL Congress sessions');
+              console.log('[API] Filtering for ALL Congress sessions');
 
               // For Congress bills, we need to handle multiple scenarios:
               // 1. Bills with explicit jurisdictionName (older format)
@@ -74,53 +74,64 @@
 
               const congressJurisdictions = [
                 "United States",
-                // "United States of America",
-                // "US",
-                // "USA",
-                // "Federal",
-                // "Congress",
-                // "U.S. Congress",
-                // "US Congress",
-                // "117th Congress",
-                // "118th Congress",
-                // "119th Congress",
-                // "United States Congress",
-                // "U.S. Federal Government"
+                "United States of America",
+                "US",
+                "USA",
+                "Federal",
+                "Congress",
+                "U.S. Congress",
+                "US Congress",
+                "117th Congress",
+                "118th Congress",
+                "119th Congress",
+                "United States Congress",
+                "U.S. Federal Government"
               ];
 
-              // Create a complex filter that matches either:
-              // 1. Bills with Congress-related jurisdictionName, OR
-              // 2. Bills without jurisdictionName but with Congress indicators
-              filter.$or = [
-                // Has Congress-related jurisdictionName
-                { jurisdictionName: { $in: congressJurisdictions } },
-                // No jurisdictionName but has Congress indicators
-                {
-                  $and: [
-                    // No jurisdictionName field (or null/empty)
-                    {
-                      $or: [
-                        { jurisdictionName: { $exists: false } },
-                        { jurisdictionName: null },
-                        { jurisdictionName: "" }
-                      ]
-                    },
-                    // Has Congress-like characteristics
-                    {
-                      $or: [
-                        // Has history entries with federal actors
-                        { "history.actor": { $in: ["House", "Senate", "President of the United States", "Congress"] } },
-                        // Title references United States Code or federal law
-                        { title: { $regex: "United States Code|Public Law|Congress", $options: "i" } },
-                        // Has federal-style identifiers (H.R., S., H.J.Res, S.J.Res, etc.)
-                        { identifier: { $regex: "^(H\\.|S\\.|H\\.R\\.|S\\.|H\\.J\\.Res|S\\.J\\.Res)", $options: "i" } }
-                      ]
-                    }
-                  ]
-                }
-              ];
+              const congressFilter = {
+                $or: [
+                  // Has Congress-related jurisdictionName
+                  { jurisdictionName: { $in: congressJurisdictions } },
+                  // No jurisdictionName but has Congress indicators
+                  {
+                    $and: [
+                      // No jurisdictionName field (or null/empty)
+                      {
+                        $or: [
+                          { jurisdictionName: { $exists: false } },
+                          { jurisdictionName: null },
+                          { jurisdictionName: "" }
+                        ]
+                      },
+                      // Has Congress-like characteristics
+                      {
+                        $or: [
+                          // Has history entries with federal actors
+                          { "history.actor": { $in: ["House", "Senate", "President of the United States", "Congress"] } },
+                          // Title references United States Code or federal law
+                          { title: { $regex: "United States Code|Public Law|Congress", $options: "i" } },
+                          // Has federal-style identifiers (H.R., S., H.J.Res, S.J.Res, etc.)
+                          { identifier: { $regex: "^(H\\.|S\\.|H\\.R\\.|S\\.|H\\.J\\.Res|S\\.J\\.Res)", $options: "i" } }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              };
 
-              // console.log('[API] Applied comprehensive Congress filter:', JSON.stringify(filter, null, 2));
+              // If a search filter already exists, combine it with the congress filter
+              if (filter.$or) {
+                filter.$and = [
+                  { $or: filter.$or }, // The existing search filter
+                  congressFilter      // The new congress filter
+                ];
+                delete filter.$or; // Remove the original $or to avoid conflicts
+              } else {
+                // Otherwise, just use the congress filter
+                Object.assign(filter, congressFilter);
+              }
+
+              console.log('[API] Applied comprehensive Congress filter:', JSON.stringify(filter, null, 2));
 
             } else if (searchParams.get('jurisdictionName')) {
               const jurisdictionNameParam = searchParams.get('jurisdictionName');
