@@ -23,7 +23,8 @@ import {
 import { useRouter } from "next/navigation";
 
 interface StateDetailData {
-  state: string;
+  state?: string;
+  jurisdiction?: string; // Add jurisdiction field for Congress
   statistics: {
     totalLegislation: number;
     recentActivity: number;
@@ -63,12 +64,70 @@ function DashboardContent() {
 
   const stateParam = searchParams.get("state");
   const stateAbbrParam = searchParams.get("stateAbbr");
+  const congressParam = searchParams.get("congress"); // Add congress parameter
 
   useEffect(() => {
-    if (stateAbbrParam) {
+    // console.log('Dashboard useEffect triggered with params:', {
+    //   congressParam,
+    //   stateParam,
+    //   stateAbbrParam
+    // });
+
+    // Check if this is actually a US Congress request disguised as a state request
+    const isUSCongressRequest = (
+      congressParam === "true" ||
+      stateParam === "United States" ||
+      stateParam === "US" ||
+      stateAbbrParam === "US" ||
+      stateAbbrParam === "USA"
+    );
+
+    if (isUSCongressRequest) {
+      // console.log('Fetching Congress data - detected US Congress request');
+      fetchCongressData();
+    } else if (stateAbbrParam && stateAbbrParam !== "US" && stateAbbrParam !== "USA") {
+      // console.log('Fetching state data for:', stateAbbrParam);
       fetchStateData(stateAbbrParam);
+    } else if (stateParam && stateParam !== "United States" && stateParam !== "US") {
+      // console.log('Fetching state data for stateParam:', stateParam);
+      // If we have a state name but no abbreviation, we need to handle this case
+      // For now, let's not fetch data if we only have stateParam without stateAbbrParam
+      // console.log('Warning: stateParam provided without stateAbbrParam, skipping fetch');
     }
-  }, [stateAbbrParam]);
+  }, [congressParam, stateAbbrParam, stateParam]); // Include all relevant params
+
+  const fetchCongressData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // console.log('Fetching US Congress data from /api/dashboard/congress');
+      const response = await fetch(`/api/dashboard/congress`);
+
+      // console.log('Congress API Response status:', response.status);
+      // console.log('Congress API Response ok:', response.ok);
+      // console.log('Congress API Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Congress API Error Response:', errorText);
+        throw new Error(`Failed to fetch US Congress data: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      // console.log('Congress API Result:', result);
+
+      if (result.success) {
+        setStateData(result.data);
+      } else {
+        throw new Error(result.error || "Unknown error");
+      }
+    } catch (error) {
+      console.error("Error fetching Congress data:", error);
+      setError(`Failed to load US Congress data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchStateData = async (stateAbbr: string) => {
     setLoading(true);
@@ -96,11 +155,20 @@ function DashboardContent() {
     router.push("/dashboard");
   };
 
-  // If state parameters are present, show state-specific dashboard
-  if (stateParam || stateAbbrParam) {
+  // If congress or state parameters are present, show specific dashboard
+  if (congressParam === "true" || stateParam || stateAbbrParam) {
+    // Use the same logic as the useEffect to determine if this is a Congress dashboard
+    const isCongressDashboard = (
+      congressParam === "true" ||
+      stateParam === "United States" ||
+      stateParam === "US" ||
+      stateAbbrParam === "US" ||
+      stateAbbrParam === "USA"
+    );
+
     return (
       <div className="space-y-4 md:space-y-6">
-        {/* State Filter Indicator */}
+        {/* Congress/State Filter Indicator */}
         <Card className="shadow-lg">
           <CardContent className="p-3 md:p-4">
             <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center md:justify-between">
@@ -114,7 +182,9 @@ function DashboardContent() {
                     className="flex items-center gap-2"
                   >
                     <ArrowLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Back to All States</span>
+                    <span className="hidden sm:inline">
+                      {isCongressDashboard ? "Back to All Jurisdictions" : "Back to All States"}
+                    </span>
                     <span className="sm:hidden">Back</span>
                   </Button>
                   <Button
@@ -129,18 +199,37 @@ function DashboardContent() {
                   </Button>
                 </div>
                 <div className="flex flex-col space-y-1 md:space-y-0 md:flex-row md:items-center md:gap-2">
-                  <Badge variant="default" className="bg-primary self-start">
-                    <span className="hidden sm:inline">
-                      State Dashboard: {stateParam || stateAbbrParam}
-                    </span>
-                    <span className="sm:hidden">{stateParam || stateAbbrParam}</span>
-                  </Badge>
-                  <span className="text-xs md:text-sm text-muted-foreground">
-                    <span className="hidden sm:inline">
-                      Showing data for {stateParam || stateAbbrParam} only
-                    </span>
-                    <span className="sm:hidden">State data only</span>
-                  </span>
+                  {isCongressDashboard ? (
+                    <>
+                      <Badge variant="default" className="bg-blue-600 self-start">
+                        <span className="hidden sm:inline">
+                          U.S. Congress Dashboard
+                        </span>
+                        <span className="sm:hidden">U.S. Congress</span>
+                      </Badge>
+                      <span className="text-xs md:text-sm text-muted-foreground">
+                        <span className="hidden sm:inline">
+                          Showing federal legislation only
+                        </span>
+                        <span className="sm:hidden">Federal data only</span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="default" className="bg-primary self-start">
+                        <span className="hidden sm:inline">
+                          State Dashboard: {stateParam || stateAbbrParam}
+                        </span>
+                        <span className="sm:hidden">{stateParam || stateAbbrParam}</span>
+                      </Badge>
+                      <span className="text-xs md:text-sm text-muted-foreground">
+                        <span className="hidden sm:inline">
+                          Showing data for {stateParam || stateAbbrParam} only
+                        </span>
+                        <span className="sm:hidden">State data only</span>
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -164,7 +253,7 @@ function DashboardContent() {
               <div className="flex items-center justify-center space-x-2">
                 <div className="animate-spin rounded-full h-5 w-5 md:h-6 md:w-6 border-b-2 border-primary"></div>
                 <span className="text-sm md:text-base">
-                  Loading state dashboard...
+                  {isCongressDashboard ? "Loading U.S. Congress dashboard..." : "Loading state dashboard..."}
                 </span>
               </div>
             </CardContent>
@@ -177,13 +266,20 @@ function DashboardContent() {
               <div className="flex items-center justify-center space-x-2 text-red-600">
                 <span className="text-sm md:text-base">{error}</span>
               </div>
+              {/* Add debug info for Congress API errors */}
+              {isCongressDashboard && (
+                <div className="mt-4 text-xs text-gray-500">
+                  <p>Debug info: Attempted to fetch from /api/dashboard/congress</p>
+                  <p>URL params: congress={congressParam}, state={stateParam}, stateAbbr={stateAbbrParam}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
         {stateData && !loading && (
           <>
-            {/* State Statistics Overview */}
+            {/* Statistics Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <Card>
                 <CardContent className="p-3 md:p-4">
@@ -273,8 +369,7 @@ function DashboardContent() {
                   </CardTitle>
                   <CardDescription className="text-xs md:text-sm">
                     <span className="hidden sm:inline">
-                      Latest legislative activity in{" "}
-                      {stateParam || stateAbbrParam}
+                      Latest legislative activity {isCongressDashboard ? "in U.S. Congress" : `in ${stateParam || stateAbbrParam}`}
                     </span>
                     <span className="sm:hidden">Latest activity</span>
                   </CardDescription>
@@ -321,24 +416,30 @@ function DashboardContent() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        // Use the actual state data instead of URL parameters
-                        const stateName =
-                          stateData?.state ||
-                          stateParam ||
-                          stateAbbrParam ||
-                          "";
-                        const stateAbbr = stateAbbrParam || "";
+                        if (isCongressDashboard) {
+                          // Navigate to legislation with US Congress filter
+                          // console.log("Dashboard: Navigating to legislation with US Congress filter");
+                          router.push("/legislation?congress=true");
+                        } else {
+                          // Navigate to legislation with state filter
+                          const stateName =
+                            stateData?.state ||
+                            stateParam ||
+                            stateAbbrParam ||
+                            "";
+                          const stateAbbr = stateAbbrParam || "";
 
-                        console.log("Dashboard: Navigating to legislation with:", {
-                          stateName,
-                          stateAbbr,
-                        });
+                          // console.log("Dashboard: Navigating to legislation with state filter:", {
+                          //   stateName,
+                          //   stateAbbr,
+                          // });
 
-                        router.push(
-                          `/legislation?state=${encodeURIComponent(
-                            stateName
-                          )}&stateAbbr=${stateAbbr}`
-                        );
+                          router.push(
+                            `/legislation?state=${encodeURIComponent(
+                              stateName
+                            )}&stateAbbr=${stateAbbr}`
+                          );
+                        }
                       }}
                       className="w-full"
                     >
@@ -358,8 +459,7 @@ function DashboardContent() {
                   </CardTitle>
                   <CardDescription className="text-xs md:text-sm">
                     <span className="hidden sm:inline">
-                      Most active policy areas in{" "}
-                      {stateParam || stateAbbrParam}
+                      Most active policy areas {isCongressDashboard ? "in U.S. Congress" : `in ${stateParam || stateAbbrParam}`}
                     </span>
                     <span className="sm:hidden">Active policy areas</span>
                   </CardDescription>
@@ -407,8 +507,10 @@ function DashboardContent() {
                 </CardTitle>
                 <CardDescription className="text-xs md:text-sm">
                   <span className="hidden sm:inline">
-                    Legislators with the most recent activity in{" "}
-                    {stateParam || stateAbbrParam}
+                    {isCongressDashboard
+                      ? "Members of Congress with the most recent activity"
+                      : `Legislators with the most recent activity in ${stateParam || stateAbbrParam}`
+                    }
                   </span>
                   <span className="sm:hidden">Most active legislators</span>
                 </CardDescription>
@@ -442,25 +544,27 @@ function DashboardContent() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      router.push(
-                        `/civic?state=${encodeURIComponent(
-                          stateParam || stateAbbrParam || ""
-                        )}&stateAbbr=${stateAbbrParam || ""}`
-                      )
-                    }
-                    className="w-full"
-                  >
-                    <span className="hidden sm:inline">
-                      View All Representatives
-                    </span>
-                    <span className="sm:hidden">View Representatives</span>
-                  </Button>
-                </div>
+                {!isCongressDashboard && (
+                  <div className="mt-4 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        router.push(
+                          `/civic?state=${encodeURIComponent(
+                            stateParam || stateAbbrParam || ""
+                          )}&stateAbbr=${stateAbbrParam || ""}`
+                        )
+                      }
+                      className="w-full"
+                    >
+                      <span className="hidden sm:inline">
+                        View All Representatives
+                      </span>
+                      <span className="sm:hidden">View Representatives</span>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </>

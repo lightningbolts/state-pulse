@@ -27,11 +27,15 @@
             const skip = searchParams.get('skip') ? parseInt(searchParams.get('skip') || '0', 10) : 0;
 
             // Parse sorting parameters
-            let sort: Record<string, 1 | -1> = { updatedAt: -1 }; // Default sort
             const sortField = searchParams.get('sortBy');
             const sortDirection = searchParams.get('sortDir');
+
+            let sort: Record<string, 1 | -1> = {};
             if (sortField) {
               sort = { [sortField]: sortDirection === 'asc' ? 1 : -1 };
+            } else {
+              // Default sort if not provided
+              sort = { updatedAt: -1 };
             }
 
             // Parse filtering parameters
@@ -59,14 +63,73 @@
             if (searchParams.get('jurisdiction')) {
               filter.jurisdictionId = searchParams.get('jurisdiction');
             }
-            if (searchParams.get('jurisdictionName')) {
+            // Handle Congress vs State filtering
+            const showCongressParam = searchParams.get('showCongress');
+            if (showCongressParam === 'true') {
+              // console.log('[API] Filtering for ALL Congress sessions');
+
+              // For Congress bills, we need to handle multiple scenarios:
+              // 1. Bills with explicit jurisdictionName (older format)
+              // 2. Bills without jurisdictionName (newer format like 119th Congress)
+
+              const congressJurisdictions = [
+                "United States",
+                // "United States of America",
+                // "US",
+                // "USA",
+                // "Federal",
+                // "Congress",
+                // "U.S. Congress",
+                // "US Congress",
+                // "117th Congress",
+                // "118th Congress",
+                // "119th Congress",
+                // "United States Congress",
+                // "U.S. Federal Government"
+              ];
+
+              // Create a complex filter that matches either:
+              // 1. Bills with Congress-related jurisdictionName, OR
+              // 2. Bills without jurisdictionName but with Congress indicators
+              filter.$or = [
+                // Has Congress-related jurisdictionName
+                { jurisdictionName: { $in: congressJurisdictions } },
+                // No jurisdictionName but has Congress indicators
+                {
+                  $and: [
+                    // No jurisdictionName field (or null/empty)
+                    {
+                      $or: [
+                        { jurisdictionName: { $exists: false } },
+                        { jurisdictionName: null },
+                        { jurisdictionName: "" }
+                      ]
+                    },
+                    // Has Congress-like characteristics
+                    {
+                      $or: [
+                        // Has history entries with federal actors
+                        { "history.actor": { $in: ["House", "Senate", "President of the United States", "Congress"] } },
+                        // Title references United States Code or federal law
+                        { title: { $regex: "United States Code|Public Law|Congress", $options: "i" } },
+                        // Has federal-style identifiers (H.R., S., H.J.Res, S.J.Res, etc.)
+                        { identifier: { $regex: "^(H\\.|S\\.|H\\.R\\.|S\\.|H\\.J\\.Res|S\\.J\\.Res)", $options: "i" } }
+                      ]
+                    }
+                  ]
+                }
+              ];
+
+              // console.log('[API] Applied comprehensive Congress filter:', JSON.stringify(filter, null, 2));
+
+            } else if (searchParams.get('jurisdictionName')) {
               const jurisdictionNameParam = searchParams.get('jurisdictionName');
-              console.log('[API] Filtering by jurisdictionName:', jurisdictionNameParam);
+              // console.log('[API] Filtering by single jurisdictionName:', jurisdictionNameParam);
 
               // Use exact match instead of regex to prevent partial matches
               filter.jurisdictionName = jurisdictionNameParam;
 
-              console.log('[API] Applied filter:', JSON.stringify(filter));
+              // console.log('[API] Applied single jurisdiction filter:', JSON.stringify(filter));
             }
             if (searchParams.get('subject')) {
               filter.subjects = searchParams.get('subject');
@@ -111,10 +174,12 @@
               limit,
               skip,
               sort,
-              filter
+              filter,
+              // Pass showCongress to the service layer
+              showCongress: showCongressParam === 'true'
             });
             return NextResponse.json(legislations, { status: 200 });
-          } catch (error) {
+          } catch (error: any) {
             console.error('Error fetching all legislation:', error);
             return NextResponse.json({ message: 'Error fetching all legislation', error: (error as Error).message }, { status: 500 });
           }

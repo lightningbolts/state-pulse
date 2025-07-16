@@ -34,7 +34,7 @@ export function UserSyncComponent() {
           const data = await response.json();
 
           if (data.success) {
-            console.log('User synced with MongoDB:', data);
+            // console.log('User synced with MongoDB:', data);
           } else {
             // Include the error message from the API response
             const errorMessage = data.error || 'Unknown error occurred';

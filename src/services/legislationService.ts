@@ -235,28 +235,124 @@ export async function getLegislationById(id: string): Promise<Legislation | null
   }
 }
 
-export async function getAllLegislation(options: {
+export async function getAllLegislation({
+  limit = 100,
+  skip = 0,
+  sort = { updatedAt: -1 },
+  filter = {},
+  showCongress = false
+}: {
   limit?: number;
   skip?: number;
   sort?: Record<string, 1 | -1>;
   filter?: Record<string, any>;
-} = {}): Promise<Legislation[]> {
+  showCongress?: boolean;
+}): Promise<Legislation[]> {
   try {
-    const { limit = 100, skip = 0, sort = { updatedAt: -1 }, filter = {} } = options;
     const legislationCollection = await getCollection('legislation');
-    const cursor = legislationCollection
+
+    const isMostRecentSort = sort.updatedAt === -1 || sort.createdAt === -1;
+
+    // If showCongress is true, always use the aggregation pipeline for proper sorting.
+    if (showCongress) {
+      console.log('[Service] Using aggregation pipeline for Congress sorting');
+
+      const sortStage: Record<string, any> = {};
+      if (isMostRecentSort) {
+        sortStage['sessionNumber'] = -1;
+        sortStage['mostRecentDate'] = -1;
+      } else if (sort.title) {
+        sortStage['title'] = sort.title;
+      } else {
+        // Fallback or other sort fields can be added here
+        sortStage['sessionNumber'] = -1;
+        sortStage['mostRecentDate'] = -1;
+      }
+
+      const pipeline = [
+        { $match: filter },
+        {
+          $addFields: {
+            sessionNumber: {
+              $let: {
+                vars: {
+                  sessionString: { $ifNull: ["$session", "0"] }
+                },
+                in: {
+                  $let: {
+                    vars: {
+                      match: { $regexFind: { input: "$$sessionString", regex: "\\d+" } }
+                    },
+                    in: { $toInt: { $ifNull: ["$$match.match", "0"] } }
+                  }
+                }
+              }
+            },
+            mostRecentDate: {
+              $max: [
+                { $ifNull: ["$firstActionAt", new Date(0)] },
+                { $ifNull: ["$latestActionAt", new Date(0)] },
+                { $ifNull: ["$createdAt", new Date(0)] },
+                {
+                  $ifNull: [ // Max from history
+                    {
+                      $max: {
+                        $map: {
+                          input: { $ifNull: ["$history", []] },
+                          in: {
+                            $dateFromString: {
+                              dateString: "$$this.date",
+                              onError: new Date(0)
+                            }
+                          }
+                        }
+                      }
+                    },
+                    new Date(0)
+                  ]
+                },
+                {
+                  $ifNull: [ // Max from versions
+                    {
+                      $max: {
+                        $map: {
+                          input: { $ifNull: ["$versions", []] },
+                          in: {
+                            $dateFromString: {
+                              dateString: "$$this.date",
+                              onError: new Date(0)
+                            }
+                          }
+                        }
+                      }
+                    },
+                    new Date(0)
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        { $sort: sortStage },
+        { $skip: skip },
+        { $limit: limit }
+      ];
+
+      const results = await legislationCollection.aggregate(pipeline).toArray();
+      return results as Legislation[];
+    }
+
+    // Default behavior for all other queries (non-congress)
+    const results = await legislationCollection
       .find(filter)
       .sort(sort)
       .skip(skip)
-      .limit(limit);
-    const documents = (await cursor.toArray()) as LegislationMongoDbDocument[];
-    return documents.map((doc) => {
-      const { _id, ...restOfDoc } = doc;
-      return { ...restOfDoc };
-    });
+      .limit(limit)
+      .toArray();
+    return results as Legislation[];
   } catch (error) {
-    console.error(`Error fetching legislation documents: `, error);
-    throw new Error('Failed to fetch legislation documents.');
+    console.error('Error fetching all legislation from service: ', error);
+    throw new Error('Failed to fetch legislation.');
   }
 }
 

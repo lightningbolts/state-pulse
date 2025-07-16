@@ -163,7 +163,7 @@ export function RepresentativesFinder() {
       // Convert full state name to abbreviation if needed
       const finalState = STATE_MAP[state] || state;
 
-      console.log('Searching for representatives in state:', finalState, 'for location:', location.display_name);
+      // console.log('Searching for representatives in state:', finalState, 'for location:', location.display_name);
 
       const response = await fetch(`/api/representatives?address=${encodeURIComponent(finalState)}`);
 
@@ -194,10 +194,10 @@ export function RepresentativesFinder() {
       const data: ApiResponse = await response.json();
       let reps = data.representatives || [];
 
-      console.log('Received representatives:', reps.length, 'for state:', finalState);
+      // console.log('Received representatives:', reps.length, 'for state:', finalState);
       if (reps.length > 0) {
-        console.log('First rep jurisdiction:', reps[0].jurisdiction);
-        console.log('Sample reps:', reps.slice(0, 3).map(r => ({ name: r.name, jurisdiction: r.jurisdiction })));
+        // console.log('First rep jurisdiction:', reps[0].jurisdiction);
+        // console.log('Sample reps:', reps.slice(0, 3).map(r => ({ name: r.name, jurisdiction: r.jurisdiction })));
       }
 
       // Calculate distances and add coordinates for representatives
@@ -268,17 +268,17 @@ export function RepresentativesFinder() {
           // Convert full state name to abbreviation if needed
           const finalStateAbbrev = STATE_MAP[stateAbbrev] || stateAbbrev;
 
-          console.log('State for coordinates:', stateAbbrev, '-> Final abbrev:', finalStateAbbrev, 'Available in stateCapitols:', !!stateCapitols[finalStateAbbrev]);
+          // console.log('State for coordinates:', stateAbbrev, '-> Final abbrev:', finalStateAbbrev, 'Available in stateCapitols:', !!stateCapitols[finalStateAbbrev]);
 
           if (finalStateAbbrev && stateCapitols[finalStateAbbrev]) {
             const capitol = stateCapitols[finalStateAbbrev];
-            console.log('Using capitol coordinates for', finalStateAbbrev, ':', capitol);
+            // console.log('Using capitol coordinates for', finalStateAbbrev, ':', capitol);
 
             // Place all representatives at the state capitol
             repLat = capitol.lat;
             repLon = capitol.lon;
           } else {
-            console.log('Fallback: No state found or not in capitol list. State:', stateAbbrev, 'Final:', finalStateAbbrev);
+            // console.log('Fallback: No state found or not in capitol list. State:', stateAbbrev, 'Final:', finalStateAbbrev);
             // Fallback: use user location with small offset if state not found
             const fallbackVariation = 0.1;
             repLat = location.lat + (Math.random() - 0.5) * fallbackVariation;
@@ -367,7 +367,7 @@ export function RepresentativesFinder() {
       // Convert full state name to abbreviation if needed
       const finalState = STATE_MAP[state] || state;
 
-      console.log('Fetching paginated representatives for state:', finalState, 'page:', page);
+      // console.log('Fetching paginated representatives for state:', finalState, 'page:', page);
 
       // Build API URL with pagination parameters - ALWAYS use state abbreviation
       const params = new URLSearchParams({
@@ -405,7 +405,7 @@ export function RepresentativesFinder() {
 
       const data: ApiResponse = await response.json();
 
-      console.log('Received paginated data:', data.representatives?.length, 'representatives, source:', data.source);
+      // console.log('Received paginated data:', data.representatives?.length, 'representatives, source:', data.source);
 
       setRepresentatives(data.representatives || []);
       setDataSource(data.source);
@@ -495,13 +495,13 @@ export function RepresentativesFinder() {
       try {
         await fetchPaginatedRepresentatives(userLocation, 1);
       } catch (error) {
-        console.log('Error during pagination attempt:', error);
+        // console.log('Error during pagination attempt:', error);
 
         // If cached data is not available, fetch fresh data first
         if (error instanceof Error &&
             (error.message.includes('No representative data found') ||
              error.message.includes('No cached data available'))) {
-          console.log('No cached data for pagination, fetching fresh data first...');
+          // console.log('No cached data for pagination, fetching fresh data first...');
 
           // Reset error state
           setError(null);
@@ -557,7 +557,7 @@ export function RepresentativesFinder() {
       // Handle the JSON-encoded address parameter (existing functionality)
       try {
         const parsedAddress = JSON.parse(decodeURIComponent(addressParam));
-        console.log('Parsed address from URL:', parsedAddress);
+        // console.log('Parsed address from URL:', parsedAddress);
         setUserLocation(parsedAddress);
         fetchRepresentatives(parsedAddress);
       } catch (error) {
@@ -569,7 +569,7 @@ export function RepresentativesFinder() {
       const stateAbbr = stateAbbrParam || (stateName ? STATE_MAP[stateName] : null);
 
       if (stateAbbr) {
-        console.log('Loading representatives for state:', stateName || stateAbbr, '(', stateAbbr, ')');
+        // console.log('Loading representatives for state:', stateName || stateAbbr, '(', stateAbbr, ')');
 
         // Create a synthetic location object for the state
         const stateLocation: AddressSuggestion = {

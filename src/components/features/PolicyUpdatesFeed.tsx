@@ -36,6 +36,7 @@ interface PolicyUpdate {
   identifier?: string;
   history?: { date: string; action: string }[];
   firstActionAt?: string | null;
+  versions?: { date: string; note?: string; classification?: string | null; links?: any[] }[];
 }
 
 // Classification tags (no descriptions)
@@ -58,7 +59,8 @@ async function fetchUpdatesFeed({ skip = 0, limit = cardNumber, search = "", sub
 
   // Handle Congress vs State filtering - they are mutually exclusive
   if (showCongress) {
-    params.append("jurisdictionName", "United States Congress");
+    // Instead of just "United States", use a special parameter to indicate we want all Congress sessions
+    params.append("showCongress", "true");
   } else if (jurisdictionName) {
     params.append("jurisdictionName", jurisdictionName);
   }
@@ -125,20 +127,35 @@ export function PolicyUpdatesFeed() {
   const { bookmarks, loading: bookmarksLoading } = useContext(BookmarksContext);
   const { user } = useUser();
 
-  // URL parameter handling for state filtering
+  // URL parameter handling for state filtering and congress filtering
   const searchParams = useSearchParams();
 
   // Handle URL parameters for state filtering
   useEffect(() => {
     const stateParam = searchParams.get('state');
     const stateAbbrParam = searchParams.get('stateAbbr');
+    const congressParam = searchParams.get('congress');
 
-    console.log('PolicyUpdatesFeed received params:', { stateParam, stateAbbrParam });
+    // console.log('PolicyUpdatesFeed received params:', { stateParam, stateAbbrParam, congressParam });
+
+    // Handle congress parameter first
+    if (congressParam === 'true') {
+      // console.log('Setting showCongress to true from URL parameter');
+      setShowCongress(true);
+      setJurisdictionName(''); // Clear any state filter
+      // Reset the feed to load fresh data for congress
+      setUpdates([]);
+      setSkip(0);
+      skipRef.current = 0;
+      setHasMore(true);
+      setLoading(true);
+      return; // Exit early to avoid state processing
+    }
 
     if (stateParam || stateAbbrParam) {
       let stateName = stateParam ? decodeURIComponent(stateParam) : null;
 
-      console.log('Initial stateName:', stateName);
+      // console.log('Initial stateName:', stateName);
 
       // If we have a state abbreviation, convert it to full name
       if (stateAbbrParam && !stateName) {
@@ -149,7 +166,7 @@ export function PolicyUpdatesFeed() {
         }, {} as Record<string, string>);
 
         stateName = abbrToStateName[stateAbbrParam.toUpperCase()] || stateAbbrParam;
-        console.log('Converted from stateAbbrParam:', stateAbbrParam, 'to stateName:', stateName);
+        // console.log('Converted from stateAbbrParam:', stateAbbrParam, 'to stateName:', stateName);
       }
 
       // If stateParam looks like an abbreviation (2 chars, all caps), convert it
@@ -161,12 +178,13 @@ export function PolicyUpdatesFeed() {
 
         const originalStateName = stateName;
         stateName = abbrToStateName[stateName] || stateName;
-        console.log('Converted abbreviation:', originalStateName, 'to full name:', stateName);
+        // console.log('Converted abbreviation:', originalStateName, 'to full name:', stateName);
       }
 
       if (stateName) {
-        console.log('Final stateName being set:', stateName);
+        // console.log('Final stateName being set:', stateName);
         setJurisdictionName(stateName);
+        setShowCongress(false); // Clear congress filter
         // Reset the feed to load fresh data for this state
         setUpdates([]);
         setSkip(0);
@@ -200,48 +218,13 @@ export function PolicyUpdatesFeed() {
         ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
         : newUpdates;
 
-      // Ensure consistent sorting by applying client-side sort as backup
+      // Since the backend now handles all sorting, we can simplify the frontend logic.
       if (filteredNewUpdates.length > 0) {
-        const sortedUpdates = [...filteredNewUpdates].sort((a, b) => {
-          if (sort.field === 'createdAt') {
-            const aDate = new Date(a.createdAt || 0).getTime();
-            const bDate = new Date(b.createdAt || 0).getTime();
-            return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
-          } else if (sort.field === 'lastActionAt') {
-            const aDate = new Date(a.lastActionAt || 0).getTime();
-            const bDate = new Date(b.lastActionAt || 0).getTime();
-            return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
-          } else if (sort.field === 'title') {
-            const aTitle = (a.title || '').toLowerCase();
-            const bTitle = (b.title || '').toLowerCase();
-            return sort.dir === 'desc' ? bTitle.localeCompare(aTitle) : aTitle.localeCompare(bTitle);
-          }
-          return 0;
-        });
-
         setUpdates((prev) => {
-          // Merge and ensure no duplicates while maintaining sort order
-          const existingIds = new Set(prev.map(update => update.id));
-          const newUniqueUpdates = sortedUpdates.filter(update => !existingIds.has(update.id));
-          const combined = [...prev, ...newUniqueUpdates];
-
-          // Re-sort the combined array to ensure consistency
-          return combined.sort((a, b) => {
-            if (sort.field === 'createdAt') {
-              const aDate = new Date(a.createdAt || 0).getTime();
-              const bDate = new Date(b.createdAt || 0).getTime();
-              return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
-            } else if (sort.field === 'lastActionAt') {
-              const aDate = new Date(a.lastActionAt || 0).getTime();
-              const bDate = new Date(b.lastActionAt || 0).getTime();
-              return sort.dir === 'desc' ? bDate - aDate : aDate - bDate;
-            } else if (sort.field === 'title') {
-              const aTitle = (a.title || '').toLowerCase();
-              const bTitle = (b.title || '').toLowerCase();
-              return sort.dir === 'desc' ? bTitle.localeCompare(aTitle) : aTitle.localeCompare(bTitle);
-            }
-            return 0;
-          });
+          // Merge and ensure no duplicates, maintaining the order from the API.
+          const existingIds = new Set(prev.map((u) => u.id));
+          const newUniqueUpdates = filteredNewUpdates.filter((u) => !existingIds.has(u.id));
+          return [...prev, ...newUniqueUpdates];
         });
       }
 
@@ -311,7 +294,7 @@ export function PolicyUpdatesFeed() {
       setUpdates([]);
       skipRef.current = 0;
       setSkip(0);
-      console.log('URL parameters detected, clearing existing state to prioritize URL params');
+      // console.log('URL parameters detected, clearing existing state to prioritize URL params');
     }
 
     // Restore scroll position *before* paint for seamlessness

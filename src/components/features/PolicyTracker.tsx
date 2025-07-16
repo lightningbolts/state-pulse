@@ -146,9 +146,9 @@ export function PolicyTracker() {
 			const res = await fetch(`/api/search-legislation-by-topic?topic=${encodeURIComponent(topic)}`);
 			if (res.ok) {
 				const data = await res.json();
-				console.log('Search results for topic:', topic, data);
-				console.log('Legislation array length:', data.legislation?.length);
-				console.log('Sample legislation:', data.legislation?.[0]);
+				// console.log('Search results for topic:', topic, data);
+				// console.log('Legislation array length:', data.legislation?.length);
+				// console.log('Sample legislation:', data.legislation?.[0]);
 				setRelatedLegislation((prev) => ({ ...prev, [topic]: data.legislation || [] }));
 			} else {
 				console.error('Failed to fetch related legislation:', res.statusText);
