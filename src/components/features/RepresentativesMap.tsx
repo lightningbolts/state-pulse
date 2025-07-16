@@ -240,7 +240,7 @@ export function RepresentativesMap({ center, zoom, representatives, userLocation
       <div
         ref={mapRef}
         className="w-full h-full"
-        style={{ minHeight: '320px' }}
+        style={{ minHeight: '320px', zIndex: 1, position: 'relative' }}
       />
     </Card>
   );
