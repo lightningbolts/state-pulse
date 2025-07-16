@@ -20,171 +20,84 @@ export async function GET() {
     const allJurisdictions = allJurisdictionsResult.map(item => item._id);
     console.log('All jurisdictions in database:', allJurisdictions.slice(0, 20)); // Log first 20
 
-    // Try different possible jurisdiction names for US Congress
-    const possibleCongressNames = [
-      "United States",
-      "United States of America",
-      "US",
-      "USA",
-      "Federal",
-      "Congress",
-      "U.S. Congress",
-      "US Congress",
-      // Add variations for different Congress sessions
-      "117th Congress",
-      "118th Congress",
-      "119th Congress",
-      "United States Congress",
-      "U.S. Federal Government"
-    ];
+    // Dynamically determine the current Congress session
+    const currentYear = new Date().getFullYear();
+    const congressNumber = Math.floor((currentYear - 1789) / 2) + 1;
+    const currentCongressSession = `${congressNumber}th Congress`;
+    // Also look ahead to the next session in case data is loaded early
+    const nextCongressSession = `${congressNumber + 1}th Congress`;
 
-    let jurisdictionPattern = null;
-    let totalFound = 0;
-    let allCongressCounts = {};
+    // Define a comprehensive query for all US Congress legislation,
+    // including sessions that may not have a `jurisdictionName`.
+    const allCongressQuery = {
+      $or: [
+        // Matches older data with explicit jurisdiction names
+        {
+          jurisdictionName: {
+            $regex: "United States|US|USA|Federal|Congress",
+            $options: "i"
+          }
+        },
+        // Matches newer data (like 119th Congress) that lacks a jurisdictionName
+        // but has a session field and other federal indicators.
+        {
+          $and: [
+            {
+              $or: [
+                { jurisdictionName: { $exists: false } },
+                { jurisdictionName: null },
+                { jurisdictionName: "" }
+              ]
+            },
+            { session: { $regex: "Congress", $options: "i" } }
+          ]
+        }
+      ]
+    };
 
-    // Find which jurisdiction name actually has data AND check all variations
-    for (const name of possibleCongressNames) {
-      const count = await db.collection('legislation').countDocuments({
-        jurisdictionName: name
-      });
-      console.log(`Checking jurisdiction "${name}": ${count} documents`);
-      allCongressCounts[name] = count;
+    // A specific query for the current and upcoming Congress for "Recent Bills"
+    const recentCongressQuery = {
+      session: { $in: [currentCongressSession, nextCongressSession] }
+    };
 
-      if (count > 0 && !jurisdictionPattern) {
-        jurisdictionPattern = name;
-        totalFound = count;
-        console.log(`Found US Congress data under jurisdiction: "${name}" with ${count} documents`);
-      }
-    }
+    // Get total legislation count across all of Congress
+    const totalLegislation = await db.collection('legislation').countDocuments(allCongressQuery);
 
-    // Log all congress-related jurisdiction names found
-    console.log('All Congress-related jurisdiction counts:', allCongressCounts);
-
-    // If we found some Congress data but want to include ALL Congress sessions,
-    // let's search for patterns that might include multiple sessions
-    if (jurisdictionPattern) {
-      // Check if there are other jurisdiction names that might be Congress sessions
-      const congressRelatedJurisdictions = allJurisdictions.filter(name =>
-        name && (
-          name.toLowerCase().includes('congress') ||
-          name.toLowerCase().includes('117th') ||
-          name.toLowerCase().includes('118th') ||
-          name.toLowerCase().includes('119th') ||
-          (name.toLowerCase().includes('united') && name.toLowerCase().includes('states'))
-        )
-      );
-
-      console.log('All Congress-related jurisdictions found in database:', congressRelatedJurisdictions);
-
-      // Calculate total across all Congress sessions
-      let totalAcrossAllSessions = 0;
-      for (const jurisdiction of congressRelatedJurisdictions) {
-        const count = await db.collection('legislation').countDocuments({
-          jurisdictionName: jurisdiction
-        });
-        console.log(`Congress session "${jurisdiction}": ${count} documents`);
-        totalAcrossAllSessions += count;
-      }
-
-      console.log(`Total across all Congress sessions: ${totalAcrossAllSessions} documents`);
-
-      // If we found multiple Congress sessions, use a query that includes all of them
-      if (congressRelatedJurisdictions.length > 1) {
-        totalFound = totalAcrossAllSessions;
-        console.log(`Using combined query for all Congress sessions with ${totalFound} total documents`);
-      }
-    }
-
-    // If we still can't find Congress data, return empty response but with info
-    if (!jurisdictionPattern) {
-      console.log('No US Congress data found in any jurisdiction');
+    if (totalLegislation === 0) {
+      console.log('No US Congress data found for any session.');
       return NextResponse.json({
         success: true,
         data: {
           jurisdiction: "United States",
-          statistics: {
-            totalLegislation: 0,
-            recentActivity: 0,
-            activeSponsors: 0,
-            averageBillAge: 0
-          },
+          statistics: { totalLegislation: 0, recentActivity: 0, activeSponsors: 0, averageBillAge: 0 },
           recentLegislation: [],
           trendingTopics: [],
           topSponsors: [],
-          debugInfo: {
-            message: "No US Congress data found",
-            availableJurisdictions: allJurisdictions.slice(0, 10),
-            searchedNames: possibleCongressNames
-          }
+          debugInfo: { message: "No US Congress data found" }
         }
       });
     }
 
-    console.log(`Using jurisdiction pattern: "${jurisdictionPattern}" with ${totalFound} documents`);
+    console.log(`Found ${totalLegislation} total documents for all of US Congress.`);
 
-    // Create query filter for all Congress sessions if multiple found
-    let congressQuery;
-    if (jurisdictionPattern) {
-      // Get all Congress-related jurisdictions that have data
-      const congressRelatedJurisdictions = allJurisdictions.filter(name =>
-        name && (
-          name.toLowerCase().includes('congress') ||
-          name.toLowerCase().includes('117th') ||
-          name.toLowerCase().includes('118th') ||
-          name.toLowerCase().includes('119th') ||
-          (name.toLowerCase().includes('united') && name.toLowerCase().includes('states'))
-        )
-      );
-
-      // Filter to only those with actual data
-      const congressJurisdictionsWithData = [];
-      for (const jurisdiction of congressRelatedJurisdictions) {
-        const count = await db.collection('legislation').countDocuments({
-          jurisdictionName: jurisdiction
-        });
-        if (count > 0) {
-          congressJurisdictionsWithData.push(jurisdiction);
-        }
-      }
-
-      // If we have multiple Congress jurisdictions, query all of them
-      if (congressJurisdictionsWithData.length > 1) {
-        console.log(`Found multiple Congress jurisdictions: ${congressJurisdictionsWithData.join(', ')}`);
-        congressQuery = { jurisdictionName: { $in: congressJurisdictionsWithData } };
-      } else {
-        congressQuery = { jurisdictionName: jurisdictionPattern };
-      }
-    } else {
-      congressQuery = { jurisdictionName: jurisdictionPattern };
-    }
-
-    console.log('Using Congress query:', congressQuery);
-
-    // Get recent activity (last 30 days) - now across ALL Congress sessions
+    // Get recent activity (last 30 days) - across ALL Congress sessions
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const recentActivity = await db.collection('legislation').countDocuments({
-      ...congressQuery,
+      ...allCongressQuery,
       $or: [
         { lastActionAt: { $gte: thirtyDaysAgo } },
         { createdAt: { $gte: thirtyDaysAgo } },
-        // Also check for recent history entries
-        {
-          "history": {
-            $elemMatch: {
-              "date": { $gte: thirtyDaysAgo.toISOString().split('T')[0] }
-            }
-          }
-        }
+        { "history.date": { $gte: thirtyDaysAgo.toISOString().split('T')[0] } }
       ]
     });
 
     console.log('Recent US Congress activity (all sessions):', recentActivity);
 
-    // Get active sponsors count - now across ALL Congress sessions
+    // Get active sponsors count - across ALL Congress sessions
     const activeSponsorsResult = await db.collection('legislation').aggregate([
-      { $match: congressQuery },
+      { $match: allCongressQuery },
       { $unwind: { path: "$sponsors", preserveNullAndEmptyArrays: true } },
       { $group: { _id: "$sponsors.name" } },
       { $count: "total" }
@@ -192,9 +105,9 @@ export async function GET() {
 
     const activeSponsors = activeSponsorsResult[0]?.total || 0;
 
-    // Calculate average bill age - now across ALL Congress sessions
+    // Calculate average bill age - across ALL Congress sessions
     const avgAgeResult = await db.collection('legislation').aggregate([
-      { $match: { ...congressQuery, createdAt: { $exists: true } } },
+      { $match: { ...allCongressQuery, createdAt: { $exists: true } } },
       {
         $addFields: {
           ageInDays: {
@@ -215,28 +128,20 @@ export async function GET() {
 
     const averageBillAge = Math.round(avgAgeResult[0]?.avgAge || 0);
 
-    // Get recent legislation (last 10) - now across ALL Congress sessions with better sorting
-    // Use aggregation to get the most recent date from multiple sources
+    // Get recent legislation (last 10) - from the 119th CONGRESS ONLY
     const recentLegislationAggregation = await db.collection('legislation').aggregate([
-      { $match: congressQuery },
+      { $match: recentCongressQuery }, // Use the 119th Congress query here
       {
         $addFields: {
-          // Calculate the most recent date from multiple sources
           mostRecentDate: {
             $max: [
               "$lastActionAt",
               "$createdAt",
-              // Get the most recent history date
               {
                 $max: {
                   $map: {
                     input: { $ifNull: ["$history", []] },
-                    in: {
-                      $dateFromString: {
-                        dateString: "$$this.date",
-                        onError: new Date(0) // Default to epoch if date parsing fails
-                      }
-                    }
+                    in: { $dateFromString: { dateString: "$$this.date", onError: new Date(0) } }
                   }
                 }
               }
@@ -248,11 +153,11 @@ export async function GET() {
       { $limit: 10 }
     ]).toArray();
 
-    console.log('Recent US Congress legislation count (all sessions, history-aware):', recentLegislationAggregation.length);
+    console.log(`Recent legislation from 119th Congress: ${recentLegislationAggregation.length} documents`);
 
-    // Get trending topics - now across ALL Congress sessions
+    // Get trending topics - across ALL Congress sessions
     const trendingTopics = await db.collection('legislation').aggregate([
-      { $match: congressQuery },
+      { $match: allCongressQuery },
       { $unwind: { path: "$subjects", preserveNullAndEmptyArrays: true } },
       { $group: { _id: "$subjects", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
@@ -261,20 +166,20 @@ export async function GET() {
         $project: {
           name: "$_id",
           totalCount: "$count",
-          recentCount: "$count", // For simplicity, using same count
+          recentCount: "$count",
           trend: "stable"
         }
       }
     ]).toArray();
 
-    // Get top sponsors - now across ALL Congress sessions
+    // Get top sponsors - across ALL Congress sessions
     const topSponsors = await db.collection('legislation').aggregate([
-      { $match: congressQuery },
+      { $match: allCongressQuery },
       { $unwind: { path: "$sponsors", preserveNullAndEmptyArrays: true } },
       { $group: {
         _id: "$sponsors.name",
         totalBills: { $sum: 1 },
-        recentBills: { $sum: 1 } // For simplicity, using same count
+        recentBills: { $sum: 1 }
       }},
       { $sort: { totalBills: -1 } },
       { $limit: 6 },
@@ -289,9 +194,9 @@ export async function GET() {
     ]).toArray();
 
     const responseData = {
-      jurisdiction: jurisdictionPattern,
+      jurisdiction: "United States Congress", // Set a consistent name
       statistics: {
-        totalLegislation: totalFound,
+        totalLegislation,
         recentActivity,
         activeSponsors,
         averageBillAge
@@ -309,15 +214,13 @@ export async function GET() {
       trendingTopics: trendingTopics.filter(topic => topic.name),
       topSponsors: topSponsors.filter(sponsor => sponsor.name),
       debugInfo: {
-        foundJurisdiction: jurisdictionPattern,
-        totalDocuments: totalFound,
-        searchedNames: possibleCongressNames,
+        totalDocuments: totalLegislation,
         availableJurisdictions: allJurisdictions.slice(0, 10)
       }
     };
 
     console.log('US Congress dashboard response data:', {
-      foundJurisdiction: jurisdictionPattern,
+      jurisdiction: responseData.jurisdiction,
       totalLegislation: responseData.statistics.totalLegislation,
       recentActivity: responseData.statistics.recentActivity,
       activeSponsors: responseData.statistics.activeSponsors,
