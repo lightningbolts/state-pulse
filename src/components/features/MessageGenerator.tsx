@@ -9,15 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { MessageSquare, Copy, Send, User, Building, AlertCircle, CheckCircle, Wand2 } from "lucide-react";
 import { BillSearch } from "./BillSearch";
 import { SelectedBills } from "./SelectedBills";
-
-interface Representative {
-  id: string;
-  name: string;
-  office: string;
-  party: string;
-  email?: string;
-  phone?: string;
-}
+import { Representative } from "@/types/representative";
+import { Bill } from "@/types/legislation";
 
 interface MessageTemplate {
   id: string;
@@ -25,20 +18,6 @@ interface MessageTemplate {
   subject: string;
   body: string;
   category: 'support' | 'oppose' | 'question' | 'thank_you' | 'general';
-}
-
-interface Bill {
-  id: string;
-  identifier: string;
-  title: string;
-  subject: string[];
-  classification: string[];
-  from_organization?: {
-    name: string;
-  };
-  latest_action_description?: string;
-  latest_action_date?: string;
-  abstract?: string;
 }
 
 interface MessageGeneratorProps {

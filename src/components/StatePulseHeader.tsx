@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export function StatePulseHeader() {
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-2 sm:px-4 md:px-6 lg:px-8 shadow-sm w-full max-w-none min-w-0">
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-background px-2 sm:px-4 md:px-6 lg:px-8 shadow-sm w-full max-w-none min-w-0">
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         <SidebarTrigger className="md:hidden" />
         <div className="flex items-center gap-2 min-w-0">

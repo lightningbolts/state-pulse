@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
+import { OpenStatesPerson, Representative } from "@/types/representative";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -20,80 +21,6 @@ async function connectToDatabase() {
 }
 
 // Interface for OpenStates person data
-interface OpenStatesPerson {
-  id: string;
-  name: string;
-  party: string;
-  current_role?: {
-    title: string;
-    org_classification: string;
-    district?: number;
-    division_id?: string;
-  };
-  jurisdiction?: {
-    id: string;
-    name: string;
-    classification: string;
-  };
-  given_name?: string;
-  family_name?: string;
-  image?: string;
-  email?: string;
-  gender?: string;
-  birth_date?: string;
-  death_date?: string;
-  extras?: {
-    profession?: string;
-  };
-  created_at?: string;
-  updated_at?: string;
-  openstates_url?: string;
-  other_identifiers?: Array<{
-    identifier: string;
-    scheme: string;
-  }>;
-  other_names?: Array<{
-    name: string;
-    note?: string;
-  }>;
-  links?: Array<{
-    url: string;
-    note?: string;
-  }>;
-  sources?: Array<{
-    url: string;
-    note?: string;
-  }>;
-  offices?: Array<{
-    name: string;
-    fax?: string;
-    voice?: string;
-    address?: string;
-    classification?: string;
-  }>;
-}
-
-interface Representative {
-  id: string;
-  name: string;
-  party: string;
-  office: string;
-  district?: string;
-  jurisdiction: string;
-  email?: string;
-  website?: string;
-  photo?: string;
-  lat?: number;
-  lon?: number;
-  addresses?: Array<{
-    type: string;
-    address: string;
-    phone?: string;
-    fax?: string;
-  }>;
-  lastUpdated: Date;
-}
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -201,7 +128,8 @@ export async function GET(request: NextRequest) {
 
         // Create a more comprehensive regex that matches both state abbreviation and full name
         const stateFullName = Object.keys(stateMap).find(name => stateMap[name] === stateCode) || stateCode;
-        const stateRegex = new RegExp(`(${stateCode}|${stateFullName.replace(/\s+/g, '\\s+')}|${stateCode}\\s+State)`, 'i');
+        // Use word boundaries to avoid partial matches (e.g., IA in California)
+        const stateRegex = new RegExp(`\\b(${stateCode}|${stateFullName.replace(/\s+/g, '\\s+')}|${stateCode}\\s+State)\\b`, 'i');
 
         const totalCachedReps = await representativesCollection.countDocuments({
           jurisdiction: { $regex: stateRegex },

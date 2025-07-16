@@ -6,34 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar, Clock, MapPin, Users, Search, ExternalLink, AlertCircle } from "lucide-react";
-
-interface PublicHearing {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  location: string;
-  type: 'city_council' | 'county_board' | 'school_board' | 'planning_commission' | 'other';
-  description: string;
-  agenda?: string[];
-  contact?: {
-    phone?: string;
-    email?: string;
-    website?: string;
-  };
-  isVirtual: boolean;
-  virtualLink?: string;
-  status: 'scheduled' | 'cancelled' | 'postponed';
-}
-
-interface PublicHearingsProps {
-  userLocation?: {
-    state?: string;
-    city?: string;
-    county?: string;
-  };
-  onClose?: () => void;
-}
+import { PublicHearing, PublicHearingsProps} from "@/types/event";
 
 export function PublicHearings({ userLocation, onClose }: PublicHearingsProps) {
   const [hearings, setHearings] = useState<PublicHearing[]>([]);

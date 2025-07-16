@@ -1,30 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-interface BallotMeasure {
-  id: string;
-  title: string;
-  type: 'proposition' | 'referendum' | 'initiative' | 'bond' | 'constitutional_amendment';
-  number?: string;
-  description: string;
-  summary: string;
-  fullText?: string;
-  supportingArgument?: string;
-  opposingArgument?: string;
-  fiscalImpact?: string;
-  jurisdiction: string;
-  electionDate: string;
-  status: 'upcoming' | 'passed' | 'failed' | 'pending';
-}
-
-interface Candidate {
-  id: string;
-  name: string;
-  party?: string;
-  office: string;
-  incumbent: boolean;
-  website?: string;
-  bio?: string;
-}
+import { BallotMeasure, Candidate } from '@/types/ballot';
 
 export async function GET(request: NextRequest) {
   try {

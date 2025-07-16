@@ -5,41 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Vote, ExternalLink, AlertCircle, Info, Download } from "lucide-react";
-
-interface BallotMeasure {
-  id: string;
-  title: string;
-  type: 'proposition' | 'referendum' | 'initiative' | 'bond' | 'constitutional_amendment';
-  number?: string;
-  description: string;
-  summary: string;
-  fullText?: string;
-  supportingArgument?: string;
-  opposingArgument?: string;
-  fiscalImpact?: string;
-  jurisdiction: string;
-  electionDate: string;
-  status: 'upcoming' | 'passed' | 'failed' | 'pending';
-}
-
-interface Candidate {
-  id: string;
-  name: string;
-  party?: string;
-  office: string;
-  incumbent: boolean;
-  website?: string;
-  bio?: string;
-}
-
-interface BallotInformationProps {
-  userLocation?: {
-    state?: string;
-    city?: string;
-    county?: string;
-  };
-  onClose?: () => void;
-}
+import type { BallotMeasure, Candidate, BallotInformationProps } from "@/types/ballot";
 
 export function BallotInformation({ userLocation, onClose }: BallotInformationProps) {
   const [measures, setMeasures] = useState<BallotMeasure[]>([]);

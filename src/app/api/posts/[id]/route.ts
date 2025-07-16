@@ -16,7 +16,7 @@ export async function PUT(
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { title, content, linkedBills, tags } = body;
 
@@ -82,7 +82,7 @@ export async function DELETE(
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const { db } = await connectToDatabase();
 
     const result = await db.collection('posts').deleteOne({

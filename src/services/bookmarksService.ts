@@ -16,7 +16,7 @@ export async function addBookmark(
     metadata?: BookmarkMetadata
 ): Promise<LegislationBookmark> {
     try {
-        // Check if bookmark already exists
+        // Check if a bookmark already exists
         const existingBookmark = await getBookmark(userId, legislationId);
         if (existingBookmark) {
             throw new Error('Legislation is already bookmarked');
@@ -219,47 +219,5 @@ export async function getUserBookmarkedLegislationIds(userId: string): Promise<s
     } catch (error) {
         console.error('Error getting bookmarked legislation IDs:', error);
         return [];
-    }
-}
-
-// Bulk operations for migration
-export async function migrateUserBookmarks(userId: string, legislationIds: string[]): Promise<void> {
-    try {
-        const collection: Collection<BookmarkMongoDbDocument> = await getCollection('bookmarks');
-        const now = new Date();
-
-        console.log('Starting migration for user:', userId, 'with legislation IDs:', legislationIds);
-
-        // Check which bookmarks already exist to avoid duplicates
-        const existingBookmarks = await collection.find({
-            userId,
-            legislationId: { $in: legislationIds }
-        }).toArray();
-
-        const existingLegislationIds = existingBookmarks.map(bookmark => bookmark.legislationId);
-        const newLegislationIds = legislationIds.filter(id => !existingLegislationIds.includes(id));
-
-        console.log('Existing bookmarks found:', existingLegislationIds);
-        console.log('New bookmarks to create:', newLegislationIds);
-
-        // Only create bookmark documents for legislation that doesn't already exist
-        if (newLegislationIds.length > 0) {
-            const bookmarkDocs = newLegislationIds.map(legislationId => ({
-                _id: new ObjectId(),
-                id: randomUUID(),
-                userId,
-                legislationId,
-                createdAt: now,
-                updatedAt: now
-            }));
-
-            await collection.insertMany(bookmarkDocs);
-            console.log('Successfully migrated', newLegislationIds.length, 'new bookmarks');
-        } else {
-            console.log('No new bookmarks to migrate - all already exist');
-        }
-    } catch (error) {
-        console.error('Error migrating user bookmarks:', error);
-        throw error;
     }
 }

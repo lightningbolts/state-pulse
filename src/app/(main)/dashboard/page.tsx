@@ -21,39 +21,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-interface StateDetailData {
-  state?: string;
-  jurisdiction?: string; // Add jurisdiction field for Congress
-  statistics: {
-    totalLegislation: number;
-    recentActivity: number;
-    activeSponsors: number;
-    averageBillAge: number;
-  };
-  recentLegislation: Array<{
-    id: string;
-    identifier: string;
-    title: string;
-    lastAction: string;
-    lastActionDate: string;
-    subjects: string[];
-    primarySponsor: string;
-    chamber: string;
-  }>;
-  trendingTopics: Array<{
-    name: string;
-    totalCount: number;
-    recentCount: number;
-    trend: string;
-  }>;
-  topSponsors: Array<{
-    name: string;
-    totalBills: number;
-    recentBills: number;
-    activity: string;
-  }>;
-}
+import { StateDetailData } from "@/types/jurisdictions";
 
 function DashboardContent() {
   const searchParams = useSearchParams();

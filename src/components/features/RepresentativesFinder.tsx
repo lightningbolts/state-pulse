@@ -13,6 +13,11 @@ import { PublicHearings } from "./PublicHearings";
 import { BallotInformation } from "./BallotInformation";
 import { MessageGenerator } from "./MessageGenerator";
 import { RepresentativesResults } from "./RepresentativesResults";
+import { Representative } from "@/types/representative";
+import { ApiResponse} from "@/types/representative";
+import { AddressSuggestion } from "@/types/geo";
+import { STATE_MAP } from "@/types/geo";
+import { STATE_COORDINATES } from "@/types/geo";
 
 // Dynamically import the map component to avoid SSR issues
 const RepresentativesMap = dynamic(() => import('./RepresentativesMap').then(mod => ({ default: mod.RepresentativesMap })), {
@@ -20,60 +25,6 @@ const RepresentativesMap = dynamic(() => import('./RepresentativesMap').then(mod
   loading: () => <div className="w-full h-80 bg-muted animate-pulse rounded-lg flex items-center justify-center">Loading map...</div>
 });
 
-interface Representative {
-  id: string;
-  name: string;
-  party: string;
-  office: string;
-  district?: string;
-  jurisdiction: string;
-  phone?: string;
-  email?: string;
-  website?: string;
-  photo?: string;
-  lat?: number;
-  lon?: number;
-  distance?: number;
-  addresses?: Array<{
-    type: string;
-    address: string;
-    phone?: string;
-    fax?: string;
-  }>;
-  lastUpdated: Date;
-}
-
-interface ApiResponse {
-  representatives: Representative[];
-  source: 'cache' | 'api';
-  count?: number;
-  pagination?: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-}
-
-interface AddressSuggestion {
-  id: string;
-  display_name: string;
-  address: {
-    house_number?: string;
-    road?: string;
-    city?: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-  };
-  lat: number;
-  lon: number;
-  importance: number;
-  type: string;
-  class: string;
-}
 
 // Calculate distance between two points using Haversine formula
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -86,23 +37,6 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
-
-// State name to abbreviation mapping - centralized constant
-const STATE_MAP: Record<string, string> = {
-  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-  'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-};
 
 export function RepresentativesFinder() {
   const [representatives, setRepresentatives] = useState<Representative[]>([]);

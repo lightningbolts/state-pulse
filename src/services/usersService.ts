@@ -1,25 +1,7 @@
 import { getCollection } from '../lib/mongodb';
 import { Collection, ObjectId } from 'mongodb';
-
-export interface User {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
-    preferences?: Record<string, any>;
-    trackingTopics: string[];
-    clerkId?: string;
-    // Other fields as needed
-}
-
-interface UserMongoDbDocument extends Omit<User, 'id' | 'createdAt' | 'updatedAt'> {
-    _id: ObjectId;
-    id: string;
-    createdAt?: Date;
-    updatedAt?: Date;
-}
+import { User } from '../types/user';
+import { UserMongoDbDocument } from "../types/user";
 
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
     const cleanData = { ...data };

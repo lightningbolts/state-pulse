@@ -24,55 +24,8 @@ import {
 } from "lucide-react";
 import { BillSearch } from "./BillSearch";
 import { SelectedBills } from "./SelectedBills";
-
-interface Bill {
-  id: string;
-  identifier: string;
-  title: string;
-  subject: string[];
-  classification: string[];
-  from_organization?: {
-    name: string;
-  };
-  latest_action_description?: string;
-  latest_action_date?: string;
-  abstract?: string;
-}
-
-interface Post {
-  _id: string;
-  userId: string;
-  username: string;
-  userImage?: string;
-  type: 'legislation' | 'bug_report';
-  title: string;
-  content: string;
-  linkedBills?: Bill[];
-  tags: string[];
-  likes: string[]; // Array of user IDs who liked
-  comments: Comment[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Comment {
-  _id: string;
-  userId: string;
-  username: string;
-  userImage?: string;
-  content: string;
-  createdAt: string;
-  replies?: Reply[];
-}
-
-interface Reply {
-  _id: string;
-  userId: string;
-  username: string;
-  userImage?: string;
-  content: string;
-  createdAt: string;
-}
+import { Bill} from "@/types/legislation";
+import { Post, Reply, Comment } from "@/types/media";
 
 export function PostsFeed() {
   const { user, isSignedIn } = useUser();

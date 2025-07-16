@@ -64,109 +64,6 @@ export async function fetchPdfFromOpenStatesUrl(legUrl: string): Promise<{ text:
   }
 }
 
-export async function robustTextExtraction(doc: any): Promise<{text: string, debug: string[]}> {
-  const debug: string[] = [];
-  let text = doc.text || doc.body || doc.title || '';
-  debug.push(`Initial text length: ${text.length}`);
-  // Get the first non-PDF source URL (state legislature webpage) from sources
-  const stateSource = doc.sources?.find((src: any) => src.url && !src.url.endsWith('.pdf'));
-  if (stateSource && stateSource.url) {
-    debug.push(`Using state legislature source URL: ${stateSource.url}`);
-    const pdfResult = await fetchPdfFromOpenStatesUrl(stateSource.url);
-    debug.push(...pdfResult.debug);
-    if (pdfResult.text && pdfResult.text.length > 100) {
-      debug.push('Used PDF from state legislature source page.');
-      return {text: pdfResult.text, debug};
-    } else {
-      debug.push('No PDF or insufficient PDF text from state legislature source page.');
-    }
-    // Try HTML extraction
-    try {
-      const res = await fetch(stateSource.url);
-      if (res.ok) {
-        const html = await res.text();
-        const $ = cheerio.load(html);
-        let htmlText = $('main').text().trim() || $('body').text().trim();
-        if (htmlText.length > 100) {
-          debug.push('Used HTML main/body text from state legislature source page.');
-          return {text: htmlText, debug};
-        }
-        htmlText = $('pre').text().trim();
-        if (htmlText.length > 100) {
-          debug.push('Used <pre> text from state legislature source page.');
-          return {text: htmlText, debug};
-        }
-        htmlText = $('.bill-text').text().trim();
-        if (htmlText.length > 100) {
-          debug.push('Used .bill-text from state legislature source page.');
-          return {text: htmlText, debug};
-        }
-      } else {
-        debug.push('Failed to fetch state legislature source page for HTML extraction.');
-      }
-    } catch (e) {
-      debug.push('Error fetching/parsing state legislature source page HTML.');
-    }
-  }
-  // Try direct PDF from sources
-  const pdfSource = doc.sources?.find((src: any) => src.url && src.url.endsWith('.pdf'));
-  if (pdfSource) {
-    try {
-      const res = await fetch(pdfSource.url);
-      if (res.ok) {
-        const buffer = await res.buffer();
-        const data = await pdf(buffer);
-        if (data.text.length > 100) {
-          debug.push('Used direct PDF from sources.');
-          return {text: data.text, debug};
-        }
-      }
-    } catch (e) {
-      debug.push('Failed to fetch/parse direct PDF from sources.');
-    }
-  }
-  // Aggressively combine all possible text fields
-  let combined = '';
-  if (doc.title) combined += doc.title + '\n';
-  if (doc.summary) combined += doc.summary + '\n';
-  if (doc.abstracts && Array.isArray(doc.abstracts)) {
-    for (const abs of doc.abstracts) {
-      if (abs && abs.abstract) combined += abs.abstract + '\n';
-    }
-  }
-  if (doc.actions && Array.isArray(doc.actions)) {
-    for (const act of doc.actions) {
-      if (act && act.description) combined += act.description + '\n';
-    }
-  }
-  if (doc.versions && Array.isArray(doc.versions)) {
-    for (const ver of doc.versions) {
-      if (ver && ver.note) combined += ver.note + '\n';
-    }
-  }
-  // Add all string fields
-  for (const key of Object.keys(doc)) {
-    if (typeof doc[key] === 'string' && doc[key].length > 20) {
-      combined += doc[key] + '\n';
-    }
-  }
-  // Remove fallback phrase from combined text
-  const fallbackPhrase = 'Summary not available due to insufficient information.';
-  if (combined.includes(fallbackPhrase)) {
-    combined = combined.split('\n').filter(line => !line.includes(fallbackPhrase)).join('\n');
-    debug.push('Removed fallback phrase from combined text.');
-  }
-  debug.push('Aggressively combined string fields. Length: ' + combined.length);
-  if (combined.length > 100) {
-    debug.push('Used aggressively combined string fields.');
-    debug.push('Combined preview: ' + combined.slice(0, 200));
-    return {text: combined, debug};
-  }
-  debug.push('Fallback to title or short text.');
-  debug.push('doc._id: ' + doc._id);
-  return {text, debug};
-}
-
 /**
  * Extracts the best available text for summarization from a legislation object.
  * Prefers fullText, then summary, then title.
@@ -191,7 +88,7 @@ export const fetchPdfTextFromOpenStatesUrl = async (legUrl: string): Promise<str
 };
 
 /**
- * Summarize text using Ollama's phi model (local LLM)
+ * Summarize text using an Ollama model (local LLM)
  * @param text The text to summarize
  * @returns The summary string
  */

@@ -3,20 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { FileText, X, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
-
-interface Bill {
-  id: string;
-  identifier: string;
-  title: string;
-  subject: string[];
-  classification: string[];
-  from_organization?: {
-    name: string;
-  };
-  latest_action_description?: string;
-  latest_action_date?: string;
-  abstract?: string;
-}
+import { Bill } from "@/types/legislation";
 
 interface SelectedBillsProps {
   selectedBills: Bill[];

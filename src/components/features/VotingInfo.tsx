@@ -5,26 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, MapPin, ExternalLink, AlertCircle, Info } from "lucide-react";
-
-interface ElectionEvent {
-  id: string;
-  type: 'election' | 'primary' | 'registration_deadline' | 'early_voting' | 'absentee_deadline';
-  title: string;
-  date: string;
-  description?: string;
-  location?: string;
-  requirements?: string[];
-  isUrgent?: boolean;
-}
-
-interface VotingInfoProps {
-  userLocation?: {
-    state?: string;
-    city?: string;
-    county?: string;
-  };
-  onClose?: () => void;
-}
+import { ElectionEvent, VotingInfoProps } from "@/types/event";
 
 export function VotingInfo({ userLocation, onClose }: VotingInfoProps) {
   const [events, setEvents] = useState<ElectionEvent[]>([]);

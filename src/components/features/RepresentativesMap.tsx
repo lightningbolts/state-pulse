@@ -2,21 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
-
-interface MapProps {
-  center: [number, number];
-  zoom: number;
-  representatives: Array<{
-    id: string;
-    name: string;
-    office: string;
-    party: string;
-    lat?: number;
-    lon?: number;
-    distance?: number;
-  }>;
-  userLocation?: [number, number];
-}
+import { MapProps } from '@/types/geo';
 
 export function RepresentativesMap({ center, zoom, representatives, userLocation }: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null);

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
+import { BookmarkButtonProps} from "@/types/legislation";
 
 // Create a context to share bookmarks data across all BookmarkButton instances
 export const BookmarksContext = createContext<{
@@ -58,11 +59,6 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
       {children}
     </BookmarksContext.Provider>
   );
-}
-
-interface BookmarkButtonProps {
-  legislationId: string;
-  className?: string;
 }
 
 export function BookmarkButton({ legislationId, className = '' }: BookmarkButtonProps) {
@@ -135,7 +131,6 @@ export function BookmarkButton({ legislationId, className = '' }: BookmarkButton
 
         // Handle 409 (already bookmarked) as a success case
         if (response.status === 409 && !isBookmarked) {
-          // Item is already bookmarked, just update the UI
           const newBookmarks = [...bookmarks, legislationId];
           updateBookmarks(newBookmarks);
           toast({

@@ -1,13 +1,11 @@
 import { auth } from '@clerk/nextjs/server';
 import {
-  User,
   addUser,
   upsertUser,
   getUserById,
   cleanupLegacySavedLegislation
 } from '@/services/usersService';
-import { migrateUserBookmarks } from '@/services/bookmarksService';
-
+import { User } from '@/types/user';
 /**
  * Get the current authenticated user from Clerk and their data from MongoDB
  * @returns User data from MongoDB with Clerk auth info
@@ -95,16 +93,6 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
 
     // Update user in MongoDB or create if doesn't exist
     await upsertUser(userData);
-
-    // Migrate legacy savedLegislation to bookmarks collection if needed
-    if (shouldMigrate) {
-      console.log('Migrating legacy savedLegislation to bookmarks collection');
-      await migrateUserBookmarks(clerkUser.id, legacySavedLegislation);
-
-      // Clean up the legacy savedLegislation array from the user document
-      console.log('Cleaning up legacy savedLegislation array from user document');
-      await cleanupLegacySavedLegislation(clerkUser.id);
-    }
 
     return { success: true };
   } catch (error) {

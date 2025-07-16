@@ -17,17 +17,7 @@ import { BookmarksList } from "@/components/features/BookmarksList";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import Link from 'next/link';
-
-interface RelatedLegislation {
-	id: string;
-	title?: string;
-	identifier?: string;
-	jurisdictionName?: string;
-	latestActionAt?: Date;
-	latestActionDescription?: string;
-	subjects?: string[];
-	stateLegislatureUrl?: string;
-}
+import { RelatedLegislation } from "@/types/legislation";
 
 export function PolicyTracker() {
 	const { user, isLoaded, isSignedIn } = useUser();

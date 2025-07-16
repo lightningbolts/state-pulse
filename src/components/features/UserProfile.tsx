@@ -15,6 +15,7 @@ import {
   MessageCircle,
   AlertTriangle
 } from "lucide-react";
+import { Post, Comment } from "@/types/media";
 
 interface UserProfile {
   id: string;
@@ -28,31 +29,6 @@ interface UserProfile {
 interface UserStats {
   postsCount: number;
   commentsCount: number;
-}
-
-interface Post {
-  _id: string;
-  userId: string;
-  username: string;
-  userImage?: string;
-  type: 'legislation' | 'bug_report';
-  title: string;
-  content: string;
-  linkedBills?: any[];
-  tags: string[];
-  likes: string[];
-  comments: Comment[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Comment {
-  _id: string;
-  userId: string;
-  username: string;
-  userImage?: string;
-  content: string;
-  createdAt: string;
 }
 
 export function UserProfile() {

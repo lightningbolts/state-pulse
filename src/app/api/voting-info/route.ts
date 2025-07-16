@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-interface ElectionEvent {
-  id: string;
-  type: 'election' | 'primary' | 'registration_deadline' | 'early_voting' | 'absentee_deadline';
-  title: string;
-  date: string;
-  description?: string;
-  location?: string;
-  requirements?: string[];
-  isUrgent?: boolean;
-}
+import { ElectionEvent } from '@/types/event';
 
 export async function GET(request: NextRequest) {
   try {

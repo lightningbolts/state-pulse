@@ -3,52 +3,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Mail, ExternalLink, AlertCircle, Database } from "lucide-react";
-
-interface Representative {
-  id: string;
-  name: string;
-  party: string;
-  office: string;
-  district?: string;
-  jurisdiction: string;
-  phone?: string;
-  email?: string;
-  website?: string;
-  photo?: string;
-  lat?: number;
-  lon?: number;
-  distance?: number;
-  addresses?: Array<{
-    type: string;
-    address: string;
-    phone?: string;
-    fax?: string;
-  }>;
-  lastUpdated: Date;
-}
-
-interface Pagination {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
-
-interface RepresentativesResultsProps {
-  representatives: Representative[];
-  closestReps: Representative[];
-  loading: boolean;
-  error: string | null;
-  showMap: boolean;
-  showAllMode: boolean;
-  userLocation: { lat: number; lon: number } | null;
-  dataSource: 'cache' | 'api' | null;
-  pagination?: Pagination;
-  onShowAllToggle: () => void;
-  onPageChange: (page: number) => void;
-}
+import { Representative, RepresentativesResultsProps} from "@/types/representative";
+import { Pagination} from "@/types/index";
 
 export function RepresentativesResults({
   representatives,

@@ -1,23 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-interface PublicHearing {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  location: string;
-  type: 'city_council' | 'county_board' | 'school_board' | 'planning_commission' | 'other';
-  description: string;
-  agenda?: string[];
-  contact?: {
-    phone?: string;
-    email?: string;
-    website?: string;
-  };
-  isVirtual: boolean;
-  virtualLink?: string;
-  status: 'scheduled' | 'cancelled' | 'postponed';
-}
+import { PublicHearing } from "@/types/event";
 
 export async function GET(request: NextRequest) {
   try {

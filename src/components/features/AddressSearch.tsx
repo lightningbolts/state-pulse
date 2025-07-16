@@ -6,32 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Search, MapPin, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface AddressSuggestion {
-  id: string;
-  display_name: string;
-  address: {
-    house_number?: string;
-    road?: string;
-    city?: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-  };
-  lat: number;
-  lon: number;
-  importance: number;
-  type: string;
-  class: string;
-}
-
-interface AddressSearchProps {
-  onAddressSelect: (suggestion: AddressSuggestion) => void;
-  onSearch: (query: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  className?: string;
-}
+import { AddressSuggestion, AddressSearchProps} from "@/types/geo";
 
 export function AddressSearch({
   onAddressSelect,

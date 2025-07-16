@@ -5,30 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, FileText } from "lucide-react";
-
-interface Bill {
-  id: string;
-  identifier: string;
-  title: string;
-  subject: string[];
-  classification: string[];
-  from_organization?: {
-    name: string;
-  };
-  latest_action_description?: string;
-  latest_action_date?: string;
-  abstract?: string;
-}
-
-interface BillSearchProps {
-  selectedBills: Bill[];
-  onBillSelect: (bill: Bill) => void;
-  userLocation?: {
-    state?: string;
-    city?: string;
-  };
-  className?: string;
-}
+import { Bill, BillSearchProps} from "@/types/legislation";
 
 export function BillSearch({ selectedBills, onBillSelect, userLocation, className }: BillSearchProps) {
   const [searchQuery, setSearchQuery] = useState('');

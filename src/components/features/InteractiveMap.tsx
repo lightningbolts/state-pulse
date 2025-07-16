@@ -8,6 +8,8 @@ import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { MapPin, Users, FileText, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { StateData } from '@/types/jurisdictions';
+import { MapMode} from "@/types/geo";
 
 // Import Leaflet for custom icons
 let L: any = null;
@@ -38,25 +40,6 @@ const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), {
 const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), {
   ssr: false,
 });
-
-// US States data structure
-interface StateData {
-  name: string;
-  abbreviation: string;
-  legislationCount: number;
-  activeRepresentatives: number;
-  recentActivity: number;
-  keyTopics: string[];
-  center: LatLngExpression;
-  color: string;
-}
-
-interface MapMode {
-  id: string;
-  label: string;
-  description: string;
-  icon: any;
-}
 
 const DEFAULT_POSITION: LatLngExpression = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
@@ -153,37 +136,6 @@ export function InteractiveMap() {
   const handleStateClick = (stateAbbr: string) => {
     setSelectedState(stateAbbr);
     fetchStateDetails(stateAbbr);
-  };
-
-  // Navigation handlers for the action buttons
-  const handleViewRepresentatives = (stateAbbr: string) => {
-    // Navigate to civic page with state parameter for pre-filtering
-    const stateName = stateStats[stateAbbr]?.name;
-    if (stateName) {
-      router.push(`/civic?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`);
-    } else {
-      router.push('/civic');
-    }
-  };
-
-  const handleViewLegislation = (stateAbbr: string) => {
-    // Navigate to legislation page with state parameter for pre-filtering
-    const stateName = stateStats[stateAbbr]?.name;
-    if (stateName) {
-      router.push(`/legislation?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`);
-    } else {
-      router.push('/legislation');
-    }
-  };
-
-  const handleStateProfile = (stateAbbr: string) => {
-    // Navigate to dashboard with state parameter for state-specific dashboard view
-    const stateName = stateStats[stateAbbr]?.name;
-    if (stateName) {
-      router.push(`/dashboard?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`);
-    } else {
-      router.push('/dashboard');
-    }
   };
 
   // Create custom marker icon

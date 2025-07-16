@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
-import { type Legislation } from '@/services/legislationService';
+import { Legislation } from '@/types/legislation';
 
 interface CollapsibleTimelineProps {
   historyEvents: Legislation['history'];

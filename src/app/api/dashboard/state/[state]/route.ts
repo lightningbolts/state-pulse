@@ -63,7 +63,7 @@ export async function GET(
       'WV': ['West Virginia'],
       'WI': ['Wisconsin'],
       'WY': ['Wyoming'],
-      'US': ['United States Congress', 'Congress']
+      'US': ['United States', 'Congress']
     };
 
     const patterns = jurisdictionPatterns[stateParam];
