@@ -458,12 +458,7 @@ export function PolicyUpdatesFeed() {
   };
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle className="font-headline text-2xl">Policy Updates</CardTitle>
-        <CardDescription>Stay updated with the latest policy developments. Filter by category or search for specific topics.</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <>
         {/* Congress Filter Indicator */}
         {showCongress && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
@@ -973,7 +968,6 @@ export function PolicyUpdatesFeed() {
           <p className="mt-6 text-center text-muted-foreground">Loading more updates...</p>
         )}
         {!hasMore && !loading && <p className="mt-6 text-center text-muted-foreground">No more updates.</p>}
-      </CardContent>
-    </Card>
+    </>
   );
 }
