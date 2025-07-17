@@ -117,61 +117,127 @@ export function BookmarksList() {
   }
 
   return (
-    <div className="space-y-4">
-      {loading ? (
-        <p className="text-muted-foreground">Loading bookmarks...</p>
-      ) : error ? (
-        <p className="text-red-500">{error}</p>
-      ) : bookmarkedLegislation.length === 0 ? (
-        <p className="text-muted-foreground">No bookmarked legislation found.</p>
-      ) : (
-        <ul className="space-y-4">
-          {bookmarkedLegislation.map((legislation, i) => (
-            <AnimatedSection
-              key={legislation.id}
-              style={{ transitionDelay: `${i * 60}ms` }}
-            >
-              <li>
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                      {legislation.identifier && <span>{legislation.identifier}:</span>}
-                      {legislation.title || 'Untitled Legislation'}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {legislation.subjects?.map((subject: string, idx: number) => (
-                        <Badge key={idx} variant="outline" className="text-xs">{subject}</Badge>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <CalendarDays className="h-4 w-4" />
-                      {legislation.latestActionAt ? new Date(legislation.latestActionAt).toLocaleDateString() : 'No date'}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <Users className="h-4 w-4" />
-                      {legislation.sponsors?.length || 0} sponsor{legislation.sponsors?.length === 1 ? '' : 's'}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <FileText className="h-4 w-4" />
-                      {legislation.jurisdictionName}
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      <Link href={`/legislation/${legislation.id}`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm">
-                          <ExternalLink className="h-4 w-4 mr-1" /> View Details
-                        </Button>
-                      </Link>
-                      <BookmarkButton legislationId={legislation.id} />
-                    </div>
-                  </CardContent>
-                </Card>
-              </li>
-            </AnimatedSection>
-          ))}
-        </ul>
-      )}
+    <div className="space-y-6">
+      <div className="text-sm text-muted-foreground mb-4">
+        {bookmarkedLegislation.length} bookmarked item{bookmarkedLegislation.length !== 1 ? 's' : ''}
+      </div>
+
+      {bookmarkedLegislation.map((legislation, i) => (
+        <AnimatedSection
+          key={legislation.id}
+          style={{ transitionDelay: `${i * 60}ms` }}
+        >
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3 md:gap-4">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-lg md:text-xl mb-2 break-words">
+                    <Link
+                      href={`/legislation/${legislation.id}`}
+                      className="hover:text-primary transition-colors"
+                    >
+                      {legislation.identifier}: {legislation.title}
+                    </Link>
+                  </CardTitle>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {legislation.statusText && (
+                      <Badge variant="secondary" className="text-xs">{legislation.statusText}</Badge>
+                    )}
+                    {legislation.classification?.map((type) => (
+                      <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground break-words">
+                    {legislation.session} - {legislation.jurisdictionName}
+                    {legislation.chamber && ` (${legislation.chamber})`}
+                  </p>
+                </div>
+                <BookmarkButton
+                  legislationId={legislation.id}
+                  className="flex-shrink-0 self-start"
+                />
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {legislation.firstActionAt && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    First Action: {new Date(legislation.firstActionAt).toLocaleDateString()}
+                  </div>
+                )}
+
+                {legislation.latestActionAt && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    Latest Action: {new Date(legislation.latestActionAt).toLocaleDateString()}
+                  </div>
+                )}
+
+                {legislation.sponsors && legislation.sponsors.length > 0 && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Users className="mr-2 h-4 w-4" />
+                    {legislation.sponsors.length} sponsor{legislation.sponsors.length !== 1 ? 's' : ''}
+                  </div>
+                )}
+
+                {legislation.abstracts && legislation.abstracts.length > 0 && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <FileText className="mr-2 h-4 w-4" />
+                    {legislation.abstracts.length} abstract{legislation.abstracts.length !== 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+
+              {legislation.subjects && legislation.subjects.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium mb-2">Subjects:</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {legislation.subjects.map((subject, idx) => (
+                      <Badge key={subject + '-' + idx} variant="default" className="text-xs">
+                        {subject}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {legislation.geminiSummary && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4">
+                  <h4 className="text-sm font-medium text-primary mb-2">AI Summary:</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {legislation.geminiSummary.length > 200
+                      ? `${legislation.geminiSummary.substring(0, 200)}...`
+                      : legislation.geminiSummary
+                    }
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                <Link href={`/legislation/${legislation.id}`}>
+                  <Button variant="outline" size="sm">
+                    View Details
+                  </Button>
+                </Link>
+
+                {legislation.openstatesUrl && (
+                  <Link
+                    href={legislation.openstatesUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline flex items-center text-sm"
+                  >
+                    <ExternalLink className="mr-1 h-3 w-3" />
+                    OpenStates
+                  </Link>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </AnimatedSection>
+      ))}
     </div>
   );
 }
