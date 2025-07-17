@@ -949,7 +949,7 @@ export function PolicyUpdatesFeed() {
                             window.open(stateUrl, '_blank', 'noopener');
                           }}
                         >
-                          {update.sources && update.sources.length > 0 ? 'State Link' : 'OpenStates Link'}
+                          {update.sources && update.sources.length > 0 ? 'Official Link' : 'OpenStates Link'}
                         </button>
 
                         <div onClick={e => e.stopPropagation()}>
