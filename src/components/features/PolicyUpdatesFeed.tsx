@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { STATE_MAP } from "@/types/geo";
+import { AnimatedSection } from "@/components/ui/AnimatedSection";
 
 interface PolicyUpdate {
   id: string;
@@ -198,7 +199,7 @@ export function PolicyUpdatesFeed() {
       if (filteredNewUpdates.length > 0) {
         setUpdates((prev) => {
           // Merge and ensure no duplicates, maintaining the order from the API.
-          const existingIds = new Set(prev.map((u) => u.id));
+          const existingIds = new Set(prev.map((u: PolicyUpdate) => u.id));
           const newUniqueUpdates = filteredNewUpdates.filter((u) => !existingIds.has(u.id));
           return [...prev, ...newUniqueUpdates];
         });
@@ -840,126 +841,127 @@ export function PolicyUpdatesFeed() {
             const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
 
             return (
-                <div
-                  key={uniqueKey}
-                  className="mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full relative"
-                >
-                  <div className="flex flex-col h-full">
-                    {/* Clickable area for navigation */}
-                    <Link
-                      href={`/legislation/${update.id}`}
-                      className="block flex-1"
-                      style={{ textDecoration: 'none', color: 'inherit' }}
-                    >
-                      <div>
-                        <div className="font-bold text-lg mb-1 text-left">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
-                        <div className="text-sm text-muted-foreground mb-1 text-left">
-                          {update.jurisdictionName} • {update.session}
-                        </div>
-                        {update.classification && update.classification.length > 0 && (
-                          <div className="mb-1">
-                            {update.classification.map((c, i) => (
-                              <Badge
-                                key={c + i}
-                                variant={classification === c.toLowerCase() ? "default" : "secondary"}
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  if (classification !== c.toLowerCase()) {
-                                    setClassification(c.toLowerCase());
-                                    setUpdates([]);
-                                    setSkip(0);
-                                    skipRef.current = 0;
-                                    setHasMore(true);
-                                    setLoading(true);
-                                  }
-                                }}
-                                className="mr-1 cursor-pointer"
-                              >
-                                {capitalize(c)}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                        {update.subjects && update.subjects.length > 0 && (
-                          <div className="mb-1">
-                            {update.subjects.map((s, i) => (
-                              <Badge
-                                key={s + i}
-                                variant={subject === s ? "default" : "outline"}
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const newSubject = subject === s ? "" : s;
-                                  if (subject !== newSubject) {
-                                    setSubject(newSubject);
-                                    setUpdates([]);
-                                    setSkip(0);
-                                    skipRef.current = 0;
-                                    setHasMore(true);
-                                    setLoading(true);
-                                  }
-                                }}
-                                className="mr-1 cursor-pointer"
-                              >
-                                #{capitalize(s)}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                        {formattedIntroDate && (
-                          <div className="text-sm text-muted-foreground mb-1">
-                              <span className="font-semibold">Introduced: </span>{formattedIntroDate}
-                          </div>
-                        )}
-                        {(lastActionDescription || formattedLastActionDate) && (
+                <AnimatedSection key={uniqueKey}>
+                  <div
+                    className="mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full relative"
+                  >
+                    <div className="flex flex-col h-full">
+                      {/* Clickable area for navigation */}
+                      <Link
+                        href={`/legislation/${update.id}`}
+                        className="block flex-1"
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                      >
+                        <div>
+                          <div className="font-bold text-lg mb-1 text-left">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
                           <div className="text-sm text-muted-foreground mb-1 text-left">
-                            <span className="font-semibold">Last Action: </span>{lastActionDescription || 'N/A'}
-                            {formattedLastActionDate && (
-                              <span className="ml-2">({formattedLastActionDate})</span>
-                            )}
+                            {update.jurisdictionName} • {update.session}
                           </div>
-                        )}
-                        {update.sponsors && update.sponsors.length > 0 && (
+                          {update.classification && update.classification.length > 0 && (
+                            <div className="mb-1">
+                              {update.classification.map((c, i) => (
+                                <Badge
+                                  key={c + i}
+                                  variant={classification === c.toLowerCase() ? "default" : "secondary"}
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (classification !== c.toLowerCase()) {
+                                      setClassification(c.toLowerCase());
+                                      setUpdates([]);
+                                      setSkip(0);
+                                      skipRef.current = 0;
+                                      setHasMore(true);
+                                      setLoading(true);
+                                    }
+                                  }}
+                                  className="mr-1 cursor-pointer"
+                                >
+                                  {capitalize(c)}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          {update.subjects && update.subjects.length > 0 && (
+                            <div className="mb-1">
+                              {update.subjects.map((s, i) => (
+                                <Badge
+                                  key={s + i}
+                                  variant={subject === s ? "default" : "outline"}
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const newSubject = subject === s ? "" : s;
+                                    if (subject !== newSubject) {
+                                      setSubject(newSubject);
+                                      setUpdates([]);
+                                      setSkip(0);
+                                      skipRef.current = 0;
+                                      setHasMore(true);
+                                      setLoading(true);
+                                    }
+                                  }}
+                                  className="mr-1 cursor-pointer"
+                                >
+                                  #{capitalize(s)}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          {formattedIntroDate && (
+                            <div className="text-sm text-muted-foreground mb-1">
+                              <span className="font-semibold">Introduced: </span>{formattedIntroDate}
+                            </div>
+                          )}
+                          {(lastActionDescription || formattedLastActionDate) && (
+                            <div className="text-sm text-muted-foreground mb-1 text-left">
+                              <span className="font-semibold">Last Action: </span>{lastActionDescription || 'N/A'}
+                              {formattedLastActionDate && (
+                                <span className="ml-2">({formattedLastActionDate})</span>
+                              )}
+                            </div>
+                          )}
+                          {update.sponsors && update.sponsors.length > 0 && (
                             <div className="mb-1 text-xs text-muted-foreground">
                               <span className="font-semibold">Sponsors: </span>
                               {update.sponsors.map((sp, i) => (
-                                  <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < (update.sponsors?.length || 0) - 1 ? ', ' : ''}</span>
+                                <span key={`${sp.name || ''}-${i}`}>{sp.name}{i < (update.sponsors?.length || 0) - 1 ? ', ' : ''}</span>
                               ))}
                             </div>
-                        )}
-                        {update.geminiSummary && (
-                          <div className="mt-2 text-sm text-left">{update.geminiSummary}</div>
-                        )}
-                        {!update.geminiSummary && update.summary && (
-                          <div className="mt-2 text-sm text-left">{update.summary}</div>
-                        )}
-                      </div>
-                    </Link>
+                          )}
+                          {update.geminiSummary && (
+                            <div className="mt-2 text-sm text-left">{update.geminiSummary}</div>
+                          )}
+                          {!update.geminiSummary && update.summary && (
+                            <div className="mt-2 text-sm text-left">{update.summary}</div>
+                          )}
+                        </div>
+                      </Link>
 
-                    {/* Bottom buttons section */}
-                    <div className="mt-auto pt-4 flex justify-between items-center gap-2">
-                      <button
-                        type="button"
-                        className="h-10 px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex-1 transition-colors"
-                        onClick={e => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          window.open(stateUrl, '_blank', 'noopener');
-                        }}
-                      >
-                        {update.sources && update.sources.length > 0 ? 'State Link' : 'OpenStates Link'}
-                      </button>
+                      {/* Bottom buttons section */}
+                      <div className="mt-auto pt-4 flex justify-between items-center gap-2">
+                        <button
+                          type="button"
+                          className="h-10 px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex-1 transition-colors"
+                          onClick={e => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.open(stateUrl, '_blank', 'noopener');
+                          }}
+                        >
+                          {update.sources && update.sources.length > 0 ? 'State Link' : 'OpenStates Link'}
+                        </button>
 
-                      <div onClick={e => e.stopPropagation()}>
-                        <BookmarkButton
-                          legislationId={update.id}
-                          className="h-10 px-3 rounded-md"
-                        />
+                        <div onClick={e => e.stopPropagation()}>
+                          <BookmarkButton
+                            legislationId={update.id}
+                            className="h-10 px-3 rounded-md"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                </AnimatedSection>
             );
           })}
         </div>

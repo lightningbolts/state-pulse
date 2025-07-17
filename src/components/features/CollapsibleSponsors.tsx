@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { Legislation } from '@/types/legislation';
+import { AnimatedSection } from '@/components/ui/AnimatedSection';
 
 interface CollapsibleSponsorsProps {
   sponsors: Legislation['sponsors'];
@@ -33,15 +34,15 @@ export function CollapsibleSponsors({ sponsors }: CollapsibleSponsorsProps) {
         )}
       </button>
       {sponsorsOpen && (
-        <div id="sponsors-content" className="mt-3">
-          <ul className="space-y-2">
+        <AnimatedSection className="mt-3">
+          <ul id="sponsors-content" className="space-y-2">
             {sponsors.map(sponsor => (
               <li key={sponsor.id || sponsor.name} className="text-sm p-2 bg-muted/50 rounded-md">
                 {sponsor.name} ({sponsor.primary ? 'Primary' : 'Co-sponsor'}) - {sponsor.entityType}
               </li>
             ))}
           </ul>
-        </div>
+        </AnimatedSection>
       )}
     </div>
   );
