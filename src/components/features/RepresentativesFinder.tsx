@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -536,20 +537,28 @@ export function RepresentativesFinder() {
             placeholder="Start typing your address or zip code..."
           />
         </div>
-      {showMap && userLocation && userLocation.lat !== 0 && userLocation.lon !== 0 && closestReps.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Map className="h-5 w-5 text-primary" />
-              <h4 className="font-semibold">Interactive Map - Top 10 Closest Representatives</h4>
-            </div>
-            <RepresentativesMap
-              center={[userLocation.lat, userLocation.lon]}
-              zoom={10}
-              representatives={closestReps}
-              userLocation={[userLocation.lat, userLocation.lon]}
-            />
-          </div>
-        )}
+      <AnimatePresence>
+        {showMap && userLocation && userLocation.lat !== 0 && userLocation.lon !== 0 && closestReps.length > 0 && (
+            <motion.div
+              className="space-y-4 mt-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+            >
+              <div className="flex items-center gap-2">
+                <Map className="h-5 w-5 text-primary" />
+                <h4 className="font-semibold">Interactive Map - Top 10 Closest Representatives</h4>
+              </div>
+              <RepresentativesMap
+                center={[userLocation.lat, userLocation.lon]}
+                zoom={10}
+                representatives={closestReps}
+                userLocation={[userLocation.lat, userLocation.lon]}
+              />
+            </motion.div>
+          )}
+      </AnimatePresence>
       <RepresentativesResults
           representatives={representatives}
           closestReps={closestReps}
@@ -563,7 +572,12 @@ export function RepresentativesFinder() {
           onShowAllToggle={handleShowAllToggle}
           onPageChange={handlePageChange}
         />
-      <div className="mt-8 border-t pt-6">
+      <motion.div
+        className="mt-8 border-t pt-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2, ease: "easeInOut" }}
+      >
           <h4 className="font-semibold mb-2 text-lg">Civic Tools</h4>
           <p className="text-sm text-muted-foreground mb-4">Quick access to other civic information.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -614,54 +628,59 @@ export function RepresentativesFinder() {
               <p className="text-xs text-muted-foreground">Create personalized messages</p>
             </button>
           </div>
-        </div>
-      {activeCivicTool === 'voting' && (
-          <div className="mt-6">
-            <VotingInfo
-              userLocation={{
-                state: userLocation?.address?.state,
-                city: userLocation?.address?.city,
-              }}
-              onClose={() => setActiveCivicTool(null)}
-            />
-          </div>
+      </motion.div>
+      <AnimatePresence mode="wait">
+        {activeCivicTool && (
+          <motion.div
+            key={activeCivicTool}
+            className="mt-6 overflow-hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+          >
+            {activeCivicTool === 'voting' && (
+                <VotingInfo
+                  userLocation={{
+                    state: userLocation?.address?.state,
+                    city: userLocation?.address?.city,
+                  }}
+                  onClose={() => setActiveCivicTool(null)}
+                />
+            )}
+            {activeCivicTool === 'hearings' && (
+                <PublicHearings
+                  userLocation={{
+                    state: userLocation?.address?.state,
+                    city: userLocation?.address?.city,
+                    county: userLocation?.address?.state, // Fallback to state if no county
+                  }}
+                  onClose={() => setActiveCivicTool(null)}
+                />
+            )}
+            {activeCivicTool === 'ballot' && (
+                <BallotInformation
+                  userLocation={{
+                    state: userLocation?.address?.state,
+                    city: userLocation?.address?.city,
+                    county: userLocation?.address?.state, // Fallback to state if no county
+                  }}
+                  onClose={() => setActiveCivicTool(null)}
+                />
+            )}
+            {activeCivicTool === 'message' && (
+                <MessageGenerator
+                  representatives={displayedRepresentatives}
+                  userLocation={{
+                    state: userLocation?.address?.state,
+                    city: userLocation?.address?.city,
+                  }}
+                  onClose={() => setActiveCivicTool(null)}
+                />
+            )}
+          </motion.div>
         )}
-      {activeCivicTool === 'hearings' && (
-          <div className="mt-6">
-            <PublicHearings
-              userLocation={{
-                state: userLocation?.address?.state,
-                city: userLocation?.address?.city,
-                county: userLocation?.address?.state, // Fallback to state if no county
-              }}
-              onClose={() => setActiveCivicTool(null)}
-            />
-          </div>
-        )}
-      {activeCivicTool === 'ballot' && (
-          <div className="mt-6">
-            <BallotInformation
-              userLocation={{
-                state: userLocation?.address?.state,
-                city: userLocation?.address?.city,
-                county: userLocation?.address?.state, // Fallback to state if no county
-              }}
-              onClose={() => setActiveCivicTool(null)}
-            />
-          </div>
-        )}
-      {activeCivicTool === 'message' && (
-          <div className="mt-6">
-            <MessageGenerator
-              representatives={displayedRepresentatives}
-              userLocation={{
-                state: userLocation?.address?.state,
-                city: userLocation?.address?.city,
-              }}
-              onClose={() => setActiveCivicTool(null)}
-            />
-          </div>
-        )}
+      </AnimatePresence>
     </>
   );
 }

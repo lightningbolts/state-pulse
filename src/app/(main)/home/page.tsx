@@ -2,12 +2,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, BarChart3, Landmark, Newspaper } from 'lucide-react';
+import { AnimatedSection } from '@/components/ui/AnimatedSection';
 
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-primary-foreground py-24 px-6 md:px-10 text-center rounded-md shadow-lg overflow-hidden">
+      <AnimatedSection className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-primary-foreground py-24 px-6 md:px-10 text-center rounded-md shadow-lg overflow-hidden">
         <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight">
           Welcome to StatePulse
         </h1>
@@ -26,10 +27,10 @@ export default function HomePage() {
             </Link>
           </Button>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Features Section */}
-      <section className="py-20 px-6 md:px-10">
+      <AnimatedSection className="py-20 px-6 md:px-10">
         <div className="container mx-auto text-center">
           <h2 className="text-4xl font-bold mb-4 tracking-tight">Why StatePulse?</h2>
           <p className="text-muted-foreground text-lg mb-16 max-w-2xl mx-auto leading-relaxed">
@@ -84,10 +85,10 @@ export default function HomePage() {
             </Card>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Call to Action Section */}
-      <section className="bg-muted/70 py-20 px-6 md:px-10 rounded-md shadow-lg overflow-hidden">
+      <AnimatedSection className="bg-muted/70 py-20 px-6 md:px-10 rounded-md shadow-lg overflow-hidden">
         <div className="container mx-auto text-center">
           <h2 className="text-4xl font-bold mb-6 tracking-tight">
             Ready to Dive In?
@@ -108,7 +109,7 @@ export default function HomePage() {
             </Button>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
     </div>
   );
 }

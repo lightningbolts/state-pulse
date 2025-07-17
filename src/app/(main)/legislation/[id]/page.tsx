@@ -1,11 +1,13 @@
-import { getLegislationById, type Legislation } from '@/services/legislationService';
+import { getLegislationById } from '@/services/legislationService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CalendarDays, FileText, Tag, Info } from 'lucide-react';
 import Link from 'next/link';
 import { CollapsibleSponsors } from '@/components/features/CollapsibleSponsors';
 import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
+import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
+import { Legislation } from "@/types/legislation";
 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -67,7 +69,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6 space-y-6 bg-background">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <AnimatedSection className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2 min-w-0">
               <h3 className="text-lg font-semibold text-foreground flex items-center">
                 <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Key Details
@@ -106,79 +108,79 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
                 <p className="text-sm text-muted-foreground">No subjects available.</p>
               )}
             </div>
-          </div>
+          </AnimatedSection>
 
           {openstatesUrl && (
-            <div className="mt-4">
+            <AnimatedSection>
               <Link href={openstatesUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center text-sm break-all">
                 <ExternalLink className="mr-2 h-4 w-4 flex-shrink-0" /> View on OpenStates
               </Link>
-            </div>
+            </AnimatedSection>
           )}
 
           {/* Sponsors Section with Collapsible Functionality */}
-          <CollapsibleSponsors sponsors={sponsors} />
+          <AnimatedSection><CollapsibleSponsors sponsors={sponsors} /></AnimatedSection>
 
           {abstracts && abstracts.length > 0 && (
-            <div className="mt-6">
+            <AnimatedSection>
               <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
                 <FileText className="mr-2 h-6 w-6 text-primary flex-shrink-0" /> Abstracts
               </h3>
               {abstracts.map((abstract, index) => (
-                <div key={index} className="p-3 border rounded-md bg-muted/50 mb-2 overflow-hidden">
+                <div key={index} className="p-3 border rounded-md bg-muted/50 mb-2">
                   <p className="text-sm text-foreground break-words">{abstract.abstract}</p>
                   {abstract.note && <p className="text-xs text-muted-foreground mt-1 break-words">Note: {abstract.note}</p>}
                 </div>
               ))}
-            </div>
+            </AnimatedSection>
           )}
 
           {geminiSummary && (
-            <div className="mt-6 p-4 border border-primary/30 rounded-lg bg-primary/5 overflow-hidden">
+            <AnimatedSection className="p-4 border border-primary/30 rounded-lg bg-primary/5">
               <h3 className="text-xl font-semibold text-primary mb-3">AI Generated Summary</h3>
               <p className="text-sm text-muted-foreground italic break-words">{geminiSummary}</p>
-            </div>
+            </AnimatedSection>
           )}
 
           {versions && versions.length > 0 && (
-            <div className="mt-6">
+            <AnimatedSection>
               <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
                 <FileText className="mr-2 h-6 w-6 text-primary flex-shrink-0" /> Versions & Documents
               </h3>
               <ul className="space-y-2">
                 {versions.map((version, index) => (
-                  <li key={index} className="p-3 border rounded-md bg-muted/50 overflow-hidden">
+                  <li key={index} className="p-3 border rounded-md bg-muted/50">
                     <p className="font-medium text-foreground break-words">{version.note}</p>
                     {version.date && <p className="text-xs text-muted-foreground">Date: {version.date.toLocaleDateString()}</p>}
                     {version.links && version.links.map((link: { url: string; media_type?: string | null }) => (
                       <Link key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm block mt-1 break-all">
-                        <ExternalLink className="inline-block mr-1 h-3 w-3 flex-shrink-0" /> {link.media_type || 'View Document'}
+                        <ExternalLink className="inline-block mr-1 h-3 w-3" /> {link.media_type || 'View Document'}
                       </Link>
                     ))}
                   </li>
                 ))}
               </ul>
-            </div>
+            </AnimatedSection>
           )}
 
           {sources && sources.length > 0 && (
-            <div className="mt-6">
+            <AnimatedSection>
               <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center">
                 <ExternalLink className="mr-2 h-6 w-6 text-primary flex-shrink-0" /> Sources
               </h3>
               <ul className="space-y-1">
                 {sources.map((source, index) => (
-                  <li key={index} className="overflow-hidden">
+                  <li key={index}>
                     <Link href={source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm break-all">
                       {source.note || source.url}
                     </Link>
                   </li>
                 ))}
               </ul>
-            </div>
+            </AnimatedSection>
           )}
 
-          <CollapsibleTimeline historyEvents={history} />
+          <AnimatedSection><CollapsibleTimeline historyEvents={history} /></AnimatedSection>
         </CardContent>
       </Card>
     </div>

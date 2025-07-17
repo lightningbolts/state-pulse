@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -323,24 +324,32 @@ Sincerely,
             ))}
           </select>
 
-          {selectedRep && (
-            <div className="mt-2 p-3 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <User className="h-4 w-4" />
-                <span className="font-medium">{selectedRep.name}</span>
-                <Badge variant="outline">{selectedRep.party}</Badge>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Building className="h-4 w-4" />
-                {selectedRep.office}
-              </div>
-              {selectedRep.email && (
-                <div className="text-sm text-muted-foreground mt-1">
-                  Email: {selectedRep.email}
+          <AnimatePresence>
+            {selectedRep && (
+              <motion.div
+                className="mt-2 p-3 bg-muted rounded-lg overflow-hidden"
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: "0.5rem" }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <User className="h-4 w-4" />
+                  <span className="font-medium">{selectedRep.name}</span>
+                  <Badge variant="outline">{selectedRep.party}</Badge>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Building className="h-4 w-4" />
+                  {selectedRep.office}
+                </div>
+                {selectedRep.email && (
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Email: {selectedRep.email}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Message Type Selection */}
@@ -371,43 +380,54 @@ Sincerely,
         </div>
 
         {/* Position Selection */}
-        {(messageType === 'support' || messageType === 'oppose' || messageType === 'general') && (
-          <div>
-            <label className="block text-sm font-medium mb-2">Your Position</label>
-            <div className="flex gap-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  value="support"
-                  checked={position === 'support'}
-                  onChange={(e) => setPosition(e.target.value as 'support' | 'oppose' | 'neutral')}
-                  className="mr-2"
-                />
-                Support
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  value="oppose"
-                  checked={position === 'oppose'}
-                  onChange={(e) => setPosition(e.target.value as 'support' | 'oppose' | 'neutral')}
-                  className="mr-2"
-                />
-                Oppose
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  value="neutral"
-                  checked={position === 'neutral'}
-                  onChange={(e) => setPosition(e.target.value as 'support' | 'oppose' | 'neutral')}
-                  className="mr-2"
-                />
-                Neutral/Question
-              </label>
-            </div>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {(messageType === 'support' || messageType === 'oppose' || messageType === 'general') && (
+            <motion.div
+              key="position-selection"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <div className="pt-2">
+                <label className="block text-sm font-medium mb-2">Your Position</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="support"
+                      checked={position === 'support'}
+                      onChange={(e) => setPosition(e.target.value as 'support' | 'oppose' | 'neutral')}
+                      className="mr-2"
+                    />
+                    Support
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="oppose"
+                      checked={position === 'oppose'}
+                      onChange={(e) => setPosition(e.target.value as 'support' | 'oppose' | 'neutral')}
+                      className="mr-2"
+                    />
+                    Oppose
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="neutral"
+                      checked={position === 'neutral'}
+                      onChange={(e) => setPosition(e.target.value as 'support' | 'oppose' | 'neutral')}
+                      className="mr-2"
+                    />
+                    Neutral/Question
+                  </label>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Personal Story */}
         <div>
@@ -462,15 +482,23 @@ Sincerely,
             </Button>
           </div>
 
-          {showBillSearch && (
-            <div className="p-4 bg-muted rounded-lg">
-              <BillSearch
-                selectedBills={selectedBills}
-                onBillSelect={handleBillSelect}
-                userLocation={userLocation}
-              />
-            </div>
-          )}
+          <AnimatePresence>
+            {showBillSearch && (
+              <motion.div
+                className="p-4 bg-muted rounded-lg overflow-hidden"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+              >
+                <BillSearch
+                  selectedBills={selectedBills}
+                  onBillSelect={handleBillSelect}
+                  userLocation={userLocation}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Generate Button */}
@@ -488,66 +516,80 @@ Sincerely,
         </Button>
 
         {/* Generated Message */}
-        {generatedMessage && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Generated Message</label>
-              <Textarea
-                value={generatedMessage}
-                onChange={(e) => setGeneratedMessage(e.target.value)}
-                rows={12}
-                className="w-full font-mono text-sm"
-                placeholder="Your generated message will appear here..."
-              />
-            </div>
+        <AnimatePresence>
+          {generatedMessage && (
+            <motion.div
+              className="space-y-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+            >
+              <div>
+                <label className="block text-sm font-medium mb-2">Generated Message</label>
+                <Textarea
+                  value={generatedMessage}
+                  onChange={(e) => setGeneratedMessage(e.target.value)}
+                  rows={12}
+                  className="w-full font-mono text-sm"
+                  placeholder="Your generated message will appear here..."
+                />
+              </div>
 
-            <div className="flex gap-2">
-              <Button
-                onClick={copyMessage}
-                variant="outline"
-                className="flex-1"
-              >
-                {copied ? (
-                  <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                ) : (
-                  <Copy className="h-4 w-4 mr-2" />
-                )}
-                {copied ? 'Copied!' : 'Copy Message'}
-              </Button>
-
-              {selectedRep?.email && (
+              <div className="flex gap-2">
                 <Button
-                  onClick={sendEmail}
+                  onClick={copyMessage}
+                  variant="outline"
                   className="flex-1"
                 >
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Email
+                  {copied ? (
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  {copied ? 'Copied!' : 'Copy Message'}
                 </Button>
-              )}
-            </div>
 
-            {!selectedRep?.email && (
-              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <span className="text-sm text-amber-800">
-                  Email address not available for this representative. You can copy the message and send it through other channels.
-                </span>
+                {selectedRep?.email && (
+                  <Button
+                    onClick={sendEmail}
+                    className="flex-1"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Email
+                  </Button>
+                )}
               </div>
-            )}
-          </div>
-        )}
 
-        {representatives.length === 0 && (
-          <div className="text-center py-8">
-            <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-muted-foreground mb-2">
-              No Representatives Found
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Please search for your representatives first to generate messages.
-            </p>
-          </div>
-        )}
+              {!selectedRep?.email && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm text-amber-800">
+                    Email address not available for this representative. You can copy the message and send it through other channels.
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {representatives.length === 0 && (
+            <motion.div
+              className="text-center py-8"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0, transition: { delay: 0.2 } }}
+            >
+              <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                No Representatives Found
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Please search for your representatives first to generate messages.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </CardContent>
     </Card>
   );
