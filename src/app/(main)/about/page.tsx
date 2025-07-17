@@ -134,8 +134,8 @@ export default function AboutPage() {
                 StatePulse would not be possible without the incredible work of open-source projects and organizations that share our commitment to transparency and accessibility:
               </p>
               <ul className="list-disc list-inside mb-4 space-y-2">
+                <li><strong>Open States Project, supported by Plural Policy:</strong> For maintaining comprehensive databases of state legislative information that form the backbone of our legislative tracking capabilities.</li>
                 <li><strong>Leaflet & OpenStreetMap:</strong> For providing the open-source mapping technology that powers our geographic features and helps users visualize legislation by location. Their commitment to free, open geographic data makes civic engagement more accessible to everyone.</li>
-                <li><strong>Open States Project:</strong> For maintaining comprehensive databases of state legislative information that form the backbone of our legislative tracking capabilities.</li>
                 <li><strong>The Open Data Community:</strong> For advocating for transparent government data and making it possible for platforms like StatePulse to exist.</li>
                 <li><strong>Our Contributors:</strong> To everyone who reports bugs, suggests improvements, and helps make StatePulse better for the entire community.</li>
               </ul>
