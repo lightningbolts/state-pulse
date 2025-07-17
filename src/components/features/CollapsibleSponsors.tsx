@@ -34,15 +34,15 @@ export function CollapsibleSponsors({ sponsors }: CollapsibleSponsorsProps) {
         )}
       </button>
       {sponsorsOpen && (
-        <AnimatedSection className="mt-3">
-          <ul id="sponsors-content" className="space-y-2">
-            {sponsors.map(sponsor => (
-              <li key={sponsor.id || sponsor.name} className="text-sm p-2 bg-muted/50 rounded-md">
+        <ul id="sponsors-content" className="space-y-2 mt-3">
+          {sponsors.map(sponsor => (
+            <AnimatedSection key={sponsor.id || sponsor.name}>
+              <li className="text-sm p-2 bg-muted/50 rounded-md">
                 {sponsor.name} ({sponsor.primary ? 'Primary' : 'Co-sponsor'}) - {sponsor.entityType}
               </li>
-            ))}
-          </ul>
-        </AnimatedSection>
+            </AnimatedSection>
+          ))}
+        </ul>
       )}
     </div>
   );

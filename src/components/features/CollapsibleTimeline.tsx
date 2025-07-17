@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
 import { Legislation } from '@/types/legislation';
+import { AnimatedSection } from '@/components/ui/AnimatedSection';
 
 interface CollapsibleTimelineProps {
   historyEvents: Legislation['history'];
@@ -64,22 +65,22 @@ export function CollapsibleTimeline({ historyEvents }: CollapsibleTimelineProps)
                   collapsed: { y: 50, opacity: 0, transition: { y: { stiffness: 1000 } } }
                 };
                 return (
-                    <motion.li key={index} className="relative pl-8 pb-8" variants={itemVariants}>
-                    {/* Vertical Connector Line - now correctly spans the full height */}
-                    {!isLast && (
-                      <div className="absolute left-[11px] top-3 h-full w-0.5 bg-primary" />
-                    )}
-                    {/* Timeline Dot */}
-                    <div className="absolute left-[6px] top-3 h-3 w-3 rounded-full bg-primary border-2 border-background" />
-                    <div className="bg-card p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                      <div className="font-medium text-primary-foreground bg-primary px-3 py-2 rounded-t-md text-sm flex justify-between items-center -m-4 mb-3">
-                        <span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}</span>
-                        <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
+                    <AnimatedSection key={index} className="relative pl-8 pb-8">
+                      {/* Vertical Connector Line - now correctly spans the full height */}
+                      {!isLast && (
+                        <div className="absolute left-[11px] top-3 h-full w-0.5 bg-primary" />
+                      )}
+                      {/* Timeline Dot */}
+                      <div className="absolute left-[6px] top-3 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+                      <div className="bg-card p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                        <div className="font-medium text-primary-foreground bg-primary px-3 py-2 rounded-t-md text-sm flex justify-between items-center -m-4 mb-3">
+                          <span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}</span>
+                          <span className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
+                        </div>
+                        <p className="text-sm text-foreground m-0">{event.action}</p>
+                        {event.details && <p className="text-xs text-muted-foreground mt-1 mb-0">Details: {event.details}</p>}
                       </div>
-                      <p className="text-sm text-foreground m-0">{event.action}</p>
-                      {event.details && <p className="text-xs text-muted-foreground mt-1 mb-0">Details: {event.details}</p>}
-                    </div>
-                    </motion.li>
+                    </AnimatedSection>
                 );
               })}
               </motion.ul>
