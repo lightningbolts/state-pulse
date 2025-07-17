@@ -527,19 +527,8 @@ export function RepresentativesFinder() {
   }, [searchParams]);
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle className="font-headline text-2xl flex items-center">
-          <Users className="mr-3 h-7 w-7" />
-          Find Your Representatives
-        </CardTitle>
-        <CardDescription>
-          Start typing your address for instant suggestions, or enter a zip code to find your closest state representatives with an interactive map.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Dynamic Address Search */}
-        <div className="max-w-lg mx-auto">
+    <>
+      <div className="max-w-lg mx-auto">
           <AddressSearch
             onAddressSelect={handleAddressSelect}
             onSearch={handleManualSearch}
@@ -547,9 +536,7 @@ export function RepresentativesFinder() {
             placeholder="Start typing your address or zip code..."
           />
         </div>
-
-        {/* Map Section */}
-        {showMap && userLocation && userLocation.lat !== 0 && userLocation.lon !== 0 && closestReps.length > 0 && (
+      {showMap && userLocation && userLocation.lat !== 0 && userLocation.lon !== 0 && closestReps.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Map className="h-5 w-5 text-primary" />
@@ -563,9 +550,7 @@ export function RepresentativesFinder() {
             />
           </div>
         )}
-
-        {/* Results Section */}
-        <RepresentativesResults
+      <RepresentativesResults
           representatives={representatives}
           closestReps={closestReps}
           loading={loading}
@@ -578,8 +563,7 @@ export function RepresentativesFinder() {
           onShowAllToggle={handleShowAllToggle}
           onPageChange={handlePageChange}
         />
-
-        <div className="mt-8 border-t pt-6">
+      <div className="mt-8 border-t pt-6">
           <h4 className="font-semibold mb-2 text-lg">Civic Tools</h4>
           <p className="text-sm text-muted-foreground mb-4">Quick access to other civic information.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -631,9 +615,7 @@ export function RepresentativesFinder() {
             </button>
           </div>
         </div>
-
-        {/* Civic Tools Components */}
-        {activeCivicTool === 'voting' && (
+      {activeCivicTool === 'voting' && (
           <div className="mt-6">
             <VotingInfo
               userLocation={{
@@ -644,8 +626,7 @@ export function RepresentativesFinder() {
             />
           </div>
         )}
-
-        {activeCivicTool === 'hearings' && (
+      {activeCivicTool === 'hearings' && (
           <div className="mt-6">
             <PublicHearings
               userLocation={{
@@ -657,8 +638,7 @@ export function RepresentativesFinder() {
             />
           </div>
         )}
-
-        {activeCivicTool === 'ballot' && (
+      {activeCivicTool === 'ballot' && (
           <div className="mt-6">
             <BallotInformation
               userLocation={{
@@ -670,8 +650,7 @@ export function RepresentativesFinder() {
             />
           </div>
         )}
-
-        {activeCivicTool === 'message' && (
+      {activeCivicTool === 'message' && (
           <div className="mt-6">
             <MessageGenerator
               representatives={displayedRepresentatives}
@@ -683,7 +662,6 @@ export function RepresentativesFinder() {
             />
           </div>
         )}
-      </CardContent>
-    </Card>
+    </>
   );
 }

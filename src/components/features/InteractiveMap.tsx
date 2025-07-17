@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { LatLngExpression } from 'leaflet';
 import dynamic from 'next/dynamic';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { MapPin, Users, FileText, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { StateData } from '@/types/jurisdictions';
@@ -138,41 +138,7 @@ export function InteractiveMap() {
     fetchStateDetails(stateAbbr);
   };
 
-  // Create custom marker icon
-  const createCustomIcon = (color: string) => {
-    if (!L) return undefined;
-
-    return L.divIcon({
-      className: 'custom-marker',
-      html: `
-        <div class="marker-pin" style="
-          width: 20px;
-          height: 20px;
-          background-color: ${color};
-          border: 2px solid hsl(var(--background));
-          border-radius: 50%;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-          position: relative;
-        ">
-          <div style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 8px;
-            height: 8px;
-            background-color: hsl(var(--background));
-            border-radius: 50%;
-          "></div>
-        </div>
-      `,
-      iconSize: [20, 20],
-      iconAnchor: [10, 10],
-      popupAnchor: [0, -10],
-    });
-  };
-
-  const getStateColor = (stateAbbr: string) => {
+  const getStateColor = useCallback((stateAbbr: string) => {
     const state = stateStats[stateAbbr];
     if (!state) return '#e0e0e0';
 
@@ -196,7 +162,50 @@ export function InteractiveMap() {
       default:
         return state.color;
     }
-  };
+  }, [mapMode, stateStats]);
+
+  // Memoize icons to prevent re-creating them on every render
+  const memoizedIcons = useMemo(() => {
+    if (!L) return {};
+
+    const uniqueColors = [...new Set(Object.keys(stateStats).map(abbr => getStateColor(abbr)))];
+    const icons: Record<string, any> = {};
+
+    uniqueColors.forEach(color => {
+      if (color) {
+        icons[color] = L.divIcon({
+          className: 'custom-marker',
+          html: `
+            <div class="marker-pin" style="
+              width: 20px;
+              height: 20px;
+              background-color: ${color};
+              border: 2px solid hsl(var(--background));
+              border-radius: 50%;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              position: relative;
+            ">
+              <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 8px;
+                height: 8px;
+                background-color: hsl(var(--background));
+                border-radius: 50%;
+              "></div>
+            </div>
+          `,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+          popupAnchor: [0, -10],
+        });
+      }
+    });
+
+    return icons;
+  }, [getStateColor, stateStats]);
 
   const getActivityLevel = (stateAbbr: string) => {
     const state = stateStats[stateAbbr];
@@ -327,7 +336,7 @@ export function InteractiveMap() {
                     eventHandlers={{
                       click: () => handleStateClick(abbr),
                     }}
-                    icon={createCustomIcon(getStateColor(abbr))}
+                    icon={memoizedIcons[getStateColor(abbr)]}
                   >
                     <Popup>
                       <div className="p-2 min-w-[180px] sm:min-w-[200px]">
