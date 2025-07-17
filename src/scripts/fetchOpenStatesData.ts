@@ -131,7 +131,7 @@ const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   { ocdId: 'ocd-jurisdiction/country:us/state:wa/government', abbr: 'WA' }, // Washington
   { ocdId: 'ocd-jurisdiction/country:us/state:wi/government', abbr: 'WI' }, // Wisconsin
   // United States Congress
-  { ocdId: 'ocd-jurisdiction/country:us/legislature', abbr: 'us' },
+  // { ocdId: 'ocd-jurisdiction/country:us/legislature', abbr: 'us' },
 
   // --- INACTIVE SESSIONS (Not currently in session - commented out) ---
   // { ocdId: 'ocd-jurisdiction/country:us/state:al/government', abbr: 'AL' }, // Alabama
