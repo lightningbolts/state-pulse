@@ -1018,8 +1018,11 @@ export function PolicyUpdatesFeed() {
                 })}
             </div>
             <div ref={loader}/>
-            {showLoadingText && (loading) && (
-                <p className="mt-6 text-center text-muted-foreground">Loading more updates...</p>
+            {showLoadingText && (loading) && updates.length > 0 && (
+                <p className="mt-6 text-center text-muted-foreground flex items-center justify-center gap-2">
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                  Loading more updates...
+                </p>
             )}
             {!hasMore && !loading && <p className="mt-6 text-center text-muted-foreground">No more updates.</p>}
         </>

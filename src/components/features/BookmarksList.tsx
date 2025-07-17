@@ -72,8 +72,13 @@ export function BookmarksList() {
 
     if (!isLoaded || loading) {
         return (
-            <div className="flex justify-center items-center py-12">
-                <div className="text-lg text-muted-foreground">Loading your bookmarks...</div>
+            <div className="relative min-h-[200px]">
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
+                    <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span className="text-sm md:text-base">Loading your bookmarks...</span>
+                    </div>
+                </div>
             </div>
         );
     }
