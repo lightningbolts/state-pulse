@@ -102,8 +102,8 @@ export default function HomePage() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="px-10 py-3 shadow-md hover:shadow-lg transition-shadow rounded-lg">
-              <Link href="/legislation">
-                View All Legislation
+              <Link href="/dashboard">
+                View Dashboard
               </Link>
             </Button>
           </div>
