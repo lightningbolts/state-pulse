@@ -16,6 +16,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Post, Comment } from "@/types/media";
+import { AnimatedSection } from "@/components/ui/AnimatedSection";
 
 interface UserProfile {
   id: string;
@@ -215,56 +216,58 @@ export function UserProfile() {
               </CardContent>
             </Card>
           ) : (
-            posts.map((post) => (
-              <Card key={post._id}>
-                <CardHeader>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant={post.type === 'legislation' ? 'default' : 'destructive'} className="text-xs">
-                      {post.type === 'legislation' ? (
-                        <>
-                          <FileText className="h-3 w-3 mr-1" />
-                          Legislation
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Bug Report
-                        </>
-                      )}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(post.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <CardTitle className="text-lg">{post.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm leading-relaxed mb-4">{post.content}</p>
+            posts.map((post, i) => (
+              <AnimatedSection key={post._id} style={{ transitionDelay: `${i * 60}ms` }}>
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant={post.type === 'legislation' ? 'default' : 'destructive'} className="text-xs">
+                        {post.type === 'legislation' ? (
+                          <>
+                            <FileText className="h-3 w-3 mr-1" />
+                            Legislation
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Bug Report
+                          </>
+                        )}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(post.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <CardTitle className="text-lg">{post.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed mb-4">{post.content}</p>
 
-                  {/* Tags */}
-                  {post.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {post.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
+                    {/* Tags */}
+                    {post.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {post.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
 
-                  {/* Post Stats */}
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Heart className="h-4 w-4" />
-                      {post.likes.length}
+                    {/* Post Stats */}
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Heart className="h-4 w-4" />
+                        {post.likes.length}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MessageCircle className="h-4 w-4" />
+                        {post.comments.length}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <MessageCircle className="h-4 w-4" />
-                      {post.comments.length}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </AnimatedSection>
             ))
           )}
         </TabsContent>
@@ -284,22 +287,24 @@ export function UserProfile() {
               </CardContent>
             </Card>
           ) : (
-            userComments.map((comment) => (
-              <Card key={comment._id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      Comment on: <span className="font-medium">{comment.postTitle}</span>
+            userComments.map((comment, i) => (
+              <AnimatedSection key={comment._id} style={{ transitionDelay: `${i * 60}ms` }}>
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        Comment on: <span className="font-medium">{comment.postTitle}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(comment.createdAt).toLocaleDateString()}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {new Date(comment.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm leading-relaxed">{comment.content}</p>
-                </CardContent>
-              </Card>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed">{comment.content}</p>
+                  </CardContent>
+                </Card>
+              </AnimatedSection>
             ))
           )}
         </TabsContent>
