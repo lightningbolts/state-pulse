@@ -28,13 +28,39 @@ export async function GET(request: NextRequest) {
     // Simplified and optimized aggregation pipeline
     const pipeline = [
       {
+        // Stage 1: Create a normalized 'effectiveJurisdictionName' field.
+        // This is the most critical step to correctly differentiate federal from state bills.
+        $addFields: {
+          effectiveJurisdictionName: {
+            $cond: {
+              // A bill is considered federal if it meets specific, unambiguous criteria.
+              if: {
+                $or: [
+                  // Criteria 1: The jurisdictionName explicitly says it's federal.
+                  { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /congress|united states/i } },
+                  // Criteria 2: The bill's history involves the President. This is a definitive federal indicator.
+                  // NOTE: We avoid using "House" or "Senate" here as they are ambiguous and exist in state legislatures.
+                  { $in: ["President of the United States", { $ifNull: ["$history.actor", []] }] }
+                ]
+              },
+              // If it's federal, label it "United States".
+              then: "United States",
+              // Otherwise, use its existing jurisdictionName.
+              else: "$jurisdictionName"
+            }
+          }
+        }
+      },
+      {
+        // Stage 2: Filter out any documents that do not have a valid jurisdiction name after normalization.
+        // This removes junk data and bills that are neither clearly federal nor state-level.
         $match: {
-          jurisdictionName: { $exists: true, $ne: null }
+          effectiveJurisdictionName: { $exists: true, $ne: null, $ne: "" }
         }
       },
       {
         $group: {
-          _id: '$jurisdictionName',
+          _id: '$effectiveJurisdictionName',
           totalBills: { $sum: 1 },
           recentBills: {
             $sum: {
