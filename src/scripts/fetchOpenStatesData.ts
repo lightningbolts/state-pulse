@@ -22,7 +22,7 @@ class GeminiRateLimiter {
   private readonly MAX_TPM = 2000000;
   private readonly MAX_RPD = 2000;
 
-  async waitForRateLimit(estimatedTokens: number = 1000): Promise<void> {
+  async waitForRateLimit(estimatedTokens: number = 2000): Promise<void> {
     const now = Date.now();
 
     // Clean old entries
