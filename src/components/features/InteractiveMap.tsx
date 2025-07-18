@@ -614,7 +614,7 @@ export function InteractiveMap() {
                                     <div className="min-w-0">
                                         <p className="text-xs md:text-sm font-medium truncate">
                                             <span className="hidden sm:inline">Jurisdictions Tracked</span>
-                                            <span className="sm:hidden">States</span>
+                                            <span className="sm:hidden">Jurisdictions</span>
                                         </p>
                                         <p className="text-lg md:text-2xl font-bold">{Object.keys(stateStats).length}</p>
                                     </div>
