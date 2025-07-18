@@ -1,12 +1,13 @@
 // src/testMongoConnection.ts
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 
 import { MongoClient } from 'mongodb';
 import {getCollection} from "@/lib/mongodb";
 
 // Test MongoDB connection
 async function testConnection() {
+  console.log('Loaded environment variables:', process.env);
   const uri = process.env.MONGODB_URI; // Make sure MONGODB_URI is in your .env file or environment
 
   if (!uri) {
