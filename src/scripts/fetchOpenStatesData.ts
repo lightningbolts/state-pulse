@@ -454,7 +454,7 @@ async function fetchSessionsForJurisdiction(ocdId: string): Promise<OpenStatesSe
 }
 
 // --- NEW: 12-hour update system ---
-const UPDATE_INTERVAL_HOURS = 12;
+const UPDATE_INTERVAL_HOURS = 24;
 
 function getUpdatedSinceString(hoursAgo: number): string {
   const now = new Date();
