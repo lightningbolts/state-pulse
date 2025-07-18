@@ -445,30 +445,29 @@ function DashboardContent() {
                     <CardContent className="pt-0">
                       <div className="space-y-2 md:space-y-3">
                         {stateData.trendingTopics.slice(0, 8).map((topic, index) => (
-                          <div
-                            key={topic.name}
-                            className="flex items-center justify-between gap-2"
-                          >
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <span className="text-xs md:text-sm font-medium flex-shrink-0">
-                                #{index + 1}
-                              </span>
-                              <span className="text-xs md:text-sm truncate">
-                                {topic.name}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
-                              <Badge variant="secondary" className="text-xs">
-                                <span className="hidden sm:inline">
-                                  {topic.recentCount} recent
+                          <AnimatedSection key={topic.name}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className="text-xs md:text-sm font-medium flex-shrink-0">
+                                  #{index + 1}
                                 </span>
-                                <span className="sm:hidden">{topic.recentCount}</span>
-                              </Badge>
-                              <span className="text-xs text-muted-foreground hidden sm:inline">
-                                {topic.totalCount} total
-                              </span>
+                                <span className="text-xs md:text-sm truncate">
+                                  {topic.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+                                <Badge variant="secondary" className="text-xs">
+                                  <span className="hidden sm:inline">
+                                    {topic.recentCount} recent
+                                  </span>
+                                  <span className="sm:hidden">{topic.recentCount}</span>
+                                </Badge>
+                                <span className="text-xs text-muted-foreground hidden sm:inline">
+                                  {topic.totalCount} total
+                                </span>
+                              </div>
                             </div>
-                          </div>
+                          </AnimatedSection>
                         ))}
                       </div>
                     </CardContent>
