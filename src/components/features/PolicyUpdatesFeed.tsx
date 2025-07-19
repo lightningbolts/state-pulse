@@ -365,8 +365,8 @@ export function PolicyUpdatesFeed() {
                 }
             },
             {
-                threshold: 0.1,
-                rootMargin: '100px'
+                threshold: 0, // Trigger as soon as any part is visible
+                rootMargin: '400px' // Expand margin to trigger earlier (near bottom)
             }
         );
         const currentLoader = loader.current;
