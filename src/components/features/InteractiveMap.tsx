@@ -289,17 +289,14 @@ export function InteractiveMap() {
                             <div className="grid grid-cols-2 gap-2 md:grid-cols-2 lg:grid-cols-4 lg:gap-2">
                                 {mapModes.map((mode) => {
                                     const IconComponent = mode.icon;
-                                    const isDisabled = mode.id !== 'legislation'; // Only legislation mode is active
+                                    // Enable all modes
                                     return (
                                         <Button
                                             key={mode.id}
                                             variant={mapMode === mode.id ? "default" : "outline"}
                                             size="sm"
-                                            onClick={() => !isDisabled && setMapMode(mode.id)}
-                                            disabled={isDisabled}
-                                            className={`flex flex-col items-center gap-1 lg:flex-row lg:gap-2 h-auto p-2 lg:p-3 min-h-[60px] lg:min-h-[auto] ${
-                                                isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                                            }`}
+                                            onClick={() => setMapMode(mode.id)}
+                                            className={`flex flex-col items-center gap-1 lg:flex-row lg:gap-2 h-auto p-2 lg:p-3 min-h-[60px] lg:min-h-[auto]`}
                                         >
                                             <IconComponent className="h-3 w-3 lg:h-4 lg:w-4 flex-shrink-0"/>
                                             <div className="text-center lg:text-left min-w-0 flex-1">
@@ -309,11 +306,6 @@ export function InteractiveMap() {
                             {mode.label.replace('Activity', '').replace('Representatives', 'Reps').replace('Legislation', 'Bills').trim()}
                           </span>
                                                 </div>
-                                                {isDisabled && (
-                                                    <div
-                                                        className="text-xs text-muted-foreground hidden lg:block mt-1">Coming
-                                                        Soon</div>
-                                                )}
                                             </div>
                                         </Button>
                                     );
