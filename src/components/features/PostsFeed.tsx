@@ -15,6 +15,7 @@ import {SelectedBills} from "./SelectedBills";
 import {Bill} from "@/types/legislation";
 import {Post} from "@/types/media";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
+import Link from "next/link";
 
 export function PostsFeed() {
     const {user, isSignedIn} = useUser();
@@ -576,7 +577,11 @@ export function PostsFeed() {
                                         )}
                                     </div>
 
-                                    <CardTitle className="text-base sm:text-lg leading-tight">{post.title}</CardTitle>
+                                    <CardTitle className="text-base sm:text-lg leading-tight">
+                                        <Link href={`/posts/${post._id}`} className="text-blue-600 hover:underline">
+                                            {post.title}
+                                        </Link>
+                                    </CardTitle>
                                 </CardHeader>
 
                                 <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">

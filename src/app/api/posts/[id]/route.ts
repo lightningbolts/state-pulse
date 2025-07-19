@@ -106,3 +106,20 @@ export async function DELETE(
     );
   }
 }
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = await params;
+    const { db } = await connectToDatabase();
+    const post = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+    if (!post) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    }
+    return NextResponse.json({ post });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch post' }, { status: 500 });
+  }
+}
