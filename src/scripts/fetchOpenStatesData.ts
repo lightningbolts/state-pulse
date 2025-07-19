@@ -572,6 +572,7 @@ async function fetchAndStoreUpdatedBills(
             // Only generate a new summary if the existing summary is less than 20 words or is the unavailable message
             let shouldGenerateSummary = false;
             let geminiSummaryWordCount = 0;
+            let geminiRateLimited = false;
             if (!legislationToStore.geminiSummary) {
               shouldGenerateSummary = true;
             } else {
@@ -584,8 +585,15 @@ async function fetchAndStoreUpdatedBills(
               }
             }
             if (shouldGenerateSummary) {
-              legislationToStore.geminiSummary = fullText ? await generateGeminiSummaryWithRateLimit(fullText) : null;
-              geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
+              try {
+                legislationToStore.geminiSummary = fullText ? await generateGeminiSummaryWithRateLimit(fullText) : null;
+                geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
+              } catch (err) {
+                // If Gemini is rate limited or throws, continue without summary
+                geminiRateLimited = true;
+                legislationToStore.geminiSummary = null;
+                console.warn(`Gemini summary failed or rate limited for ${legislationToStore.identifier}:`, err);
+              }
             }
 
             // Always upsert the legislation - we want to keep all bills with summaries
