@@ -166,8 +166,15 @@ export function PostCard({
                             <img
                                 src={post.userImage}
                                 alt={post.username}
-                                className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => router.push(`/users/${post.userId}`)}
+                                className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0 cursor-default select-none pointer-events-none"
+                                draggable={false}
+                                style={{ userDrag: "none" }}
+                                onContextMenu={e => e.preventDefault()}
+                                onMouseDown={e => e.preventDefault()}
+                                onDragStart={e => e.preventDefault()}
+                                onCopy={e => e.preventDefault()}
+                                onPaste={e => e.preventDefault()}
+                                onCut={e => e.preventDefault()}
                             />
                         )}
                         <div className="min-w-0 flex-1">
@@ -355,7 +362,21 @@ export function PostCard({
                         <div className="space-y-2 sm:space-y-3">
                             {post.comments.map((comment: Comment) => (
                                 <div key={comment._id} className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
-                                    {comment.userImage && <img src={comment.userImage} alt={comment.username} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => router.push(`/users/${comment.userId}`)} />}
+                                    {comment.userImage && (
+                                        <img
+                                            src={comment.userImage}
+                                            alt={comment.username}
+                                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 mt-0.5 cursor-default select-none pointer-events-none"
+                                            draggable={false}
+                                            style={{ userDrag: "none" }}
+                                            onContextMenu={e => e.preventDefault()}
+                                            onMouseDown={e => e.preventDefault()}
+                                            onDragStart={e => e.preventDefault()}
+                                            onCopy={e => e.preventDefault()}
+                                            onPaste={e => e.preventDefault()}
+                                            onCut={e => e.preventDefault()}
+                                        />
+                                    )}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -405,7 +426,21 @@ export function PostCard({
                                             <div className="mt-3 ml-4 space-y-2 border-l-2 border-muted pl-4">
                                                 {comment.replies.map((reply: Reply) => (
                                                     <div key={reply._id} className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-background rounded-lg border">
-                                                        {reply.userImage && <img src={reply.userImage} alt={reply.username} className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => router.push(`/users/${reply.userId}`)} />}
+                                                        {reply.userImage && (
+                                                            <img
+                                                                src={reply.userImage}
+                                                                alt={reply.username}
+                                                                className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 mt-0.5 cursor-default select-none pointer-events-none"
+                                                                draggable={false}
+                                                                style={{ userDrag: "none" }}
+                                                                onContextMenu={e => e.preventDefault()}
+                                                                onMouseDown={e => e.preventDefault()}
+                                                                onDragStart={e => e.preventDefault()}
+                                                                onCopy={e => e.preventDefault()}
+                                                                onPaste={e => e.preventDefault()}
+                                                                onCut={e => e.preventDefault()}
+                                                            />
+                                                        )}
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="flex items-center gap-2 mb-1 flex-wrap">

@@ -17,6 +17,7 @@ import {Post} from "@/types/media";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { PostCard } from "./PostCard";
 
 export function PostsFeed() {
     const {user, isSignedIn} = useUser();
@@ -600,534 +601,66 @@ export function PostsFeed() {
                     <AnimatedSection>
                         <Card>
                             <CardContent className="text-center py-6 sm:py-8">
-                                <MessageSquare
-                                    className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4"/>
-                                <h3 className="text-base sm:text-lg font-medium text-muted-foreground mb-2">
-                                    No posts found
-                                </h3>
-                                <p className="text-sm text-muted-foreground">
-                                    Try a different search term or clear the filter.
-                                </p>
+                                <MessageSquare className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4"/>
+                                <h3 className="text-base sm:text-lg font-medium text-muted-foreground mb-2">No posts found</h3>
+                                <p className="text-sm text-muted-foreground">Try a different search term or clear the filter.</p>
                             </CardContent>
                         </Card>
                     </AnimatedSection>
                 ) : (
                     filteredPosts.map((post) => (
                         <AnimatedSection key={post._id}>
-                            <Card className="mx-0 sm:mx-0">
-                                <CardHeader className="pb-3 sm:pb-4">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                                            {post.userImage && (
-                                                <img
-                                                    src={post.userImage}
-                                                    alt={post.username}
-                                                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                                                    onClick={() => router.push(`/users/${post.userId}`)}
-                                                />
-                                            )}
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                              className="font-medium text-sm sm:text-base truncate cursor-pointer hover:text-primary transition-colors"
-                              onClick={() => router.push(`/users/${post.userId}`)}
-                          >
-                            {post.username}
-                          </span>
-                                                    <Badge
-                                                        variant={post.type === 'legislation' ? 'default' : 'destructive'}
-                                                        className="text-xs px-2 py-0.5">
-                                                        {post.type === 'legislation' ? (
-                                                            <>
-                                                                <FileText className="h-3 w-3 mr-1"/>
-                                                                <span className="hidden xs:inline">Legislation</span>
-                                                                <span className="xs:hidden">Bills</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <AlertTriangle className="h-3 w-3 mr-1"/>
-                                                                <span className="hidden xs:inline">Bug Report</span>
-                                                                <span className="xs:hidden">Bug</span>
-                                                            </>
-                                                        )}
-                                                    </Badge>
-                                                </div>
-                                                <p className="text-xs sm:text-sm text-muted-foreground">
-                                                    {new Date(post.createdAt).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Post Actions for Owner */}
-                                        {isSignedIn && user?.id === post.userId && (
-                                            <div className="flex gap-1 sm:gap-2 flex-shrink-0">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => startEditPost(post)}
-                                                    className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-                                                >
-                                                    <Edit className="h-3 w-3 sm:h-4 sm:w-4"/>
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDeletePost(post._id)}
-                                                    className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-                                                >
-                                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4"/>
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <CardTitle className="text-base sm:text-lg leading-tight">
-                                        <Link href={`/posts/${post._id}`} className="text-blue-600 hover:underline">
-                                            {post.title}
-                                        </Link>
-                                    </CardTitle>
-                                </CardHeader>
-
-                                <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
-                                    <p className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">{post.content}</p>
-
-                                    {/* Linked Bills */}
-                                    {post.linkedBills && post.linkedBills.length > 0 && (
-                                        <div className="mt-3 sm:mt-4">
-                                            <SelectedBills
-                                                selectedBills={post.linkedBills}
-                                                onRemoveBill={() => {
-                                                }} // Read-only
-                                                onClearAll={() => {
-                                                }} // Read-only
-                                                title="Referenced Bills"
-                                                description="Bills discussed in this post"
-                                                readOnly={true}
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Tags */}
-                                    {post.tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 sm:gap-2">
-                                            {post.tags.map((tag) => (
-                                                <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5">
-                                                    {tag}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Post Actions */}
-                                    <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
-                                        <div className="flex items-center gap-3 sm:gap-4">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleLikePost(post._id)}
-                                                className={`flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 ${
-                                                    isSignedIn && post.likes.includes(user?.id || '')
-                                                        ? 'text-red-500'
-                                                        : ''
-                                                }`}
-                                            >
-                                                <Heart className={`h-4 w-4 ${
-                                                    isSignedIn && post.likes.includes(user?.id || '')
-                                                        ? 'fill-current'
-                                                        : ''
-                                                }`}/>
-                                                <span className="text-sm">{post.likes.length}</span>
-                                            </Button>
-
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setShowComments(prev => ({
-                                                    ...prev,
-                                                    [post._id]: !prev[post._id]
-                                                }))}
-                                                className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3"
-                                            >
-                                                <MessageCircle className="h-4 w-4"/>
-                                                <span className="text-sm">{post.comments.length}</span>
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    {/* Comments Section */}
-                                    {showComments[post._id] && (
-                                        <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4 border-t">
-                                            {/* Add Comment */}
-                                            {isSignedIn && (
-                                                <div className="space-y-2">
-                                                    <Textarea
-                                                        value={commentContent[post._id] || ''}
-                                                        onChange={(e) => setCommentContent(prev => ({
-                                                            ...prev,
-                                                            [post._id]: e.target.value
-                                                        }))}
-                                                        placeholder="Write a comment..."
-                                                        rows={2}
-                                                        className="text-sm resize-none"
-                                                    />
-                                                    <div className="flex justify-end">
-                                                        <Button
-                                                            onClick={() => handleAddComment(post._id)}
-                                                            disabled={!commentContent[post._id]?.trim()}
-                                                            size="sm"
-                                                            className="px-4 sm:px-6"
-                                                        >
-                                                            Post
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Comments List */}
-                                            <div className="space-y-2 sm:space-y-3">
-                                                {post.comments.map((comment) => (
-                                                    <div key={comment._id}
-                                                         className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
-                                                        {comment.userImage && (
-                                                            <img
-                                                                src={comment.userImage}
-                                                                alt={comment.username}
-                                                                className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                                                                onClick={() => router.push(`/users/${comment.userId}`)}
-                                                            />
-                                                        )}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-start justify-between gap-2">
-                                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <span
-                                      className="font-medium text-xs sm:text-sm cursor-pointer hover:text-primary transition-colors"
-                                      onClick={() => router.push(`/users/${comment.userId}`)}
-                                  >
-                                    {comment.username}
-                                  </span>
-                                                                    <span className="text-xs text-muted-foreground">
-                                    {new Date(comment.createdAt).toLocaleDateString()}
-                                  </span>
-                                                                </div>
-
-                                                                {/* Edit/Delete Comment Actions - Aligned to the right */}
-                                                                {isSignedIn && user?.id === comment.userId && (
-                                                                    <div className="flex gap-1 sm:gap-2 flex-shrink-0">
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => {
-                                                                                setEditingComment(comment._id);
-                                                                                setEditCommentContent(comment.content);
-                                                                            }}
-                                                                            className="h-6 w-6 sm:h-7 sm:w-7 p-0"
-                                                                        >
-                                                                            <Edit className="h-3 w-3"/>
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => handleDeleteComment(post._id, comment._id)}
-                                                                            className="h-6 w-6 sm:h-7 sm:w-7 p-0"
-                                                                        >
-                                                                            <Trash2 className="h-3 w-3"/>
-                                                                        </Button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Comment Content */}
-                                                            {editingComment === comment._id ? (
-                                                                <div className="space-y-2">
-                                                                    <Textarea
-                                                                        value={editCommentContent}
-                                                                        onChange={(e) => setEditCommentContent(e.target.value)}
-                                                                        placeholder="Edit your comment..."
-                                                                        rows={2}
-                                                                        className="text-sm resize-none"
-                                                                    />
-                                                                    <div className="flex justify-end gap-2">
-                                                                        <Button
-                                                                            onClick={() => setEditingComment(null)}
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="px-3 sm:px-4"
-                                                                        >
-                                                                            Cancel
-                                                                        </Button>
-                                                                        <Button
-                                                                            onClick={() => handleEditComment(post._id, comment._id)}
-                                                                            disabled={!editCommentContent.trim()}
-                                                                            size="sm"
-                                                                            className="px-3 sm:px-4"
-                                                                        >
-                                                                            Save
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <>
-                                                                    <p className="text-xs sm:text-sm leading-relaxed">{comment.content}</p>
-
-                                                                    {/* Reply Button */}
-                                                                    {isSignedIn && (
-                                                                        <div className="flex items-center gap-2 mt-2">
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() => setShowReplyForm(prev => ({
-                                                                                    ...prev,
-                                                                                    [comment._id]: !prev[comment._id]
-                                                                                }))}
-                                                                                className="text-xs text-muted-foreground hover:text-primary h-6 px-2"
-                                                                            >
-                                                                                Reply
-                                                                            </Button>
-
-                                                                            {/* Show/Hide Replies Toggle */}
-                                                                            {comment.replies && comment.replies.length > 0 && (
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="sm"
-                                                                                    onClick={() => setShowReplies(prev => ({
-                                                                                        ...prev,
-                                                                                        [comment._id]: !prev[comment._id]
-                                                                                    }))}
-                                                                                    className="text-xs text-muted-foreground hover:text-primary h-6 px-2"
-                                                                                >
-                                                                                    {showReplies[comment._id] ? 'Hide' : 'View'} {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
-                                                                                </Button>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-
-                                                                    {/* Reply Form */}
-                                                                    {showReplyForm[comment._id] && isSignedIn && (
-                                                                        <div className="mt-3 space-y-2">
-                                                                            <Textarea
-                                                                                value={replyContent[comment._id] || ''}
-                                                                                onChange={(e) => setReplyContent(prev => ({
-                                                                                    ...prev,
-                                                                                    [comment._id]: e.target.value
-                                                                                }))}
-                                                                                placeholder="Write a reply..."
-                                                                                rows={2}
-                                                                                className="text-sm resize-none"
-                                                                            />
-                                                                            <div className="flex justify-end gap-2">
-                                                                                <Button
-                                                                                    onClick={() => setShowReplyForm(prev => ({
-                                                                                        ...prev,
-                                                                                        [comment._id]: false
-                                                                                    }))}
-                                                                                    variant="outline"
-                                                                                    size="sm"
-                                                                                    className="px-3 sm:px-4"
-                                                                                >
-                                                                                    Cancel
-                                                                                </Button>
-                                                                                <Button
-                                                                                    onClick={() => handleAddReply(comment._id)}
-                                                                                    disabled={!replyContent[comment._id]?.trim()}
-                                                                                    size="sm"
-                                                                                    className="px-3 sm:px-4"
-                                                                                >
-                                                                                    Reply
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                </>
-                                                            )}
-
-                                                            {/* Replies Section - Nested Comments */}
-                                                            {showReplies[comment._id] && comment.replies && comment.replies.length > 0 && (
-                                                                <div
-                                                                    className="mt-3 ml-4 space-y-2 border-l-2 border-muted pl-4">
-                                                                    {comment.replies.map((reply) => (
-                                                                        <div key={reply._id}
-                                                                             className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-background rounded-lg border">
-                                                                            {reply.userImage && (
-                                                                                <img
-                                                                                    src={reply.userImage}
-                                                                                    alt={reply.username}
-                                                                                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                                                                                    onClick={() => router.push(`/users/${reply.userId}`)}
-                                                                                />
-                                                                            )}
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <div
-                                                                                    className="flex items-start justify-between gap-2">
-                                                                                    <div
-                                                                                        className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <span
-                                                className="font-medium text-xs cursor-pointer hover:text-primary transition-colors"
-                                                onClick={() => router.push(`/users/${reply.userId}`)}
-                                            >
-                                              {reply.username}
-                                            </span>
-                                                                                        <span
-                                                                                            className="text-xs text-muted-foreground">
-                                              {new Date(reply.createdAt).toLocaleDateString()}
-                                            </span>
-                                                                                    </div>
-
-                                                                                    {/* Edit/Delete Reply Actions */}
-                                                                                    {isSignedIn && user?.id === reply.userId && (
-                                                                                        <div
-                                                                                            className="flex gap-1 flex-shrink-0">
-                                                                                            <Button
-                                                                                                variant="ghost"
-                                                                                                size="sm"
-                                                                                                onClick={() => {
-                                                                                                    setEditingComment(reply._id);
-                                                                                                    setEditCommentContent(reply.content);
-                                                                                                }}
-                                                                                                className="h-5 w-5 p-0"
-                                                                                            >
-                                                                                                <Edit
-                                                                                                    className="h-2.5 w-2.5"/>
-                                                                                            </Button>
-                                                                                            <Button
-                                                                                                variant="ghost"
-                                                                                                size="sm"
-                                                                                                onClick={() => handleDeleteReply(comment._id, reply._id)}
-                                                                                                className="h-5 w-5 p-0"
-                                                                                            >
-                                                                                                <Trash2
-                                                                                                    className="h-2.5 w-2.5"/>
-                                                                                            </Button>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-
-                                                                                {/* Reply Content */}
-                                                                                {editingComment === reply._id ? (
-                                                                                    <div className="space-y-2">
-                                                                                        <Textarea
-                                                                                            value={editCommentContent}
-                                                                                            onChange={(e) => setEditCommentContent(e.target.value)}
-                                                                                            placeholder="Edit your reply..."
-                                                                                            rows={2}
-                                                                                            className="text-sm resize-none"
-                                                                                        />
-                                                                                        <div
-                                                                                            className="flex justify-end gap-2">
-                                                                                            <Button
-                                                                                                onClick={() => setEditingComment(null)}
-                                                                                                variant="outline"
-                                                                                                size="sm"
-                                                                                                className="px-2 text-xs"
-                                                                                            >
-                                                                                                Cancel
-                                                                                            </Button>
-                                                                                            <Button
-                                                                                                onClick={() => handleEditReply(comment._id, reply._id)}
-                                                                                                disabled={!editCommentContent.trim()}
-                                                                                                size="sm"
-                                                                                                className="px-2 text-xs"
-                                                                                            >
-                                                                                                Save
-                                                                                            </Button>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <p className="text-xs leading-relaxed">{reply.content}</p>
-
-                                                                                        {/* Reply to Reply Button */}
-                                                                                        {isSignedIn && (
-                                                                                            <div
-                                                                                                className="flex items-center gap-2 mt-1">
-                                                                                                <Button
-                                                                                                    variant="ghost"
-                                                                                                    size="sm"
-                                                                                                    onClick={() => {
-                                                                                                        const replyKey = `${comment._id}-${reply._id}`;
-                                                                                                        setShowReplyForm(prev => ({
-                                                                                                            ...prev,
-                                                                                                            [replyKey]: !prev[replyKey]
-                                                                                                        }));
-                                                                                                        // Pre-fill with @username
-                                                                                                        setReplyContent(prev => ({
-                                                                                                            ...prev,
-                                                                                                            [replyKey]: `@${reply.username} `
-                                                                                                        }));
-                                                                                                    }}
-                                                                                                    className="text-xs text-muted-foreground hover:text-primary h-5 px-1"
-                                                                                                >
-                                                                                                    Reply
-                                                                                                </Button>
-                                                                                            </div>
-                                                                                        )}
-
-                                                                                        {/* Reply to Reply Form */}
-                                                                                        {showReplyForm[`${comment._id}-${reply._id}`] && isSignedIn && (
-                                                                                            <div
-                                                                                                className="mt-2 space-y-2">
-                                                                                                <Textarea
-                                                                                                    value={replyContent[`${comment._id}-${reply._id}`] || ''}
-                                                                                                    onChange={(e) => setReplyContent(prev => ({
-                                                                                                        ...prev,
-                                                                                                        [`${comment._id}-${reply._id}`]: e.target.value
-                                                                                                    }))}
-                                                                                                    placeholder={`Reply to @${reply.username}...`}
-                                                                                                    rows={2}
-                                                                                                    className="text-sm resize-none"
-                                                                                                />
-                                                                                                <div
-                                                                                                    className="flex justify-end gap-2">
-                                                                                                    <Button
-                                                                                                        onClick={() => setShowReplyForm(prev => ({
-                                                                                                            ...prev,
-                                                                                                            [`${comment._id}-${reply._id}`]: false
-                                                                                                        }))}
-                                                                                                        variant="outline"
-                                                                                                        size="sm"
-                                                                                                        className="px-2 text-xs"
-                                                                                                    >
-                                                                                                        Cancel
-                                                                                                    </Button>
-                                                                                                    <Button
-                                                                                                        onClick={() => {
-                                                                                                            const replyKey = `${comment._id}-${reply._id}`;
-                                                                                                            const content = replyContent[replyKey]?.trim();
-                                                                                                            if (content) {
-                                                                                                                handleAddReply(comment._id, content);
-                                                                                                                setReplyContent(prev => ({
-                                                                                                                    ...prev,
-                                                                                                                    [replyKey]: ''
-                                                                                                                }));
-                                                                                                                setShowReplyForm(prev => ({
-                                                                                                                    ...prev,
-                                                                                                                    [replyKey]: false
-                                                                                                                }));
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        disabled={!replyContent[`${comment._id}-${reply._id}`]?.trim()}
-                                                                                                        size="sm"
-                                                                                                        className="px-2 text-xs"
-                                                                                                    >
-                                                                                                        Reply
-                                                                                                    </Button>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                            <PostCard
+                                post={post}
+                                user={user}
+                                isSignedIn={isSignedIn}
+                                router={router}
+                                editingPostId={editingPost}
+                                startEditPost={startEditPost}
+                                handleCancelEditPost={resetCreateForm}
+                                handleSavePost={handleEditPost}
+                                editTitle={title}
+                                setEditTitle={setTitle}
+                                editContent={content}
+                                setEditContent={setContent}
+                                editPostType={postType}
+                                setEditPostType={setPostType}
+                                editTags={tags}
+                                currentTag={currentTag}
+                                setCurrentTag={setCurrentTag}
+                                addTag={addTag}
+                                removeTag={removeTag}
+                                editSelectedBills={selectedBills}
+                                handleBillSelect={handleBillSelect}
+                                editShowBillSearch={showBillSearch}
+                                setEditShowBillSearch={setShowBillSearch}
+                                handleDeletePost={handleDeletePost}
+                                handleLikePost={handleLikePost}
+                                showComments={showComments}
+                                setShowComments={setShowComments}
+                                commentContent={commentContent}
+                                setCommentContent={setCommentContent}
+                                handleAddComment={handleAddComment}
+                                editingComment={editingComment}
+                                setEditingComment={setEditingComment}
+                                editCommentContent={editCommentContent}
+                                setEditCommentContent={setEditCommentContent}
+                                handleEditComment={handleEditComment}
+                                handleDeleteComment={handleDeleteComment}
+                                showReplyForm={showReplyForm}
+                                setShowReplyForm={setShowReplyForm}
+                                replyContent={replyContent}
+                                setReplyContent={setReplyContent}
+                                handleAddReply={handleAddReply}
+                                showReplies={showReplies}
+                                setShowReplies={setShowReplies}
+                                handleDeleteReply={handleDeleteReply}
+                                editingReply={null}
+                                setEditingReply={() => {}}
+                                editReplyContent={editCommentContent}
+                                setEditReplyContent={setEditCommentContent}
+                                handleEditReply={handleEditReply}
+                            />
                         </AnimatedSection>
                     ))
                 )}

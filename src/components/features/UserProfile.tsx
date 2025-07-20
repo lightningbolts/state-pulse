@@ -9,20 +9,7 @@ import {AlertTriangle, Calendar, FileText, Heart, MessageCircle, MessageSquare, 
 import {Comment, Post} from "@/types/media";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import Link from "next/link";
-
-interface UserProfile {
-    id: string;
-    name?: string;
-    email?: string;
-    createdAt?: string;
-    trackingTopics: string[];
-    imageUrl?: string;
-}
-
-interface UserStats {
-    postsCount: number;
-    commentsCount: number;
-}
+import {type UserProfile, UserStats} from "@/types/user";
 
 export function UserProfile() {
     const params = useParams();
@@ -133,7 +120,15 @@ export function UserProfile() {
                                 <img
                                     src={profile.imageUrl}
                                     alt={profile.name || 'User'}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover cursor-default select-none pointer-events-none"
+                                    draggable={false}
+                                    style={{ userDrag: "none" }}
+                                    onContextMenu={e => e.preventDefault()}
+                                    onMouseDown={e => e.preventDefault()}
+                                    onDragStart={e => e.preventDefault()}
+                                    onCopy={e => e.preventDefault()}
+                                    onPaste={e => e.preventDefault()}
+                                    onCut={e => e.preventDefault()}
                                 />
                             ) : (
                                 <User className="h-8 w-8 text-primary"/>
