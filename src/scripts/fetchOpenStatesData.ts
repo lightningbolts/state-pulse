@@ -1006,45 +1006,14 @@ async function fetchCongressBills(updatedSince: string) {
 
             const legislationToStore = transformCongressBillToMongoDB(congressBill);
 
-            // Get full text for summary generation
-            let fullText = '';
-            if (congressBill.textVersions?.textVersions?.[0]?.formats) {
-              const textFormat = congressBill.textVersions.textVersions[0].formats.find((f: any) => f.type === 'Formatted Text');
-              if (textFormat?.url) {
-                legislationToStore.stateLegislatureUrl = textFormat.url;
-                fullText = (await fetchPdfTextFromOpenStatesUrl(textFormat.url)) || legislationToStore.title || '';
-              }
-            }
-
-            if (!fullText) {
-              fullText = legislationToStore.title || '';
-            }
-
-            legislationToStore.fullText = fullText;
-
-            // Generate summary if needed
-            let shouldGenerateSummary = false;
-            let geminiSummaryWordCount = 0;
-            if (!legislationToStore.geminiSummary) {
-              shouldGenerateSummary = true;
-            } else {
-              geminiSummaryWordCount = legislationToStore.geminiSummary.trim().split(/\s+/).length;
-              if (
-                geminiSummaryWordCount < 20 ||
-                legislationToStore.geminiSummary === 'Summary not available due to insufficient information.'
-              ) {
-                shouldGenerateSummary = true;
-              }
-            }
-
-            if (shouldGenerateSummary) {
-              legislationToStore.geminiSummary = fullText ? await generateGeminiSummaryWithRateLimit(fullText) : null;
-              geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
-            }
+            // Use richest source summary utility for Congress bills
+            const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
+            legislationToStore.geminiSummary = summary;
+            legislationToStore.geminiSummarySource = sourceType;
 
             // Upsert the legislation
             await upsertLegislationSelective(legislationToStore);
-            console.log(`Upserted: ${legislationToStore.identifier} (Congress) - Summary: ${geminiSummaryWordCount} words`);
+            console.log(`Upserted: ${legislationToStore.identifier} (Congress) - Source: ${sourceType}`);
             billsProcessed++;
 
             // Rate limiting for Congress API
@@ -1055,4 +1024,17 @@ async function fetchCongressBills(updatedSince: string) {
           }
         }
 
-        if
+        if (hasMore) {
+          offset += limit;
+        }
+      } else {
+        hasMore = false;
+      }
+    } catch (error) {
+      console.error(`Network error fetching Congress bills:`, error);
+      hasMore = false;
+    }
+  }
+
+  console.log(`Finished fetching Congress bills. Processed ${billsProcessed} bills.`);
+}
