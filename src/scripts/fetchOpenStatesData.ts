@@ -561,6 +561,8 @@ async function fetchAndStoreUpdatedBills(
             const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
             legislationToStore.geminiSummary = summary;
             legislationToStore.geminiSummarySource = sourceType;
+            // Calculate word count for Gemini summary
+            const geminiSummaryWordCount = summary ? summary.split(/\s+/).filter(Boolean).length : 0;
             // Always upsert the legislation - we want to keep all bills with summaries
             await upsertLegislationSelective(legislationToStore);
             console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id} - Summary: ${geminiSummaryWordCount} words`);
