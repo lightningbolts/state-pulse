@@ -8,7 +8,7 @@ import {
   generateOllamaSummary,
   fetchPdfTextFromOpenStatesUrl,
   extractBestTextForSummary,
-  generateGeminiSummary
+  generateGeminiSummary, summarizeLegislationRichestSource
 } from '../services/aiSummaryUtil';
 
 config({ path: '../../.env' });
@@ -557,45 +557,10 @@ async function fetchAndStoreUpdatedBills(
         for (const osBill of data.results) {
           try {
             const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
-            // --- Scrape full text and generate Gemini summary using util ---
-            let fullText = '';
-            if (osBill.sources && osBill.sources.length > 0) {
-              // Use the first non-PDF source as the state legislature page
-              const stateSource = osBill.sources.find((s:any) => s.url && !s.url.endsWith('.pdf'));
-              const stateLegUrl = stateSource ? stateSource.url : osBill.sources[0].url;
-              legislationToStore.stateLegislatureUrl = stateLegUrl;
-              fullText = (await fetchPdfTextFromOpenStatesUrl(stateLegUrl)) || legislationToStore.title || '';
-            } else {
-              fullText = legislationToStore.title || '';
-            }
-            legislationToStore.fullText = fullText;
-            // Only generate a new summary if the existing summary is less than 20 words or is the unavailable message
-            let shouldGenerateSummary = false;
-            let geminiSummaryWordCount = 0;
-            let geminiRateLimited = false;
-            if (!legislationToStore.geminiSummary) {
-              shouldGenerateSummary = true;
-            } else {
-              geminiSummaryWordCount = legislationToStore.geminiSummary.trim().split(/\s+/).length;
-              if (
-                geminiSummaryWordCount < 20 ||
-                legislationToStore.geminiSummary === 'Summary not available due to insufficient information.'
-              ) {
-                shouldGenerateSummary = true;
-              }
-            }
-            if (shouldGenerateSummary) {
-              try {
-                legislationToStore.geminiSummary = fullText ? await generateGeminiSummaryWithRateLimit(fullText) : null;
-                geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.trim().split(/\s+/).length : 0;
-              } catch (err) {
-                // If Gemini is rate limited or throws, continue without summary
-                geminiRateLimited = true;
-                legislationToStore.geminiSummary = null;
-                console.warn(`Gemini summary failed or rate limited for ${legislationToStore.identifier}:`, err);
-              }
-            }
-
+            // --- Use richest source summary utility ---
+            const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
+            legislationToStore.geminiSummary = summary;
+            legislationToStore.geminiSummarySource = sourceType;
             // Always upsert the legislation - we want to keep all bills with summaries
             await upsertLegislationSelective(legislationToStore);
             console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id} - Summary: ${geminiSummaryWordCount} words`);
@@ -1090,22 +1055,4 @@ async function fetchCongressBills(updatedSince: string) {
           }
         }
 
-        if (data.bills.length < limit) {
-          hasMore = false;
-        } else {
-          offset += limit;
-          await delay(1000); // Rate limiting between pages
-        }
-      } else {
-        console.log(`No more Congress bills found at offset ${offset}.`);
-        hasMore = false;
-      }
-    } catch (error) {
-      console.error(`Network error fetching Congress bills at offset ${offset}:`, error);
-      hasMore = false;
-      break;
-    }
-  }
-
-  console.log(`Finished fetching Congress bills (since ${updatedSince}). Processed ${billsProcessed} bills.`);
-}
+        if

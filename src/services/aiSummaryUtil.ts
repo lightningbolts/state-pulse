@@ -2,6 +2,7 @@ import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
+import { Legislation } from '../types/legislation';
 
 export async function generateGeminiSummary(text: string): Promise<string> {
   // Use Gemini to generate a ~100-word summary
@@ -118,4 +119,80 @@ export async function generateOllamaSummary(text: string, model: string): Promis
     console.error('Error generating ollama summary:', err);
     return 'Summary not available due to insufficient information.';
   }
+}
+
+/**
+ * Generates a summary for a bill using the richest available information, in priority order:
+ * 1. PDF text from bill versions
+ * 2. Concatenated abstracts
+ * 3. Text from first sources.url
+ * 4. Bill title
+ */
+export async function summarizeLegislationRichestSource(bill: Legislation): Promise<{ summary: string, sourceType: string }> {
+  // 1. Try most recent PDF from versions
+  if (bill.versions && Array.isArray(bill.versions)) {
+    // Sort versions by date (if available), descending
+    const sortedVersions = bill.versions.slice().sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA;
+    });
+    for (const version of sortedVersions) {
+      if (version.url && version.url.endsWith('.pdf')) {
+        try {
+          const res = await fetch(version.url);
+          if (res.ok) {
+            const buffer = await res.arrayBuffer();
+            const pdfText = await pdf(Buffer.from(buffer));
+            if (pdfText.text && pdfText.text.trim().length > 100) {
+              const summary = await generateGeminiSummary(pdfText.text);
+              return { summary, sourceType: 'pdf' };
+            }
+          }
+        } catch (e) {
+          // Ignore and continue
+        }
+      }
+    }
+  }
+  // 2. Try abstracts
+  if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
+    const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
+    if (abstractsText.trim().length > 20) {
+      const summary = await generateGeminiSummary(abstractsText);
+      return { summary, sourceType: 'abstracts' };
+    }
+  }
+  // 3. Try all sources.url, remove duplicate info
+  if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
+    const seenTexts = new Set<string>();
+    let combinedText = '';
+    for (const source of bill.sources) {
+      if (source.url) {
+        try {
+          const res = await fetch(source.url);
+          if (res.ok) {
+            const html = await res.text();
+            const $ = cheerio.load(html);
+            const pageText = $('body').text().trim();
+            // Only add unique, non-empty text
+            if (pageText.length > 100 && !seenTexts.has(pageText)) {
+              seenTexts.add(pageText);
+              combinedText += pageText + '\n';
+            }
+          }
+        } catch (e) {
+          // Ignore and continue
+        }
+      }
+    }
+    if (combinedText.trim().length > 100) {
+      const summary = await generateGeminiSummary(combinedText);
+      return { summary, sourceType: 'sources.url' };
+    }
+  }
+  // 4. Fallback: bill title
+  const title = bill.title || 'No title available.';
+  const summary = await generateGeminiSummary(title);
+  return { summary, sourceType: 'title' };
 }
