@@ -4,12 +4,12 @@ import {useEffect, useState} from "react";
 import {useUser} from "@clerk/nextjs";
 import {useRouter} from "next/navigation";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
 import {Textarea} from "@/components/ui/textarea";
 import {Input} from "@/components/ui/input";
-import {Tabs, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {Button} from "@/components/ui/button";
 import {Badge} from "@/components/ui/badge";
-import {AlertTriangle, Edit, FileText, Heart, MessageCircle, MessageSquare, Plus, Save, Trash2, X} from "lucide-react";
+import {DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem} from "@/components/ui/dropdown-menu";
+import {AlertTriangle, Edit, FileText, Heart, MessageCircle, MessageSquare, Plus, Save, Trash2, X, Search} from "lucide-react";
 import {BillSearch} from "./BillSearch";
 import {SelectedBills} from "./SelectedBills";
 import {Bill} from "@/types/legislation";
@@ -47,9 +47,52 @@ export function PostsFeed() {
     const [showReplyForm, setShowReplyForm] = useState<{ [commentId: string]: boolean }>({});
     const [showReplies, setShowReplies] = useState<{ [commentId: string]: boolean }>({});
 
+    // Search/filter state
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
+
+    // Tag filter state
+    const allTags = Array.from(new Set(posts.flatMap(post => post.tags))).sort();
+    const [selectedTag, setSelectedTag] = useState<string>("");
+
     useEffect(() => {
         fetchPosts();
     }, []);
+
+    useEffect(() => {
+        // Filter posts whenever posts or searchTerm changes
+        if (!searchTerm.trim()) {
+            setFilteredPosts(posts);
+        } else {
+            const term = searchTerm.toLowerCase();
+            setFilteredPosts(
+                posts.filter(
+                    post =>
+                        post.title.toLowerCase().includes(term) ||
+                        post.content.toLowerCase().includes(term) ||
+                        post.tags.some(tag => tag.toLowerCase().includes(term))
+                )
+            );
+        }
+    }, [posts, searchTerm]);
+
+    useEffect(() => {
+        // Filter posts by search term and selected tag
+        let filtered = posts;
+        if (selectedTag) {
+            filtered = filtered.filter(post => post.tags.includes(selectedTag));
+        }
+        if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(
+                post =>
+                    post.title.toLowerCase().includes(term) ||
+                    post.content.toLowerCase().includes(term) ||
+                    post.tags.some(tag => tag.toLowerCase().includes(term))
+            );
+        }
+        setFilteredPosts(filtered);
+    }, [posts, searchTerm, selectedTag]);
 
     const fetchPosts = async () => {
         try {
@@ -335,6 +378,54 @@ export function PostsFeed() {
 
     return (
         <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+            {/* Search/Filter Bar (consistent UI) */}
+            <div className="mb-4 flex justify-center w-full">
+                <div className="flex flex-row gap-2 w-full max-w-4xl">
+                    <div className="relative flex-1">
+                        <Input
+                            type="text"
+                            placeholder="Search posts by title, content, or tag..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="pl-10 h-12 text-base"
+                            style={{height: '48px'}}
+                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <Search className="h-5 w-5" />
+                        </span>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="default"
+                        size="lg"
+                        className="h-12 px-6 text-base"
+                        style={{height: '48px'}}
+                        onClick={() => setSearchTerm(searchTerm.trim())}
+                    >
+                        Enter
+                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="lg" className="h-12 min-w-[120px] text-base flex items-center gap-2" style={{height: '48px'}}>
+                                {selectedTag ? (
+                                    <Badge variant="secondary" className="text-xs">{selectedTag}</Badge>
+                                ) : (
+                                    <span className="text-base text-muted-foreground">Filter by tag</span>
+                                )}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setSelectedTag("")}>All</DropdownMenuItem>
+                            {allTags.map(tag => (
+                                <DropdownMenuItem key={tag} onClick={() => setSelectedTag(tag)}>
+                                    <Badge variant="secondary" className="text-xs mr-2">{tag}</Badge>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
+
             {/* Create Post Button */}
             {!showCreatePost && (
                 <AnimatedSection>
@@ -502,25 +593,26 @@ export function PostsFeed() {
                 </AnimatedSection>
             )}
 
+
             {/* Posts Feed */}
             <div className="space-y-3 sm:space-y-4">
-                {posts.length === 0 ? (
+                {filteredPosts.length === 0 ? (
                     <AnimatedSection>
                         <Card>
                             <CardContent className="text-center py-6 sm:py-8">
                                 <MessageSquare
                                     className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4"/>
                                 <h3 className="text-base sm:text-lg font-medium text-muted-foreground mb-2">
-                                    No posts yet
+                                    No posts found
                                 </h3>
                                 <p className="text-sm text-muted-foreground">
-                                    Be the first to share your thoughts on legislation or report a bug!
+                                    Try a different search term or clear the filter.
                                 </p>
                             </CardContent>
                         </Card>
                     </AnimatedSection>
                 ) : (
-                    posts.map((post) => (
+                    filteredPosts.map((post) => (
                         <AnimatedSection key={post._id}>
                             <Card className="mx-0 sm:mx-0">
                                 <CardHeader className="pb-3 sm:pb-4">
