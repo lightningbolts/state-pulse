@@ -16,10 +16,12 @@ import {Bill} from "@/types/legislation";
 import {Post} from "@/types/media";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 export function PostsFeed() {
     const {user, isSignedIn} = useUser();
     const router = useRouter();
+    const { toast } = useToast();
     const [posts, setPosts] = useState<Post[]>([]);
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState<string | null>(null);
@@ -334,10 +336,20 @@ export function PostsFeed() {
     return (
         <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
             {/* Create Post Button */}
-            {isSignedIn && !showCreatePost && (
+            {!showCreatePost && (
                 <AnimatedSection>
                     <Button
-                        onClick={() => setShowCreatePost(true)}
+                        onClick={() => {
+                            if (!isSignedIn) {
+                                toast({
+                                    title: "Sign in required",
+                                    description: "You must be signed in to create a post.",
+                                    variant: "destructive"
+                                });
+                                return;
+                            }
+                            setShowCreatePost(true);
+                        }}
                         className="w-full min-h-[48px] text-sm sm:text-base"
                         size="lg"
                     >
