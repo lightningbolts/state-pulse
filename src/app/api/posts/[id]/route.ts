@@ -42,11 +42,13 @@ export async function PUT(
       );
     }
 
+
     const updateData: any = {
       title: title.trim(),
       content: content.trim(),
       tags: tags || [],
       updatedAt: new Date().toISOString(),
+      type: body.type || existingPost.type,
     };
 
     // Only update linkedBills for legislation posts

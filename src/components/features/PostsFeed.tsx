@@ -22,27 +22,30 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function PostsFeed() {
 
-    // Fetch posts on mount
-    useEffect(() => {
-        fetchPosts();
-    }, []);
+    // All hooks must be declared before any return
     const [selectedTag, setSelectedTag] = useState<string>("");
     const {user, isSignedIn} = useUser();
     const router = useRouter();
     const { toast } = useToast();
     const [posts, setPosts] = useState<Post[]>([]);
-    const allTags = Array.from(new Set(posts.flatMap(post => post.tags))).sort();
-    // Removed obsolete showCreatePost state
     const [loading, setLoading] = useState(true);
-    // Search/filter state
     const [searchTerm, setSearchTerm] = useState("");
     const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
-    // Tag filter state
+    // Inline create post state
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [newTitle, setNewTitle] = useState("");
+    const [newContent, setNewContent] = useState("");
+    const [newType, setNewType] = useState<'legislation' | 'bug_report'>('legislation');
+    const [newTags, setNewTags] = useState<string[]>([]);
+    const [newTagInput, setNewTagInput] = useState("");
+    const [newBills, setNewBills] = useState<any[]>([]);
+    const [showBillSearch, setShowBillSearch] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const allTags = Array.from(new Set(posts.flatMap(post => post.tags))).sort();
 
-
-
-
-    // Removed obsolete linkedBills normalization effect
+    useEffect(() => {
+        fetchPosts();
+    }, []);
 
     useEffect(() => {
         // Filter posts by search term and selected tag
@@ -77,7 +80,6 @@ export function PostsFeed() {
         }
     };
 
-
     if (loading) {
         return (
             <div className="space-y-4">
@@ -99,20 +101,150 @@ export function PostsFeed() {
         );
     }
 
+    const handleCreatePost = async () => {
+        if (!newTitle.trim() || !newContent.trim()) return;
+        setCreating(true);
+        try {
+            const response = await fetch('/api/posts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: newTitle.trim(),
+                    content: newContent.trim(),
+                    type: newType,
+                    tags: newTags,
+                    linkedBills: newType === 'legislation' ? newBills : undefined
+                })
+            });
+            if (response.ok) {
+                setShowCreateForm(false);
+                setNewTitle("");
+                setNewContent("");
+                setNewType('legislation');
+                setNewTags([]);
+                setNewBills([]);
+                setShowBillSearch(false);
+                fetchPosts();
+            }
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    // Update a post in the posts state after edit
+    const handlePostUpdated = (updatedPost: Post) => {
+        setPosts(prevPosts => prevPosts.map(p => p._id === updatedPost._id ? updatedPost : p));
+    };
+
     return (
         <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
-            {/* Create Post Button */}
+            {/* Inline Create Post */}
             {isSignedIn && (
-                <div className="w-full mb-2">
-                    <Button
-                        variant="default"
-                        size="lg"
-                        className="h-12 w-full text-base flex items-center gap-2 justify-center"
-                        onClick={() => router.push('/posts/new')}
-                    >
-                        <Plus className="h-5 w-5 mr-1" />
-                        Create Post
-                    </Button>
+                <div className="w-full mb-4">
+                    {!showCreateForm ? (
+                        <Button
+                            variant="default"
+                            size="lg"
+                            className="h-12 w-full text-base flex items-center gap-2 justify-center"
+                            onClick={() => setShowCreateForm(true)}
+                        >
+                            <Plus className="h-5 w-5 mr-1" />
+                            Create Post
+                        </Button>
+                    ) : (
+                        <Card className="w-full">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-bold">Create New Post</h2>
+                                    <Button variant="ghost" size="sm" onClick={() => setShowCreateForm(false)}><X className="h-5 w-5" /></Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <Input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Title" className="text-base" />
+                                {/* Type selector above content */}
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Type</label>
+                                    <Tabs
+                                        value={newType}
+                                        onValueChange={v => {
+                                            setNewType(v as 'legislation' | 'bug_report');
+                                            if (v !== 'legislation') {
+                                                setNewBills([]);
+                                                setShowBillSearch(false);
+                                            }
+                                        }}
+                                    >
+                                        <TabsList className="grid grid-cols-2 w-full">
+                                            <TabsTrigger value="legislation">Legislation</TabsTrigger>
+                                            <TabsTrigger value="bug_report">Bug Report</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+                                </div>
+                                <Textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Content" rows={5} className="text-base" />
+                                {/* Linked Bills section below content */}
+                                {newType === 'legislation' && (
+                                    <div className="space-y-2">
+                                        <SelectedBills
+                                            selectedBills={newBills}
+                                            onRemoveBill={billId => setNewBills(newBills.filter(b => b.id !== billId))}
+                                            onClearAll={() => setNewBills([])}
+                                            title="Linked Bills"
+                                            description="Bills referenced in this post"
+                                        />
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="block text-sm font-medium">Link Related Bills</label>
+                                                <Button variant="outline" size="sm" onClick={() => setShowBillSearch(!showBillSearch)} className="text-xs px-2">{showBillSearch ? 'Hide' : 'Show'} Search</Button>
+                                            </div>
+                                            {showBillSearch && (
+                                                <div className="p-3 bg-muted rounded-lg">
+                                                    <BillSearch selectedBills={newBills} onBillSelect={bill => {
+                                                        if (!bill || !bill.id) return;
+                                                        setNewBills(prev => {
+                                                            const exists = prev.find(b => b.id === bill.id);
+                                                            if (exists) {
+                                                                return prev.filter(b => b.id !== bill.id);
+                                                            } else {
+                                                                return [...prev, bill];
+                                                            }
+                                                        });
+                                                    }} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Tags</label>
+                                    <div className="flex gap-2 mb-2">
+                                        <Input value={newTagInput} onChange={e => setNewTagInput(e.target.value)} placeholder="Add a tag..." onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (newTagInput.trim() && !newTags.includes(newTagInput.trim())) { setNewTags([...newTags, newTagInput.trim()]); setNewTagInput(''); } } }} className="flex-1" />
+                                        <Button onClick={() => { if (newTagInput.trim() && !newTags.includes(newTagInput.trim())) { setNewTags([...newTags, newTagInput.trim()]); setNewTagInput(''); } }} variant="outline">Add</Button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {newTags.map(tag => (
+                                            <Badge key={tag} variant="secondary" className="flex items-center gap-1 text-xs px-2 py-1">
+                                                <span>{tag}</span>
+                                                <Button variant="ghost" size="sm" className="h-4 w-4 p-0" onClick={() => setNewTags(newTags.filter(t => t !== tag))}><X className="h-3 w-3" /></Button>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-4">
+                                    <Button variant="outline" onClick={() => setShowCreateForm(false)}>Cancel</Button>
+                                    <Button onClick={async () => {
+                                        await handleCreatePost();
+                                        setShowCreateForm(false);
+                                        setNewTitle("");
+                                        setNewContent("");
+                                        setNewType('legislation');
+                                        setNewTags([]);
+                                        setNewBills([]);
+                                        setShowBillSearch(false);
+                                    }} disabled={!newTitle.trim() || !newContent.trim() || creating}>{creating ? 'Creating...' : 'Create'}</Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             )}
             {/* Search/Filter Bar (consistent UI) */}
@@ -180,7 +312,7 @@ export function PostsFeed() {
                 ) : (
                     filteredPosts.map((post) => (
                         <AnimatedSection key={post._id}>
-                            <PostCard post={post} onPostDeleted={fetchPosts} />
+                            <PostCard post={post} onPostDeleted={fetchPosts} onPostUpdated={handlePostUpdated} />
                         </AnimatedSection>
                     ))
                 )}

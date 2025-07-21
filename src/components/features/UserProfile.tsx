@@ -3,6 +3,7 @@
 import {useEffect, useState} from "react";
 import {useParams} from "next/navigation";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import { PostCard } from "./PostCard";
 import {Badge} from "@/components/ui/badge";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {AlertTriangle, Calendar, FileText, Heart, MessageCircle, MessageSquare, User} from "lucide-react";
@@ -206,58 +207,7 @@ export function UserProfile() {
                     ) : (
                         posts.map((post, i) => (
                             <AnimatedSection key={post._id} style={{transitionDelay: `${i * 60}ms`}}>
-                                <Link href={`/posts/${post._id}`} className="block">
-                                    <Card className="hover:ring-2 hover:ring-primary/40 transition-shadow">
-                                        <CardHeader>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Badge variant={post.type === 'legislation' ? 'default' : 'destructive'}
-                                                       className="text-xs">
-                                                    {post.type === 'legislation' ? (
-                                                        <>
-                                                            <FileText className="h-3 w-3 mr-1"/>
-                                                            Legislation
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <AlertTriangle className="h-3 w-3 mr-1"/>
-                                                            Bug Report
-                                                        </>
-                                                    )}
-                                                </Badge>
-                                                <span className="text-sm text-muted-foreground">
-                        {new Date(post.createdAt).toLocaleDateString()}
-                      </span>
-                                            </div>
-                                            <CardTitle className="text-lg">{post.title}</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <p className="text-sm leading-relaxed mb-4">{post.content}</p>
-
-                                            {/* Tags */}
-                                            {post.tags.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mb-4">
-                                                    {post.tags.map((tag) => (
-                                                        <Badge key={tag} variant="outline" className="text-xs">
-                                                            {tag}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Post Stats */}
-                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                <div className="flex items-center gap-1">
-                                                    <Heart className="h-4 w-4"/>
-                                                    {post.likes.length}
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <MessageCircle className="h-4 w-4"/>
-                                                    {post.comments.length}
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </Link>
+                                <PostCard post={post} />
                             </AnimatedSection>
                         ))
                     )}

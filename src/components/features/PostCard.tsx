@@ -16,13 +16,15 @@ import { useToast } from "@/hooks/use-toast";
 import { BillSearch } from "./BillSearch";
 
 
+
 interface PostCardProps {
     post: Post;
     onPostDeleted?: () => void; // callback for parent to refresh posts if deleted
+    onPostUpdated?: (updatedPost: Post) => void; // callback for parent to update post after edit
 }
 
 
-export function PostCard({ post, onPostDeleted }: PostCardProps) {
+export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) {
     const { user, isSignedIn } = useUser();
     const router = useRouter();
     const { toast } = useToast();
@@ -93,12 +95,15 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
                 const data = await response.json();
                 console.log('handleSavePost API response:', data.post);
                 setIsEditing(false);
-                if (data.post && typeof data.post === 'object') setPostState(data.post);
-                setEditTitle(data.post?.title ?? editTitle);
-                setEditContent(data.post?.content ?? editContent);
-                setEditPostType(data.post?.type ?? editPostType);
-                setEditTags(data.post?.tags || editTags);
-                setEditSelectedBills(data.post?.linkedBills || editSelectedBills);
+                if (data.post && typeof data.post === 'object') {
+                    setPostState(data.post);
+                    setEditTitle(data.post?.title ?? editTitle);
+                    setEditContent(data.post?.content ?? editContent);
+                    setEditPostType(data.post?.type ?? editPostType);
+                    setEditTags(data.post?.tags || editTags);
+                    setEditSelectedBills(data.post?.linkedBills || editSelectedBills);
+                    if (onPostUpdated) onPostUpdated(data.post);
+                }
             }
         } catch (error) {
             // ignore
@@ -377,20 +382,33 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
             <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
                 {isEditingPost ? (
                     <div className="space-y-4">
-                        <Tabs value={editPostType} onValueChange={(value) => setEditPostType(value as 'legislation' | 'bug_report')}>
-                            <TabsList className="grid w-full grid-cols-2 h-10 sm:h-auto">
-                                <TabsTrigger value="legislation" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
-                                    <FileText className="h-3 w-3 sm:h-4 sm:w-4"/>
-                                    <span className="hidden xs:inline">Legislation</span>
-                                    <span className="xs:hidden">Bills</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="bug_report" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
-                                    <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4"/>
-                                    <span className="hidden xs:inline">Bug Report</span>
-                                    <span className="xs:hidden">Bug</span>
-                                </TabsTrigger>
-                            </TabsList>
-                        </Tabs>
+                        {/* Editable type/category selector */}
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Type</label>
+                            <Tabs
+                                value={editPostType}
+                                onValueChange={v => {
+                                    setEditPostType(v as 'legislation' | 'bug_report');
+                                    if (v !== 'legislation') {
+                                        setEditSelectedBills([]);
+                                        setEditShowBillSearch(false);
+                                    }
+                                }}
+                            >
+                                <TabsList className="grid w-full grid-cols-2 h-10 sm:h-auto">
+                                    <TabsTrigger value="legislation" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+                                        <FileText className="h-3 w-3 sm:h-4 sm:w-4"/>
+                                        <span className="hidden xs:inline">Legislation</span>
+                                        <span className="xs:hidden">Bills</span>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="bug_report" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+                                        <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4"/>
+                                        <span className="hidden xs:inline">Bug Report</span>
+                                        <span className="xs:hidden">Bug</span>
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        </div>
                         <Textarea
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
@@ -398,6 +416,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
                             rows={8}
                             placeholder="Post content"
                         />
+                        {/* Linked Bills section below content */}
                         {editPostType === 'legislation' && (
                             <>
                                 <SelectedBills
