@@ -24,6 +24,7 @@ export interface Comment {
     content: string;
     createdAt: string;
     replies?: Reply[];
+    likes: string[]; // Array of user IDs who liked
 }
 
 export interface Reply {
@@ -33,4 +34,5 @@ export interface Reply {
     userImage?: string;
     content: string;
     createdAt: string;
+    likes: string[]; // Array of user IDs who liked
 }

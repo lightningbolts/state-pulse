@@ -130,6 +130,30 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
         } catch (error) {}
     };
 
+    // Like/unlike comment
+    const handleLikeComment = async (commentId: string) => {
+        if (!isSignedIn) return;
+        try {
+            const response = await fetch(`/api/posts/${postState._id}/comments/${commentId}/like`, { method: 'POST' });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+
+    // Like/unlike reply
+    const handleLikeReply = async (commentId: string, replyId: string) => {
+        if (!isSignedIn) return;
+        try {
+            const response = await fetch(`/api/comments/${commentId}/replies/${replyId}/like`, { method: 'POST' });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+
     // Comment actions
     const handleAddComment = async () => {
         if (!isSignedIn || !commentContent.trim()) return;
@@ -548,16 +572,32 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                         ) : (
                                             <>
                                                 <p className="text-xs sm:text-sm leading-relaxed">{comment.content}</p>
-                                                {isSignedIn && (
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        <Button variant="ghost" size="sm" onClick={() => setShowReplyForm((prev) => ({ ...prev, [comment._id]: !prev[comment._id] }))} className="text-xs text-muted-foreground hover:text-primary h-6 px-2">Reply</Button>
-                                                        {comment.replies && comment.replies.length > 0 && (
-                                                            <Button variant="ghost" size="sm" onClick={() => setShowReplies((prev) => ({ ...prev, [comment._id]: !prev[comment._id] }))} className="text-xs text-muted-foreground hover:text-primary h-6 px-2">
-                                                                {showReplies[comment._id] ? 'Hide' : 'View'} {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
-                                                            </Button>
-                                                        )}
+                                                <div className="flex items-center gap-4 mt-2">
+                                                    {/* Likes at bottom left */}
+                                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleLikeComment(comment._id)}
+                                                            className={`h-6 w-6 p-0 ${comment.likes && comment.likes.includes(user?.id || '') ? 'text-red-500' : ''}`}
+                                                            title={comment.likes && comment.likes.includes(user?.id || '') ? 'Unlike' : 'Like'}
+                                                        >
+                                                            <Heart className={`h-3 w-3 ${comment.likes && comment.likes.includes(user?.id || '') ? 'fill-red-500' : ''}`}/>
+                                                        </Button>
+                                                        <span>{comment.likes ? comment.likes.length : 0}</span>
                                                     </div>
-                                                )}
+                                                    {/* Reply/view reply buttons */}
+                                                    {isSignedIn && (
+                                                        <div className="flex items-center gap-2">
+                                                            <Button variant="ghost" size="sm" onClick={() => setShowReplyForm((prev) => ({ ...prev, [comment._id]: !prev[comment._id] }))} className="text-xs text-muted-foreground hover:text-primary h-6 px-2">Reply</Button>
+                                                            {comment.replies && comment.replies.length > 0 && (
+                                                                <Button variant="ghost" size="sm" onClick={() => setShowReplies((prev) => ({ ...prev, [comment._id]: !prev[comment._id] }))} className="text-xs text-muted-foreground hover:text-primary h-6 px-2">
+                                                                    {showReplies[comment._id] ? 'Hide' : 'View'} {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 {showReplyForm[comment._id] && isSignedIn && (
                                                     <div className="mt-3 space-y-2">
                                                         <Textarea value={replyContent[comment._id] || ''} onChange={(e) => setReplyContent((prev) => ({ ...prev, [comment._id]: e.target.value }))} placeholder="Write a reply..." rows={2} className="text-sm resize-none" />
@@ -590,10 +630,10 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                                         )}
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-start justify-between gap-2">
-                                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                                    <span className="font-medium text-xs cursor-pointer hover:text-primary transition-colors" onClick={() => router.push(`/users/${reply.userId}`)}>{reply.username}</span>
-                                                                    <span className="text-xs text-muted-foreground">{new Date(reply.createdAt).toLocaleDateString()}</span>
-                                                                </div>
+                                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                                <span className="font-medium text-xs cursor-pointer hover:text-primary transition-colors" onClick={() => router.push(`/users/${reply.userId}`)}>{reply.username}</span>
+                                                                <span className="text-xs text-muted-foreground">{new Date(reply.createdAt).toLocaleDateString()}</span>
+                                                            </div>
                                                                 {isSignedIn && user?.id === reply.userId && (
                                                                     <div className="flex gap-1 flex-shrink-0">
                                                                         <Button variant="ghost" size="sm" onClick={() => { setEditingReply({ commentId: comment._id, replyId: reply._id }); setEditReplyContent(reply.content); }} className="h-5 w-5 p-0">
@@ -626,22 +666,38 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                                             ) : (
                                                                 <>
                                                                     <p className="text-xs leading-relaxed" dangerouslySetInnerHTML={{ __html: reply.content.replace(/(@\w+)/g, '<strong class="text-primary">$&</strong>') }}></p>
-                                                                    {isSignedIn && (
-                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                    <div className="flex items-center gap-4 mt-1">
+                                                                        {/* Likes at bottom left of reply */}
+                                                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                                                             <Button
                                                                                 variant="ghost"
                                                                                 size="sm"
-                                                                                onClick={() => {
-                                                                                    const replyKey = `${comment._id}-${reply._id}`;
-                                                                                    setShowReplyForm(prev => ({ ...prev, [replyKey]: !prev[replyKey] }));
-                                                                                    setReplyContent(prev => ({ ...prev, [replyKey]: `@${reply.username} ` }));
-                                                                                }}
-                                                                                className="text-xs text-muted-foreground hover:text-primary h-5 px-1"
+                                                                                onClick={() => handleLikeReply(comment._id, reply._id)}
+                                                                                className={`h-5 w-5 p-0 ${reply.likes && reply.likes.includes(user?.id || '') ? 'text-red-500' : ''}`}
+                                                                                title={reply.likes && reply.likes.includes(user?.id || '') ? 'Unlike' : 'Like'}
                                                                             >
-                                                                                Reply
+                                                                                <Heart className={`h-3 w-3 ${reply.likes && reply.likes.includes(user?.id || '') ? 'fill-red-500' : ''}`}/>
                                                                             </Button>
+                                                                            <span>{reply.likes ? reply.likes.length : 0}</span>
                                                                         </div>
-                                                                    )}
+                                                                        {/* Reply button */}
+                                                                        {isSignedIn && (
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    onClick={() => {
+                                                                                        const replyKey = `${comment._id}-${reply._id}`;
+                                                                                        setShowReplyForm(prev => ({ ...prev, [replyKey]: !prev[replyKey] }));
+                                                                                        setReplyContent(prev => ({ ...prev, [replyKey]: `@${reply.username} ` }));
+                                                                                    }}
+                                                                                    className="text-xs text-muted-foreground hover:text-primary h-5 px-1"
+                                                                                >
+                                                                                    Reply
+                                                                                </Button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </>
                                                             )}
                                                             {showReplyForm[`${comment._id}-${reply._id}`] && isSignedIn && (
