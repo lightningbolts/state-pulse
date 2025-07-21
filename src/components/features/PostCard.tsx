@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
+import { formatDistanceToNow, format } from 'date-fns';
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -363,9 +364,21 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                     </Badge>
                                 )}
                             </div>
-                            <p className="text-xs sm:text-sm text-muted-foreground">
-                                {new Date(postState.createdAt).toLocaleDateString()}
-                            </p>
+                            <div className="text-xs sm:text-sm text-muted-foreground flex flex-col gap-0.5">
+                                <span
+                                  title={
+                                    postState.updatedAt && postState.updatedAt !== postState.createdAt
+                                      ? `Created: ${format(new Date(postState.createdAt), 'yyyy-MM-dd HH:mm:ss')}` +
+                                        `\nEdited: ${format(new Date(postState.updatedAt), 'yyyy-MM-dd HH:mm:ss')}`
+                                      : `Created: ${format(new Date(postState.createdAt), 'yyyy-MM-dd HH:mm:ss')}`
+                                  }
+                                >
+                                  {formatDistanceToNow(new Date(postState.createdAt), { addSuffix: false, includeSeconds: false }).replace(/^about /, "")} ago
+                                  {postState.updatedAt && postState.updatedAt !== postState.createdAt && (
+                                    <span className="ml-1">({formatDistanceToNow(new Date(postState.updatedAt), { addSuffix: false, includeSeconds: false }).replace(/^about /, "")} ago)</span>
+                                  )}
+                                </span>
+                            </div>
                         </div>
                     </div>
                     {isSignedIn && user?.id === post.userId && (
@@ -552,7 +565,21 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                 <span className="font-medium text-xs sm:text-sm cursor-pointer hover:text-primary transition-colors" onClick={() => router.push(`/users/${comment.userId}`)}>{comment.username}</span>
-                                                <span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleDateString()}</span>
+                                                <div className="text-[10px] sm:text-xs text-muted-foreground flex flex-col gap-0.5 ml-1">
+                                                  <span
+                                                    title={
+                                                      comment.updatedAt && comment.updatedAt !== comment.createdAt
+                                                        ? `Created: ${format(new Date(comment.createdAt), 'yyyy-MM-dd HH:mm:ss')}` +
+                                                          `\nEdited: ${format(new Date(comment.updatedAt), 'yyyy-MM-dd HH:mm:ss')}`
+                                                        : `Created: ${format(new Date(comment.createdAt), 'yyyy-MM-dd HH:mm:ss')}`
+                                                    }
+                                                  >
+                                                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: false, includeSeconds: false }).replace(/^about /, "")} ago
+                                                    {comment.updatedAt && comment.updatedAt !== comment.createdAt && (
+                                                      <span className="ml-1">({formatDistanceToNow(new Date(comment.updatedAt), { addSuffix: false, includeSeconds: false }).replace(/^about /, "")} ago)</span>
+                                                    )}
+                                                  </span>
+                                                </div>
                                             </div>
                                             {isSignedIn && user?.id === comment.userId && (
                                                 <div className="flex gap-1 sm:gap-2 flex-shrink-0">
@@ -632,7 +659,21 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                                             <div className="flex items-start justify-between gap-2">
                                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                                 <span className="font-medium text-xs cursor-pointer hover:text-primary transition-colors" onClick={() => router.push(`/users/${reply.userId}`)}>{reply.username}</span>
-                                                                <span className="text-xs text-muted-foreground">{new Date(reply.createdAt).toLocaleDateString()}</span>
+                                                                <div className="text-[10px] sm:text-xs text-muted-foreground flex flex-col gap-0.5 ml-1">
+                                                                  <span
+                                                                    title={
+                                                                      reply.updatedAt && reply.updatedAt !== reply.createdAt
+                                                                        ? `Created: ${format(new Date(reply.createdAt), 'yyyy-MM-dd HH:mm:ss')}` +
+                                                                          `\nEdited: ${format(new Date(reply.updatedAt), 'yyyy-MM-dd HH:mm:ss')}`
+                                                                        : `Created: ${format(new Date(reply.createdAt), 'yyyy-MM-dd HH:mm:ss')}`
+                                                                    }
+                                                                  >
+                                                                    {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: false, includeSeconds: false }).replace(/^about /, "")} ago
+                                                                    {reply.updatedAt && reply.updatedAt !== reply.createdAt && (
+                                                                      <span className="ml-1">({formatDistanceToNow(new Date(reply.updatedAt), { addSuffix: false, includeSeconds: false }).replace(/^about /, "")} ago)</span>
+                                                                    )}
+                                                                  </span>
+                                                                </div>
                                                             </div>
                                                                 {isSignedIn && user?.id === reply.userId && (
                                                                     <div className="flex gap-1 flex-shrink-0">

@@ -16,6 +16,7 @@ export interface Post {
     updatedAt: string;
 }
 
+
 export interface Comment {
     _id: string;
     userId: string;
@@ -23,9 +24,11 @@ export interface Comment {
     userImage?: string;
     content: string;
     createdAt: string;
+    updatedAt: string;
     replies?: Reply[];
     likes: string[]; // Array of user IDs who liked
 }
+
 
 export interface Reply {
     _id: string;
@@ -34,5 +37,6 @@ export interface Reply {
     userImage?: string;
     content: string;
     createdAt: string;
+    updatedAt: string;
     likes: string[]; // Array of user IDs who liked
 }
