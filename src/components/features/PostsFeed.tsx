@@ -21,8 +21,13 @@ import { PostCard } from "./PostCard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function PostsFeed() {
-
-    // All hooks must be declared before any return
+    const [sortBy, setSortBy] = useState('newest');
+    const sortOptions = [
+        { label: 'Newest', value: 'newest' },
+        { label: 'Hot', value: 'hot' },
+        { label: 'Top', value: 'top' },
+        { label: 'Oldest', value: 'oldest' },
+    ];
     const [selectedTag, setSelectedTag] = useState<string>("");
     const {user, isSignedIn} = useUser();
     const router = useRouter();
@@ -31,7 +36,6 @@ export function PostsFeed() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
-    // Inline create post state
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newTitle, setNewTitle] = useState("");
     const [newContent, setNewContent] = useState("");
@@ -42,13 +46,38 @@ export function PostsFeed() {
     const [showBillSearch, setShowBillSearch] = useState(false);
     const [creating, setCreating] = useState(false);
     const allTags = Array.from(new Set(posts.flatMap(post => post.tags))).sort();
+    const getSortedPosts = () => {
+        let sorted = [...filteredPosts];
+        switch (sortBy) {
+            case 'oldest':
+                sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                break;
+            case 'top':
+                sorted.sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
+                break;
+            case 'hot':
+                sorted.sort((a, b) => {
+                    const now = Date.now();
+                    const score = (post: any) => {
+                        const hours = Math.max(1, (now - new Date(post.createdAt).getTime()) / 36e5);
+                        return (post.likes?.length || 0) / hours;
+                    };
+                    return score(b) - score(a);
+                });
+                break;
+            case 'newest':
+            default:
+                sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                break;
+        }
+        return sorted;
+    };
 
     useEffect(() => {
         fetchPosts();
     }, []);
 
     useEffect(() => {
-        // Filter posts by search term and selected tag
         let filtered = posts;
         if (selectedTag) {
             filtered = filtered.filter(post => post.tags.includes(selectedTag));
@@ -248,8 +277,10 @@ export function PostsFeed() {
                 </div>
             )}
             {/* Search/Filter Bar (consistent UI) */}
-            <div className="mb-4 flex justify-center w-full">
-                <div className="flex flex-row gap-2 w-full max-w-4xl">
+
+            {/* Search/Filter/Sort Bar (horizontal on desktop, vertical on mobile) */}
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full max-w-4xl mx-auto">
+                <div className="flex flex-row gap-2 flex-1">
                     <div className="relative flex-1">
                         <Input
                             type="text"
@@ -273,6 +304,8 @@ export function PostsFeed() {
                     >
                         Enter
                     </Button>
+                </div>
+                <div className="flex flex-row gap-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="lg" className="h-12 min-w-[120px] text-base flex items-center gap-2" style={{height: '48px'}}>
@@ -292,14 +325,29 @@ export function PostsFeed() {
                             ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="lg" className="h-12 min-w-[120px] text-base flex items-center gap-2" style={{height: '48px'}}>
+                                <span className="text-base text-muted-foreground">Sort by:</span>
+                                <Badge variant="secondary" className="text-xs ml-2">
+                                    {sortOptions.find(opt => opt.value === sortBy)?.label}
+                                </Badge>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            {sortOptions.map(opt => (
+                                <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)}>
+                                    <Badge variant={sortBy === opt.value ? "default" : "secondary"} className="text-xs mr-2">{opt.label}</Badge>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 
-
-
             {/* Posts Feed */}
             <div className="space-y-3 sm:space-y-4">
-                {filteredPosts.length === 0 ? (
+                {getSortedPosts().length === 0 ? (
                     <AnimatedSection>
                         <Card>
                             <CardContent className="text-center py-6 sm:py-8">
@@ -310,7 +358,7 @@ export function PostsFeed() {
                         </Card>
                     </AnimatedSection>
                 ) : (
-                    filteredPosts.map((post) => (
+                    getSortedPosts().map((post) => (
                         <AnimatedSection key={post._id}>
                             <PostCard post={post} onPostDeleted={fetchPosts} onPostUpdated={handlePostUpdated} />
                         </AnimatedSection>
