@@ -18,6 +18,7 @@ import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { PostCard } from "./PostCard";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function PostsFeed() {
     const {user, isSignedIn} = useUser();
@@ -59,6 +60,16 @@ export function PostsFeed() {
     useEffect(() => {
         fetchPosts();
     }, []);
+
+    // Always normalize linkedBills to a non-null, non-[null] array after fetching posts
+    useEffect(() => {
+        setPosts(posts => posts.map(post => ({
+            ...post,
+            linkedBills: Array.isArray(post.linkedBills)
+                ? post.linkedBills.filter(Boolean)
+                : []
+        })));
+    }, [loading]);
 
     useEffect(() => {
         // Filter posts whenever posts or searchTerm changes
@@ -322,6 +333,7 @@ export function PostsFeed() {
         setTags([]);
         setCurrentTag('');
         setShowBillSearch(false);
+        setEditingPost(null); // Also exit edit mode
     };
 
     const startEditPost = (post: Post) => {
@@ -346,12 +358,14 @@ export function PostsFeed() {
     };
 
     const handleBillSelect = (bill: Bill) => {
+        if (!bill || !bill.id) return;
         setSelectedBills(prev => {
-            const exists = prev.find(b => b.id === bill.id);
+            const filteredPrev = prev.filter(b => b && b.id);
+            const exists = filteredPrev.find(b => b.id === bill.id);
             if (exists) {
-                return prev.filter(b => b.id !== bill.id);
+                return filteredPrev.filter(b => b.id !== bill.id);
             } else {
-                return [...prev, bill];
+                return [...filteredPrev, bill];
             }
         });
     };
@@ -451,13 +465,13 @@ export function PostsFeed() {
                 </AnimatedSection>
             )}
 
-            {/* Create/Edit Post Form */}
-            {showCreatePost && isSignedIn && (
+            {/* Create Post Form */}
+            {showCreatePost && isSignedIn && !editingPost && (
                 <AnimatedSection>
                     <Card className="mx-0 sm:mx-0">
                         <CardHeader className="pb-3 sm:pb-6">
                             <CardTitle className="flex items-center justify-between text-lg sm:text-xl">
-                                <span className="truncate pr-2">{editingPost ? 'Edit Post' : 'Create New Post'}</span>
+                                <span className="truncate pr-2">Create New Post</span>
                                 <Button variant="ghost" size="sm" onClick={resetCreateForm} className="flex-shrink-0">
                                     <X className="h-4 w-4"/>
                                 </Button>
@@ -582,12 +596,12 @@ export function PostsFeed() {
 
                             {/* Submit Button */}
                             <Button
-                                onClick={editingPost ? () => handleEditPost(editingPost) : handleCreatePost}
+                                onClick={handleCreatePost}
                                 className="w-full h-12 sm:h-auto text-sm sm:text-base"
                                 disabled={!title.trim() || !content.trim()}
                             >
                                 <Save className="h-4 w-4 mr-2"/>
-                                {editingPost ? 'Update Post' : 'Create Post'}
+                                Create Post
                             </Button>
                         </CardContent>
                     </Card>
@@ -619,21 +633,21 @@ export function PostsFeed() {
                                 startEditPost={startEditPost}
                                 handleCancelEditPost={resetCreateForm}
                                 handleSavePost={handleEditPost}
-                                editTitle={title}
-                                setEditTitle={setTitle}
-                                editContent={content}
-                                setEditContent={setContent}
-                                editPostType={postType}
-                                setEditPostType={setPostType}
-                                editTags={tags}
-                                currentTag={currentTag}
-                                setCurrentTag={setCurrentTag}
-                                addTag={addTag}
-                                removeTag={removeTag}
-                                editSelectedBills={selectedBills}
-                                handleBillSelect={handleBillSelect}
-                                editShowBillSearch={showBillSearch}
-                                setEditShowBillSearch={setShowBillSearch}
+                                editTitle={editingPost === post._id ? title : post.title}
+                                setEditTitle={editingPost === post._id ? setTitle : () => {}}
+                                editContent={editingPost === post._id ? content : post.content}
+                                setEditContent={editingPost === post._id ? setContent : () => {}}
+                                editPostType={editingPost === post._id ? postType : post.type}
+                                setEditPostType={editingPost === post._id ? setPostType : () => {}}
+                                editTags={editingPost === post._id ? tags : post.tags}
+                                currentTag={editingPost === post._id ? currentTag : ''}
+                                setCurrentTag={editingPost === post._id ? setCurrentTag : () => {}}
+                                addTag={editingPost === post._id ? addTag : () => {}}
+                                removeTag={editingPost === post._id ? removeTag : () => {}}
+                                editSelectedBills={editingPost === post._id ? selectedBills : (post.linkedBills || [])}
+                                handleBillSelect={editingPost === post._id ? handleBillSelect : () => {}}
+                                editShowBillSearch={editingPost === post._id ? showBillSearch : false}
+                                setEditShowBillSearch={editingPost === post._id ? setShowBillSearch : () => {}}
                                 handleDeletePost={handleDeletePost}
                                 handleLikePost={handleLikePost}
                                 showComments={showComments}

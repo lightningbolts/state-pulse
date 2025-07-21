@@ -131,8 +131,8 @@ export function PostCard({
 
     const billsAreEqual = (a: Bill[], b: Bill[]) => {
         if (a.length !== b.length) return false;
-        const aIds = a.map(bill => bill.id).sort();
-        const bIds = b.map(bill => bill.id).sort();
+        const aIds = a.filter(Boolean).map(bill => bill.id).sort();
+        const bIds = b.filter(Boolean).map(bill => bill.id).sort();
         return arraysAreEqual(aIds, bIds);
     };
 
