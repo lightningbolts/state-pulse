@@ -42,7 +42,7 @@ export async function PUT(
       );
     }
 
-    const updateData = {
+    const updateData: any = {
       title: title.trim(),
       content: content.trim(),
       tags: tags || [],
@@ -59,7 +59,10 @@ export async function PUT(
       { $set: updateData }
     );
 
-    return NextResponse.json({ message: 'Post updated successfully' });
+    // Fetch the updated post
+    const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+
+    return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error updating post:', error);
     return NextResponse.json(

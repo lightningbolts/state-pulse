@@ -55,7 +55,7 @@ export async function PUT(
           'comments.$[comment].replies.$[reply].content': content.trim(),
           'comments.$[comment].replies.$[reply].updatedAt': new Date().toISOString()
         }
-      },
+      } as any,
       {
         arrayFilters: [
           { 'comment._id': new ObjectId(commentId) },
@@ -71,9 +71,11 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json({
-      message: 'Reply updated successfully'
-    });
+    // Find the post id for this comment
+    const postDoc = await db.collection('posts').findOne({ 'comments._id': new ObjectId(commentId) });
+    const postId = postDoc?._id;
+    const updatedPost = postId ? await db.collection('posts').findOne({ _id: postId }) : null;
+    return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error updating reply:', error);
     return NextResponse.json(
@@ -114,28 +116,37 @@ export async function DELETE(
       );
     }
 
-    // Remove the reply
-    const result = await db.collection('posts').updateOne(
-      { 'comments._id': new ObjectId(commentId) },
-      {
-        $pull: {
-          'comments.$.replies': {
-            _id: new ObjectId(replyId)
-          }
-        }
-      }
-    );
+            // Remove the reply and return updated post
+            const result = await db.collection('posts').updateOne(
+                {
+                    'comments._id': new ObjectId(commentId),
+                    'comments.replies._id': new ObjectId(replyId),
+                    'comments.replies.userId': userId
+                },
+                {
+                    $pull: {
+                        'comments.$[comment].replies': { _id: new ObjectId(replyId) }
+                    }
+                } as any,
+                {
+                    arrayFilters: [
+                        { 'comment._id': new ObjectId(commentId) }
+                    ]
+                }
+            );
 
-    if (result.modifiedCount === 0) {
-      return NextResponse.json(
-        { error: 'Reply not found' },
-        { status: 404 }
-      );
-    }
+            if (result.modifiedCount === 0) {
+                return NextResponse.json(
+                    { error: 'Reply not found or unauthorized' },
+                    { status: 404 }
+                );
+            }
 
-    return NextResponse.json({
-      message: 'Reply deleted successfully'
-    });
+            // Find the post id for this comment (avoid redeclaration)
+            const postDoc = await db.collection('posts').findOne({ 'comments._id': new ObjectId(commentId) });
+            const postId = postDoc?._id;
+            const updatedPost = postId ? await db.collection('posts').findOne({ _id: postId }) : null;
+            return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error deleting reply:', error);
     return NextResponse.json(

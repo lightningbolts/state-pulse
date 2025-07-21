@@ -77,13 +77,11 @@ export async function POST(
         $push: {
           'comments.$.replies': newReply
         }
-      }
+      } as any
     );
 
-    return NextResponse.json({
-      message: 'Reply added successfully',
-      reply: newReply
-    });
+    const updatedPost = await db.collection('posts').findOne({ _id: post._id });
+    return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error adding reply:', error);
     return NextResponse.json(

@@ -41,12 +41,14 @@ export async function POST(
 
     await db.collection('posts').updateOne(
       { _id: new ObjectId(id) },
-      updateOperation
+      updateOperation as any
     );
 
+    // Fetch the updated post
+    const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+
     return NextResponse.json({
-      message: isLiked ? 'Post unliked' : 'Post liked',
-      liked: !isLiked
+      post: updatedPost
     });
   } catch (error) {
     console.error('Error toggling like:', error);

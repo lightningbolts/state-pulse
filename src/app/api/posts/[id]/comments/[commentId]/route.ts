@@ -55,7 +55,7 @@ export async function PUT(
           'comments.$.content': content.trim(),
           'comments.$.updatedAt': new Date().toISOString()
         }
-      }
+      } as any
     );
 
     if (result.modifiedCount === 0) {
@@ -65,9 +65,8 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json({
-      message: 'Comment updated successfully'
-    });
+    const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+    return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error updating comment:', error);
     return NextResponse.json(
@@ -117,7 +116,7 @@ export async function DELETE(
             _id: new ObjectId(commentId)
           }
         }
-      }
+      } as any
     );
 
     if (result.modifiedCount === 0) {
@@ -127,11 +126,14 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({
-      message: 'Comment deleted successfully'
-    });
+    // Return the updated post object
+    const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+    return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error deleting comment:', error);
+            // Return the updated post object
+            const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+            return NextResponse.json({ post: updatedPost });
     return NextResponse.json(
       { error: 'Failed to delete comment' },
       { status: 500 }

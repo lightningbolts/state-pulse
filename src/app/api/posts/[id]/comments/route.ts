@@ -92,15 +92,13 @@ export async function POST(
       createdAt: new Date().toISOString(),
     };
 
-    await db.collection('posts').updateOne(
-      { _id: new ObjectId(id) },
-      { $push: { comments: newComment } }
-    );
+        await db.collection('posts').updateOne(
+            { _id: new ObjectId(id) },
+            { $push: { comments: newComment } } as any
+        );
 
-    return NextResponse.json({
-      message: 'Comment added successfully',
-      comment: newComment
-    });
+        const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+        return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error adding comment:', error);
     return NextResponse.json(

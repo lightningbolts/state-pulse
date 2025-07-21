@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,117 +10,240 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Post, Comment, Reply } from "@/types/media";
 import { Bill } from "@/types/legislation";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 import { BillSearch } from "./BillSearch";
 
-interface User {
-    id: string;
-}
 
 interface PostCardProps {
     post: Post;
-    user?: User;
-    isSignedIn: boolean;
-    router: any;
-    editingPostId: string | null;
-    startEditPost: (post: Post) => void;
-    handleCancelEditPost: () => void;
-    handleSavePost: (postId: string) => void;
-    editTitle: string;
-    setEditTitle: (value: string) => void;
-    editContent: string;
-    setEditContent: (value: string) => void;
-    editPostType: 'legislation' | 'bug_report';
-    setEditPostType: (type: 'legislation' | 'bug_report') => void;
-    editTags: string[];
-    currentTag: string;
-    setCurrentTag: (tag: string) => void;
-    addTag: () => void;
-    removeTag: (tag: string) => void;
-    editSelectedBills: Bill[];
-    handleBillSelect: (bill: Bill) => void;
-    editShowBillSearch: boolean;
-    setEditShowBillSearch: React.Dispatch<React.SetStateAction<boolean>>;
-    handleDeletePost: (postId: string) => void;
-    handleLikePost: (postId: string) => void;
-    showComments: Record<string, boolean>;
-    setShowComments: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-    commentContent: Record<string, string>;
-    setCommentContent: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-    handleAddComment: (postId: string) => void;
-    editingComment: string | null;
-    setEditingComment: React.Dispatch<React.SetStateAction<string | null>>;
-    editCommentContent: string;
-    setEditCommentContent: React.Dispatch<React.SetStateAction<string>>;
-    handleEditComment: (postId: string, commentId: string) => void;
-    handleDeleteComment: (postId: string, commentId: string) => void;
-    // Reply Actions
-    showReplyForm: Record<string, boolean>;
-    setShowReplyForm: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-    replyContent: Record<string, string>;
-    setReplyContent: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-    handleAddReply: (commentId: string, content?: string) => void;
-    showReplies: Record<string, boolean>;
-    setShowReplies: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-    handleDeleteReply: (commentId: string, replyId: string) => void;
-    editingReply: { commentId: string; replyId: string } | null;
-    setEditingReply: React.Dispatch<React.SetStateAction<{ commentId: string; replyId: string } | null>>;
-    editReplyContent: string;
-    setEditReplyContent: React.Dispatch<React.SetStateAction<string>>;
-    handleEditReply: (commentId: string, replyId: string) => void;
+    onPostDeleted?: () => void; // callback for parent to refresh posts if deleted
 }
 
-export function PostCard({
-                             post,
-                             user,
-                             isSignedIn,
-                             router,
-                             editingPostId,
-                             startEditPost,
-                             handleCancelEditPost,
-                             handleSavePost,
-                             editTitle,
-                             setEditTitle,
-                             editContent,
-                             setEditContent,
-                             editPostType,
-                             setEditPostType,
-                             editTags,
-                             currentTag,
-                             setCurrentTag,
-                             addTag,
-                             removeTag,
-                             editSelectedBills,
-                             handleBillSelect,
-                             editShowBillSearch,
-                             setEditShowBillSearch,
-                             handleDeletePost,
-                             handleLikePost,
-                             showComments,
-                             setShowComments,
-                             commentContent,
-                             setCommentContent,
-                             handleAddComment,
-                             editingComment,
-                             setEditingComment,
-                             editCommentContent,
-                             setEditCommentContent,
-                             handleEditComment,
-                             handleDeleteComment,
-                             showReplyForm,
-                             setShowReplyForm,
-                             replyContent,
-                             setReplyContent,
-                             handleAddReply,
-                             showReplies,
-                             setShowReplies,
-                             handleDeleteReply,
-                             editingReply,
-                             setEditingReply,
-                             editReplyContent,
-                             setEditReplyContent,
-                             handleEditReply,
-                         }: PostCardProps) {
-    const isEditingPost = editingPostId === post._id;
+
+export function PostCard({ post, onPostDeleted }: PostCardProps) {
+    const { user, isSignedIn } = useUser();
+    const router = useRouter();
+    const { toast } = useToast();
+
+    // Unified local post state
+    const [postState, setPostState] = useState<Post>(post);
+
+    // Local state for editing post
+    const [isEditing, setIsEditing] = useState(false);
+    const [editTitle, setEditTitle] = useState(post.title);
+    const [editContent, setEditContent] = useState(post.content);
+    const [editPostType, setEditPostType] = useState<'legislation' | 'bug_report'>(post.type);
+    const [editTags, setEditTags] = useState<string[]>(post.tags || []);
+    const [currentTag, setCurrentTag] = useState('');
+    const [editSelectedBills, setEditSelectedBills] = useState<Bill[]>(post.linkedBills || []);
+    const [editShowBillSearch, setEditShowBillSearch] = useState(false);
+
+    // Local state for comments and replies
+    const [showComments, setShowComments] = useState(false);
+    const [commentContent, setCommentContent] = useState('');
+    const [editingComment, setEditingComment] = useState<string | null>(null);
+    const [editCommentContent, setEditCommentContent] = useState('');
+    const [showReplyForm, setShowReplyForm] = useState<Record<string, boolean>>({});
+    const [replyContent, setReplyContent] = useState<Record<string, string>>({});
+    const [showReplies, setShowReplies] = useState<Record<string, boolean>>({});
+    const [editingReply, setEditingReply] = useState<{ commentId: string; replyId: string } | null>(null);
+    const [editReplyContent, setEditReplyContent] = useState('');
+
+    // Only reset local state if the post ID changes (e.g., navigating to a different post)
+    useEffect(() => {
+        setPostState(post);
+        setEditTitle(post.title);
+        setEditContent(post.content);
+        setEditPostType(post.type);
+        setEditTags(post.tags || []);
+        setEditSelectedBills(post.linkedBills || []);
+    }, [post._id]);
+
+    // Helper: refresh post data from API (for comments/likes)
+    const refreshPost = async () => {
+        try {
+            const response = await fetch(`/api/posts/${postState._id}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {
+            // ignore
+        }
+    };
+
+    // Post actions
+    const handleSavePost = async () => {
+        if (!isSignedIn) return;
+        try {
+            const response = await fetch(`/api/posts/${postState._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: editTitle.trim(),
+                    content: editContent.trim(),
+                    type: editPostType,
+                    linkedBills: editPostType === 'legislation' ? editSelectedBills : undefined,
+                    tags: editTags
+                })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleSavePost API response:', data.post);
+                setIsEditing(false);
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+                setEditTitle(data.post?.title ?? editTitle);
+                setEditContent(data.post?.content ?? editContent);
+                setEditPostType(data.post?.type ?? editPostType);
+                setEditTags(data.post?.tags || editTags);
+                setEditSelectedBills(data.post?.linkedBills || editSelectedBills);
+            }
+        } catch (error) {
+            // ignore
+        }
+    };
+
+    const handleDeletePost = async () => {
+        if (!isSignedIn || !confirm('Are you sure you want to delete this post?')) return;
+        try {
+            const response = await fetch(`/api/posts/${post._id}`, { method: 'DELETE' });
+            if (response.ok && onPostDeleted) onPostDeleted();
+        } catch (error) {}
+    };
+
+    const handleLikePost = async () => {
+        if (!isSignedIn) return;
+        try {
+            const response = await fetch(`/api/posts/${postState._id}/like`, { method: 'POST' });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleLikePost API response:', data.post);
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+
+    // Comment actions
+    const handleAddComment = async () => {
+        if (!isSignedIn || !commentContent.trim()) return;
+        try {
+            const response = await fetch(`/api/posts/${postState._id}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: commentContent.trim() })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleAddComment API response:', data.post);
+                setCommentContent('');
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+    const handleEditComment = async (commentId: string) => {
+        if (!isSignedIn || !editCommentContent.trim()) return;
+        try {
+            const response = await fetch(`/api/posts/${postState._id}/comments/${commentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: editCommentContent.trim() })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleEditComment API response:', data.post);
+                setEditingComment(null);
+                setEditCommentContent('');
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+    const handleDeleteComment = async (commentId: string) => {
+        if (!isSignedIn || !confirm('Are you sure you want to delete this comment?')) return;
+        try {
+            const response = await fetch(`/api/posts/${postState._id}/comments/${commentId}`, { method: 'DELETE' });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleDeleteComment API response:', data.post);
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+
+    // Reply actions
+    const handleAddReply = async (commentId: string, customContent?: string) => {
+        const content = customContent || replyContent[commentId];
+        if (!isSignedIn || !content?.trim()) return;
+        try {
+            const response = await fetch(`/api/comments/${commentId}/replies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content.trim() })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleAddReply API response:', data.post);
+                setReplyContent(prev => ({ ...prev, [commentId]: '' }));
+                setShowReplies(prev => ({ ...prev, [commentId]: true }));
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+    const handleEditReply = async (commentId: string, replyId: string) => {
+        if (!isSignedIn || !editReplyContent.trim()) return;
+        try {
+            const response = await fetch(`/api/comments/${commentId}/replies/${replyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: editReplyContent.trim() })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleEditReply API response:', data.post);
+                setEditingReply(null);
+                setEditReplyContent('');
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+    const handleDeleteReply = async (commentId: string, replyId: string) => {
+        if (!isSignedIn || !confirm('Are you sure you want to delete this reply?')) return;
+        try {
+            const response = await fetch(`/api/comments/${commentId}/replies/${replyId}`, { method: 'DELETE' });
+            if (response.ok) {
+                const data = await response.json();
+                console.log('handleDeleteReply API response:', data.post);
+                if (data.post && typeof data.post === 'object') setPostState(data.post);
+            }
+        } catch (error) {}
+    };
+
+    // Tag actions
+    const addTag = () => {
+        if (currentTag.trim() && !editTags.includes(currentTag.trim())) {
+            setEditTags([...editTags, currentTag.trim()]);
+            setCurrentTag('');
+        }
+    };
+    const removeTag = (tagToRemove: string) => {
+        setEditTags(editTags.filter(tag => tag !== tagToRemove));
+    };
+
+    // Bill actions
+    const handleBillSelect = (bill: Bill) => {
+        if (!bill || !bill.id) return;
+        setEditSelectedBills(prev => {
+            const filteredPrev = prev.filter(b => b && b.id);
+            const exists = filteredPrev.find(b => b.id === bill.id);
+            if (exists) {
+                return filteredPrev.filter(b => b.id !== bill.id);
+            } else {
+                return [...filteredPrev, bill];
+            }
+        });
+    };
+    const isEditingPost = isEditing;
 
     const arraysAreEqual = (a: any[], b: any[]) => {
         if (a.length !== b.length) return false;
@@ -137,11 +260,13 @@ export function PostCard({
     };
 
     const isPostUnchanged =
-        post.title === editTitle &&
-        post.content === editContent &&
-        post.type === editPostType &&
-        arraysAreEqual(post.tags || [], editTags) &&
-        billsAreEqual(post.linkedBills || [], editSelectedBills);
+        !!postState &&
+        typeof postState === 'object' &&
+        postState.title === editTitle &&
+        postState.content === editContent &&
+        postState.type === editPostType &&
+        arraysAreEqual(postState.tags || [], editTags) &&
+        billsAreEqual(postState.linkedBills || [], editSelectedBills);
 
     // Add ref and effect for reply-to-reply textarea
     const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -157,18 +282,21 @@ export function PostCard({
         }
     }, [showReplyForm, replyContent]);
 
+    console.log('PostCard render, postState:', postState);
+    if (!postState || typeof postState !== 'object' || !postState.title) {
+        return null;
+    }
     return (
         <Card className="mx-0 sm:mx-0">
             <CardHeader className="pb-3 sm:pb-4">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                        {post.userImage && (
+                        {postState.userImage && (
                             <img
-                                src={post.userImage}
-                                alt={post.username}
+                                src={postState.userImage}
+                                alt={postState.username}
                                 className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0 cursor-default select-none pointer-events-none"
                                 draggable={false}
-                                style={{ userDrag: "none" }}
                                 onContextMenu={e => e.preventDefault()}
                                 onMouseDown={e => e.preventDefault()}
                                 onDragStart={e => e.preventDefault()}
@@ -181,16 +309,16 @@ export function PostCard({
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span
                                     className="font-medium text-sm sm:text-base truncate cursor-pointer hover:text-primary transition-colors"
-                                    onClick={() => router.push(`/users/${post.userId}`)}
+                                    onClick={() => router.push(`/users/${postState.userId}`)}
                                 >
-                                  {post.username}
+                                  {postState.username}
                                 </span>
                                 {!isEditingPost && (
                                     <Badge
-                                        variant={post.type === 'legislation' ? 'default' : 'destructive'}
+                                        variant={postState.type === 'legislation' ? 'default' : 'destructive'}
                                         className="text-xs px-2 py-0.5"
                                     >
-                                        {post.type === 'legislation' ? (
+                                        {postState.type === 'legislation' ? (
                                             <>
                                                 <FileText className="h-3 w-3 mr-1" />
                                                 <span className="hidden xs:inline">Legislation</span>
@@ -207,23 +335,23 @@ export function PostCard({
                                 )}
                             </div>
                             <p className="text-xs sm:text-sm text-muted-foreground">
-                                {new Date(post.createdAt).toLocaleDateString()}
+                                {new Date(postState.createdAt).toLocaleDateString()}
                             </p>
                         </div>
                     </div>
                     {isSignedIn && user?.id === post.userId && (
                         <div className="flex gap-1 sm:gap-2 flex-shrink-0">
-                            {isEditingPost ? (
+                            {isEditing ? (
                                 <>
-                                    <Button variant="outline" size="sm" onClick={handleCancelEditPost}>Cancel</Button>
-                                    <Button size="sm" onClick={() => handleSavePost(post._id)} disabled={isPostUnchanged || !editTitle.trim() || !editContent.trim()}>Save</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
+                                    <Button size="sm" onClick={handleSavePost} disabled={isPostUnchanged || !editTitle.trim() || !editContent.trim()}>Save</Button>
                                 </>
                             ) : (
                                 <>
-                                    <Button variant="ghost" size="sm" onClick={() => startEditPost(post)} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
                                         <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDeletePost(post._id)} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                                    <Button variant="ghost" size="sm" onClick={handleDeletePost} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
                                         <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                     </Button>
                                 </>
@@ -231,7 +359,7 @@ export function PostCard({
                         </div>
                     )}
                 </div>
-                {isEditingPost ? (
+                {isEditing ? (
                     <Input
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
@@ -240,8 +368,8 @@ export function PostCard({
                     />
                 ) : (
                     <CardTitle className="text-base sm:text-lg leading-tight">
-                        <Link href={`/posts/${post._id}`} className="text-blue-600 hover:underline">
-                            {post.title}
+                        <Link href={`/posts/${postState._id}`} className="text-blue-600 hover:underline">
+                            {postState.title}
                         </Link>
                     </CardTitle>
                 )}
@@ -275,7 +403,7 @@ export function PostCard({
                                 <SelectedBills
                                     selectedBills={editSelectedBills}
                                     onRemoveBill={(billId) => handleBillSelect(editSelectedBills.find(b => b.id === billId)!)}
-                                    onClearAll={() => editSelectedBills.forEach(bill => handleBillSelect(bill))}
+                                    onClearAll={() => setEditSelectedBills([])}
                                     title="Linked Bills"
                                     description="Bills referenced in this post"
                                 />
@@ -322,15 +450,15 @@ export function PostCard({
                     </div>
                 ) : (
                     <>
-                        <p className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">{post.content}</p>
-                        {post.linkedBills && post.linkedBills.length > 0 && (
+                        <p className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed">{postState.content}</p>
+                        {postState.type === 'legislation' && postState.linkedBills && postState.linkedBills.length > 0 && (
                             <div className="mt-3 sm:mt-4">
-                                <SelectedBills selectedBills={post.linkedBills as Bill[]} onRemoveBill={() => {}} onClearAll={() => {}} title="Referenced Bills" description="Bills discussed in this post" readOnly={true} />
+                                <SelectedBills selectedBills={postState.linkedBills as Bill[]} onRemoveBill={() => {}} onClearAll={() => {}} title="Referenced Bills" description="Bills discussed in this post" readOnly={true} />
                             </div>
                         )}
-                        {post.tags.length > 0 && (
+                        {postState.tags && postState.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 sm:gap-2">
-                                {post.tags.map((tag: string) => ( <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5">{tag}</Badge> ))}
+                                {postState.tags.map((tag: string) => ( <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5">{tag}</Badge> ))}
                             </div>
                         )}
                     </>
@@ -338,29 +466,29 @@ export function PostCard({
 
                 <div className="flex items-center justify-between pt-3 sm:pt-4 border-t">
                     <div className="flex items-center gap-3 sm:gap-4">
-                        <Button variant="ghost" size="sm" onClick={() => handleLikePost(post._id)} className={`flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 ${isSignedIn && post.likes.includes(user?.id || '') ? 'text-red-500' : ''}`}>
-                            <Heart className={`h-4 w-4 ${isSignedIn && post.likes.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
-                            <span className="text-sm">{post.likes.length}</span>
+                        <Button variant="ghost" size="sm" onClick={handleLikePost} className={`flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 ${isSignedIn && postState.likes && postState.likes.includes(user?.id || '') ? 'text-red-500' : ''}`}>
+                            <Heart className={`h-4 w-4 ${isSignedIn && postState.likes && postState.likes.includes(user?.id || '') ? 'fill-red-500' : ''}`} />
+                            <span className="text-sm">{postState.likes ? postState.likes.length : 0}</span>
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setShowComments((prev) => ({ ...prev, [post._id]: !prev[post._id] }))} className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3">
+                        <Button variant="ghost" size="sm" onClick={() => setShowComments((prev) => !prev)} className="flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3">
                             <MessageCircle className="h-4 w-4" />
-                            <span className="text-sm">{post.comments.length}</span>
+                            <span className="text-sm">{postState.comments ? postState.comments.length : 0}</span>
                         </Button>
                     </div>
                 </div>
 
-                {showComments[post._id] && (
+                {showComments && (
                     <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4 border-t">
                         {isSignedIn && (
                             <div className="space-y-2">
-                                <Textarea value={commentContent[post._id] || ''} onChange={(e) => setCommentContent((prev) => ({ ...prev, [post._id]: e.target.value }))} placeholder="Write a comment..." rows={2} className="text-sm resize-none" />
+                                <Textarea value={commentContent} onChange={(e) => setCommentContent(e.target.value)} placeholder="Write a comment..." rows={2} className="text-sm resize-none" />
                                 <div className="flex justify-end">
-                                    <Button onClick={() => handleAddComment(post._id)} disabled={!commentContent[post._id]?.trim()} size="sm" className="px-4 sm:px-6">Post</Button>
+                                    <Button onClick={handleAddComment} disabled={!commentContent.trim()} size="sm" className="px-4 sm:px-6">Post</Button>
                                 </div>
                             </div>
                         )}
                         <div className="space-y-2 sm:space-y-3">
-                            {post.comments.map((comment: Comment) => (
+                            {(postState.comments || []).map((comment: Comment) => (
                                 <div key={comment._id} className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
                                     {comment.userImage && (
                                         <img
@@ -368,7 +496,7 @@ export function PostCard({
                                             alt={comment.username}
                                             className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 mt-0.5 cursor-default select-none pointer-events-none"
                                             draggable={false}
-                                            style={{ userDrag: "none" }}
+                                            // ...removed userDrag property...
                                             onContextMenu={e => e.preventDefault()}
                                             onMouseDown={e => e.preventDefault()}
                                             onDragStart={e => e.preventDefault()}
@@ -386,7 +514,7 @@ export function PostCard({
                                             {isSignedIn && user?.id === comment.userId && (
                                                 <div className="flex gap-1 sm:gap-2 flex-shrink-0">
                                                     <Button variant="ghost" size="sm" onClick={() => { setEditingComment(comment._id); setEditCommentContent(comment.content); }} className="h-6 w-6 sm:h-7 sm:w-7 p-0"><Edit className="h-3 w-3" /></Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteComment(post._id, comment._id)} className="h-6 w-6 sm:h-7 sm:w-7 p-0"><Trash2 className="h-3 w-3" /></Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteComment(comment._id)} className="h-6 w-6 sm:h-7 sm:w-7 p-0"><Trash2 className="h-3 w-3" /></Button>
                                                 </div>
                                             )}
                                         </div>
@@ -395,7 +523,7 @@ export function PostCard({
                                                 <Textarea value={editCommentContent} onChange={(e) => setEditCommentContent(e.target.value)} placeholder="Edit your comment..." rows={2} className="text-sm resize-none" />
                                                 <div className="flex justify-end gap-2">
                                                     <Button onClick={() => setEditingComment(null)} variant="outline" size="sm" className="px-3 sm:px-4">Cancel</Button>
-                                                    <Button onClick={() => handleEditComment(post._id, comment._id)} disabled={!editCommentContent.trim()} size="sm" className="px-3 sm:px-4">Save</Button>
+                                                    <Button onClick={() => handleEditComment(comment._id)} disabled={!editCommentContent.trim()} size="sm" className="px-3 sm:px-4">Save</Button>
                                                 </div>
                                             </div>
                                         ) : (
@@ -432,7 +560,7 @@ export function PostCard({
                                                                 alt={reply.username}
                                                                 className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 mt-0.5 cursor-default select-none pointer-events-none"
                                                                 draggable={false}
-                                                                style={{ userDrag: "none" }}
+                                                                // ...removed userDrag property...
                                                                 onContextMenu={e => e.preventDefault()}
                                                                 onMouseDown={e => e.preventDefault()}
                                                                 onDragStart={e => e.preventDefault()}
