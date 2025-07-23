@@ -44,6 +44,7 @@ interface PolicyUpdate {
 const CLASSIFICATIONS = [
     {label: "All", value: ""},
     {label: "Bill", value: "bill"},
+    {label: "Proposed bill", value: "proposed bill"},
     {label: "Resolution", value: "resolution"},
     {label: "Joint Resolution", value: "concurrent resolution"},
     {label: "Concurrent Resolution", value: "memorial"},
