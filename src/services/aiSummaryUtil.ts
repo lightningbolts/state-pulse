@@ -196,7 +196,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
   if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
     const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
     if (abstractsText.trim().length > 20) {
-      const summary = await generateGeminiSummary(abstractsText);
+      const summary = await summarizeWithAzure(abstractsText);
       return { summary: String(summary), sourceType: 'abstracts' };
     }
   }
@@ -224,12 +224,12 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
       }
     }
     if (combinedText.trim().length > 100) {
-      const summary = await generateGeminiSummary(combinedText);
+      const summary = await summarizeWithAzure(combinedText);
       return { summary: String(summary), sourceType: 'sources.url' };
     }
   }
   // 4. Fallback: bill title
   const title = bill.title || 'No title available.';
-  const summary = await generateGeminiSummary(title);
+  const summary = await summarizeWithAzure(title);
   return { summary: String(summary), sourceType: 'title' };
 }
