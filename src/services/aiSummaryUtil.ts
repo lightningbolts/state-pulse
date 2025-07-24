@@ -327,8 +327,32 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
           }
           const html = await res.text();
           // Find ALL PDF links in the HTML
-          const pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
-          console.log('[DEBUG] Found PDF links:', pdfLinks);
+          let pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+          // If no PDF links found and this is a congress.gov bill, try the 'Text' subpage
+          if (pdfLinks.length === 0 && source.url.includes('congress.gov/bill/')) {
+            // Look for a link to the Text subpage
+            const textTabMatch = html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*Text\s*<\/a>/i);
+            if (textTabMatch) {
+              let textTabUrl = textTabMatch[1];
+              if (!textTabUrl.startsWith('http')) {
+                const base = new URL(source.url);
+                textTabUrl = new URL(textTabUrl, base).href;
+              }
+              console.log('[DEBUG] Following Congress.gov Text tab:', textTabUrl);
+              try {
+                const textRes = await fetch(textTabUrl);
+                if (textRes.ok) {
+                  const textHtml = await textRes.text();
+                  pdfLinks = Array.from(textHtml.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+                  console.log('[DEBUG] Found PDF links in Text tab:', pdfLinks);
+                }
+              } catch (e) {
+                console.log('[Bill Extraction] Error fetching/parsing Text tab:', textTabUrl, e);
+              }
+            }
+          } else {
+            console.log('[DEBUG] Found PDF links:', pdfLinks);
+          }
           for (let pdfUrl of pdfLinks) {
             if (!pdfUrl.startsWith('http')) {
               const base = new URL(source.url);
