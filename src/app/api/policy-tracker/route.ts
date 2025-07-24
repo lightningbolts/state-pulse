@@ -5,6 +5,7 @@ import { getAuth } from '@clerk/nextjs/server';
 // POST /api/policy-tracker
 export async function POST(req: NextRequest) {
   const auth = getAuth(req);
+
   if (!auth.userId) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 401 });
   }
@@ -20,38 +21,36 @@ export async function POST(req: NextRequest) {
     { upsert: true }
   );
 
-  // If this is a new subscription (upserted), send confirmation email
-  if (result.upsertedCount > 0 || result.matchedCount === 0) {
-    // Fetch user email using Clerk
-    let email = undefined;
+  // Always send confirmation email for any topic subscription
+  // Fetch user email using Clerk
+  let email = undefined;
+  try {
+    const { users } = await import('@clerk/clerk-sdk-node');
+    const clerkUser = await users.getUser(auth.userId);
+    email = clerkUser?.emailAddresses?.[0]?.emailAddress;
+  } catch (e) {
+    console.warn('Could not fetch Clerk user for', auth.userId, e);
+  }
+  // Fallback: try to get email from users collection
+  if (!email) {
+    const userDoc = await db.collection('users').findOne({ id: auth.userId });
+    email = userDoc?.email;
+  }
+  if (email) {
+    const { sendEmail } = await import('@/lib/email');
     try {
-      const { users } = await import('@clerk/clerk-sdk-node');
-      const clerkUser = await users.getUser(auth.userId);
-      email = clerkUser?.emailAddresses?.[0]?.emailAddress;
+      await sendEmail({
+        to: email,
+        subject: `Subscribed to topic: ${topic}`,
+        text: `You are now subscribed to updates for the topic: ${topic}. You will receive notifications when new legislation is available.`,
+        html: `<h2>Subscription Confirmed</h2><p>You are now subscribed to updates for the topic: <b>${topic}</b>. You will receive notifications when new legislation is available.</p>`
+      });
+      console.log(`Sent subscription confirmation email to ${email}`);
     } catch (e) {
-      console.warn('Could not fetch Clerk user for', auth.userId, e);
+      console.error('Failed to send subscription confirmation email:', e);
     }
-    // Fallback: try to get email from users collection
-    if (!email) {
-      const userDoc = await db.collection('users').findOne({ id: auth.userId });
-      email = userDoc?.email;
-    }
-    if (email) {
-      const { sendEmail } = await import('@/lib/email');
-      try {
-        await sendEmail({
-          to: email,
-          subject: `Subscribed to topic: ${topic}`,
-          text: `You are now subscribed to updates for the topic: ${topic}. You will receive notifications when new legislation is available.`,
-          html: `<h2>Subscription Confirmed</h2><p>You are now subscribed to updates for the topic: <b>${topic}</b>. You will receive notifications when new legislation is available.</p>`
-        });
-        console.log(`Sent subscription confirmation email to ${email}`);
-      } catch (e) {
-        console.error('Failed to send subscription confirmation email:', e);
-      }
-    } else {
-      console.warn('No email found for user', auth.userId);
-    }
+  } else {
+    console.warn('No email found for user', auth.userId);
   }
   return NextResponse.json({ success: true });
 }
@@ -96,11 +95,43 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
   }
 
+  // Send unsubscribe confirmation email
+  let email = undefined;
+  try {
+    const { users } = await import('@clerk/clerk-sdk-node');
+    const clerkUser = await users.getUser(auth.userId);
+    email = clerkUser?.emailAddresses?.[0]?.emailAddress;
+  } catch (e) {
+    console.warn('Could not fetch Clerk user for', auth.userId, e);
+  }
+  // Fallback: try to get email from users collection
+  if (!email) {
+    const userDoc = await db.collection('users').findOne({ id: auth.userId });
+    email = userDoc?.email;
+  }
+  if (email) {
+    const { sendEmail } = await import('@/lib/email');
+    try {
+      await sendEmail({
+        to: email,
+        subject: `Unsubscribed from topic: ${topic}`,
+        text: `You are no longer subscribed to this ${topic}.`,
+        html: `<h2>Unsubscribed</h2><p>You are no longer subscribed to this <b>${topic}</b>.</p>`
+      });
+      console.log(`Sent unsubscribe confirmation email to ${email}`);
+    } catch (e) {
+      console.error('Failed to send unsubscribe confirmation email:', e);
+    }
+  } else {
+    console.warn('No email found for user', auth.userId);
+  }
+
   return NextResponse.json({ success: true });
 }
 
 // PUT /api/policy-tracker
 export async function PUT(req: NextRequest) {
+  console.log('PUT /api/policy-tracker called');
   const auth = getAuth(req);
   if (!auth.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -125,6 +156,37 @@ export async function PUT(req: NextRequest) {
 
   if (result.matchedCount === 0) {
     return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+  }
+
+  // Always send confirmation email for any topic subscription update
+  let email = undefined;
+  try {
+    const { users } = await import('@clerk/clerk-sdk-node');
+    const clerkUser = await users.getUser(auth.userId);
+    email = clerkUser?.emailAddresses?.[0]?.emailAddress;
+  } catch (e) {
+    console.warn('Could not fetch Clerk user for', auth.userId, e);
+  }
+  // Fallback: try to get email from users collection
+  if (!email) {
+    const userDoc = await db.collection('users').findOne({ id: auth.userId });
+    email = userDoc?.email;
+  }
+  if (email) {
+    const { sendEmail } = await import('@/lib/email');
+    try {
+      await sendEmail({
+        to: email,
+        subject: `Subscribed to topic: ${newTopic || oldTopic}`,
+        text: `You are now subscribed to updates for the topic: ${newTopic || oldTopic}. You will receive notifications when new legislation is available.`,
+        html: `<h2>Subscription Confirmed</h2><p>You are now subscribed to updates for the topic: <b>${newTopic || oldTopic}</b>. You will receive notifications when new legislation is available.</p>`
+      });
+      console.log(`Sent subscription confirmation email to ${email}`);
+    } catch (e) {
+      console.error('Failed to send subscription confirmation email:', e);
+    }
+  } else {
+    console.warn('No email found for user', auth.userId);
   }
 
   return NextResponse.json({ success: true });
