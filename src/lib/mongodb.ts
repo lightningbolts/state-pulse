@@ -20,9 +20,15 @@ const client = new MongoClient(MONGODB_URI, {
 
 const clientPromise = client.connect(); // ✅ Define it!
 
+
 export async function getDb() {
-  const client = await clientPromise;
-  return client.db(MONGODB_DB_NAME);
+  try {
+    const client = await clientPromise;
+    return client.db(MONGODB_DB_NAME);
+  } catch (err) {
+    console.error('Error connecting to MongoDB:', err);
+    throw err;
+  }
 }
 
 export async function getCollection(collectionName: string) {
