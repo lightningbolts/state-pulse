@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@azure/ai-text-analytics": "^5.1.0",
     "@clerk/clerk-sdk-node": "^4.13.23",
     "@clerk/nextjs": "^6.22.0",
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",

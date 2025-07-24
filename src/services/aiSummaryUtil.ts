@@ -12,42 +12,146 @@ export async function generateGeminiSummary(text: string): Promise<string> {
 }
 
 export async function summarizeWithAzure(text: string): Promise<string[]> {
+  // NOTE: Azure extractive summarization only selects sentences from the input, it does not generate new text.
+  // If you want a paraphrased summary, use an abstractive/generative model (e.g., Gemini, GPT, Ollama).
+  // console.log('[Azure] Input to summarization (first 500 chars):', text.slice(0, 500));
   const endpoint = process.env.AZURE_LANGUAGE_ENDPOINT!;
   const apiKey = process.env.AZURE_LANGUAGE_KEY!;
-
-  const response = await fetch(`${endpoint}/language/:analyze-text`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Ocp-Apim-Subscription-Key": apiKey
-    },
-    body: JSON.stringify({
-      kind: "ExtractiveSummarization",
-      parameters: { sentenceCount: 5 },
-      displayName: "Legislation Summary",
-      analysisInput: {
-        documents: [
-          {
-            id: "1",
-            language: "en",
-            text
-          }
-        ]
+  const apiVersion = "2024-11-15-preview";
+  // Azure limit: 125,000 characters per request
+  const MAX_CHARS = 125000;
+  if (text.length > MAX_CHARS) {
+    text = text.slice(0, MAX_CHARS);
+  }
+  try {
+    const response = await fetch(`${endpoint}/language/analyze-text/jobs?api-version=${apiVersion}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Ocp-Apim-Subscription-Key": apiKey
+        },
+        body: JSON.stringify({
+          displayName: "Abstractive Legislation Summarization",
+          analysisInput: {
+            documents: [
+              {
+                id: "1",
+                language: "en",
+                text
+              }
+            ]
+          },
+          tasks: [
+            {
+              kind: "AbstractiveSummarization",
+              taskName: "Abstractive Summarization Task",
+              parameters: { sentenceCount: 5 }
+            }
+          ]
+        })
       }
-    })
-  });
-
-  const result = await response.json();
-
-  if (response.ok) {
-    return result.results.documents[0].sentences.map((s: any) => s.text);
-  } else {
-    console.error("Azure summarization failed", result);
-    throw new Error("Azure summarization failed");
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error("Azure summarization failed", error);
+      throw new Error("Azure summarization failed");
+    }
+    // Azure returns 202 Accepted and an operation-location header for async jobs
+    if (response.status === 202) {
+      const operationLocation = response.headers.get("operation-location");
+      if (!operationLocation) throw new Error("No operation-location header from Azure");
+      console.log(`[Azure] operation-location: ${operationLocation}`);
+      // Poll for result
+      let pollCount = 0;
+      const maxPolls = 60; // up to 60s
+      let last404 = false;
+      let lastPollJson: any = null;
+      while (pollCount < maxPolls) {
+        await new Promise(res => setTimeout(res, 1000));
+        let pollUrl = `${operationLocation}?api-version=${apiVersion}`;
+        let pollRes = await fetch(pollUrl, {
+          headers: {
+            "Ocp-Apim-Subscription-Key": apiKey
+          }
+        });
+        let pollJson: any = await pollRes.json();
+        lastPollJson = pollJson;
+        const status = pollJson.status || (pollJson.error ? pollJson.error.code : 'unknown');
+        // console.log(`[Azure] Poll ${pollCount + 1}/${maxPolls} - status: ${status} - url: ${pollUrl}`);
+        if (pollJson.error && pollJson.error.code === "404") {
+          // Try again without api-version param
+          pollUrl = operationLocation;
+          pollRes = await fetch(pollUrl, {
+            headers: {
+              "Ocp-Apim-Subscription-Key": apiKey
+            }
+          });
+          pollJson = await pollRes.json();
+          lastPollJson = pollJson;
+          last404 = true;
+          const status2 = pollJson.status || (pollJson.error ? pollJson.error.code : 'unknown');
+          console.log(`[Azure] Poll ${pollCount + 1}/${maxPolls} (no api-version) - status: ${status2} - url: ${pollUrl}`);
+        }
+        // Log the full pollJson at debug level
+        // console.debug(`[Azure] Poll ${pollCount + 1} response:`, JSON.stringify(pollJson));
+        if (pollJson.status === "succeeded") {
+          // Log the full response for debugging
+          // console.log('[Azure] Full success response:', JSON.stringify(pollJson, null, 2));
+          const task = pollJson.tasks.items[0];
+          const doc = task.results.documents[0];
+          // Abstractive summarization: look for summaries
+          if (doc.summaries) {
+            const summaries = doc.summaries.map((s: any) => s.text);
+            console.log('[Azure] Abstractive summaries returned:', summaries);
+            return summaries;
+          }
+          // Extractive summarization: look for sentences
+          if (doc.sentences) {
+            const sentences = doc.sentences.map((s: any) => s.text);
+            console.log('[Azure] Extractive sentences returned:', sentences);
+            return sentences;
+          }
+          // Fallback: log and return error
+          console.error('[Azure] No summaries or sentences found in response:', JSON.stringify(doc));
+          return ['Summary not available: Azure response missing summaries/sentences.'];
+        } else if (pollJson.status === "failed") {
+          console.error("Azure summarization job failed", pollJson);
+          throw new Error("Azure summarization job failed");
+        } else if (pollJson.error) {
+          console.error("Azure summarization polling error:", pollJson.error);
+          throw new Error("Azure summarization polling error");
+        }
+        pollCount++;
+      }
+      console.error("Azure summarization timed out. Last poll response:", JSON.stringify(lastPollJson));
+      throw new Error("Azure summarization timed out");
+    } else {
+      // Synchronous response (should not happen for jobs endpoint)
+      const result: any = await response.json();
+      if (result.results && result.results.documents && result.results.documents[0].sentences) {
+        return result.results.documents[0].sentences.map((s: any) => s.text);
+      }
+      throw new Error("Unexpected Azure summarization response");
+    }
+  } catch (err) {
+    console.error("Azure summarization failed", err);
+    // Fallback: return a single sentence indicating failure
+    return ["Summary not available due to Azure summarization error."];
   }
 }
 
-// Fetches the 'Bill as Passed Legislature' PDF (or equivalent) from a state legislature site and extracts its text
+/**
+ * Uses Azure AI Language extractive summarization API to summarize text.
+ *
+ * Requires the following environment variables:
+ *   AZURE_LANGUAGE_ENDPOINT: e.g. https://<your-resource-name>.cognitiveservices.azure.com
+ *   AZURE_LANGUAGE_KEY: your Azure Language resource key
+ *
+ * The endpoint and key must be from the same Azure resource and region.
+ *
+ * See: https://learn.microsoft.com/en-us/azure/ai-services/language-service/summarization/how-to/text-summarization
+ */
 export async function fetchPdfFromOpenStatesUrl(legUrl: string): Promise<{ text: string | null, debug: string[] }> {
   const debug: string[] = [];
   try {
@@ -147,7 +251,7 @@ export async function generateOllamaSummary(text: string, model: string): Promis
       console.error(`[Ollama] API error: ${response.status} ${response.statusText}`);
       throw new Error(`Ollama ${model} API error: ${response.status}`);
     }
-    const data = await response.json();
+    const data: any = await response.json();
     console.log('Valid Ollama summary generated.')
     // console.log('[Ollama] Raw response:', data);
     return data.response?.trim() || 'Summary not available due to insufficient information.';
@@ -165,26 +269,52 @@ export async function generateOllamaSummary(text: string, model: string): Promis
  * 4. Bill title
  */
 export async function summarizeLegislationRichestSource(bill: Legislation): Promise<{ summary: string, sourceType: string }> {
-  // 1. Try most recent PDF from versions
+  // 1. Try most recent PDF or plain-text version from bill.versions
   if (bill.versions && Array.isArray(bill.versions)) {
-    // Sort versions by date (if available), descending
     const sortedVersions = bill.versions.slice().sort((a, b) => {
       const dateA = a.date ? new Date(a.date).getTime() : 0;
       const dateB = b.date ? new Date(b.date).getTime() : 0;
       return dateB - dateA;
     });
     for (const version of sortedVersions) {
-      if (version.url && version.url.endsWith('.pdf')) {
+      if (version.url && (version.url.endsWith('.pdf') || version.url.endsWith('.txt'))) {
         try {
           const res = await fetch(version.url);
           if (res.ok) {
-            const buffer = await res.arrayBuffer();
-            const pdfText = await pdf(Buffer.from(buffer));
-            if (pdfText.text && pdfText.text.trim().length > 100) {
-              const summaryArr = await summarizeWithAzure(pdfText.text);
-              const summary = Array.isArray(summaryArr) ? summaryArr.join(' ') : String(summaryArr);
-              return { summary, sourceType: 'pdf' };
+            let billText = '';
+            if (version.url.endsWith('.pdf')) {
+              const buffer = await res.arrayBuffer();
+              const pdfText = await pdf(Buffer.from(buffer));
+              billText = pdfText.text;
+            } else {
+              billText = await res.text();
             }
+            if (billText && billText.trim().length > 100) {
+              console.log('[Bill Extraction] Using version:', version.url);
+              console.log('[Bill Extraction] First 500 chars:', billText.trim().slice(0, 500));
+              const summaryArr = await summarizeWithAzure(billText.trim());
+              const summary = Array.isArray(summaryArr) ? summaryArr.join(' ') : String(summaryArr);
+              return { summary, sourceType: version.url.endsWith('.pdf') ? 'pdf' : 'text' };
+            }
+          }
+        } catch (e) {
+          // Ignore and continue
+        }
+      }
+    }
+  }
+
+  // 1b. If no PDF in bill.versions, try to extract PDF from HTML using fetchPdfFromOpenStatesUrl
+  if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
+    for (const source of bill.sources) {
+      if (source.url) {
+        try {
+          const pdfResult = await fetchPdfFromOpenStatesUrl(source.url);
+          if (pdfResult.text && pdfResult.text.trim().length > 100) {
+            console.log('[Bill Extraction] Using PDF extracted from HTML:', source.url);
+            const summaryArr = await summarizeWithAzure(pdfResult.text.trim());
+            const summary = Array.isArray(summaryArr) ? summaryArr.join(' ') : String(summaryArr);
+            return { summary, sourceType: 'pdf-extracted' };
           }
         } catch (e) {
           // Ignore and continue
@@ -196,40 +326,13 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
   if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
     const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
     if (abstractsText.trim().length > 20) {
-      const summary = await summarizeWithAzure(abstractsText);
+      const summary = await summarizeWithAzure(abstractsText.trim());
       return { summary: String(summary), sourceType: 'abstracts' };
     }
   }
-  // 3. Try all sources.url, remove duplicate info
-  if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
-    const seenTexts = new Set<string>();
-    let combinedText = '';
-    for (const source of bill.sources) {
-      if (source.url) {
-        try {
-          const res = await fetch(source.url);
-          if (res.ok) {
-            const html = await res.text();
-            const $ = cheerio.load(html);
-            const pageText = $('body').text().trim();
-            // Only add unique, non-empty text
-            if (pageText.length > 100 && !seenTexts.has(pageText)) {
-              seenTexts.add(pageText);
-              combinedText += pageText + '\n';
-            }
-          }
-        } catch (e) {
-          // Ignore and continue
-        }
-      }
-    }
-    if (combinedText.trim().length > 100) {
-      const summary = await summarizeWithAzure(combinedText);
-      return { summary: String(summary), sourceType: 'sources.url' };
-    }
-  }
+  // 3. Remove HTML fallback: do not summarize navigation-heavy pages
   // 4. Fallback: bill title
   const title = bill.title || 'No title available.';
-  const summary = await summarizeWithAzure(title);
+  const summary = await summarizeWithAzure(title.trim());
   return { summary: String(summary), sourceType: 'title' };
 }
