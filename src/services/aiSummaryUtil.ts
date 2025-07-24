@@ -11,6 +11,42 @@ export async function generateGeminiSummary(text: string): Promise<string> {
   return response.text.trim();
 }
 
+export async function summarizeWithAzure(text: string): Promise<string[]> {
+  const endpoint = process.env.AZURE_LANGUAGE_ENDPOINT!;
+  const apiKey = process.env.AZURE_LANGUAGE_KEY!;
+
+  const response = await fetch(`${endpoint}/language/:analyze-text`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Ocp-Apim-Subscription-Key": apiKey
+    },
+    body: JSON.stringify({
+      kind: "ExtractiveSummarization",
+      parameters: { sentenceCount: 5 },
+      displayName: "Legislation Summary",
+      analysisInput: {
+        documents: [
+          {
+            id: "1",
+            language: "en",
+            text
+          }
+        ]
+      }
+    })
+  });
+
+  const result = await response.json();
+
+  if (response.ok) {
+    return result.results.documents[0].sentences.map((s: any) => s.text);
+  } else {
+    console.error("Azure summarization failed", result);
+    throw new Error("Azure summarization failed");
+  }
+}
+
 // Fetches the 'Bill as Passed Legislature' PDF (or equivalent) from a state legislature site and extracts its text
 export async function fetchPdfFromOpenStatesUrl(legUrl: string): Promise<{ text: string | null, debug: string[] }> {
   const debug: string[] = [];
@@ -145,7 +181,8 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
             const buffer = await res.arrayBuffer();
             const pdfText = await pdf(Buffer.from(buffer));
             if (pdfText.text && pdfText.text.trim().length > 100) {
-              const summary = await generateGeminiSummary(pdfText.text);
+              const summaryArr = await summarizeWithAzure(pdfText.text);
+              const summary = Array.isArray(summaryArr) ? summaryArr.join(' ') : String(summaryArr);
               return { summary, sourceType: 'pdf' };
             }
           }
@@ -160,7 +197,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
     const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
     if (abstractsText.trim().length > 20) {
       const summary = await generateGeminiSummary(abstractsText);
-      return { summary, sourceType: 'abstracts' };
+      return { summary: String(summary), sourceType: 'abstracts' };
     }
   }
   // 3. Try all sources.url, remove duplicate info
@@ -188,11 +225,11 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
     }
     if (combinedText.trim().length > 100) {
       const summary = await generateGeminiSummary(combinedText);
-      return { summary, sourceType: 'sources.url' };
+      return { summary: String(summary), sourceType: 'sources.url' };
     }
   }
   // 4. Fallback: bill title
   const title = bill.title || 'No title available.';
   const summary = await generateGeminiSummary(title);
-  return { summary, sourceType: 'title' };
+  return { summary: String(summary), sourceType: 'title' };
 }
