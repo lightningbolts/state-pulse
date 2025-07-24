@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import { syncUserToMongoDB } from '@/lib/clerkMongoIntegration';
 import { sendEmail } from '@/lib/email';
+import { renderBrandedEmail } from '@/lib/emailTemplate';
 
 // Webhook secret from Clerk Dashboard (Settings > Webhooks > Your Webhook > Signing Secret)
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
@@ -49,10 +50,16 @@ export async function POST(req: NextRequest) {
                 const firstName = (evt as any).data?.first_name || '';
                 if (email) {
                     try {
+                        const html = renderBrandedEmail({
+                            heading: 'Welcome to StatePulse!',
+                            message: `Hi ${firstName || 'there'},<br>Welcome to StatePulse! You can now track legislation and receive updates on the issues you care about.`,
+                            ctaUrl: 'https://statepulse.me/dashboard',
+                            ctaText: 'Go to Dashboard',
+                        });
                         await sendEmail({
                             to: email,
                             subject: 'Welcome to StatePulse!',
-                            html: `<p>Hi ${firstName}, welcome to StatePulse!</p>`
+                            html,
                         });
                     } catch (e) {
                         console.error('Failed to send welcome email:', e);
