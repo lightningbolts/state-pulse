@@ -46,7 +46,7 @@ export async function summarizeWithAzure(text: string): Promise<string[]> {
             {
               kind: "AbstractiveSummarization",
               taskName: "Abstractive Summarization Task",
-              parameters: { sentenceCount: 5 }
+              parameters: { sentenceCount: 4 }
             }
           ]
         })
@@ -61,7 +61,7 @@ export async function summarizeWithAzure(text: string): Promise<string[]> {
     if (response.status === 202) {
       const operationLocation = response.headers.get("operation-location");
       if (!operationLocation) throw new Error("No operation-location header from Azure");
-      console.log(`[Azure] operation-location: ${operationLocation}`);
+      // console.log(`[Azure] operation-location: ${operationLocation}`);
       // Poll for result
       let pollCount = 0;
       const maxPolls = 60; // up to 60s
@@ -91,7 +91,7 @@ export async function summarizeWithAzure(text: string): Promise<string[]> {
           lastPollJson = pollJson;
           last404 = true;
           const status2 = pollJson.status || (pollJson.error ? pollJson.error.code : 'unknown');
-          console.log(`[Azure] Poll ${pollCount + 1}/${maxPolls} (no api-version) - status: ${status2} - url: ${pollUrl}`);
+          // console.log(`[Azure] Poll ${pollCount + 1}/${maxPolls} (no api-version) - status: ${status2} - url: ${pollUrl}`);
         }
         // Log the full pollJson at debug level
         // console.debug(`[Azure] Poll ${pollCount + 1} response:`, JSON.stringify(pollJson));
@@ -103,13 +103,13 @@ export async function summarizeWithAzure(text: string): Promise<string[]> {
           // Abstractive summarization: look for summaries
           if (doc.summaries) {
             const summaries = doc.summaries.map((s: any) => s.text);
-            console.log('[Azure] Abstractive summaries returned:', summaries);
+            // console.log('[Azure] Abstractive summaries returned:', summaries);
             return summaries;
           }
           // Extractive summarization: look for sentences
           if (doc.sentences) {
             const sentences = doc.sentences.map((s: any) => s.text);
-            console.log('[Azure] Extractive sentences returned:', sentences);
+            // console.log('[Azure] Extractive sentences returned:', sentences);
             return sentences;
           }
           // Fallback: log and return error
@@ -252,7 +252,7 @@ export async function generateOllamaSummary(text: string, model: string): Promis
       throw new Error(`Ollama ${model} API error: ${response.status}`);
     }
     const data: any = await response.json();
-    console.log('Valid Ollama summary generated.')
+    // console.log('Valid Ollama summary generated.')
     // console.log('[Ollama] Raw response:', data);
     return data.response?.trim() || 'Summary not available due to insufficient information.';
   } catch (err) {
@@ -269,7 +269,7 @@ export async function generateOllamaSummary(text: string, model: string): Promis
  * 4. Bill title
  */
 export async function summarizeLegislationRichestSource(bill: Legislation): Promise<{ summary: string, sourceType: string }> {
-  // 1. Try most recent PDF or plain-text version from bill.versions
+  // 1. Try ALL PDFs and plain-text versions in bill.versions
   if (bill.versions && Array.isArray(bill.versions)) {
     const sortedVersions = bill.versions.slice().sort((a, b) => {
       const dateA = a.date ? new Date(a.date).getTime() : 0;
@@ -289,35 +289,65 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
             } else {
               billText = await res.text();
             }
-            if (billText && billText.trim().length > 100) {
-              console.log('[Bill Extraction] Using version:', version.url);
-              console.log('[Bill Extraction] First 500 chars:', billText.trim().slice(0, 500));
-              const summaryArr = await summarizeWithAzure(billText.trim());
-              const summary = Array.isArray(summaryArr) ? summaryArr.join(' ') : String(summaryArr);
-              return { summary, sourceType: version.url.endsWith('.pdf') ? 'pdf' : 'text' };
+            if (billText && billText.trim().length > 10) {
+              // console.log('[Bill Extraction] Using version:', version.url);
+              // console.log('[Bill Extraction] First 500 chars:', billText.trim().slice(0, 500));
+              return {
+                summary: Array.isArray(await summarizeWithAzure(billText.trim()))
+                  ? (await summarizeWithAzure(billText.trim())).join(' ')
+                  : String(await summarizeWithAzure(billText.trim())),
+                sourceType: version.url.endsWith('.pdf') ? 'pdf' : 'text'
+              };
+            } else {
+              // console.log('[Bill Extraction] Skipped version (too short):', version.url);
             }
+          } else {
+            // console.log('[Bill Extraction] Fetch failed for version:', version.url);
           }
         } catch (e) {
-          // Ignore and continue
+          // console.log('[Bill Extraction] Error fetching/parsing version:', version.url, e);
         }
       }
     }
   }
 
-  // 1b. If no PDF in bill.versions, try to extract PDF from HTML using fetchPdfFromOpenStatesUrl
+  // 1b. Try ALL PDFs found in bill.sources pages (not just first found)
   if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
     for (const source of bill.sources) {
       if (source.url) {
         try {
-          const pdfResult = await fetchPdfFromOpenStatesUrl(source.url);
-          if (pdfResult.text && pdfResult.text.trim().length > 100) {
-            console.log('[Bill Extraction] Using PDF extracted from HTML:', source.url);
-            const summaryArr = await summarizeWithAzure(pdfResult.text.trim());
-            const summary = Array.isArray(summaryArr) ? summaryArr.join(' ') : String(summaryArr);
-            return { summary, sourceType: 'pdf-extracted' };
+          const res = await fetch(source.url);
+          if (!res.ok) continue;
+          const html = await res.text();
+          // Find ALL PDF links in the HTML
+          const pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+          for (let pdfUrl of pdfLinks) {
+            if (!pdfUrl.startsWith('http')) {
+              const base = new URL(source.url);
+              pdfUrl = new URL(pdfUrl, base).href;
+            }
+            try {
+              const pdfRes = await fetch(pdfUrl);
+              if (!pdfRes.ok) continue;
+              const buffer = await pdfRes.arrayBuffer();
+              const data = await pdf(Buffer.from(buffer));
+              if (data.text && data.text.trim().length > 10) {
+                // console.log('[Bill Extraction] Using PDF from source:', pdfUrl);
+                return {
+                  summary: Array.isArray(await summarizeWithAzure(data.text.trim()))
+                    ? (await summarizeWithAzure(data.text.trim())).join(' ')
+                    : String(await summarizeWithAzure(data.text.trim())),
+                  sourceType: 'pdf-extracted'
+                };
+              } else {
+                // console.log('[Bill Extraction] Skipped PDF (too short):', pdfUrl);
+              }
+            } catch (e) {
+              // console.log('[Bill Extraction] Error fetching/parsing PDF:', pdfUrl, e);
+            }
           }
         } catch (e) {
-          // Ignore and continue
+          // console.log('[Bill Extraction] Error fetching/parsing source page:', source.url, e);
         }
       }
     }
