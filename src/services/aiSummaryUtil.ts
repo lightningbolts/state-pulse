@@ -264,11 +264,16 @@ export async function generateOllamaSummary(text: string, model: string): Promis
 /**
  * Generates a summary for a bill using the richest available information, in priority order:
  * 1. PDF text from bill versions
- * 2. Concatenated abstracts
- * 3. Text from first sources.url
+ * 2. Text from first sources.url
+ * 3. Concatenated abstracts
  * 4. Bill title
  */
 export async function summarizeLegislationRichestSource(bill: Legislation): Promise<{ summary: string, sourceType: string }> {
+  console.log('[Bill Extraction] Starting richest source summarization for bill:', bill.id);
+  console.log('[DEBUG] Bill versions:', bill.versions);
+  console.log('[DEBUG] Bill sources:', bill.sources);
+  console.log('[DEBUG] Bill abstracts:', bill.abstracts);
+  console.log('[DEBUG] Bill title:', bill.title);
   // 1. Try ALL PDFs and plain-text versions in bill.versions
   if (bill.versions && Array.isArray(bill.versions)) {
     const sortedVersions = bill.versions.slice().sort((a, b) => {
