@@ -4,6 +4,7 @@ import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import path from 'path';
 import { sendEmail } from '../lib/email';
+import { renderBrandedEmail } from '../lib/emailTemplate';
 import { users } from '@clerk/clerk-sdk-node';
 import { searchLegislationByTopic } from '../services/legislationService';
 
@@ -59,17 +60,24 @@ async function main() {
           email = subWithEmail?.email;
         }
         if (email) {
-          let html = `<h2>New Legislation Updates for Your Tracked Topics</h2>`;
+          // Build the message body for all topics
+          let message = '';
           for (const entry of newLegislation) {
-            html += `<h3>Topic: ${entry.topic}</h3><ul>`;
+            message += `<h3 style=\"margin:1.5em 0 0.5em 0;font-family:Geist,Arial,sans-serif;font-size:1.2em;\">Topic: ${entry.topic}</h3><ul style=\"margin:0 0 1.5em 0;padding-left:1.2em;\">`;
             for (const bill of entry.bills) {
-              html += `<li><b>${bill.identifier}</b>: ${bill.title} <br/>`;
-              html += `Session: ${bill.session}, Jurisdiction: ${bill.jurisdictionName}`;
-              if (bill.latestActionAt) html += `, Latest Action: ${new Date(bill.latestActionAt).toLocaleDateString()}`;
-              html += `</li>`;
+              message += `<li style=\"margin-bottom:0.5em;\"><b>${bill.identifier}</b>: ${bill.title} <br/>`;
+              message += `Session: ${bill.session}, Jurisdiction: ${bill.jurisdictionName}`;
+              if (bill.latestActionAt) message += `, Latest Action: ${new Date(bill.latestActionAt).toLocaleDateString()}`;
+              message += `</li>`;
             }
-            html += `</ul>`;
+            message += `</ul>`;
           }
+          const html = renderBrandedEmail({
+            heading: 'New Legislation Updates for Your Tracked Topics',
+            message,
+            ctaUrl: 'https://statepulse.me/tracker',
+            ctaText: 'View All Updates',
+          });
           try {
             await sendEmail({
               to: email,
