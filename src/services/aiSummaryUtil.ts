@@ -274,7 +274,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
   console.log('[DEBUG] Bill sources:', bill.sources);
   console.log('[DEBUG] Bill abstracts:', bill.abstracts);
   console.log('[DEBUG] Bill title:', bill.title);
-  // 1. Try ALL PDFs and plain-text versions in bill.versions
+  // 1. Try ALL PDFs and plain-text versions in bill.versions (including links arrays)
   if (bill.versions && Array.isArray(bill.versions)) {
     const sortedVersions = bill.versions.slice().sort((a, b) => {
       const dateA = a.date ? new Date(a.date).getTime() : 0;
@@ -282,6 +282,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
       return dateB - dateA;
     });
     for (const version of sortedVersions) {
+      // Try top-level url if present
       if (version.url && (version.url.endsWith('.pdf') || version.url.endsWith('.txt'))) {
         console.log('[DEBUG] Checking version URL:', version.url);
         try {
@@ -299,7 +300,6 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
             }
             if (billText && billText.trim().length > 100) {
               console.log('[Bill Extraction] Using version:', version.url);
-              // console.log('[Bill Extraction] First 500 chars:', billText.trim().slice(0, 500));
               return {
                 summary: Array.isArray(await summarizeWithAzure(billText.trim()))
                   ? (await summarizeWithAzure(billText.trim())).join(' ')
@@ -316,18 +316,58 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
           console.log('[Bill Extraction] Error fetching/parsing version:', version.url, e);
         }
       }
+      // Try all links in version.links if present
+      if (Array.isArray(version.links)) {
+        for (const linkObj of version.links) {
+          const linkUrl = linkObj.url || linkObj.href || linkObj.link;
+          if (linkUrl && (linkUrl.endsWith('.pdf') || linkUrl.endsWith('.txt'))) {
+            console.log('[DEBUG] Checking version link URL:', linkUrl);
+            try {
+              const res = await fetch(linkUrl);
+              if (res.ok) {
+                let billText = '';
+                if (linkUrl.endsWith('.pdf')) {
+                  const buffer = await res.arrayBuffer();
+                  const pdfText = await pdf(Buffer.from(buffer));
+                  billText = pdfText.text;
+                  console.log('[DEBUG] PDF text length:', billText.length);
+                } else {
+                  billText = await res.text();
+                  console.log('[DEBUG] Plain text length:', billText.length);
+                }
+                if (billText && billText.trim().length > 100) {
+                  console.log('[Bill Extraction] Using version link:', linkUrl);
+                  return {
+                    summary: Array.isArray(await summarizeWithAzure(billText.trim()))
+                      ? (await summarizeWithAzure(billText.trim())).join(' ')
+                      : String(await summarizeWithAzure(billText.trim())),
+                    sourceType: linkUrl.endsWith('.pdf') ? 'pdf' : 'text'
+                  };
+                } else {
+                  console.log('[Bill Extraction] Skipped version link (too short):', linkUrl, 'Length:', billText ? billText.length : 0);
+                }
+              } else {
+                console.log('[Bill Extraction] Fetch failed for version link:', linkUrl, 'Status:', res.status);
+              }
+            } catch (e) {
+              console.log('[Bill Extraction] Error fetching/parsing version link:', linkUrl, e);
+            }
+          }
+        }
+      }
     }
   }
 
   // 1b. Try ALL PDFs found in bill.sources pages (not just first found)
   if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
+    let foundPdfInAnySource = false;
     for (const source of bill.sources) {
       if (source.url) {
         console.log('[DEBUG] Checking source URL:', source.url);
         try {
           const res = await fetch(source.url);
           if (!res.ok) {
-            // console.log('[Bill Extraction] Source fetch failed:', source.url, 'Status:', res.status);
+            console.log('[Bill Extraction] Source fetch failed:', source.url, 'Status:', res.status);
             continue;
           }
           const html = await res.text();
@@ -379,6 +419,9 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
           } else {
             console.log('[DEBUG] Found PDF links:', pdfLinks);
           }
+          if (pdfLinks.length === 0) {
+            console.log('[Bill Extraction] No PDF links found in source:', source.url);
+          }
           for (let pdfUrl of pdfLinks) {
             if (!pdfUrl.startsWith('http')) {
               const base = new URL(source.url);
@@ -396,6 +439,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
               console.log('[DEBUG] PDF text length:', data.text ? data.text.length : 0);
               if (data.text && data.text.trim().length > 100) {
                 console.log('[Bill Extraction] Using PDF from source:', pdfUrl);
+                foundPdfInAnySource = true;
                 return {
                   summary: Array.isArray(await summarizeWithAzure(data.text.trim()))
                     ? (await summarizeWithAzure(data.text.trim())).join(' ')
@@ -413,6 +457,9 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
           console.log('[Bill Extraction] Error fetching/parsing source page:', source.url, e);
         }
       }
+    }
+    if (!foundPdfInAnySource) {
+      console.log('[Bill Extraction] No PDFs found in any sources for bill:', bill.id);
     }
   }
   // 2. Try abstracts
