@@ -278,6 +278,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
     });
     for (const version of sortedVersions) {
       if (version.url && (version.url.endsWith('.pdf') || version.url.endsWith('.txt'))) {
+        console.log('[DEBUG] Checking version URL:', version.url);
         try {
           const res = await fetch(version.url);
           if (res.ok) {
@@ -286,11 +287,13 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
               const buffer = await res.arrayBuffer();
               const pdfText = await pdf(Buffer.from(buffer));
               billText = pdfText.text;
+              console.log('[DEBUG] PDF text length:', billText.length);
             } else {
               billText = await res.text();
+              console.log('[DEBUG] Plain text length:', billText.length);
             }
-            if (billText && billText.trim().length > 10) {
-              // console.log('[Bill Extraction] Using version:', version.url);
+            if (billText && billText.trim().length > 100) {
+              console.log('[Bill Extraction] Using version:', version.url);
               // console.log('[Bill Extraction] First 500 chars:', billText.trim().slice(0, 500));
               return {
                 summary: Array.isArray(await summarizeWithAzure(billText.trim()))
@@ -299,13 +302,13 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
                 sourceType: version.url.endsWith('.pdf') ? 'pdf' : 'text'
               };
             } else {
-              // console.log('[Bill Extraction] Skipped version (too short):', version.url);
+              console.log('[Bill Extraction] Skipped version (too short):', version.url, 'Length:', billText ? billText.length : 0);
             }
           } else {
-            // console.log('[Bill Extraction] Fetch failed for version:', version.url);
+            console.log('[Bill Extraction] Fetch failed for version:', version.url, 'Status:', res.status);
           }
         } catch (e) {
-          // console.log('[Bill Extraction] Error fetching/parsing version:', version.url, e);
+          console.log('[Bill Extraction] Error fetching/parsing version:', version.url, e);
         }
       }
     }
@@ -315,24 +318,34 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
   if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
     for (const source of bill.sources) {
       if (source.url) {
+        console.log('[DEBUG] Checking source URL:', source.url);
         try {
           const res = await fetch(source.url);
-          if (!res.ok) continue;
+          if (!res.ok) {
+            // console.log('[Bill Extraction] Source fetch failed:', source.url, 'Status:', res.status);
+            continue;
+          }
           const html = await res.text();
           // Find ALL PDF links in the HTML
           const pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+          console.log('[DEBUG] Found PDF links:', pdfLinks);
           for (let pdfUrl of pdfLinks) {
             if (!pdfUrl.startsWith('http')) {
               const base = new URL(source.url);
               pdfUrl = new URL(pdfUrl, base).href;
             }
+            console.log('[DEBUG] Trying PDF URL:', pdfUrl);
             try {
               const pdfRes = await fetch(pdfUrl);
-              if (!pdfRes.ok) continue;
+              if (!pdfRes.ok) {
+                console.log('[Bill Extraction] PDF fetch failed:', pdfUrl, 'Status:', pdfRes.status);
+                continue;
+              }
               const buffer = await pdfRes.arrayBuffer();
               const data = await pdf(Buffer.from(buffer));
-              if (data.text && data.text.trim().length > 10) {
-                // console.log('[Bill Extraction] Using PDF from source:', pdfUrl);
+              console.log('[DEBUG] PDF text length:', data.text ? data.text.length : 0);
+              if (data.text && data.text.trim().length > 100) {
+                console.log('[Bill Extraction] Using PDF from source:', pdfUrl);
                 return {
                   summary: Array.isArray(await summarizeWithAzure(data.text.trim()))
                     ? (await summarizeWithAzure(data.text.trim())).join(' ')
@@ -340,14 +353,14 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
                   sourceType: 'pdf-extracted'
                 };
               } else {
-                // console.log('[Bill Extraction] Skipped PDF (too short):', pdfUrl);
+                console.log('[Bill Extraction] Skipped PDF (too short):', pdfUrl, 'Length:', data.text ? data.text.length : 0);
               }
             } catch (e) {
-              // console.log('[Bill Extraction] Error fetching/parsing PDF:', pdfUrl, e);
+              console.log('[Bill Extraction] Error fetching/parsing PDF:', pdfUrl, e);
             }
           }
         } catch (e) {
-          // console.log('[Bill Extraction] Error fetching/parsing source page:', source.url, e);
+          console.log('[Bill Extraction] Error fetching/parsing source page:', source.url, e);
         }
       }
     }
