@@ -21,12 +21,19 @@ async function main() {
     await client.connect();
     console.log('Connected to MongoDB.');
     const db = client.db(DB_NAME);
-    const usersCol = db.collection('users');
-    const usersCursor = usersCol.find({ topic_subscriptions: { $exists: true, $ne: [] } });
-    const usersArr = await usersCursor.toArray();
-    for (const userDoc of usersArr) {
-      const userId = userDoc._id?.toString?.() || userDoc.id || userDoc.userId;
-      const topics = userDoc.topic_subscriptions || [];
+    const subsCol = db.collection('topic_subscriptions');
+    // Find all subscriptions with notifyByEmail: true
+    const subsCursor = subsCol.find({ notifyByEmail: true });
+    const subsArr = await subsCursor.toArray();
+    // Group subscriptions by userId
+    const userTopicsMap: Record<string, string[]> = {};
+    for (const sub of subsArr) {
+      if (!sub.userId || !sub.topic) continue;
+      if (!userTopicsMap[sub.userId]) userTopicsMap[sub.userId] = [];
+      userTopicsMap[sub.userId].push(sub.topic);
+    }
+    for (const userId of Object.keys(userTopicsMap)) {
+      const topics = userTopicsMap[userId];
       let newLegislation: { topic: string; bills: any[] }[] = [];
       for (const topic of topics) {
         // Only get bills from the last 1 day
@@ -36,15 +43,20 @@ async function main() {
         }
       }
       if (newLegislation.length > 0) {
-        // Fetch user email (try Clerk first, fallback to userDoc.email)
-        let email = userDoc.email;
+        // Fetch user email (try Clerk first, fallback to topic_subscriptions.email if present)
+        let email = undefined;
         try {
           if (users && userId) {
             const clerkUser = await users.getUser(userId);
-            email = clerkUser?.emailAddresses?.[0]?.emailAddress || email;
+            email = clerkUser?.emailAddresses?.[0]?.emailAddress;
           }
         } catch (e) {
           console.warn('Could not fetch Clerk user for', userId, e);
+        }
+        // Fallback: try to get email from any subscription for this user
+        if (!email) {
+          const subWithEmail = subsArr.find(s => s.userId === userId && s.email);
+          email = subWithEmail?.email;
         }
         if (email) {
           let html = `<h2>New Legislation Updates for Your Tracked Topics</h2>`;

@@ -14,11 +14,45 @@ export async function POST(req: NextRequest) {
   }
   const db = await getDb();
   // Store subscriptions in topic_subscriptions collection
-  await db.collection('topic_subscriptions').updateOne(
+  const result = await db.collection('topic_subscriptions').updateOne(
     { userId: auth.userId, topic },
     { $set: { userId: auth.userId, topic, notifyByEmail: !!notifyByEmail }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
   );
+
+  // If this is a new subscription (upserted), send confirmation email
+  if (result.upsertedCount > 0 || result.matchedCount === 0) {
+    // Fetch user email using Clerk
+    let email = undefined;
+    try {
+      const { users } = await import('@clerk/clerk-sdk-node');
+      const clerkUser = await users.getUser(auth.userId);
+      email = clerkUser?.emailAddresses?.[0]?.emailAddress;
+    } catch (e) {
+      console.warn('Could not fetch Clerk user for', auth.userId, e);
+    }
+    // Fallback: try to get email from users collection
+    if (!email) {
+      const userDoc = await db.collection('users').findOne({ id: auth.userId });
+      email = userDoc?.email;
+    }
+    if (email) {
+      const { sendEmail } = await import('@/lib/email');
+      try {
+        await sendEmail({
+          to: email,
+          subject: `Subscribed to topic: ${topic}`,
+          text: `You are now subscribed to updates for the topic: ${topic}. You will receive notifications when new legislation is available.`,
+          html: `<h2>Subscription Confirmed</h2><p>You are now subscribed to updates for the topic: <b>${topic}</b>. You will receive notifications when new legislation is available.</p>`
+        });
+        console.log(`Sent subscription confirmation email to ${email}`);
+      } catch (e) {
+        console.error('Failed to send subscription confirmation email:', e);
+      }
+    } else {
+      console.warn('No email found for user', auth.userId);
+    }
+  }
   return NextResponse.json({ success: true });
 }
 
