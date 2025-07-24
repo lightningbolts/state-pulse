@@ -354,22 +354,51 @@ export async function searchLegislationByTopic(topic: string, daysBack: number =
       'montana', 'rhode island', 'delaware', 'south dakota', 'north dakota',
       'alaska', 'vermont', 'wyoming'
     ];
+    // Add federal keywords
+    const federalKeywords = [
+      'congress', 'united states congress', 'us congress', 'federal', 'national', 'house of representatives', 'senate', 'capitol hill', 'washington dc', 'dc congress'
+    ];
 
     const topicLower = topic.toLowerCase();
     const detectedStates = locationKeywords.filter(state => topicLower.includes(state));
+    const detectedFederal = federalKeywords.filter(fed => topicLower.includes(fed));
 
-    // Create search terms from the topic (excluding location words for content search)
+    // Create search terms from the topic (excluding location and federal words for content search)
     const searchTerms = topic.toLowerCase()
       .split(' ')
-      .filter(term => term.length > 2 && !locationKeywords.includes(term))
+      .filter(term => term.length > 2 && !locationKeywords.includes(term) && !federalKeywords.includes(term))
       .filter(term => !['in', 'of', 'the', 'and', 'or', 'laws', 'law', 'bill', 'bills'].includes(term));
 
     console.log('Search debug:', { topic, detectedStates, searchTerms });
 
     let docs = [];
 
+    // Try federal search first if detected
+    if (detectedFederal.length > 0) {
+      const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
+      const query = {
+        $and: [
+          { jurisdictionName: { $in: [/united states congress/i, /congress/i, /federal/i] } },
+          searchTerms.length > 0 ? {
+            $or: [
+              { title: { $in: regexPatterns } },
+              { subjects: { $in: regexPatterns } },
+              { summary: { $in: regexPatterns } },
+              { geminiSummary: { $in: regexPatterns } },
+              { latestActionDescription: { $in: regexPatterns } }
+            ]
+          } : {}
+        ].filter(Boolean)
+      };
+      docs = await legislationCollection
+        .find(query)
+        .sort({ latestActionAt: -1, createdAt: -1 })
+        .limit(10)
+        .toArray();
+      console.log('Federal search results:', docs.length);
+    }
     // Try specific search first (location + content)
-    if (detectedStates.length > 0 && searchTerms.length > 0) {
+    if (docs.length === 0 && detectedStates.length > 0 && searchTerms.length > 0) {
       const statePatterns = detectedStates.map(state => new RegExp(state, 'i'));
       const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
 

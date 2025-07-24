@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   if (!auth.userId) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 401 });
   }
-  const { topic } = await req.json();
+  const { topic, notifyByEmail } = await req.json();
   if (!topic) {
     return NextResponse.json({ error: 'Missing topic' }, { status: 400 });
   }
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   // Store subscriptions in topic_subscriptions collection
   await db.collection('topic_subscriptions').updateOne(
     { userId: auth.userId, topic },
-    { $set: { userId: auth.userId, topic }, $setOnInsert: { createdAt: new Date() } },
+    { $set: { userId: auth.userId, topic, notifyByEmail: !!notifyByEmail }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
   );
   return NextResponse.json({ success: true });
@@ -72,18 +72,21 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { oldTopic, newTopic } = await req.json();
-  if (!oldTopic || !newTopic) {
+  const { oldTopic, newTopic, notifyByEmail } = await req.json();
+  if (!oldTopic && !newTopic && typeof notifyByEmail === 'undefined') {
     return NextResponse.json(
-      { error: 'Missing oldTopic or newTopic' },
+      { error: 'Missing update fields' },
       { status: 400 }
     );
   }
 
   const db = await getDb();
+  let update: any = {};
+  if (newTopic) update.topic = newTopic;
+  if (typeof notifyByEmail !== 'undefined') update.notifyByEmail = !!notifyByEmail;
   const result = await db.collection('topic_subscriptions').updateOne(
-    { userId: auth.userId, topic: oldTopic },
-    { $set: { topic: newTopic } }
+    { userId: auth.userId, topic: oldTopic || newTopic },
+    { $set: update }
   );
 
   if (result.matchedCount === 0) {

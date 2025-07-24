@@ -6,19 +6,20 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle,} from "@/comp
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
+import {useToast} from "@/hooks/use-toast";
 import {
-	Ban,
-	BellRing,
-	Bookmark,
-	CalendarDays,
-	Check,
-	ChevronDown,
-	ChevronUp,
-	ExternalLink,
-	FileText,
-	Pencil,
-	Users,
-	X
+    Ban,
+    BellRing,
+    Bookmark,
+    CalendarDays,
+    Check,
+    ChevronDown,
+    ChevronUp,
+    ExternalLink,
+    FileText,
+    Pencil,
+    Users,
+    X
 } from "lucide-react";
 import {BookmarksList} from "@/components/features/BookmarksList";
 import {Badge} from "@/components/ui/badge";
@@ -31,6 +32,7 @@ export function PolicyTracker() {
     const userId = user?.id;
     const [input, setInput] = useState("");
     const [topics, setTopics] = useState<string[]>([]);
+    const [topicNotifications, setTopicNotifications] = useState<Record<string, boolean>>({});
     const [updates, setUpdates] = useState<{
         topic: string;
         message: string;
@@ -41,6 +43,33 @@ export function PolicyTracker() {
     const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
     const [relatedLegislation, setRelatedLegislation] = useState<Record<string, RelatedLegislation[]>>({});
     const [loadingLegislation, setLoadingLegislation] = useState<Set<string>>(new Set());
+    const {toast} = useToast();
+    // Toggle daily email notification for a topic
+    const handleToggleNotification = async (topic: string) => {
+        if (!isSignedIn) return;
+        const enabled = !topicNotifications[topic];
+        const res = await fetch("/api/policy-tracker", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ oldTopic: topic, notifyByEmail: enabled }),
+        });
+        if (res.ok) {
+            setTopicNotifications((prev) => ({ ...prev, [topic]: enabled }));
+            toast({
+                title: enabled ? `Email notifications enabled for "${topic}"` : `Email notifications disabled for "${topic}"`,
+                description: enabled
+                    ? "You will receive daily emails if new legislation is found for this topic."
+                    : "You will no longer receive daily emails for this topic.",
+                variant: "default",
+            });
+        } else {
+            toast({
+                title: "Error updating notification",
+                description: "Please try again.",
+                variant: "destructive",
+            });
+        }
+    };
 
     // Fetch topics and updates from backend
     const fetchUpdates = async () => {
@@ -50,7 +79,13 @@ export function PolicyTracker() {
             const data = await res.json();
             setUpdates(data.updates || []);
             const topicStrings = (data.updates || []).map((u: any) => u.topic).filter((topic: any): topic is string => typeof topic === 'string');
-            setTopics([...new Set(topicStrings)]);
+            setTopics(Array.from(new Set(topicStrings)));
+            // Track notification status for each topic
+            const notifications: Record<string, boolean> = {};
+            (data.updates || []).forEach((u: any) => {
+                if (u.topic) notifications[u.topic] = !!u.notifyByEmail;
+            });
+            setTopicNotifications(notifications);
         }
     };
 
@@ -220,7 +255,7 @@ export function PolicyTracker() {
                                             className="w-full md:w-auto flex-shrink-0 text-sm"
                                         >
                                             <BellRing className="mr-2 h-4 w-4"/>
-                                            Subscribe
+                                            Add Topic
                                         </Button>
                                     </form>
 
@@ -280,11 +315,20 @@ export function PolicyTracker() {
                                                                             )}
                                                                         </Button>
                                                                         <Button
-                                                                            variant="outline"
+                                                                            variant={topicNotifications[topic] ? "default" : "outline"}
                                                                             size="sm"
-                                                                            className="text-primary border-primary hover:bg-primary hover:text-white flex-shrink-0"
-                                                                            aria-label={`Simulate update for ${topic}`}
-                                                                            data-testid={`policy-tracker-simulate-update-${topic}`}
+                                                                            className={
+                                                                                `text-sm flex-shrink-0 border rounded-md transition-colors px-3 py-2 ${
+                                                                                    topicNotifications[topic]
+                                                                                        ? "text-yellow-500 border-yellow-500 bg-yellow-100 hover:bg-yellow-200"
+                                                                                        : "text-primary border-primary hover:bg-primary hover:text-white"
+                                                                                }`
+                                                                            }
+                                                                            aria-label={topicNotifications[topic]
+                                                                                ? `Disable daily email notifications for ${topic}`
+                                                                                : `Enable daily email notifications for ${topic}`}
+                                                                            data-testid={`policy-tracker-toggle-email-${topic}`}
+                                                                            onClick={() => handleToggleNotification(topic)}
                                                                         >
                                                                             <BellRing className="w-4 h-4"/>
                                                                         </Button>
@@ -345,8 +389,7 @@ export function PolicyTracker() {
                                                                                 matches were found.
                                                                             </div>
                                                                             {relatedLegislation[topic].map((legislation, i) => (
-                                                                                <AnimatedSection key={legislation.id}
-                                                                                                 style={{transitionDelay: `${i * 60}ms`}}>
+                                                                                <AnimatedSection key={legislation.id}>
                                                                                     <Card
                                                                                         className="hover:shadow-md transition-shadow">
                                                                                         <CardHeader className="pb-2">

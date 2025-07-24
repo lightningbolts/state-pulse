@@ -72,10 +72,19 @@ export interface RelatedLegislation {
   title?: string;
   identifier?: string;
   jurisdictionName?: string;
-  latestActionAt?: Date;
+  latestActionAt?: string;
   latestActionDescription?: string;
   subjects?: string[];
   stateLegislatureUrl?: string;
+  statusText?: string;
+  classification?: string[];
+  session?: string;
+  chamber?: string;
+  firstActionAt?: string;
+  sponsors?: { name: string }[];
+  abstracts?: { abstract: string }[];
+  geminiSummary?: string;
+  openstatesUrl?: string;
 }
 
 export interface Bill {
