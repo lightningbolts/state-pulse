@@ -330,8 +330,10 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
           let pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
           // If no PDF links found and this is a congress.gov bill, try the 'Text' subpage
           if (pdfLinks.length === 0 && source.url.includes('congress.gov/bill/')) {
-            // Look for a link to the Text subpage
-            const textTabMatch = html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*Text\s*<\/a>/i);
+            // More robust regex for the Text tab (allow whitespace, case-insensitive, and possible variations)
+            const textTabMatch = html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*Text\s*<\/a>/i)
+              || html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*Bill Text\s*<\/a>/i)
+              || html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*View Text\s*<\/a>/i);
             if (textTabMatch) {
               let textTabUrl = textTabMatch[1];
               if (!textTabUrl.startsWith('http')) {
@@ -343,11 +345,30 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
                 const textRes = await fetch(textTabUrl);
                 if (textRes.ok) {
                   const textHtml = await textRes.text();
+                  console.log('[DEBUG] First 500 chars of Text tab HTML:', textHtml.slice(0, 500));
                   pdfLinks = Array.from(textHtml.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
                   console.log('[DEBUG] Found PDF links in Text tab:', pdfLinks);
                 }
               } catch (e) {
                 console.log('[Bill Extraction] Error fetching/parsing Text tab:', textTabUrl, e);
+              }
+            } else {
+              // Log the HTML snippet around the Text tab match attempt for debugging
+              const snippet = html.slice(0, 2000);
+              console.log('[DEBUG] No Text tab found. First 2000 chars of HTML:', snippet);
+              // Fallback: try fetching the /text subpage directly
+              try {
+                let textTabUrl = source.url.replace(/\/$/, '') + '/text';
+                console.log('[DEBUG] Fallback: Trying direct /text subpage:', textTabUrl);
+                const textRes = await fetch(textTabUrl);
+                if (textRes.ok) {
+                  const textHtml = await textRes.text();
+                  console.log('[DEBUG] First 500 chars of direct /text HTML:', textHtml.slice(0, 500));
+                  pdfLinks = Array.from(textHtml.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+                  console.log('[DEBUG] Found PDF links in direct /text:', pdfLinks);
+                }
+              } catch (e) {
+                console.log('[Bill Extraction] Error fetching/parsing direct /text subpage:', e);
               }
             }
           } else {
