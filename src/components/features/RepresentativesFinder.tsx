@@ -44,7 +44,7 @@ export function RepresentativesFinder() {
     const [closestReps, setClosestReps] = useState<Representative[]>([]);
     // New pagination state
     const [showAllMode, setShowAllMode] = useState(false);
-    const [pagination, setPagination] = useState<ApiResponse['pagination'] | null>(null);
+    const [pagination, setPagination] = useState<ApiResponse['pagination'] | undefined>(undefined);
     const [currentPage, setCurrentPage] = useState(1);
 
     // Civic tools state
@@ -60,7 +60,7 @@ export function RepresentativesFinder() {
         setClosestReps([]);
         // Reset pagination state for fresh searches
         setShowAllMode(false);
-        setPagination(null);
+        setPagination(undefined);
         setCurrentPage(1);
 
         try {
@@ -233,7 +233,7 @@ export function RepresentativesFinder() {
 
             setRepresentatives(reps);
             setDataSource(data.source);
-            setPagination(data.pagination || null);
+            setPagination(data.pagination || undefined);
 
         } catch (err) {
             console.error('Error fetching representatives:', err);
@@ -242,16 +242,24 @@ export function RepresentativesFinder() {
             let userMessage = 'Unable to find representatives for this address.';
 
             if (err instanceof Error) {
-                if (err.message.includes('Service temporarily unavailable')) {
+                const msg = err.message.toLowerCase();
+                if (
+                    msg.includes('fetch failed') ||
+                    msg.includes('enotfound') ||
+                    msg.includes('failed to fetch') ||
+                    msg.includes('networkerror')
+                ) {
+                    userMessage = 'The representative lookup service is currently unavailable due to a third-party outage. Please try again later or contact support if the issue persists.';
+                } else if (msg.includes('service temporarily unavailable')) {
                     userMessage = 'The representative lookup service is temporarily unavailable. Please try again later or contact support if the issue persists.';
-                } else if (err.message.includes('API rate limits')) {
-                    userMessage = 'Too many requests. Please wait a moment and try again.';
-                } else if (err.message.includes('configuration')) {
+                } else if (msg.includes('configuration')) {
                     userMessage = 'Service configuration issue. Please contact support.';
-                } else if (err.message.includes('Unable to determine state')) {
+                } else if (msg.includes('unable to determine state')) {
                     userMessage = 'Please enter a complete address including the state (e.g., "123 Main St, New York, NY").';
-                } else if (err.message.includes('No representative data found')) {
+                } else if (msg.includes('no representative data found')) {
                     userMessage = err.message;
+                } else if (msg.includes('api rate limits')) {
+                    userMessage = 'Too many requests. Please wait a moment and try again.';
                 } else {
                     userMessage = err.message;
                 }
@@ -339,7 +347,7 @@ export function RepresentativesFinder() {
 
             setRepresentatives(data.representatives || []);
             setDataSource(data.source);
-            setPagination(data.pagination || null);
+            setPagination(data.pagination || undefined);
             setCurrentPage(page);
 
         } catch (err) {
@@ -349,16 +357,26 @@ export function RepresentativesFinder() {
             let userMessage = 'Unable to find representatives for this address.';
 
             if (err instanceof Error) {
-                if (err.message.includes('Service temporarily unavailable')) {
+                const msg = err.message.toLowerCase();
+                if (
+                    msg.includes('fetch failed') ||
+                    msg.includes('enotfound') ||
+                    msg.includes('failed to fetch') ||
+                    msg.includes('networkerror') ||
+                    msg.includes('getaddrinfo') ||
+                    msg.includes('ENOTFOUND')
+                ) {
+                    userMessage = 'The representative lookup service is currently unavailable due to a third-party outage. Please try again later or contact support if the issue persists.';
+                } else if (msg.includes('service temporarily unavailable')) {
                     userMessage = 'The representative lookup service is temporarily unavailable. Please try again later or contact support if the issue persists.';
-                } else if (err.message.includes('API rate limits')) {
-                    userMessage = 'Too many requests. Please wait a moment and try again.';
-                } else if (err.message.includes('configuration')) {
+                } else if (msg.includes('configuration')) {
                     userMessage = 'Service configuration issue. Please contact support.';
-                } else if (err.message.includes('Unable to determine state')) {
+                } else if (msg.includes('unable to determine state')) {
                     userMessage = 'Please enter a complete address including the state (e.g., "123 Main St, New York, NY").';
-                } else if (err.message.includes('No representative data found')) {
+                } else if (msg.includes('no representative data found')) {
                     userMessage = err.message;
+                } else if (msg.includes('api rate limits')) {
+                    userMessage = 'Too many requests. Please wait a moment and try again.';
                 } else {
                     userMessage = err.message;
                 }
@@ -461,7 +479,7 @@ export function RepresentativesFinder() {
         } else {
             // Switch back to proximity mode
             setShowAllMode(false);
-            setPagination(null);
+            setPagination(undefined);
             setCurrentPage(1);
             await fetchRepresentatives(userLocation); // This will show proximity-based results
         }
