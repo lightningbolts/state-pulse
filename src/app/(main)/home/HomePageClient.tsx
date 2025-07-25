@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, BarChart3, Landmark, Newspaper } from 'lucide-react';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
+
+import dynamic from 'next/dynamic';
 import { useUser } from '@clerk/nextjs';
+const ParallaxShowcase = dynamic(() => import('./ParallaxShowcase'), { ssr: false });
 
 export default function HomePageClient() {
   const { isSignedIn } = useUser();
@@ -32,6 +35,7 @@ export default function HomePageClient() {
           </Button>
         </div>
       </AnimatedSection>
+
 
       {/* Features Section */}
       <AnimatedSection className="py-20 px-6 md:px-10">
@@ -90,6 +94,9 @@ export default function HomePageClient() {
           </div>
         </div>
       </AnimatedSection>
+
+      {/* Parallax Showcase Section */}
+      <ParallaxShowcase />
 
       {/* Call to Action Section */}
       <AnimatedSection className="bg-muted/70 py-20 px-6 md:px-10 rounded-md shadow-lg overflow-hidden">
