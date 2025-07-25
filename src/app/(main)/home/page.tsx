@@ -110,6 +110,23 @@ export default function HomePage() {
           </div>
         </div>
       </AnimatedSection>
-    </div>
+    {/* Donate Callout Section */}
+    <AnimatedSection className="bg-yellow-100 py-14 px-6 md:px-10 rounded-md shadow-lg overflow-hidden mt-12 flex flex-col items-center">
+      <h2 className="text-3xl md:text-4xl font-bold mb-4 text-yellow-900 tracking-tight">Support StatePulse</h2>
+      <p className="text-lg md:text-xl text-yellow-900/90 mb-8 max-w-2xl mx-auto leading-relaxed text-center">
+        If you find StatePulse valuable, consider supporting our work! Your donation helps us keep the platform running and free for everyone.
+      </p>
+      <a
+        href="https://buymeacoffee.com/timberlake2025"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block"
+      >
+        <Button className="bg-yellow-400 text-black hover:bg-yellow-300 font-semibold shadow-md px-8 py-3 rounded-lg text-lg transition-colors" asChild>
+          <span>Donate</span>
+        </Button>
+      </a>
+    </AnimatedSection>
+  </div>
   );
 }

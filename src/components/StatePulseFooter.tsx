@@ -106,19 +106,28 @@ export function StatePulseFooter() {
                 <ExternalLink className="h-4 w-4 sm:h-5 sm:w-5" />
               </a>
               <a
-                href="mailto:statepulseme@gmail.com"
+                href="mailto:contact@statepulse.me"
                 className="text-muted-foreground hover:text-foreground transition-colors p-1"
                 aria-label="Email"
               >
                 <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
               </a>
+              <a
+                href="https://buymeacoffee.com/timberlake2025"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-yellow-400 text-black font-semibold px-3 py-1 rounded shadow hover:bg-yellow-300 transition-colors text-xs sm:text-sm ml-2"
+                aria-label="Donate"
+              >
+                Donate
+              </a>
             </div>
             <div className="text-xs sm:text-sm text-muted-foreground">
               <a
-                href="mailto:statepulseme@gmail.com"
+                href="mailto:contact@statepulse.me"
                 className="hover:text-foreground transition-colors"
               >
-                statepulseme@gmail.com
+                contact@statepulse.me
               </a>
             </div>
           </div>

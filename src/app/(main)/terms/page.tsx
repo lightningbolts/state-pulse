@@ -148,7 +148,7 @@ export default function TermsOfService() {
               If you have any questions about these Terms of Service, please contact us at:
             </p>
             <p className="mb-2">
-              <strong>Email:</strong> statepulseme@gmail.com
+              <strong>Email:</strong> contact@statepulse.me
             </p>
           </section>
         </AnimatedSection>

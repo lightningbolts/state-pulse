@@ -105,8 +105,28 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContentWithAutoClose />
-        <SidebarFooter className="p-4">
-          <SidebarAuthAndTheme />
+        <SidebarFooter className="p-4 flex flex-col gap-3">
+          <div className="flex flex-row items-center w-full gap-2 mb-2">
+            <SidebarAuthAndTheme />
+            <a
+              href="https://buymeacoffee.com/timberlake2025"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+              style={{ minWidth: 0 }}
+            >
+              <button
+                className="h-10 w-full bg-yellow-400 text-black font-semibold px-3 rounded-lg shadow hover:bg-yellow-300 transition-colors text-sm flex items-center justify-center gap-1"
+                style={{ minWidth: 0 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 01.75-.75h9a.75.75 0 01.75.75v6a2.25 2.25 0 01-2.25 2.25h-6A2.25 2.25 0 016.75 18v-6z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75v6.75" />
+                </svg>
+                Donate
+              </button>
+            </a>
+          </div>
           <SidebarSeparator className="my-2" />
           <p className="text-xs text-sidebar-foreground/70 text-center">
             © {new Date().getFullYear()} StatePulse
