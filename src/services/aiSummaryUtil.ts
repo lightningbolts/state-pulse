@@ -6,7 +6,7 @@ import { Legislation } from '../types/legislation';
 
 export async function generateGeminiSummary(text: string): Promise<string> {
   // Use Gemini to generate a ~100-word summary
-  const prompt = `Summarize the following legislation in about 100 words, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.'\n\n${text}`;
+  const prompt = `Summarize the following legislation in about 100 to 150 words, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.'\n\n${text}`;
   const response = await ai.generate({ prompt });
   return response.text.trim();
 }
@@ -301,9 +301,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
             if (billText && billText.trim().length > 100) {
               console.log('[Bill Extraction] Using version:', version.url);
               return {
-                summary: Array.isArray(await summarizeWithAzure(billText.trim()))
-                  ? (await summarizeWithAzure(billText.trim())).join(' ')
-                  : String(await summarizeWithAzure(billText.trim())),
+                summary: await generateGeminiSummary(billText.trim()),
                 sourceType: version.url.endsWith('.pdf') ? 'pdf' : 'text'
               };
             } else {
@@ -338,9 +336,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
                 if (billText && billText.trim().length > 100) {
                   console.log('[Bill Extraction] Using version link:', linkUrl);
                   return {
-                    summary: Array.isArray(await summarizeWithAzure(billText.trim()))
-                      ? (await summarizeWithAzure(billText.trim())).join(' ')
-                      : String(await summarizeWithAzure(billText.trim())),
+                    summary: await generateGeminiSummary(billText.trim()),
                     sourceType: linkUrl.endsWith('.pdf') ? 'pdf' : 'text'
                   };
                 } else {
@@ -441,9 +437,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
                 console.log('[Bill Extraction] Using PDF from source:', pdfUrl);
                 foundPdfInAnySource = true;
                 return {
-                  summary: Array.isArray(await summarizeWithAzure(data.text.trim()))
-                    ? (await summarizeWithAzure(data.text.trim())).join(' ')
-                    : String(await summarizeWithAzure(data.text.trim())),
+                  summary: await generateGeminiSummary(data.text.trim()),
                   sourceType: 'pdf-extracted'
                 };
               } else {
@@ -466,13 +460,13 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
   if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
     const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
     if (abstractsText.trim().length > 20) {
-      const summary = await summarizeWithAzure(abstractsText.trim());
+      const summary = await generateGeminiSummary(abstractsText.trim());
       return { summary: String(summary), sourceType: 'abstracts' };
     }
   }
   // 3. Remove HTML fallback: do not summarize navigation-heavy pages
   // 4. Fallback: bill title
   const title = bill.title || 'No title available.';
-  const summary = await summarizeWithAzure(title.trim());
+  const summary = await generateGeminiSummary(title.trim());
   return { summary: String(summary), sourceType: 'title' };
 }
