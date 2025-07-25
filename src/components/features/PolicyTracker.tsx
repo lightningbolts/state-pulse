@@ -204,7 +204,6 @@ export function PolicyTracker() {
                 <Card className="shadow-lg">
                     <CardHeader>
                         <CardTitle className="font-headline text-2xl flex items-center">
-                            <BellRing className="mr-3 h-7 w-7"/>
                             Track Your Policies
                         </CardTitle>
                         <CardDescription>

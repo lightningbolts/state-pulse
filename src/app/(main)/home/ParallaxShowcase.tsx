@@ -2,133 +2,198 @@
 
 import React from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Landmark, User, MessageCircle } from 'lucide-react';
 
-const mockLegislation = [
-  { id: '1', title: 'CA AB123: Clean Energy Act', summary: 'Mandates 100% renewable energy by 2045.', link: '/legislation/ca-ab123' },
-  { id: '2', title: 'NY SB456: Affordable Housing', summary: 'Expands affordable housing programs.', link: '/legislation/ny-sb456' },
-  { id: '3', title: 'TX HB789: Education Reform', summary: 'Increases teacher salaries and funding.', link: '/legislation/tx-hb789' },
-];
+import PolicyUpdateCard from '@/components/features/PolicyUpdateCard';
+import { PostCard } from '@/components/features/PostCard';
+import RepresentativeCard from '@/components/features/RepresentativeCard';
 
-const mockPosts = [
-  { id: '1', author: 'Jane Doe', content: 'Excited to see new climate legislation in CA!', link: '/posts/1' },
-  { id: '2', author: 'Alex Smith', content: 'Affordable housing is a game changer for NY.', link: '/posts/2' },
-  { id: '3', author: 'Sam Lee', content: 'Education reform is long overdue in Texas.', link: '/posts/3' },
-];
 
-const mockReps = [
-  { id: '1', name: 'Rep. Maria Garcia', state: 'CA', link: '/representatives/1' },
-  { id: '2', name: 'Sen. John Kim', state: 'NY', link: '/representatives/2' },
-  { id: '3', name: 'Rep. Lisa Patel', state: 'TX', link: '/representatives/3' },
-];
+import { useEffect, useState } from 'react';
+import type { Legislation } from '@/types/legislation';
+import type { Post } from '@/types/media';
+import type { Representative } from '@/types/representative';
 
-const allCards = [
-  ...mockLegislation.map(l => ({ type: 'legislation', ...l })),
-  ...mockPosts.map(p => ({ type: 'post', ...p })),
-  ...mockReps.map(r => ({ type: 'rep', ...r })),
-];
+function useRecentData<T>(url: string, key: string): { data: T[]; loading: boolean; error: string | null } {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetch(url)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      })
+      .then((json) => setData(json[key] || json))
+      .catch((e) => setError(e.message || 'Error fetching data'))
+      .finally(() => setLoading(false));
+  }, [url, key]);
+  return { data, loading, error };
+}
 
-function getCard(card: any) {
-  switch (card.type) {
-    case 'legislation':
+
+// Minimal state for PolicyUpdateCard (legislation)
+const emptyFn = () => {};
+const emptyArr: any[] = [];
+const emptyRef = { current: 0 };
+function truncate(str: string | undefined, n = 100) {
+  if (!str) return '';
+  return str.length > n ? str.slice(0, n) + '...' : str;
+}
+
+function getCard(card: any, idx: number, type: 'legislation' | 'post' | 'rep', updatesArr?: any[]) {
+  switch (type) {
+    case 'legislation': {
+      // Truncate title, summary, geminiSummary
+      const update = {
+        ...card,
+        title: truncate(card.title, 100),
+        summary: truncate(card.summary, 100),
+        geminiSummary: truncate(card.geminiSummary, 100),
+      };
       return (
-        <Card className="w-80 min-w-80 mx-2 bg-card/90 shadow-lg hover:shadow-xl transition-transform hover:-translate-y-1 border-primary border-opacity-20 border">
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <Landmark className="h-6 w-6 text-primary" />
-            <CardTitle className="text-lg font-semibold truncate">{card.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-2 line-clamp-2">{card.summary}</p>
-            <Link href={card.link} className="text-primary font-medium flex items-center gap-1 hover:underline">
-              View Bill <ArrowRight className="h-4 w-4" />
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="w-80 min-w-80 mx-2 rounded-xl overflow-hidden">
+          <PolicyUpdateCard
+            update={update}
+            idx={idx}
+            updates={updatesArr || []}
+            classification={card.classification?.[0] || ''}
+            subject={card.subjects?.[0] || ''}
+            setClassification={emptyFn}
+            setSubject={emptyFn}
+            setUpdates={emptyFn}
+            setSkip={emptyFn}
+            skipRef={emptyRef as React.MutableRefObject<number>}
+            setHasMore={emptyFn}
+            setLoading={emptyFn}
+          />
+        </div>
       );
-    case 'post':
+    }
+    case 'post': {
+      // Truncate title/content
+      const post = {
+        ...card,
+        title: truncate(card.title, 100),
+        content: truncate(card.content, 100),
+      };
       return (
-        <Card className="w-80 min-w-80 mx-2 bg-card/90 shadow-lg hover:shadow-xl transition-transform hover:-translate-y-1 border-secondary border-opacity-20 border">
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <MessageCircle className="h-6 w-6 text-secondary" />
-            <CardTitle className="text-lg font-semibold truncate">Community Post</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-2 line-clamp-2">"{card.content}"</p>
-            <span className="text-xs text-secondary-foreground">by {card.author}</span>
-            <br />
-            <Link href={card.link} className="text-secondary font-medium flex items-center gap-1 hover:underline">
-              View Post <ArrowRight className="h-4 w-4" />
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="w-80 min-w-80 mx-2 rounded-xl overflow-hidden">
+          <PostCard post={post} />
+        </div>
       );
+    }
     case 'rep':
       return (
-        <Card className="w-80 min-w-80 mx-2 bg-card/90 shadow-lg hover:shadow-xl transition-transform hover:-translate-y-1 border-accent border-opacity-20 border">
-          <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <User className="h-6 w-6 text-accent" />
-            <CardTitle className="text-lg font-semibold truncate">{card.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-2">State: {card.state}</p>
-            <Link href={card.link} className="text-accent font-medium flex items-center gap-1 hover:underline">
-              View Profile <ArrowRight className="h-4 w-4" />
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="w-80 min-w-80 mx-2 rounded-xl overflow-hidden">
+          <RepresentativeCard rep={card} />
+        </div>
       );
     default:
       return null;
   }
 }
 
+
 export default function ParallaxShowcase() {
-  // Duplicate cards for seamless vertical loop
-  const legislationCards = [...mockLegislation, ...mockLegislation];
-  const postCards = [...mockPosts, ...mockPosts];
-  const repCards = [...mockReps, ...mockReps];
+  // Fetch real data
+  const { data: legislation, loading: loadingLeg, error: errorLeg } = useRecentData<Legislation>(
+    '/api/legislation?limit=100&sortBy=updatedAt&sortDir=desc', 'legislations'
+  );
+  const { data: posts, loading: loadingPosts, error: errorPosts } = useRecentData<Post>(
+    '/api/posts?limit=100', 'posts'
+  );
+  const { data: reps, loading: loadingReps, error: errorReps } = useRecentData<Representative>(
+    '/api/representatives?pageSize=100&sortBy=name', 'representatives'
+  );
+
+  // Duplicate for seamless loop
+  const legislationCards = [...legislation, ...legislation];
+  const postCards = [...posts, ...posts];
+  const repCards = [...reps, ...reps];
+
+  // Animation speed: px/sec
+  const CARD_HEIGHT = 336; // 320px card + 16px margin (mb-4)
+  const SPEED = 40; // px/sec, adjust for desired scroll speed
+
+  // Calculate duration based on total scroll distance (half the column)
+  const getDuration = (cards: any[]) => {
+    const totalHeight = cards.length * CARD_HEIGHT;
+    return totalHeight / SPEED;
+  };
+
+  const legislationDuration = getDuration(legislationCards);
+  const postDuration = getDuration(postCards);
+  const repDuration = getDuration(repCards);
 
   return (
-    <div className="relative w-full overflow-x-hidden py-12 bg-gradient-to-b from-background/80 to-muted/60">
+    <div className="relative w-full overflow-x-hidden py-12 bg-gradient-to-b from-background/80 to-muted/60 rounded-md overflow-hidden">
       <h2 className="text-3xl md:text-4xl font-bold mb-8 text-center tracking-tight">See What’s Happening</h2>
       <div className="w-full flex flex-col md:flex-row items-stretch justify-center gap-8 max-w-6xl mx-auto">
         {/* Legislation Column */}
-        <div className="flex-1 flex flex-col items-center">
+        <div className="flex-1 flex flex-col items-center rounded-xl overflow-hidden">
           <div className="relative h-96 w-full overflow-hidden">
-            <div className="absolute left-0 top-0 w-full animate-marquee-vert flex flex-col">
-              {legislationCards.map((card, i) => (
-                <div key={i} className="mb-4 flex justify-center">
-                  {getCard({ type: 'legislation', ...card })}
-                </div>
-              ))}
-            </div>
+            {loadingLeg ? (
+              <div className="flex items-center justify-center h-full">Loading...</div>
+            ) : errorLeg ? (
+              <div className="text-red-500 text-center">{errorLeg}</div>
+            ) : (
+              <div
+                className="absolute left-0 top-0 w-full animate-marquee-vert flex flex-col"
+                style={{ animationDuration: `${legislationDuration}s` }}
+              >
+                {legislationCards.map((card, i) => (
+                  <div key={i} className="mb-4 flex justify-center">
+                    {getCard(card, i, 'legislation', legislation)}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-center mt-2 font-semibold text-primary">Recent Legislation</div>
         </div>
         {/* Posts Column */}
-        <div className="flex-1 flex flex-col items-center">
+        <div className="flex-1 flex flex-col items-center rounded-xl overflow-hidden">
           <div className="relative h-96 w-full overflow-hidden">
-            <div className="absolute left-0 top-0 w-full animate-marquee-vert-reverse flex flex-col">
-              {postCards.map((card, i) => (
-                <div key={i} className="mb-4 flex justify-center">
-                  {getCard({ type: 'post', ...card })}
-                </div>
-              ))}
-            </div>
+            {loadingPosts ? (
+              <div className="flex items-center justify-center h-full">Loading...</div>
+            ) : errorPosts ? (
+              <div className="text-red-500 text-center">{errorPosts}</div>
+            ) : (
+              <div
+                className="absolute left-0 top-0 w-full animate-marquee-vert-reverse flex flex-col"
+                style={{ animationDuration: `${postDuration}s` }}
+              >
+                {postCards.map((card, i) => (
+                  <div key={i} className="mb-4 flex justify-center">
+                    {getCard(card, i, 'post')}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-center mt-2 font-semibold text-secondary">Community Posts</div>
         </div>
         {/* Representatives Column */}
-        <div className="flex-1 flex flex-col items-center">
+        <div className="flex-1 flex flex-col items-center rounded-xl overflow-hidden">
           <div className="relative h-96 w-full overflow-hidden">
-            <div className="absolute left-0 top-0 w-full animate-marquee-vert flex flex-col">
-              {repCards.map((card, i) => (
-                <div key={i} className="mb-4 flex justify-center">
-                  {getCard({ type: 'rep', ...card })}
-                </div>
-              ))}
-            </div>
+            {loadingReps ? (
+              <div className="flex items-center justify-center h-full">Loading...</div>
+            ) : errorReps ? (
+              <div className="text-red-500 text-center">{errorReps}</div>
+            ) : (
+              <div
+                className="absolute left-0 top-0 w-full animate-marquee-vert flex flex-col"
+                style={{ animationDuration: `${repDuration}s` }}
+              >
+                {repCards.map((card, i) => (
+                  <div key={i} className="mb-4 flex justify-center">
+                    {getCard(card, i, 'rep')}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-center mt-2 font-semibold text-accent">Representatives</div>
         </div>
@@ -143,10 +208,14 @@ export default function ParallaxShowcase() {
           100% { transform: translateY(0); }
         }
         .animate-marquee-vert {
-          animation: marquee-vert 24s linear infinite;
+          animation-name: marquee-vert;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
         }
         .animate-marquee-vert-reverse {
-          animation: marquee-vert-reverse 28s linear infinite;
+          animation-name: marquee-vert-reverse;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
         }
       `}</style>
     </div>

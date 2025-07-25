@@ -52,6 +52,15 @@ export interface RepresentativesResultsProps {
 }
 
 export interface OpenStatesPerson {
+    roles?: Array<{
+        type: string;
+        title: string;
+        org_classification: string;
+        district?: string | number;
+        division_id?: string;
+        party?: string;
+        end_date?: string | null;
+    }>;
     id: string;
     name: string;
     party: string;

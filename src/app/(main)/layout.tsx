@@ -1,5 +1,5 @@
-"use client";
-
+"use client"
+import { Gavel, LayoutDashboard, Newspaper, Eye, Users, MessageSquare, BrainCircuit, Wrench } from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -19,16 +19,6 @@ import {
   SidebarAuthAndTheme,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  LayoutDashboard,
-  Newspaper,
-  Eye,
-  BrainCircuit,
-  Users,
-  Gavel,
-  MessageSquare,
-  type LucideIcon,
-} from "lucide-react";
 import {StatePulseFooter} from "@/components/StatePulseFooter";
 
 type ActiveView =
@@ -36,6 +26,7 @@ type ActiveView =
     | "dashboard"
     | "updates"
     | "tracker"
+    | "representatives"
     | "posts"
     | "timeline"
     | "summaries"
@@ -53,9 +44,10 @@ const menuItems: MenuItem[] = [
     { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "updates", path: "/legislation", label: "Policy Updates", icon: Newspaper },
     { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },
+    { id: "representatives", path: "/representatives", label: "Representatives", icon: Users },
     { id: "posts", path: "/posts", label: "Community Posts", icon: MessageSquare },
     { id: "summaries", path: "/summaries", label: "AI Summaries", icon: BrainCircuit },
-    { id: "civic", path: "/civic", label: "Civic Tools", icon: Users },
+    { id: "civic", path: "/civic", label: "Civic Tools", icon: Wrench },
 ];
 
 function SidebarContentWithAutoClose() {
