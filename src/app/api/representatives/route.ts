@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { OpenStatesPerson, Representative } from "@/types/representative";
 
+// US State mapping and validation
+export const stateMap: Record<string, string> = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+  'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
+};
+
+export const validStates = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  'DC'
+];
+
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable');
@@ -24,41 +50,25 @@ async function connectToDatabase() {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    // Accept all possible civics page parameters
     const address = searchParams.get('address');
     const state = searchParams.get('state');
+    const stateAbbr = searchParams.get('stateAbbr');
     const forceRefresh = searchParams.get('refresh') === 'true';
-    const pageParam = parseInt(searchParams.get('page') || '1');
-    const pageSize = parseInt(searchParams.get('pageSize') || '10');
+    const pageParam = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get('pageSize') || '10'))); // Limit pageSize to 100 max
     const showAll = searchParams.get('showAll') === 'true';
+    const sortBy = searchParams.get('sortBy') || 'name';
+    const sortDir = (searchParams.get('sortDir') || 'asc').toLowerCase() === 'desc' ? -1 : 1;
+    const search = searchParams.get('search')?.trim();
+    const filterParty = searchParams.get('party')?.trim();
+    const filterChamber = searchParams.get('chamber')?.trim();
+    const filterState = searchParams.get('filterState')?.trim() || searchParams.get('state')?.trim() || searchParams.get('stateAbbr')?.trim();
 
     // console.log(`[API] Request received - address: ${address}, state: ${state}, forceRefresh: ${forceRefresh}`);
 
-    if (!address && !state) {
-      return NextResponse.json(
-        { error: 'Address or state parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    // Define state mapping at function level so it's available throughout
-    const stateMap: Record<string, string> = {
-      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-      'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-      'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-      'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-      'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-      'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-      'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-      'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-      'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-      'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-      'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-      'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-      'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-    };
-
-    // Extract state from address if not provided separately
-    let stateCode = state;
+    // Accept stateAbbr as a priority, then state, then extract from address
+    let stateCode = stateAbbr || state;
     if (!stateCode && address) {
       // Check if address contains a full state name (case-insensitive)
       for (const [fullName, abbrev] of Object.entries(stateMap)) {
@@ -67,7 +77,6 @@ export async function GET(request: NextRequest) {
           break;
         }
       }
-
       // If no full state name found, try to find 2-letter state code
       if (!stateCode) {
         const stateMatch = address.match(/,\s*([A-Z]{2})(?:\s|$)|(?:^|\s)([A-Z]{2})(?:\s*$)/);
@@ -77,48 +86,84 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Always connect to DB and get collection once
+    const client = await connectToDatabase();
+    const db = client.db('statepulse');
+    const representativesCollection = db.collection<Representative>('representatives');
+
+    // If no state/address provided, fetch all representatives (with pagination, search, sorting)
     if (!stateCode) {
-      return NextResponse.json(
-        { error: 'Unable to determine state from address. Please include state abbreviation at the end (e.g., "123 Main St, Columbus, OH").' },
-        { status: 400 }
-      );
+      // Build robust filter for all reps with support for name, state, chamber, party
+      const filter: any = {};
+      const andFilters: any[] = [];
+      // Multi-field search (name, office, district, party)
+      if (search) {
+        const regex = { $regex: search, $options: 'i' };
+        andFilters.push({ $or: [
+          { name: regex },
+          { office: regex },
+          { district: regex },
+          { party: regex }
+        ] });
+      }
+      // Party substring match (case-insensitive)
+      if (filterParty) {
+        andFilters.push({ party: { $regex: filterParty, $options: 'i' } });
+      }
+      // Chamber match (office field, robust)
+      if (filterChamber) {
+        if (/senate|upper/i.test(filterChamber)) {
+          andFilters.push({ office: { $regex: 'senator', $options: 'i' } });
+        } else if (/house|lower|assembly/i.test(filterChamber)) {
+          andFilters.push({ office: { $regex: 'representative|assembly', $options: 'i' } });
+        }
+      }
+      // State match (jurisdiction field, robust)
+      if (filterState && validStates.includes(filterState.toUpperCase())) {
+        // Match jurisdiction containing state abbreviation or full name
+        const stateRegex = new RegExp(`\\b(${filterState}|${Object.keys(stateMap).find(name => stateMap[name] === filterState.toUpperCase()) || filterState})\\b`, 'i');
+        andFilters.push({ jurisdiction: { $regex: stateRegex } });
+      }
+      if (andFilters.length > 0) {
+        filter.$and = andFilters;
+      }
+      // Sorting
+      const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction'];
+      const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
+      const sortObj: Record<string, 1 | -1> = { [sortField]: sortDir };
+      // Pagination
+      const skip = (pageParam - 1) * pageSize;
+      const total = await representativesCollection.countDocuments(filter);
+      const reps = await representativesCollection
+        .find(filter)
+        .sort(sortObj)
+        .skip(skip)
+        .limit(pageSize)
+        .toArray();
+      return NextResponse.json({
+        representatives: reps,
+        source: 'cache',
+        pagination: {
+          page: pageParam,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+          hasNext: skip + pageSize < total,
+          hasPrev: pageParam > 1
+        }
+      });
     }
-
     // Validate state code
-    const validStates = [
-      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
-      'DC'
-    ];
-
     if (!validStates.includes(stateCode.toUpperCase())) {
       return NextResponse.json(
         { error: `Invalid state abbreviation: ${stateCode}. Please use a valid US state abbreviation.` },
         { status: 400 }
       );
     }
-
     stateCode = stateCode.toUpperCase();
     // console.log(`[API] Processing request for state: ${stateCode}`);
 
-    // Check MongoDB connection
-    let client;
-    try {
-      client = await connectToDatabase();
-      // console.log(`[API] Database connection established`);
-    } catch (dbError) {
-      console.error(`[API] Database connection failed:`, dbError);
-      return NextResponse.json(
-        { error: 'Database connection failed. Please try again later.' },
-        { status: 503 }
-      );
-    }
-
-    const db = client.db('statepulse');
-    const representativesCollection = db.collection<Representative>('representatives');
+    // DB connection already established above
 
     // Check for cached data first - ALWAYS check cache before hitting external API
     if (!forceRefresh) {
@@ -131,21 +176,28 @@ export async function GET(request: NextRequest) {
         // Use word boundaries to avoid partial matches (e.g., IA in California)
         const stateRegex = new RegExp(`\\b(${stateCode}|${stateFullName.replace(/\s+/g, '\\s+')}|${stateCode}\\s+State)\\b`, 'i');
 
-        const totalCachedReps = await representativesCollection.countDocuments({
+        // Build filter for cache query
+        const cacheFilter = {
           jurisdiction: { $regex: stateRegex },
-          lastUpdated: { $gte: yesterday }
-        });
+          lastUpdated: { $gte: yesterday },
+          ...(search ? { name: { $regex: search, $options: 'i' } } : {})
+        };
+
+        const totalCachedReps = await representativesCollection.countDocuments(cacheFilter);
 
         // console.log(`[API] Found ${totalCachedReps} cached representatives for ${stateCode} using regex: ${stateRegex}`);
 
         if (totalCachedReps > 0) {
+          // Build sort object
+          const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction'];
+          const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
+          const sortObj: Record<string, 1 | -1> = { [sortField]: sortDir };
+
           if (showAll) {
             const skip = (pageParam - 1) * pageSize;
             const cachedReps = await representativesCollection
-              .find({
-                jurisdiction: { $regex: stateRegex },
-                lastUpdated: { $gte: yesterday }
-              })
+              .find(cacheFilter)
+              .sort(sortObj)
               .skip(skip)
               .limit(pageSize)
               .toArray();
@@ -165,10 +217,8 @@ export async function GET(request: NextRequest) {
             });
           } else {
             const cachedReps = await representativesCollection
-              .find({
-                jurisdiction: { $regex: stateRegex },
-                lastUpdated: { $gte: yesterday }
-              })
+              .find(cacheFilter)
+              .sort(sortObj)
               .limit(10)
               .toArray();
 
@@ -180,14 +230,8 @@ export async function GET(request: NextRequest) {
           }
         } else {
           // console.log(`[API] No cached data found for ${stateCode}`);
-
           // For pagination requests (showAll=true), we'll fetch fresh data and then paginate
           // This ensures pagination always works even if cache is missing
-          if (showAll) {
-            // console.log(`[API] Pagination request with no cached data - will fetch fresh data and then paginate`);
-          } else {
-            // console.log(`[API] Initial request with no cached data, will fetch from OpenStates API`);
-          }
         }
       } catch (cacheError) {
         console.error(`[API] Cache check failed:`, cacheError);
@@ -199,7 +243,6 @@ export async function GET(request: NextRequest) {
             details: 'Cache check failed for pagination request.'
           }, { status: 500 });
         }
-
         // Continue to fetch from API if cache fails and this is not a pagination request
       }
     } else {
@@ -465,13 +508,61 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Return response
-    if (showAll) {
-      const total = representatives.length;
-      const skip = (pageParam - 1) * pageSize;
-      const paginatedReps = representatives.slice(skip, skip + pageSize);
+    // Apply search and sorting to API-fetched data
+    let filteredReps = representatives;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredReps = filteredReps.filter(rep =>
+        rep.name.toLowerCase().includes(searchLower) ||
+        (rep.office && rep.office.toLowerCase().includes(searchLower)) ||
+        (rep.district && rep.district.toLowerCase().includes(searchLower)) ||
+        (rep.party && rep.party.toLowerCase().includes(searchLower))
+      );
+    }
+    // Sorting
+    const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
+    // Type-safe sort mapping
+    filteredReps = filteredReps.sort((a, b) => {
+      let aVal = '';
+      let bVal = '';
+      switch (sortField) {
+        case 'name':
+          aVal = a.name || '';
+          bVal = b.name || '';
+          break;
+        case 'party':
+          aVal = a.party || '';
+          bVal = b.party || '';
+          break;
+        case 'office':
+          aVal = a.office || '';
+          bVal = b.office || '';
+          break;
+        case 'district':
+          aVal = a.district || '';
+          bVal = b.district || '';
+          break;
+        case 'jurisdiction':
+          aVal = a.jurisdiction || '';
+          bVal = b.jurisdiction || '';
+          break;
+        default:
+          aVal = a.name || '';
+          bVal = b.name || '';
+      }
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+      if (aVal < bVal) return -1 * sortDir;
+      if (aVal > bVal) return 1 * sortDir;
+      return 0;
+    });
 
-      // console.log(`[API] Returning ${paginatedReps.length} representatives (paginated)`);
+    if (showAll) {
+      const total = filteredReps.length;
+      const skip = (pageParam - 1) * pageSize;
+      const paginatedReps = filteredReps.slice(skip, skip + pageSize);
+      // Defensive: always return pagination object for showAll
       return NextResponse.json({
         representatives: paginatedReps,
         source: 'api',
@@ -485,9 +576,9 @@ export async function GET(request: NextRequest) {
         }
       });
     } else {
-      // console.log(`[API] Returning ${Math.min(representatives.length, 10)} representatives`);
+      // Defensive: always return at most 10 reps for non-showAll
       return NextResponse.json({
-        representatives: representatives.slice(0, 10),
+        representatives: filteredReps.slice(0, 10),
         source: 'api'
       });
     }

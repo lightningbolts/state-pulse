@@ -47,6 +47,12 @@ export function StatePulseFooter() {
                 Track Policies
               </Link>
               <Link
+                href="/reps"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+              >
+                Representatives
+              </Link>
+              <Link
                 href="/posts"
                 className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
               >
