@@ -151,7 +151,9 @@ export default function ParallaxShowcase() {
               </div>
             )}
           </div>
-          <div className="text-center mt-2 font-semibold text-primary">Recent Legislation</div>
+          <Link href="/legislation" passHref legacyBehavior>
+            <a className="mt-2 inline-block px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold shadow hover:bg-primary/90 transition-colors text-center w-full max-w-xs">Recent Legislation</a>
+          </Link>
         </div>
         {/* Posts Column */}
         <div className="flex-1 flex flex-col items-center rounded-xl overflow-hidden">
@@ -173,7 +175,9 @@ export default function ParallaxShowcase() {
               </div>
             )}
           </div>
-          <div className="text-center mt-2 font-semibold text-secondary">Community Posts</div>
+          <Link href="/posts" passHref legacyBehavior>
+            <a className="mt-2 inline-block px-4 py-2 rounded-lg bg-secondary text-secondary-foreground font-semibold shadow hover:bg-secondary/90 transition-colors text-center w-full max-w-xs">Community Posts</a>
+          </Link>
         </div>
         {/* Representatives Column */}
         <div className="flex-1 flex flex-col items-center rounded-xl overflow-hidden">
@@ -195,7 +199,9 @@ export default function ParallaxShowcase() {
               </div>
             )}
           </div>
-          <div className="text-center mt-2 font-semibold text-accent">Representatives</div>
+          <Link href="/representatives" passHref legacyBehavior>
+            <a className="mt-2 inline-block px-4 py-2 rounded-lg bg-accent text-accent-foreground font-semibold shadow hover:bg-accent/90 transition-colors text-center w-full max-w-xs">Representatives</a>
+          </Link>
         </div>
       </div>
       <style jsx>{`
