@@ -54,9 +54,13 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                 </div>
               )}
               {rep.email && (
-                <div className="flex items-center">
+                <div className="flex items-center w-full max-w-full md:col-span-2">
                   <Mail className="mr-2 h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <a href={`mailto:${rep.email}`} className="text-primary hover:underline break-all">
+                  <a
+                    href={`mailto:${rep.email}`}
+                    className="text-primary hover:underline overflow-hidden whitespace-nowrap w-full max-w-full"
+                    style={{ display: 'inline-block' }}
+                  >
                     {rep.email}
                   </a>
                 </div>
