@@ -120,7 +120,10 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
     };
 
     const handleLikePost = async () => {
-        if (!isSignedIn) return;
+        if (!isSignedIn) {
+            router.push('/sign-up');
+            return;
+        }
         try {
             const response = await fetch(`/api/posts/${postState._id}/like`, { method: 'POST' });
             if (response.ok) {
@@ -133,7 +136,10 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
 
     // Like/unlike comment
     const handleLikeComment = async (commentId: string) => {
-        if (!isSignedIn) return;
+        if (!isSignedIn) {
+            router.push('/sign-up');
+            return;
+        }
         try {
             const response = await fetch(`/api/posts/${postState._id}/comments/${commentId}/like`, { method: 'POST' });
             if (response.ok) {
@@ -145,7 +151,10 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
 
     // Like/unlike reply
     const handleLikeReply = async (commentId: string, replyId: string) => {
-        if (!isSignedIn) return;
+        if (!isSignedIn) {
+            router.push('/sign-up');
+            return;
+        }
         try {
             const response = await fetch(`/api/comments/${commentId}/replies/${replyId}/like`, { method: 'POST' });
             if (response.ok) {
@@ -614,16 +623,16 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                                         <span>{comment.likes ? comment.likes.length : 0}</span>
                                                     </div>
                                                     {/* Reply/view reply buttons */}
-                                                    {isSignedIn && (
-                                                        <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        {isSignedIn && (
                                                             <Button variant="ghost" size="sm" onClick={() => setShowReplyForm((prev) => ({ ...prev, [comment._id]: !prev[comment._id] }))} className="text-xs text-muted-foreground hover:text-primary h-6 px-2">Reply</Button>
-                                                            {comment.replies && comment.replies.length > 0 && (
-                                                                <Button variant="ghost" size="sm" onClick={() => setShowReplies((prev) => ({ ...prev, [comment._id]: !prev[comment._id] }))} className="text-xs text-muted-foreground hover:text-primary h-6 px-2">
-                                                                    {showReplies[comment._id] ? 'Hide' : 'View'} {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                        )}
+                                                        {comment.replies && comment.replies.length > 0 && (
+                                                            <Button variant="ghost" size="sm" onClick={() => setShowReplies((prev) => ({ ...prev, [comment._id]: !prev[comment._id] }))} className="text-xs text-muted-foreground hover:text-primary h-6 px-2">
+                                                                {showReplies[comment._id] ? 'Hide' : 'View'} {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 {showReplyForm[comment._id] && isSignedIn && (
                                                     <div className="mt-3 space-y-2">

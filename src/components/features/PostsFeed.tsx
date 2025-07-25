@@ -168,20 +168,25 @@ export function PostsFeed() {
     return (
         <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
             {/* Inline Create Post */}
-            {isSignedIn && (
-                <div className="w-full mb-4">
-                    {!showCreateForm ? (
-                        <Button
-                            variant="default"
-                            size="lg"
-                            className="h-12 w-full text-base flex items-center gap-2 justify-center"
-                            onClick={() => setShowCreateForm(true)}
-                        >
-                            <Plus className="h-5 w-5 mr-1" />
-                            Create Post
-                        </Button>
-                    ) : (
-                        <Card className="w-full">
+            <div className="w-full mb-4">
+                {!showCreateForm ? (
+                    <Button
+                        variant="default"
+                        size="lg"
+                        className="h-12 w-full text-base flex items-center gap-2 justify-center"
+                        onClick={() => {
+                            if (!isSignedIn) {
+                                router.push('/sign-up');
+                            } else {
+                                setShowCreateForm(true);
+                            }
+                        }}
+                    >
+                        <Plus className="h-5 w-5 mr-1" />
+                        Create Post
+                    </Button>
+                ) : (
+                    <Card className="w-full">
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <h2 className="text-lg font-bold">Create New Post</h2>
@@ -275,7 +280,6 @@ export function PostsFeed() {
                         </Card>
                     )}
                 </div>
-            )}
             {/* Search/Filter Bar (consistent UI) */}
 
             {/* Search/Filter/Sort Bar (horizontal on desktop, vertical on mobile) */}
