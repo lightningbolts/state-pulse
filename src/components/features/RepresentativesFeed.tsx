@@ -30,12 +30,14 @@ export default function RepresentativesFeed() {
       params.set('sortBy', sort.field);
       params.set('sortDir', sort.dir);
       if (search.trim() !== "") {
-        params.set('q', search);
+        params.set('search', search);
       }
       if (showCongress) {
         params.set('showCongress', 'true');
       } else if (jurisdictionName) {
-        params.set('jurisdictionName', jurisdictionName);
+        // Convert state name to abbreviation if possible
+        const abbr = STATE_MAP[jurisdictionName] || jurisdictionName;
+        params.set('filterState', abbr);
       }
       const res = await fetch(`/api/representatives?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch representatives');
@@ -81,8 +83,7 @@ export default function RepresentativesFeed() {
   }, [fetchReps]);
 
   return (
-    <div className="max-w-5xl mx-auto py-10 px-4">
-      <h1 className="text-4xl font-bold mb-8 text-center tracking-tight">Find Your Representatives</h1>
+    <div className="px-0 sm:px-0">
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-center">
         <div className="relative flex-grow w-full sm:w-auto flex">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />

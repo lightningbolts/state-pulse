@@ -177,11 +177,20 @@ export async function GET(request: NextRequest) {
         const stateRegex = new RegExp(`\\b(${stateCode}|${stateFullName.replace(/\s+/g, '\\s+')}|${stateCode}\\s+State)\\b`, 'i');
 
         // Build filter for cache query
-        const cacheFilter = {
+        const cacheFilter: any = {
           jurisdiction: { $regex: stateRegex },
-          lastUpdated: { $gte: yesterday },
-          ...(search ? { name: { $regex: search, $options: 'i' } } : {})
+          lastUpdated: { $gte: yesterday }
         };
+        // Multi-field search (name, office, district, party)
+        if (search) {
+          const regex = { $regex: search, $options: 'i' };
+          cacheFilter.$or = [
+            { name: regex },
+            { office: regex },
+            { district: regex },
+            { party: regex }
+          ];
+        }
 
         const totalCachedReps = await representativesCollection.countDocuments(cacheFilter);
 
@@ -229,9 +238,268 @@ export async function GET(request: NextRequest) {
             });
           }
         } else {
-          // console.log(`[API] No cached data found for ${stateCode}`);
-          // For pagination requests (showAll=true), we'll fetch fresh data and then paginate
-          // This ensures pagination always works even if cache is missing
+          // No cached data found for this state, so fetch from OpenStates API and cache results
+          // (This logic is similar to the forceRefresh path, but triggered automatically on cache miss)
+          // console.log(`[API] No cached data found for ${stateCode}, fetching from OpenStates API...`);
+          // Check OpenStates API key
+          const openStatesApiKey = process.env.OPENSTATES_API_KEY;
+          if (!openStatesApiKey) {
+            console.error('[API] OPENSTATES_API_KEY not found in environment variables');
+            return NextResponse.json(
+              { error: 'OpenStates API key not configured. Please contact support.' },
+              { status: 503 }
+            );
+          }
+
+          let allPeople: OpenStatesPerson[] = [];
+          let currentPage = 1;
+          let hasMorePages = true;
+          const perPage = 50;
+          while (hasMorePages) {
+            let openStatesUrl: string;
+            let response: Response;
+            let data: any;
+            let pagePeople: OpenStatesPerson[] = [];
+            // 1. Try short jurisdiction format
+            openStatesUrl = `https://v3.openstates.org/people?jurisdiction=${stateCode.toLowerCase()}&per_page=${perPage}&page=${currentPage}`;
+            try {
+              console.log(`[OpenStates API] Requesting: ${openStatesUrl}`);
+              response = await fetch(openStatesUrl, {
+                headers: {
+                  'X-API-KEY': openStatesApiKey,
+                  'Accept': 'application/json'
+                },
+                timeout: 10000
+              } as any);
+              let fallback = false;
+              if (!response.ok && response.status === 400) {
+                fallback = true;
+              } else {
+                data = await response.json();
+                pagePeople = data.results || [];
+                if (pagePeople.length === 0) {
+                  fallback = true;
+                }
+              }
+              // 2. Fallback to ocd-division if needed
+              if (fallback) {
+                openStatesUrl = `https://v3.openstates.org/people?jurisdiction=ocd-division/country:us/state:${stateCode.toLowerCase()}&per_page=${perPage}&page=${currentPage}`;
+                console.log(`[OpenStates API] Fallback Requesting: ${openStatesUrl}`);
+                response = await fetch(openStatesUrl, {
+                  headers: {
+                    'X-API-KEY': openStatesApiKey,
+                    'Accept': 'application/json'
+                  },
+                  timeout: 10000
+                } as any);
+                if (!response.ok) {
+                  console.error(`[OpenStates API] Error: ${response.status} ${response.statusText}`);
+                  const errorText = await response.text();
+                  console.error(`[OpenStates API] Error response body:`, errorText);
+                  break;
+                }
+                data = await response.json();
+                pagePeople = data.results || [];
+              }
+              if (pagePeople.length === 0) {
+                console.warn(`[OpenStates API] 0 people returned for URL: ${openStatesUrl}`);
+                console.warn(`[OpenStates API] Raw response:`, JSON.stringify(data));
+              }
+              console.log(`[OpenStates API] Fetched ${pagePeople.length} people for page ${currentPage} of ${stateCode}`);
+              allPeople = allPeople.concat(pagePeople);
+              if (pagePeople.length < perPage) {
+                hasMorePages = false;
+              } else {
+                currentPage++;
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              if (currentPage > 10) {
+                hasMorePages = false;
+              }
+            } catch (fetchError) {
+              break;
+            }
+          }
+          console.log(`[OpenStates API] Total people fetched for ${stateCode}:`, allPeople.length);
+          const representatives: Representative[] = allPeople
+            .map(person => {
+              // Use current_role if available, else synthesize from roles array
+              let role = person.current_role;
+              if (!role && Array.isArray(person.roles)) {
+                const found = person.roles.find((r: any) => r.type === 'member' && !r.end_date);
+                if (found) {
+                  // Synthesize role with district as number if possible
+                  role = {
+                    ...found,
+                    district: typeof found.district === 'number' ? found.district : (typeof found.district === 'string' && !isNaN(Number(found.district)) ? Number(found.district) : undefined)
+                  };
+                }
+              }
+              if (!role || person.death_date) {
+                console.log(`[OpenStates API] Skipping person (no valid role or deceased):`, person.name, person.id);
+                return null;
+              }
+              let email: string | undefined = person.email;
+              let website: string | undefined;
+              let addresses: Array<{ type: string; address: string; phone?: string; fax?: string }> = [];
+              if (person.offices && person.offices.length > 0) {
+                addresses = person.offices
+                  .filter(office => office.address)
+                  .map(office => ({
+                    type: office.name || office.classification || 'Office',
+                    address: office.address!,
+                    phone: office.voice,
+                    fax: office.fax
+                  }));
+              }
+              if (!email && person.offices && person.offices.length > 0) {
+                const officeWithEmail = person.offices.find(office => (office as any).email);
+                if (officeWithEmail) {
+                  email = (officeWithEmail as any).email;
+                }
+              }
+              if (person.links && person.links.length > 0) {
+                const homepage = person.links.find(link => link.note?.toLowerCase().includes('homepage'));
+                if (homepage) {
+                  website = homepage.url;
+                } else {
+                  const govSite = person.links.find(link => link.url.includes('.gov'));
+                  if (govSite) {
+                    website = govSite.url;
+                  } else {
+                    const stateLegSite = person.links.find(link =>
+                      link.url.includes('legislature') ||
+                      link.url.includes('senate') ||
+                      link.url.includes('house') ||
+                      link.url.includes('assembly') ||
+                      link.url.includes('capitol')
+                    );
+                    if (stateLegSite) {
+                      website = stateLegSite.url;
+                    } else {
+                      const officialLink = person.links.find(link =>
+                        link.note?.toLowerCase().includes('official') &&
+                        !link.url.includes('openstates.org')
+                      );
+                      if (officialLink) {
+                        website = officialLink.url;
+                      } else {
+                        const nonOpenStatesLink = person.links.find(link =>
+                          !link.url.includes('openstates.org')
+                        );
+                        if (nonOpenStatesLink) {
+                          website = nonOpenStatesLink.url;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              let officeTitle = role.title;
+              if (role.org_classification === 'upper') {
+                officeTitle = 'State Senator';
+              } else if (role.org_classification === 'lower') {
+                officeTitle = 'State Representative';
+              }
+              let districtInfo = '';
+              if (role.district !== undefined && role.district !== null) {
+                districtInfo = `District ${role.district}`;
+              }
+              return {
+                id: person.id,
+                name: person.name,
+                party: person.party || 'Unknown',
+                office: officeTitle,
+                ...(districtInfo ? { district: districtInfo } : {}),
+                jurisdiction: person.jurisdiction?.name || `${stateCode} State Legislature`,
+                ...(email ? { email } : {}),
+                ...(website ? { website } : {}),
+                ...(person.image ? { photo: person.image } : {}),
+                ...(addresses.length > 0 ? { addresses } : {}),
+                lastUpdated: new Date()
+              };
+            })
+            .filter((x): x is Representative => x !== null); // Remove nulls and type narrow
+          console.log(`[OpenStates API] Representatives mapped for ${stateCode}:`, representatives.length);
+          if (representatives.length > 0) {
+            try {
+              await representativesCollection.deleteMany({
+                jurisdiction: { $regex: new RegExp(stateCode, 'i') }
+              });
+              await representativesCollection.insertMany(representatives);
+            } catch (storageError) {
+              // Continue without caching if storage fails
+            }
+          }
+          // Apply search and sorting to API-fetched data
+          let filteredReps = representatives;
+          if (search) {
+            const regex = new RegExp(search, 'i');
+            filteredReps = filteredReps.filter(rep =>
+              regex.test(rep.name) ||
+              (rep.office && regex.test(rep.office)) ||
+              (rep.district && regex.test(rep.district)) ||
+              (rep.party && regex.test(rep.party))
+            );
+          }
+          const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction'];
+          const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
+          filteredReps = filteredReps.sort((a, b) => {
+            let aVal = '';
+            let bVal = '';
+            switch (sortField) {
+              case 'name':
+                aVal = a.name || '';
+                bVal = b.name || '';
+                break;
+              case 'party':
+                aVal = a.party || '';
+                bVal = b.party || '';
+                break;
+              case 'office':
+                aVal = a.office || '';
+                bVal = b.office || '';
+                break;
+              case 'district':
+                aVal = a.district || '';
+                bVal = b.district || '';
+                break;
+              case 'jurisdiction':
+                aVal = a.jurisdiction || '';
+                bVal = b.jurisdiction || '';
+                break;
+              default:
+                aVal = a.name || '';
+                bVal = b.name || '';
+            }
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+            if (aVal < bVal) return -1 * sortDir;
+            if (aVal > bVal) return 1 * sortDir;
+            return 0;
+          });
+          if (showAll) {
+            const total = filteredReps.length;
+            const skip = (pageParam - 1) * pageSize;
+            const paginatedReps = filteredReps.slice(skip, skip + pageSize);
+            return NextResponse.json({
+              representatives: paginatedReps,
+              source: 'api',
+              pagination: {
+                page: pageParam,
+                pageSize,
+                total,
+                totalPages: Math.ceil(total / pageSize),
+                hasNext: skip + pageSize < total,
+                hasPrev: pageParam > 1
+              }
+            });
+          } else {
+            return NextResponse.json({
+              representatives: filteredReps.slice(0, 10),
+              source: 'api'
+            });
+          }
         }
       } catch (cacheError) {
         console.error(`[API] Cache check failed:`, cacheError);
@@ -509,14 +777,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply search and sorting to API-fetched data
+
     let filteredReps = representatives;
     if (search) {
-      const searchLower = search.toLowerCase();
+      const regex = new RegExp(search, 'i');
       filteredReps = filteredReps.filter(rep =>
-        rep.name.toLowerCase().includes(searchLower) ||
-        (rep.office && rep.office.toLowerCase().includes(searchLower)) ||
-        (rep.district && rep.district.toLowerCase().includes(searchLower)) ||
-        (rep.party && rep.party.toLowerCase().includes(searchLower))
+        regex.test(rep.name) ||
+        (rep.office && regex.test(rep.office)) ||
+        (rep.district && regex.test(rep.district)) ||
+        (rep.party && regex.test(rep.party))
       );
     }
     // Sorting

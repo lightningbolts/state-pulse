@@ -95,7 +95,7 @@ export function RepresentativesFinder() {
 
             // console.log('Searching for representatives in state:', finalState, 'for location:', location.display_name);
 
-            const response = await fetch(`/api/representatives?address=${encodeURIComponent(finalState)}`);
+            const response = await fetch(`/api/civic?address=${encodeURIComponent(finalState)}`);
 
             if (!response.ok) {
                 let errorMessage = 'Failed to fetch representatives';
@@ -307,7 +307,7 @@ export function RepresentativesFinder() {
                 pageSize: '10'
             });
 
-            const response = await fetch(`/api/representatives?${params}`);
+            const response = await fetch(`/api/civic?${params}`);
 
             if (!response.ok) {
                 let errorMessage = 'Failed to fetch representatives';
@@ -573,7 +573,7 @@ export function RepresentativesFinder() {
                 animate={{opacity: 1, y: 0}}
                 transition={{duration: 0.5, delay: 0.2, ease: "easeInOut"}}
             >
-                <h4 className="font-semibold mb-2 text-lg">Civic Tools</h4>
+                <h4 className="font-semibold mb-2 text-lg">Other</h4>
                 <p className="text-sm text-muted-foreground mb-4">Quick access to other civic information.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button

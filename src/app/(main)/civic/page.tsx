@@ -10,8 +10,7 @@ export default function CivicPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-2xl flex items-center">
-            <Users className="mr-3 h-7 w-7" />
-            Find Your Representatives
+            Civic Tools
           </CardTitle>
           <CardDescription>
             Start typing your address for instant suggestions, or enter a zip code to find your closest state representatives with an interactive map.
