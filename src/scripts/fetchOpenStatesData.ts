@@ -631,15 +631,27 @@ async function runUpdateCycle(enableOpenStates: boolean = true, enableCongress: 
   console.log(`--- OpenStates API: ${enableOpenStates ? 'ENABLED' : 'DISABLED'} ---`);
   console.log(`--- Congress API: ${enableCongress ? 'ENABLED' : 'DISABLED'} ---`);
 
+  const path = require('path');
+  const fs = require('fs');
   let congressUpdatedSince = getDefaultCongressCutoffDate();
   if (enableCongress) {
     // Try to load last cutoff date
+    const cutoffPath = path.resolve(CONGRESS_CUTOFF_PATH);
     const loadedCutoff = loadCongressCutoffDate();
     if (loadedCutoff) {
       congressUpdatedSince = loadedCutoff;
-      console.log(`Loaded Congress cutoff date from file: ${congressUpdatedSince}`);
+      console.log(`[Congress Cutoff] Loaded from file: ${cutoffPath}`);
+      console.log(`[Congress Cutoff] Value: ${congressUpdatedSince}`);
+      // Warn if cutoff is very old (e.g., more than 7 days ago)
+      const cutoffDate = new Date(congressUpdatedSince);
+      const now = new Date();
+      const ageDays = (now.getTime() - cutoffDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (ageDays > 7) {
+        console.warn(`[Congress Cutoff] WARNING: Cutoff date is very old (${ageDays.toFixed(1)} days ago). This may cause the script to fetch all bills!`);
+      }
     } else {
-      console.log(`No Congress cutoff file found. Using default: ${congressUpdatedSince}`);
+      console.log(`[Congress Cutoff] No cutoff file found at: ${cutoffPath}`);
+      console.log(`[Congress Cutoff] Using default (24h ago): ${congressUpdatedSince}`);
     }
   }
 
@@ -816,7 +828,15 @@ export function transformCongressBillToMongoDB(congressBill: any): any {
   const now = new Date();
 
   // Process sponsors
-  const sponsors = [];
+  const sponsors: Array<{
+    name: string;
+    id: string | null;
+    entityType: string;
+    primary: boolean;
+    classification: string;
+    personId: string | null;
+    organizationId: string | null;
+  }> = [];
   if (congressBill.sponsors && congressBill.sponsors.length > 0) {
     congressBill.sponsors.forEach((sponsor: any) => {
       sponsors.push({
