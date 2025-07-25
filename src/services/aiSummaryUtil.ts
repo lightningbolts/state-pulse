@@ -6,7 +6,7 @@ import { Legislation } from '../types/legislation';
 
 export async function generateGeminiSummary(text: string): Promise<string> {
   // Use Gemini to generate a ~100-word summary
-  const prompt = `Summarize the following legislation in about 100 to 150 words, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.'\n\n${text}`;
+  const prompt = `Summarize the following legislation in 100 words, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.'\n\n${text}`;
   const response = await ai.generate({ prompt });
   return response.text.trim();
 }
