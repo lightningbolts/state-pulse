@@ -354,11 +354,39 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
     }
   }
 
-  // 1b. Try ALL PDFs found in bill.sources pages (not just first found)
   if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
     let foundPdfInAnySource = false;
     for (const source of bill.sources) {
       if (source.url) {
+        // Illinois-specific logic: fetch FullText page, ignore PDFs
+        if (bill.jurisdictionName === 'Illinois' && source.url.includes('ilga.gov/Legislation/BillStatus')) {
+          const fullTextUrl = source.url.replace('/billstatus', '/billstatus/fulltext');
+          console.log('[ILGA] Fetching Illinois FullText page:', fullTextUrl);
+          try {
+            const res = await fetch(fullTextUrl);
+            if (!res.ok) {
+              console.log('[ILGA] FullText fetch failed:', fullTextUrl, 'Status:', res.status);
+              continue;
+            }
+            const textHtml = await res.text();
+            // Extract bill text from <pre> tags
+            const match = textHtml.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+            if (match && match[1] && match[1].trim().length > 100) {
+              const billText = match[1].replace(/<[^>]+>/g, '').trim();
+              console.log('[ILGA] Extracted bill text length:', billText.length);
+              return {
+                summary: await generateGeminiSummary(billText),
+                sourceType: 'ilga-fulltext'
+              };
+            } else {
+              console.log('[ILGA] No usable <pre> text found in FullText page:', fullTextUrl);
+            }
+          } catch (e) {
+            console.log('[ILGA] Error fetching/parsing FullText page:', fullTextUrl, e);
+          }
+          continue; // Skip PDF logic for Illinois
+        }
+        // ...existing code for other states and Congress.gov...
         console.log('[DEBUG] Checking source URL:', source.url);
         try {
           const res = await fetch(source.url);

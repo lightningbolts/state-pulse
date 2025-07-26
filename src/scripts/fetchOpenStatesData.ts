@@ -103,12 +103,12 @@ const CONGRESS_API_BASE_URL = 'https://api.congress.gov/v3';
 
 const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   // --- ACTIVE SESSIONS (Currently in session as of July 2025) ---
-  { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' }, // Alaska
-  { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' }, // California
-  { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' }, // Delaware
-  { ocdId: 'ocd-jurisdiction/country:us/district:dc/government', abbr: 'DC' }, // District of Columbia
-  { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' }, // Georgia
-  { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' }, // Hawaii
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ak/government', abbr: 'AK' }, // Alaska
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ca/government', abbr: 'CA' }, // California
+  // { ocdId: 'ocd-jurisdiction/country:us/state:de/government', abbr: 'DE' }, // Delaware
+  // { ocdId: 'ocd-jurisdiction/country:us/district:dc/government', abbr: 'DC' }, // District of Columbia
+  // { ocdId: 'ocd-jurisdiction/country:us/state:ga/government', abbr: 'GA' }, // Georgia
+  // { ocdId: 'ocd-jurisdiction/country:us/state:hi/government', abbr: 'HI' }, // Hawaii
   { ocdId: 'ocd-jurisdiction/country:us/state:il/government', abbr: 'IL' }, // Illinois
   { ocdId: 'ocd-jurisdiction/country:us/state:ia/government', abbr: 'IA' }, // Iowa
   { ocdId: 'ocd-jurisdiction/country:us/state:ks/government', abbr: 'KS' }, // Kansas
@@ -541,7 +541,10 @@ async function fetchAndStoreUpdatedBills(
         }
       }
 
-      const data = await response.json();
+      const data = await response.json() as {
+        pagination?: { page?: number; max_page?: number; total_pages?: number; total_items?: number };
+        results?: any[];
+      };
 
       // Log pagination info for debugging
       if (data.pagination) {
@@ -557,12 +560,14 @@ async function fetchAndStoreUpdatedBills(
         for (const osBill of data.results) {
           try {
             const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
-            // --- Use richest source summary utility ---
-            const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
-            legislationToStore.geminiSummary = summary;
-            legislationToStore.geminiSummarySource = sourceType;
+            // Only summarize if geminiSummary is missing or less than 100 chars
+            if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
+              const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
+              legislationToStore.geminiSummary = summary;
+              legislationToStore.geminiSummarySource = sourceType;
+            }
             // Calculate word count for Gemini summary
-            const geminiSummaryWordCount = summary ? summary.split(/\s+/).filter(Boolean).length : 0;
+            const geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.split(/\s+/).filter(Boolean).length : 0;
             // Always upsert the legislation - we want to keep all bills with summaries
             await upsertLegislationSelective(legislationToStore);
             console.log(`Upserted: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id} - Summary: ${geminiSummaryWordCount} words`);
@@ -1027,17 +1032,16 @@ async function fetchCongressBills(updatedSince: string) {
             }
 
             const legislationToStore = transformCongressBillToMongoDB(congressBill);
-
-            // Use richest source summary utility for Congress bills
-            const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
-            legislationToStore.geminiSummary = summary;
-            legislationToStore.geminiSummarySource = sourceType;
-
+            // Only summarize if geminiSummary is missing or less than 100 chars
+            if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
+              const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
+              legislationToStore.geminiSummary = summary;
+              legislationToStore.geminiSummarySource = sourceType;
+            }
             // Upsert the legislation
             await upsertLegislationSelective(legislationToStore);
-            console.log(`Upserted: ${legislationToStore.identifier} (Congress) - Source: ${sourceType}`);
+            console.log(`Upserted: ${legislationToStore.identifier} (Congress)`);
             billsProcessed++;
-
             // Rate limiting for Congress API
             await delay(100); // Congress API allows higher rates but be respectful
 
