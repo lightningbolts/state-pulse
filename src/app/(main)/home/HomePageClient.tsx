@@ -96,7 +96,7 @@ export default function HomePageClient() {
       </AnimatedSection>
 
       {/* Parallax Showcase Section */}
-      <ParallaxShowcase />
+      {/* <ParallaxShowcase /> */}
 
       {/* Call to Action Section */}
       <AnimatedSection className="bg-muted/70 py-20 px-6 md:px-10 rounded-md shadow-lg overflow-hidden">
