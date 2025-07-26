@@ -253,7 +253,9 @@ export function InteractiveMap() {
                     <CardContent>
                         <div
                             className="h-[500px] w-full rounded-md overflow-hidden border flex items-center justify-center bg-muted">
-                            <p>Loading interactive map...</p>
+                            <p className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary">
+                                <span className="sr-only">Loading map...</span>
+                            </p>
                         </div>
                     </CardContent>
                 </Card>

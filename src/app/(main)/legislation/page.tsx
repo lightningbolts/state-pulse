@@ -1,5 +1,6 @@
 import { PolicyUpdatesFeed } from "@/components/features/PolicyUpdatesFeed";
 import { Suspense } from "react";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 
@@ -17,7 +18,7 @@ export default function UpdatesPage() {
             </AnimatedSection>
         </CardHeader>
         <CardContent>
-          <Suspense fallback={<div className="text-center p-8">Loading policy feed...</div>}>
+          <Suspense fallback={<LoadingOverlay text="Loading policy feed..." smallText="Loading..." /> }>
             <PolicyUpdatesFeed />
           </Suspense>
         </CardContent>

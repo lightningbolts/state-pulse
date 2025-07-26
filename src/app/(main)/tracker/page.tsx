@@ -1,13 +1,14 @@
 "use client";
 
 import { PolicyTracker } from "@/components/features/PolicyTracker";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { useUser } from "@clerk/nextjs";
 
 export default function TrackerPage() {
   const { isSignedIn, isLoaded } = useUser();
 
   if (!isLoaded) {
-    return <div>Loading...</div>; // Or a spinner component
+    return <LoadingOverlay text="Loading tracker..." smallText="Loading..." />;
   }
 
   if (!isSignedIn) {

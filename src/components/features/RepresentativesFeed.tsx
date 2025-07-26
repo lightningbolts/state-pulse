@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { STATE_MAP } from '@/types/geo';
 import { Input } from '@/components/ui/input';
@@ -162,7 +163,7 @@ export default function RepresentativesFeed() {
           <RepresentativeCard key={rep.id + idx} rep={rep} />
         ))}
       </div>
-      {loading && <div className="text-center py-4">Loading...</div>}
+      {loading && <LoadingOverlay text="Loading representatives..." smallText="Loading..." />}
       {!hasMore && !loading && reps.length === 0 && (
         <div className="text-center py-4 text-muted-foreground">No representatives found.</div>
       )}

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import RepresentativesFeed from "@/components/features/RepresentativesFeed";
@@ -17,7 +18,7 @@ export default function RepresentativesPage() {
         </AnimatedSection>
       </CardHeader>
       <CardContent>
-        <Suspense fallback={<div className="text-center p-8">Loading representatives...</div>}>
+        <Suspense fallback={<LoadingOverlay text="Loading representatives..." smallText="Loading..." /> }>
           <RepresentativesFeed />
         </Suspense>
       </CardContent>

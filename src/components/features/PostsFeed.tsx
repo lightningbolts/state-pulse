@@ -4,6 +4,7 @@ import {useEffect, useState} from "react";
 import {useUser} from "@clerk/nextjs";
 import {useRouter} from "next/navigation";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {LoadingOverlay} from "@/components/ui/LoadingOverlay";
 import {Textarea} from "@/components/ui/textarea";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
@@ -110,24 +111,7 @@ export function PostsFeed() {
     };
 
     if (loading) {
-        return (
-            <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                    <Card key={i} className="animate-pulse">
-                        <CardHeader>
-                            <div className="h-4 bg-muted rounded w-3/4"></div>
-                            <div className="h-3 bg-muted rounded w-1/2"></div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                <div className="h-3 bg-muted rounded"></div>
-                                <div className="h-3 bg-muted rounded w-5/6"></div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        );
+        return <LoadingOverlay text="Loading posts..." smallText="Loading..." />;
     }
 
     const handleCreatePost = async () => {
@@ -166,7 +150,8 @@ export function PostsFeed() {
     };
 
     return (
-        <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+        <div className="space-y-4 sm:space-y-6 px-2 sm:px-0 relative">
+            {creating && <LoadingOverlay text="Creating post..." smallText="Creating..." />}
             {/* Inline Create Post */}
             <div className="w-full mb-4">
                 {!showCreateForm ? (
