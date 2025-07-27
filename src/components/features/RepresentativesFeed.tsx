@@ -35,6 +35,8 @@ export default function RepresentativesFeed() {
       }
       if (showCongress) {
         params.set('showCongress', 'true');
+        // Explicitly clear filterState for Congress
+        params.delete('filterState');
       } else if (jurisdictionName) {
         // Convert state name to abbreviation if possible
         const abbr = STATE_MAP[jurisdictionName] || jurisdictionName;

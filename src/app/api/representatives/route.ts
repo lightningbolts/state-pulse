@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
-import { OpenStatesPerson, Representative } from "@/types/representative";
+import { OpenStatesPerson, Representative, CongressPerson } from "@/types/representative";
 
 // US State mapping and validation
 export const stateMap: Record<string, string> = {
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     // Always connect to DB and get collection once
     const client = await connectToDatabase();
     const db = client.db('statepulse');
-    const representativesCollection = db.collection<Representative>('representatives');
+    const representativesCollection = db.collection<Representative | CongressPerson>('representatives');
 
     // If no state/address provided, fetch all representatives (with pagination, search, sorting)
     if (!stateCode) {
@@ -103,32 +103,51 @@ export async function GET(request: NextRequest) {
           { name: regex },
           { office: regex },
           { district: regex },
-          { party: regex }
+          { party: regex },
+          { lastName: regex }, // CongressPerson field
+          { firstName: regex } // CongressPerson field
         ] });
       }
       // Party substring match (case-insensitive)
       if (filterParty) {
-        andFilters.push({ party: { $regex: filterParty, $options: 'i' } });
+        andFilters.push({ $or: [
+          { party: { $regex: filterParty, $options: 'i' } },
+          { 'partyHistory.partyName': { $regex: filterParty, $options: 'i' } } // CongressPerson field
+        ] });
       }
-      // Chamber match (office field, robust)
+      // Chamber match (office or terms field)
       if (filterChamber) {
         if (/senate|upper/i.test(filterChamber)) {
-          andFilters.push({ office: { $regex: 'senator', $options: 'i' } });
+          andFilters.push({ $or: [
+            { office: { $regex: 'senator', $options: 'i' } },
+            { 'terms.memberType': { $regex: 'Senator', $options: 'i' } } // CongressPerson field
+          ] });
         } else if (/house|lower|assembly/i.test(filterChamber)) {
-          andFilters.push({ office: { $regex: 'representative|assembly', $options: 'i' } });
+          andFilters.push({ $or: [
+            { office: { $regex: 'representative|assembly', $options: 'i' } },
+            { 'terms.memberType': { $regex: 'Representative', $options: 'i' } } // CongressPerson field
+          ] });
         }
       }
-      // State match (jurisdiction field, robust)
+      // State match (jurisdiction or state field)
       if (filterState && validStates.includes(filterState.toUpperCase())) {
-        // Match jurisdiction containing state abbreviation or full name
-        const stateRegex = new RegExp(`\\b(${filterState}|${Object.keys(stateMap).find(name => stateMap[name] === filterState.toUpperCase()) || filterState})\\b`, 'i');
-        andFilters.push({ jurisdiction: { $regex: stateRegex } });
+        // Match jurisdiction containing state abbreviation or full name, CongressPerson state field, terms.stateCode, and terms.stateName
+        const abbr = filterState.toUpperCase();
+        const fullName = Object.keys(stateMap).find(name => stateMap[name] === abbr) || abbr;
+        const stateRegex = new RegExp(`\\b(${abbr}|${fullName})\\b`, 'i');
+        andFilters.push({ $or: [
+          { 'jurisdiction.name': { $regex: fullName, $options: 'i' } }, // OpenStates full state name
+          { jurisdiction: { $regex: stateRegex } }, // fallback for string jurisdiction
+          { state: { $regex: stateRegex } }, // CongressPerson field
+          { 'terms.stateCode': abbr }, // CongressPerson field
+          { 'terms.stateName': { $regex: fullName, $options: 'i' } } // CongressPerson field
+        ] });
       }
       if (andFilters.length > 0) {
         filter.$and = andFilters;
       }
       // Sorting
-      const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction'];
+      const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction', 'lastName', 'firstName'];
       const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
       const sortObj: Record<string, 1 | -1> = { [sortField]: sortDir };
       // Pagination
@@ -140,8 +159,26 @@ export async function GET(request: NextRequest) {
         .skip(skip)
         .limit(pageSize)
         .toArray();
+      // Normalize results for frontend compatibility
+      const normalizedReps = reps.map(rep => {
+        // CongressPerson normalization
+        if ('terms' in rep && Array.isArray(rep.terms)) {
+          const latestTerm = rep.terms[rep.terms.length - 1] || {};
+          return {
+            ...rep,
+            office: latestTerm.memberType || '',
+            district: '',
+            photo: rep.depiction?.imageUrl || '',
+            party: (rep.partyHistory && rep.partyHistory[0] && rep.partyHistory[0].partyName) ? rep.partyHistory[0].partyName : ('party' in rep ? rep.party : ''),
+            jurisdiction: 'state' in rep ? rep.state : (latestTerm.stateName || ''),
+            name: rep.directOrderName || ('name' in rep ? rep.name : '') || ('firstName' in rep ? rep.firstName : '') + ' ' + ('lastName' in rep ? rep.lastName : ''),
+          };
+        }
+        // Representative normalization (already matches frontend)
+        return rep;
+      });
       return NextResponse.json({
-        representatives: reps,
+        representatives: normalizedReps,
         source: 'cache',
         pagination: {
           page: pageParam,
@@ -232,8 +269,24 @@ export async function GET(request: NextRequest) {
               .toArray();
 
             // console.log(`[API] Returning ${cachedReps.length} cached representatives (first 10)`);
+            // Normalize results for frontend compatibility
+            const normalizedCachedReps = cachedReps.map(rep => {
+              if ('terms' in rep && Array.isArray(rep.terms)) {
+                const latestTerm = rep.terms[rep.terms.length - 1] || {};
+                return {
+                  ...rep,
+                  office: latestTerm.memberType || '',
+                  district: '',
+                  photo: rep.depiction?.imageUrl || '',
+                  party: (rep.partyHistory && rep.partyHistory[0] && rep.partyHistory[0].partyName) ? rep.partyHistory[0].partyName : ('party' in rep ? rep.party : ''),
+                  jurisdiction: 'state' in rep ? rep.state : (latestTerm.stateName || ''),
+                  name: rep.directOrderName || ('name' in rep ? rep.name : '') || ('firstName' in rep ? rep.firstName : '') + ' ' + ('lastName' in rep ? rep.lastName : ''),
+                };
+              }
+              return rep;
+            });
             return NextResponse.json({
-              representatives: cachedReps,
+              representatives: normalizedCachedReps,
               source: 'cache'
             });
           }
@@ -321,14 +374,12 @@ export async function GET(request: NextRequest) {
             }
           }
           console.log(`[OpenStates API] Total people fetched for ${stateCode}:`, allPeople.length);
-          const representatives: Representative[] = allPeople
+          const representatives = allPeople
             .map(person => {
-              // Use current_role if available, else synthesize from roles array
               let role = person.current_role;
               if (!role && Array.isArray(person.roles)) {
                 const found = person.roles.find((r: any) => r.type === 'member' && !r.end_date);
                 if (found) {
-                  // Synthesize role with district as number if possible
                   role = {
                     ...found,
                     district: typeof found.district === 'number' ? found.district : (typeof found.district === 'string' && !isNaN(Number(found.district)) ? Number(found.district) : undefined)
@@ -336,7 +387,6 @@ export async function GET(request: NextRequest) {
                 }
               }
               if (!role || person.death_date) {
-                console.log(`[OpenStates API] Skipping person (no valid role or deceased):`, person.name, person.id);
                 return null;
               }
               let email: string | undefined = person.email;
@@ -419,7 +469,7 @@ export async function GET(request: NextRequest) {
                 lastUpdated: new Date()
               };
             })
-            .filter((x): x is Representative => x !== null); // Remove nulls and type narrow
+            .filter(x => x !== null);
           console.log(`[OpenStates API] Representatives mapped for ${stateCode}:`, representatives.length);
           if (representatives.length > 0) {
             try {
@@ -465,8 +515,17 @@ export async function GET(request: NextRequest) {
                 bVal = b.district || '';
                 break;
               case 'jurisdiction':
-                aVal = a.jurisdiction || '';
-                bVal = b.jurisdiction || '';
+                // Always treat jurisdiction as a string
+                aVal = (typeof a.jurisdiction === 'string')
+                  ? a.jurisdiction
+                  : (a.jurisdiction && typeof a.jurisdiction === 'object' && 'name' in (a.jurisdiction as any)
+                      ? ((a.jurisdiction as any).name as string)
+                      : '');
+                bVal = (typeof b.jurisdiction === 'string')
+                  ? b.jurisdiction
+                  : (b.jurisdiction && typeof b.jurisdiction === 'object' && 'name' in (b.jurisdiction as any)
+                      ? ((b.jurisdiction as any).name as string)
+                      : '');
                 break;
               default:
                 aVal = a.name || '';
@@ -643,7 +702,7 @@ export async function GET(request: NextRequest) {
     // console.log(`[API] Total representatives fetched for ${stateCode}: ${allPeople.length}`);
 
     // Transform OpenStates data to our Representative format
-    const representatives: Representative[] = allPeople
+    const representatives = allPeople
       .filter(person => person.current_role && !person.death_date) // Only include people with current roles who are alive
       .map(person => {
         const role = person.current_role!;
