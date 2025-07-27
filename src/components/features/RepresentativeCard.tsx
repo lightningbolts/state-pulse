@@ -38,17 +38,20 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
             >
               {/* Main card block */}
               <div className="flex flex-col md:flex-row md:items-start gap-4">
-                {rep.photo && (
-                  <img
-                    src={rep.photo}
-                    alt={rep.name}
-                    className="w-16 h-16 rounded-full object-cover flex-shrink-0 mx-auto md:mx-0"
-                  />
-                )}
+                <img
+                  src={rep.image || rep.photo || 'https://via.placeholder.com/150'}
+                  alt={rep.name}
+                  className="w-16 h-16 rounded-full object-cover flex-shrink-0 mx-auto md:mx-0"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h5 className="font-semibold text-lg break-words">{rep.name}</h5>
+                      {/* {rep.current_role?.district && (
+                        <Badge variant="secondary" className="text-xs">
+                          District {rep.current_role?.district}
+                        </Badge>
+                      )} */}
                       {showMap && rep.distance && (
                         <Badge variant="secondary" className="text-xs">
                           #{index !== undefined ? index + 1 : ''} - {rep.distance.toFixed(1)} mi
@@ -63,7 +66,7 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                     {/* Office: prefer string, fallback to first office name */}
                     {typeof rep.office === 'string' && rep.office}
                     {!rep.office && rep.offices && rep.offices.length > 0 && rep.offices[0].name}
-                    {rep.district && ` - ${rep.district}`}
+                    {rep.current_role && `${rep.current_role?.title} - ${rep.current_role?.district}`}
                   </p>
                   <p className="text-xs text-muted-foreground mb-3">
                     {/* Jurisdiction: render name if object, else string */}

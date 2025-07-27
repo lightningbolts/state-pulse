@@ -43,7 +43,7 @@ function RepresentativeCard({ rep, person, timeInOffice }: {
   return (
     <div className="flex items-center gap-6 mb-8">
       <img
-        src={person.image || rep.photo || 'https://via.placeholder.com/150'}
+        src={person.image || rep.image || rep.photo || 'https://via.placeholder.com/150'}
         alt={rep.name}
         className="w-32 h-32 rounded-full object-cover border"
       />
