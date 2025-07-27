@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
     }
 
     const db = client.db('statepulse');
-    const representativesCollection = db.collection<Representative>('representatives');
+    const representativesCollection = db.collection('representatives');
 
     // Check for cached data first - ALWAYS check cache before hitting external API
     if (!forceRefresh) {
@@ -331,124 +331,14 @@ export async function GET(request: NextRequest) {
 
     // console.log(`[API] Total representatives fetched for ${stateCode}: ${allPeople.length}`);
 
-    // Transform OpenStates data to our Representative format
-    const representatives: Representative[] = allPeople
-      .filter(person => person.current_role && !person.death_date) // Only include people with current roles who are alive
-      .map(person => {
-        const role = person.current_role!;
+    // Transform only ocd-person/xxxx to ocd-person_xxxx for person.id
+    const transformOcdPersonId = (id: string) =>
+      typeof id === 'string' ? id.replace(/^ocd-person\//, 'ocd-person_') : id;
 
-        // Extract contact information from offices array - more comprehensive extraction
-        let email: string | undefined;
-        let website: string | undefined;
-        let addresses: Array<{
-          type: string;
-          address: string;
-          phone?: string;
-          fax?: string;
-        }> = [];
-
-        // Get phone and addresses from offices array
-        if (person.offices && person.offices.length > 0) {
-          // Extract addresses from all offices
-          addresses = person.offices
-            .filter(office => office.address) // Only include offices with addresses
-            .map(office => ({
-              type: office.name || office.classification || 'Office',
-              address: office.address!,
-              phone: office.voice,
-              fax: office.fax
-            }));
-        }
-
-        // Get email - can be at person level or in offices
-        email = person.email;
-        if (!email && person.offices && person.offices.length > 0) {
-          // Check if email is in office data (some APIs might store it there)
-          const officeWithEmail = person.offices.find(office => (office as any).email);
-          if (officeWithEmail) {
-            email = (officeWithEmail as any).email;
-          }
-        }
-
-        // Extract website - prioritize official government links
-        if (person.links && person.links.length > 0) {
-          // First try to find homepage
-          const homepage = person.links.find(link =>
-            link.note?.toLowerCase().includes('homepage')
-          );
-          if (homepage) {
-            website = homepage.url;
-          } else {
-            // Then try .gov domains
-            const govSite = person.links.find(link =>
-              link.url.includes('.gov')
-            );
-            if (govSite) {
-              website = govSite.url;
-            } else {
-              // Then try state legislature domains (common patterns)
-              const stateLegSite = person.links.find(link =>
-                link.url.includes('legislature') ||
-                link.url.includes('senate') ||
-                link.url.includes('house') ||
-                link.url.includes('assembly') ||
-                link.url.includes('capitol')
-              );
-              if (stateLegSite) {
-                website = stateLegSite.url;
-              } else {
-                // Fallback to any official link that's NOT openstates
-                const officialLink = person.links.find(link =>
-                  link.note?.toLowerCase().includes('official') &&
-                  !link.url.includes('openstates.org')
-                );
-                if (officialLink) {
-                  website = officialLink.url;
-                } else {
-                  // Last resort - first link that's NOT openstates
-                  const nonOpenStatesLink = person.links.find(link =>
-                    !link.url.includes('openstates.org')
-                  );
-                  if (nonOpenStatesLink) {
-                    website = nonOpenStatesLink.url;
-                  }
-                  // Only use openstates_url if absolutely no other links exist
-                  // Don't set website to openstates_url at all - let it be undefined
-                }
-              }
-            }
-          }
-        }
-        // Don't use person.openstates_url as fallback - leave website undefined if no official site found
-
-        // Create office title with proper formatting
-        let officeTitle = role.title;
-        if (role.org_classification === 'upper') {
-          officeTitle = 'State Senator';
-        } else if (role.org_classification === 'lower') {
-          officeTitle = 'State Representative';
-        }
-
-        // Format district information
-        let districtInfo = '';
-        if (role.district) {
-          districtInfo = `District ${role.district}`;
-        }
-
-        return {
-          id: person.id,
-          name: person.name,
-          party: person.party || 'Unknown',
-          office: officeTitle,
-          district: districtInfo,
-          jurisdiction: person.jurisdiction?.name || `${stateCode} State Legislature`,
-          email,
-          website,
-          photo: person.image,
-          addresses, // Add the extracted addresses array
-          lastUpdated: new Date()
-        };
-      });
+    const representatives: OpenStatesPerson[] = allPeople.map(person => ({
+      ...person,
+      id: person.id ? transformOcdPersonId(person.id) : person.id
+    }));
 
     // Store in MongoDB
     if (representatives.length > 0) {
