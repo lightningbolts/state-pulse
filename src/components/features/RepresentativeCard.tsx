@@ -60,11 +60,15 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                     </Badge>
                   </div>
                   <p className="text-sm font-medium text-primary mb-2">
-                    {rep.office}
+                    {/* Office: prefer string, fallback to first office name */}
+                    {typeof rep.office === 'string' && rep.office}
+                    {!rep.office && rep.offices && rep.offices.length > 0 && rep.offices[0].name}
                     {rep.district && ` - ${rep.district}`}
                   </p>
                   <p className="text-xs text-muted-foreground mb-3">
-                    {rep.jurisdiction}
+                    {/* Jurisdiction: render name if object, else string */}
+                    {typeof rep.jurisdiction === 'string' && rep.jurisdiction}
+                    {rep.jurisdiction && typeof rep.jurisdiction === 'object' && rep.jurisdiction.name}
                   </p>
                 </div>
               </div>

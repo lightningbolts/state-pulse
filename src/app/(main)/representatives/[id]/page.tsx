@@ -50,7 +50,9 @@ function RepresentativeCard({ rep, person, timeInOffice }: {
       <div>
         <h1 className="text-3xl font-bold mb-2">{rep.name}</h1>
         <div className="text-lg text-gray-700 mb-1">{rep.office} ({rep.party})</div>
-        <div className="text-md text-gray-500 mb-1">District {rep.district}, {rep.jurisdiction}</div>
+        <div className="text-md text-gray-500 mb-1">
+          District {rep.district}, {typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name}
+        </div>
         <div className="text-md text-gray-500">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
       </div>
     </div>
