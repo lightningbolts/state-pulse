@@ -8,20 +8,20 @@ declare global {
   } | undefined;
 }
 import { MongoClient } from 'mongodb';
-import { Representative } from '../types/representative';
+import { Representative, CongressPerson } from '../types/representative';
 import dotenv from 'dotenv';
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 import fetch from 'node-fetch';
 
-const PROPUBLICA_API_KEY = process.env.PROPUBLICA_API_KEY || '';
+const CONGRESS_API_KEY = process.env.US_CONGRESS_API_KEY || '';
 
-async function fetchCongressMembers(chamber: 'house' | 'senate'): Promise<Representative[]> {
-  // Use current congress number (e.g., 118th as of 2025)
-  const congress = 118;
-  const url = `https://api.propublica.org/congress/v1/${congress}/${chamber}/members.json`;
+async function fetchCongressMembers(chamber: 'house' | 'senate'): Promise<CongressPerson[]> {
+  // Use current congress number (e.g., 119th as of 2025)
+  const congress = 119;
+  const url = `https://api.congress.gov/v3/member/congress/${congress}`;
   const res = await fetch(url, {
     headers: {
-      'X-API-Key': PROPUBLICA_API_KEY,
+      'X-Api-Key': CONGRESS_API_KEY,
       'Accept': 'application/json'
     }
   });
@@ -30,55 +30,26 @@ async function fetchCongressMembers(chamber: 'house' | 'senate'): Promise<Repres
     return [];
   }
   const data = await res.json() as any;
-  const members = (data.results && data.results[0] && data.results[0].members) || [];
-  // Normalize to Representative type
+  // Congress.gov returns members in data.members array
+  const members = (data.members || []).filter((m: any) => m.chamber && m.chamber.toLowerCase() === chamber);
+  // Normalize to CongressPerson type
   return members.map((m: any) => ({
-    id: m.id,
-    name: `${m.first_name} ${m.middle_name ? m.middle_name + ' ' : ''}${m.last_name}${m.suffix ? ' ' + m.suffix : ''}`.trim(),
-    first_name: m.first_name,
-    middle_name: m.middle_name,
-    last_name: m.last_name,
-    suffix: m.suffix,
-    date_of_birth: m.date_of_birth,
-    gender: m.gender,
-    party: m.party,
-    chamber: chamber,
+    id: m.bioguideId || m.memberId,
+    birthYear: m.birthYear,
+    cosponsoredLegislation: m.cosponsoredLegislation,
+    depiction: m.depiction,
+    directOrderName: m.directOrderName,
+    firstName: m.firstName,
+    honorificName: m.honorificName,
+    invertedOrderName: m.invertedOrderName,
+    lastName: m.lastName,
+    leadership: m.leadership,
+    partyHistory: m.partyHistory,
+    sponsoredLegislation: m.sponsoredLegislation,
     state: m.state,
-    district: m.district || null,
-    url: m.url,
-    contact_form: m.contact_form,
-    in_office: m.in_office,
-    next_election: m.next_election,
-    office: m.office,
-    phone: m.phone,
-    fax: m.fax,
-    twitter_account: m.twitter_account,
-    facebook_account: m.facebook_account,
-    youtube_account: m.youtube_account,
-    govtrack_id: m.govtrack_id,
-    cspan_id: m.cspan_id,
-    votesmart_id: m.votesmart_id,
-    icpsr_id: m.icpsr_id,
-    crp_id: m.crp_id,
-    google_entity_id: m.google_entity_id,
-    fec_candidate_id: m.fec_candidate_id,
-    rss_url: m.rss_url,
-    leadership_role: m.leadership_role,
-    seniority: m.seniority,
-    missed_votes: m.missed_votes,
-    total_votes: m.total_votes,
-    total_present: m.total_present,
-    last_updated: m.last_updated,
-    ocd_id: m.ocd_id,
-    cook_pvi: m.cook_pvi,
-    dw_nominate: m.dw_nominate,
-    ideal_point: m.ideal_point,
-    bills_sponsored: m.bills_sponsored,
-    bills_cosponsored: m.bills_cosponsored,
-    missed_votes_pct: m.missed_votes_pct,
-    votes_with_party_pct: m.votes_with_party_pct,
-    votes_against_party_pct: m.votes_against_party_pct,
-    jurisdiction: chamber === 'house' ? 'US House' : 'US Senate',
+    terms: m.terms,
+    updateDate: m.updateDate,
+    lastUpdated: m.lastUpdated ? new Date(m.lastUpdated) : undefined
   }));
 }
 
@@ -160,8 +131,8 @@ async function fetchRepresentativesForState(state: string): Promise<Representati
     }
     const data = await res.json() as any;
     const pagePeople: Representative[] = (data.results || []).map((rep: any) => {
-      if (rep.ocd_id && typeof rep.ocd_id === 'string') {
-        rep.ocd_id = rep.ocd_id.replace('/', '_');
+      if (rep.id && typeof rep.id === 'string') {
+        rep.id = rep.id.replace('/', '_');
       }
       return rep;
     });

@@ -71,6 +71,50 @@ export interface Representative {
   lastUpdated?: Date;
 }
 
+// CongressPerson type matches congress.gov API response example
+export interface CongressPerson {
+  id: string;
+  birthYear?: string;
+  cosponsoredLegislation?: {
+    count: number;
+    URL: string;
+  };
+  depiction?: {
+    attribution?: string;
+    imageUrl?: string;
+  };
+  directOrderName?: string;
+  firstName?: string;
+  honorificName?: string;
+  invertedOrderName?: string;
+  lastName?: string;
+  leadership?: Array<{
+    congress: number;
+    type: string;
+  }>;
+  partyHistory?: Array<{
+    partyAbbreviation: string;
+    partyName: string;
+    startYear: number;
+  }>;
+  sponsoredLegislation?: {
+    count: number;
+    url: string;
+  };
+  state?: string;
+  terms?: Array<{
+    chamber: string;
+    congress: number;
+    endYear: number;
+    memberType: string;
+    startYear: number;
+    stateCode: string;
+    stateName: string;
+  }>;
+  updateDate?: string;
+  lastUpdated?: Date;
+}
+
 export interface ApiResponse {
     representatives: Representative[];
     source: 'cache' | 'api';
