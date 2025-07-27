@@ -1,26 +1,74 @@
-import {Pagination} from "@/types/index";
 
+import { Pagination } from "@/types/index";
+
+// Representative type now matches OpenStatesPerson, plus legacy fields
 export interface Representative {
+  id: string;
+  name: string;
+  party?: string;
+  current_role?: {
+    title: string;
+    org_classification: string;
+    district?: string | number;
+    division_id?: string;
+  };
+  jurisdiction?: {
     id: string;
     name: string;
-    party: string;
-    office: string;
-    district?: string;
-    jurisdiction: string;
-    phone?: string;
+    classification: string;
+  };
+  given_name?: string;
+  family_name?: string;
+  image?: string;
+  email?: string;
+  gender?: string;
+  birth_date?: string;
+  death_date?: string;
+  extras?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+  openstates_url?: string;
+  other_identifiers?: Array<{
+    identifier: string;
+    scheme: string;
+  }>;
+  other_names?: Array<{
+    name: string;
+    note?: string;
+  }>;
+  links?: Array<{
+    url: string;
+    note?: string;
+  }>;
+  sources?: Array<{
+    url: string;
+    note?: string;
+  }>;
+  offices?: Array<{
+    name?: string;
+    fax?: string;
+    voice?: string;
+    address?: string;
+    classification?: string;
     email?: string;
-    website?: string;
-    photo?: string;
-    lat?: number;
-    lon?: number;
-    distance?: number;
-    addresses?: Array<{
-        type: string;
-        address: string;
-        phone?: string;
-        fax?: string;
-    }>;
-    lastUpdated: Date;
+  }>;
+  // Legacy/derived fields for compatibility
+  office?: string;
+  district?: string;
+  jurisdictionName?: string;
+  phone?: string;
+  website?: string;
+  photo?: string;
+  lat?: number;
+  lon?: number;
+  distance?: number;
+  addresses?: Array<{
+    type: string;
+    address: string;
+    phone?: string;
+    fax?: string;
+  }>;
+  lastUpdated?: Date;
 }
 
 export interface ApiResponse {
