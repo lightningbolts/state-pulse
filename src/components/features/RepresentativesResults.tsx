@@ -74,7 +74,13 @@ export function RepresentativesResults({
             {/* Representatives List */}
             <div className="space-y-4">
                 {displayedReps.map((rep, index) => (
-                  <RepresentativeCard key={rep.id} rep={rep} index={index} showMap={showMap} />
+                  <RepresentativeCard
+                    key={rep.id}
+                    rep={rep}
+                    index={index}
+                    showMap={showMap}
+                    href={`/representatives/${rep.id}`}
+                  />
                 ))}
             </div>
 

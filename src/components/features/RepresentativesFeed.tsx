@@ -158,9 +158,13 @@ export default function RepresentativesFeed() {
         </DropdownMenu>
       </div>
       {error && <div className="text-red-500 text-center mb-4">{error}</div>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
         {reps.map((rep, idx) => (
-          <RepresentativeCard key={rep.id + idx} rep={rep} />
+          <RepresentativeCard
+            key={rep.id + idx}
+            rep={rep}
+            href={`/representatives/${rep.id}`}
+          />
         ))}
       </div>
       {loading && <LoadingOverlay text="Loading representatives..." smallText="Loading..." />}

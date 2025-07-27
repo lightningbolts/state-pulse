@@ -59,6 +59,7 @@ export interface OpenStatesPerson {
         district?: string | number;
         division_id?: string;
         party?: string;
+        start_date?: string;
         end_date?: string | null;
     }>;
     id: string;
