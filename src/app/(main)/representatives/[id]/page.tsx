@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 "use client";
-
+export const dynamic = 'force-dynamic';
+import { LucideIcon } from "lucide-react";
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import type { Representative, OpenStatesPerson } from '@/types/representative';
