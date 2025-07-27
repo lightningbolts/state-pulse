@@ -331,9 +331,14 @@ export async function GET(request: NextRequest) {
 
     // console.log(`[API] Total representatives fetched for ${stateCode}: ${allPeople.length}`);
 
-    // Transform OpenStates data to our Representative format
-    // Store all OpenStatesPerson objects as-is, no filtering or transformation
-    const representatives: OpenStatesPerson[] = allPeople;
+    // Transform only ocd-person/xxxx to ocd-person_xxxx for person.id
+    const transformOcdPersonId = (id: string) =>
+      typeof id === 'string' ? id.replace(/^ocd-person\//, 'ocd-person_') : id;
+
+    const representatives: OpenStatesPerson[] = allPeople.map(person => ({
+      ...person,
+      id: person.id ? transformOcdPersonId(person.id) : person.id
+    }));
 
     // Store in MongoDB
     if (representatives.length > 0) {
