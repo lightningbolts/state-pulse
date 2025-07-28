@@ -236,8 +236,21 @@ export async function GET(request: NextRequest) {
         // CongressPerson normalization
         if ('terms' in rep && Array.isArray(rep.terms)) {
           const latestTerm = rep.terms[rep.terms.length - 1] || {};
+          // Always set a valid id field
+          let id = rep.id || '';
+          // Fallback: try to build a composite id if missing or too short
+          if (!id || id.length < 8) {
+            id = [
+              (rep as any).firstName || (rep as any).first_name || '',
+              (rep as any).lastName || (rep as any).last_name || '',
+              (rep as any).state || '',
+              latestTerm.chamber || '',
+              latestTerm.startYear || ''
+            ].filter(Boolean).join('-');
+          }
           return {
             ...rep,
+            id,
             office: latestTerm.memberType || '',
             district: '',
             photo: rep.depiction?.imageUrl || '',
@@ -247,7 +260,18 @@ export async function GET(request: NextRequest) {
           };
         }
         // Representative normalization (already matches frontend)
-        return rep;
+        // Defensive: always set id
+        let id = rep.id || '';
+        const firstName = (rep as any).firstName || (rep as any).first_name || '';
+        const lastName = (rep as any).lastName || (rep as any).last_name || '';
+        const stateVal = (rep as any).state || '';
+        if ((!id || id.length < 8) && firstName && lastName) {
+          id = [firstName, lastName, stateVal].join('-');
+        }
+        return {
+          ...rep,
+          id,
+        };
       });
       return NextResponse.json({
         representatives: normalizedReps,

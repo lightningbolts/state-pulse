@@ -81,8 +81,8 @@ export default function RepresentativeDetailPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [showAllBills, setShowAllBills] = useState(false);
 
-  // Guard: check if id looks like a valid representative id (basic check: must be a string and at least 8 chars)
-  const isLikelyRepId = typeof id === 'string' && id.length >= 8;
+  // Guard: check if id is a non-empty string
+  const isLikelyRepId = typeof id === 'string' && id.length > 0;
   if (!isLikelyRepId) {
     return (
       <div className="py-8 text-center text-red-600">
