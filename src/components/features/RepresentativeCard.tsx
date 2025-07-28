@@ -162,6 +162,8 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     <AnimatedSection key={normalized.id}>
       <Card className="border-l-4 border-l-primary hover:shadow-lg transition-shadow">
         <CardContent className="p-4">
+          {/* DEBUG: Show rep.id for troubleshooting */}
+          {/* <div className="mb-2 text-xs text-red-500">DEBUG: rep.id = {String(rep.id)}</div> */}
           {href ? (
             <div
               className="cursor-pointer"

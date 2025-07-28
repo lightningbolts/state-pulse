@@ -9,8 +9,29 @@ import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
 import { Legislation } from "@/types/legislation";
 
+
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
+  // Guard: check if id looks like a valid legislation id (basic check: must contain a dash or be longer than 10 chars)
+  const isLikelyLegislationId = typeof id === 'string' && (id.length > 10 || id.includes('-'));
+  if (!isLikelyLegislationId) {
+    return (
+      <Card className="mt-6 shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl text-destructive">Invalid Legislation ID</CardTitle>
+          <CardDescription>
+            The ID <Badge variant="outline">{id}</Badge> does not appear to be a valid legislation ID.<br />
+            You may have followed a broken or incorrect link.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link href="/legislation" className="text-primary hover:underline flex items-center">
+            <ExternalLink className="mr-2 h-4 w-4" /> Go back to legislation search
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
   // console.log(params, "Params in LegislationDetailPage");
   const legislation = await getLegislationById(id);
 

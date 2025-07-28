@@ -1,10 +1,13 @@
 "use client";
 export const dynamic = 'force-dynamic';
-import { LucideIcon } from "lucide-react";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import type { Representative, OpenStatesPerson } from '@/types/representative';
+import type { Representative } from '@/types/representative';
 import type { Bill } from '@/types/legislation';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ExternalLink, Info, FileText, Tag } from 'lucide-react';
+import Link from 'next/link';
 
 // Real fetch function for representative detail
 const fetchRepresentativeData = async (id: string) => {
@@ -13,13 +16,20 @@ const fetchRepresentativeData = async (id: string) => {
   return await res.json();
 };
 
-const getTimeInOffice = (roles: any[]) => {
-  if (!roles || roles.length === 0) return 'N/A';
-  const startDates = roles.map(r => new Date(r.start_date));
-  const earliest = new Date(Math.min(...startDates.map(d => d.getTime())));
+const getTimeInOffice = (role: any) => {
+  if (!role || !role.start_date) return 'N/A';
+  const start = new Date(role.start_date);
+  if (isNaN(start.getTime())) return 'N/A';
   const now = new Date();
-  const years = now.getFullYear() - earliest.getFullYear();
-  return `${years} year${years !== 1 ? 's' : ''}`;
+  let years = now.getFullYear() - start.getFullYear();
+  // Adjust if the current month/day is before the start month/day
+  if (
+    now.getMonth() < start.getMonth() ||
+    (now.getMonth() === start.getMonth() && now.getDate() < start.getDate())
+  ) {
+    years--;
+  }
+  return years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : '<1 year';
 };
 
 const getTopTopics = (bills: Bill[], count = 3) => {
@@ -35,15 +45,14 @@ const getTopTopics = (bills: Bill[], count = 3) => {
     .map(([topic]) => topic);
 };
 
-function RepresentativeCard({ rep, person, timeInOffice }: {
+function RepresentativeCard({ rep, timeInOffice }: {
   rep: Representative,
-  person: OpenStatesPerson,
   timeInOffice: string
 }) {
   return (
     <div className="flex items-center gap-6 mb-8">
       <img
-        src={person.image || rep.image || rep.photo || 'https://via.placeholder.com/150'}
+        src={rep.image || rep.photo || 'https://via.placeholder.com/150'}
         alt={rep.name}
         className="w-32 h-32 rounded-full object-cover border"
       />
@@ -59,15 +68,26 @@ function RepresentativeCard({ rep, person, timeInOffice }: {
   );
 }
 
+
 export default function RepresentativeDetailPage() {
   const params = useParams<{ id: string }>();
   const { id } = params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rep, setRep] = useState<Representative | null>(null);
-  const [person, setPerson] = useState<OpenStatesPerson | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
   const [showAllBills, setShowAllBills] = useState(false);
+
+  // Guard: check if id looks like a valid representative id (basic check: must be a string and at least 8 chars)
+  const isLikelyRepId = typeof id === 'string' && id.length >= 8;
+  if (!isLikelyRepId) {
+    return (
+      <div className="py-8 text-center text-red-600">
+        Invalid Representative ID.<br />
+        You may have followed a broken or incorrect link.
+      </div>
+    );
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -76,7 +96,6 @@ export default function RepresentativeDetailPage() {
       .then(data => {
         if (!mounted) return;
         setRep(data.representative);
-        setPerson(data.openStatesPerson);
         setBills(data.bills);
         setLoading(false);
       })
@@ -89,69 +108,143 @@ export default function RepresentativeDetailPage() {
   }, [id]);
 
   if (loading) return <div className="py-8 text-center">Loading representative...</div>;
-  if (error || !rep || !person) return <div className="py-8 text-center text-red-600">{error || 'Representative not found.'}</div>;
+  if (error) return <div className="py-8 text-center text-red-600">{error}</div>;
+  if (!rep) return <div className="py-8 text-center text-red-600">Representative not found.</div>;
 
+  // Section: Normalize data for display
+  const timeInOffice = getTimeInOffice(rep.current_role);
   const recentBills = bills.slice(0, 3);
   const topTopics = getTopTopics(bills);
-  const timeInOffice = getTimeInOffice(person.roles || []);
 
   return (
-    <div className="flex justify-center py-8 px-2">
-      <div className="w-full max-w-3xl">
-        <RepresentativeCard rep={rep} person={person} timeInOffice={timeInOffice} />
+    <div className="container mx-auto py-8 px-4 md:px-6">
+      <Card className="w-full max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden">
+        <CardHeader className="bg-gray-700 text-primary-foreground p-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-6">
+            <div className="flex justify-center sm:block mb-4 sm:mb-0">
+              <img
+                src={rep.image || rep.photo || 'https://via.placeholder.com/150'}
+                alt={rep.name}
+                className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border shadow-lg"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col items-center justify-center sm:flex-row sm:items-center sm:justify-between gap-2">
+                <CardTitle className="text-2xl md:text-3xl font-bold tracking-tight break-words text-center sm:text-left">{rep.name}</CardTitle>
+                {rep.party && (
+                  <Badge
+                    className="bg-black text-white border-black text-base font-semibold px-4 py-1 mt-2 sm:mt-0 sm:ml-4 whitespace-nowrap mx-auto sm:mx-0"
+                    style={{ minWidth: 64, textAlign: 'center' }}
+                  >
+                    {rep.party}
+                  </Badge>
+                )}
+              </div>
+              <div className="text-primary-foreground/80 text-sm mt-2 break-words text-center sm:text-left">
+                {rep.office}
+              </div>
+              <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">
+                {rep.current_role?.org_classification && (
+                  <span>
+                    Chamber: {rep.current_role.org_classification === 'upper' ? 'Senate' : rep.current_role.org_classification === 'lower' ? 'House' : rep.current_role.org_classification.charAt(0).toUpperCase() + rep.current_role.org_classification.slice(1)}
+                  </span>
+                )}
+              </div>
+              <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">
+                {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) && (
+                  <span>{typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name}</span>
+                )}
+                {rep.current_role?.district && (
+                  <span>{((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) ? ' - ' : ''}District {rep.current_role.district}</span>
+                )}
+              </div>
+              <div className="text-md text-gray-200 mt-2 text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 space-y-6 bg-background">
+          <section>
+            <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+              <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Key Details
+            </h3>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {rep.email && (
+                <a href={`mailto:${rep.email}`} className="text-primary underline font-medium">
+                  {rep.email}
+                </a>
+              )}
+              {rep.phone && <Badge variant="secondary">Phone: {rep.phone}</Badge>}
+              {rep.website && (
+                <Link href={rep.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  <Badge variant="secondary">Website</Badge>
+                </Link>
+              )}
+            </div>
+          </section>
 
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">Bills Sponsored</h2>
-          <div className="text-md mb-2">Total: <span className="font-bold">{bills.length}</span></div>
-          <div>
-            <h3 className="text-md font-semibold mb-1">Recent Bills</h3>
-            <ul className="list-disc pl-6">
-              {recentBills.map(bill => (
-                <li key={bill.id} className="mb-1">
-                  <span className="font-bold">{bill.identifier}</span>: {bill.title} <span className="text-gray-500">({bill.latest_action_description})</span>
-                </li>
-              ))}
-            </ul>
-            {!showAllBills && bills.length > 3 && (
-              <button
-                className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                onClick={() => setShowAllBills(true)}
-              >
-                Show all bills sponsored
-              </button>
-            )}
-            {showAllBills && (
-              <div className="mt-4">
-                <h3 className="text-md font-semibold mb-1">All Bills Sponsored</h3>
+          <section>
+            <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+              <FileText className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Bills Sponsored
+            </h3>
+            <div className="text-md mb-2">Total: <span className="font-bold">{bills.length}</span></div>
+            {bills.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No bills sponsored by this representative.</div>
+            ) : (
+              <>
+                <h4 className="text-md font-semibold mb-1">Recent Bills</h4>
                 <ul className="list-disc pl-6">
-                  {bills.map(bill => (
+                  {recentBills.map(bill => (
                     <li key={bill.id} className="mb-1">
                       <span className="font-bold">{bill.identifier}</span>: {bill.title} <span className="text-gray-500">({bill.latest_action_description})</span>
                     </li>
                   ))}
                 </ul>
-                <button
-                  className="mt-2 px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                  onClick={() => setShowAllBills(false)}
-                >
-                  Hide all bills
-                </button>
+                {!showAllBills && bills.length > 3 && (
+                  <button
+                    className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    onClick={() => setShowAllBills(true)}
+                  >
+                    Show all bills sponsored
+                  </button>
+                )}
+                {showAllBills && (
+                  <div className="mt-4">
+                    <h4 className="text-md font-semibold mb-1">All Bills Sponsored</h4>
+                    <ul className="list-disc pl-6">
+                      {bills.map(bill => (
+                        <li key={bill.id} className="mb-1">
+                          <span className="font-bold">{bill.identifier}</span>: {bill.title} <span className="text-gray-500">({bill.latest_action_description})</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      className="mt-2 px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                      onClick={() => setShowAllBills(false)}
+                    >
+                      Hide all bills
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          <section>
+            <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+              <Tag className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Top Topics
+            </h3>
+            {topTopics.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No topics found for sponsored bills.</div>
+            ) : (
+              <div className="flex gap-2 flex-wrap">
+                {topTopics.map(topic => (
+                  <Badge key={topic} variant="default" className="text-xs break-words">{topic}</Badge>
+                ))}
               </div>
             )}
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-2">Top Topics</h2>
-          <div className="flex gap-2 flex-wrap">
-            {topTopics.map(topic => (
-              <span key={topic} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                {topic}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
+          </section>
+        </CardContent>
+      </Card>
     </div>
   );
 }
