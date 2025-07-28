@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import type { Representative } from '@/types/representative';
 import type { Bill } from '@/types/legislation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import PolicyUpdateCard from '@/components/features/PolicyUpdateCard';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Info, FileText, Tag } from 'lucide-react';
 import Link from 'next/link';
@@ -35,9 +36,11 @@ const getTimeInOffice = (role: any) => {
 const getTopTopics = (bills: Bill[], count = 3) => {
   const topicCounts: Record<string, number> = {};
   bills.forEach(bill => {
-    bill.subject.forEach(topic => {
-      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
-    });
+    if (Array.isArray(bill.subject)) {
+      bill.subject.forEach(topic => {
+        topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+      });
+    }
   });
   return Object.entries(topicCounts)
     .sort((a, b) => b[1] - a[1])
@@ -192,38 +195,25 @@ export default function RepresentativeDetailPage() {
             ) : (
               <>
                 <h4 className="text-md font-semibold mb-1">Recent Bills</h4>
-                <ul className="list-disc pl-6">
+                <div className="space-y-3">
                   {recentBills.map(bill => (
-                    <li key={bill.id} className="mb-1">
-                      <span className="font-bold">{bill.identifier}</span>: {bill.title} <span className="text-gray-500">({bill.latest_action_description})</span>
-                    </li>
+                    <div key={bill.id} className="border rounded-lg p-3 bg-muted/50 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                      <div>
+                        <span className="font-bold">{bill.identifier}</span>: {bill.title}
+                      </div>
+                      <Link href={`/legislation/${bill.id}`} className="text-blue-600 hover:underline text-sm font-medium mt-2 md:mt-0" target="_blank" rel="noopener noreferrer">
+                        View Details
+                      </Link>
+                    </div>
                   ))}
-                </ul>
-                {!showAllBills && bills.length > 3 && (
-                  <button
-                    className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    onClick={() => setShowAllBills(true)}
+                </div>
+                {bills.length > 3 && (
+                  <Link
+                    href={`/legislation?rep=${encodeURIComponent(rep.name)}`}
+                    className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
                   >
-                    Show all bills sponsored
-                  </button>
-                )}
-                {showAllBills && (
-                  <div className="mt-4">
-                    <h4 className="text-md font-semibold mb-1">All Bills Sponsored</h4>
-                    <ul className="list-disc pl-6">
-                      {bills.map(bill => (
-                        <li key={bill.id} className="mb-1">
-                          <span className="font-bold">{bill.identifier}</span>: {bill.title} <span className="text-gray-500">({bill.latest_action_description})</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      className="mt-2 px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                      onClick={() => setShowAllBills(false)}
-                    >
-                      Hide all bills
-                    </button>
-                  </div>
+                    View all bills sponsored
+                  </Link>
                 )}
               </>
             )}

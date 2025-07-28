@@ -20,7 +20,14 @@ export async function getOpenStatesPersonById(id: string): Promise<OpenStatesPer
 
 export async function getBillsSponsoredByRep(id: string): Promise<Bill[]> {
   const collection = await getCollection('legislation');
-  // Assuming 'sponsors' is an array of objects with a 'id' field
-  const bills = await collection.find({ 'sponsors.id': id }).toArray();
+  // Normalize id to use slashes (ocd-person/uuid) for matching sponsors.id
+  const normalizedId = id.replace(/^ocd-person_/, 'ocd-person/').replace(/_/g, '-').replace('ocd-person/-', 'ocd-person/');
+  // Also try the original id in case some are still using underscores
+  const bills = await collection.find({
+    $or: [
+      { 'sponsors.id': id },
+      { 'sponsors.id': normalizedId }
+    ]
+  }).toArray();
   return bills.map(({ _id, ...rest }) => rest as Bill);
 }

@@ -7,7 +7,7 @@ import {Button} from "@/components/ui/button";
 import {Bookmark, MapPin, Plus, Search, X} from "lucide-react";
 import {BookmarkButton, BookmarksContext} from "@/components/features/BookmarkButton";
 import React, {useCallback, useContext, useEffect, useLayoutEffect, useRef, useState} from "react";
-import {useSearchParams} from "next/navigation";
+import {useSearchParams, useRouter} from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,16 +57,17 @@ let cardNumber = 20;
 
 // Fetch updates with optional filters and sorting
 async function fetchUpdatesFeed({
-                                    skip = 0,
-                                    limit = cardNumber,
-                                    search = "",
-                                    subject = "",
-                                    sortField = "createdAt",
-                                    sortDir = "desc",
-                                    classification = "",
-                                    jurisdictionName = "",
-                                    showCongress = false
-                                }: {
+    skip = 0,
+    limit = cardNumber,
+    search = "",
+    subject = "",
+    sortField = "createdAt",
+    sortDir = "desc",
+    classification = "",
+    jurisdictionName = "",
+    showCongress = false,
+    sponsor = ""
+}: {
     skip?: number;
     limit?: number;
     search?: string;
@@ -75,7 +76,8 @@ async function fetchUpdatesFeed({
     sortDir?: string;
     classification?: string;
     jurisdictionName?: string;
-    showCongress?: boolean
+    showCongress?: boolean;
+    sponsor?: string;
 }) {
     const params = new URLSearchParams({limit: String(limit), skip: String(skip)});
     if (search) params.append("search", search);
@@ -94,6 +96,7 @@ async function fetchUpdatesFeed({
     if (apiSortField) params.append("sortBy", apiSortField);
     if (sortDir) params.append("sortDir", sortDir);
     if (classification) params.append("classification", classification);
+    if (sponsor) params.append("sponsor", sponsor);
     const res = await fetch(`/api/legislation?${params.toString()}`);
     if (!res.ok) throw new Error("Failed to fetch updates");
     return await res.json();
@@ -110,6 +113,8 @@ export function PolicyUpdatesFeed() {
     const [jurisdictionName, setJurisdictionName] = useState("");
     const [showCongress, setShowCongress] = useState(false);
     const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({field: 'createdAt', dir: 'desc'});
+    const [repFilter, setRepFilter] = useState<string>("");
+    const router = useRouter();
     const [showLoadingText, setShowLoadingText] = useState(true);
     const [searchInput, setSearchInput] = useState("");
     const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false);
@@ -132,7 +137,7 @@ export function PolicyUpdatesFeed() {
     const {bookmarks, loading: bookmarksLoading} = useContext(BookmarksContext);
     const {user} = useUser();
 
-    // URL parameter handling for state filtering and congress filtering
+    // URL parameter handling for state filtering, congress, and rep filtering
     const searchParams = useSearchParams();
 
     // Handle URL parameters for state filtering
@@ -140,57 +145,50 @@ export function PolicyUpdatesFeed() {
         const stateParam = searchParams.get('state');
         const stateAbbrParam = searchParams.get('stateAbbr');
         const congressParam = searchParams.get('congress');
+        const repParam = searchParams.get('rep');
 
-        // console.log('PolicyUpdatesFeed received params:', { stateParam, stateAbbrParam, congressParam });
-
-        // Handle congress parameter first
-        if (congressParam === 'true') {
-            // console.log('Setting showCongress to true from URL parameter');
-            setShowCongress(true);
-            setJurisdictionName(''); // Clear any state filter
-            // Reset the feed to load fresh data for congress
+        if (repParam) {
+            setRepFilter(repParam);
             setUpdates([]);
             setSkip(0);
             skipRef.current = 0;
             setHasMore(true);
             setLoading(true);
-            return; // Exit early to avoid state processing
+        } else {
+            setRepFilter("");
         }
 
+        // Existing state and congress logic...
+        if (congressParam === 'true') {
+            setShowCongress(true);
+            setJurisdictionName('');
+            setUpdates([]);
+            setSkip(0);
+            skipRef.current = 0;
+            setHasMore(true);
+            setLoading(true);
+            return;
+        }
         if (stateParam || stateAbbrParam) {
             let stateName = stateParam ? decodeURIComponent(stateParam) : null;
-
-            // console.log('Initial stateName:', stateName);
-
-            // If we have a state abbreviation, convert it to full name
             if (stateAbbrParam && !stateName) {
-                // Create reverse mapping from abbreviation to state name
                 const abbrToStateName = Object.entries(STATE_MAP).reduce((acc, [fullName, abbr]) => {
                     acc[abbr] = fullName;
                     return acc;
                 }, {} as Record<string, string>);
-
                 stateName = abbrToStateName[stateAbbrParam.toUpperCase()] || stateAbbrParam;
-                // console.log('Converted from stateAbbrParam:', stateAbbrParam, 'to stateName:', stateName);
             }
-
-            // If stateParam looks like an abbreviation (2 chars, all caps), convert it
             if (stateName && stateName.length === 2 && stateName === stateName.toUpperCase()) {
                 const abbrToStateName = Object.entries(STATE_MAP).reduce((acc, [fullName, abbr]) => {
                     acc[abbr] = fullName;
                     return acc;
                 }, {} as Record<string, string>);
-
                 const originalStateName = stateName;
                 stateName = abbrToStateName[stateName] || stateName;
-                // console.log('Converted abbreviation:', originalStateName, 'to full name:', stateName);
             }
-
             if (stateName) {
-                // console.log('Final stateName being set:', stateName);
                 setJurisdictionName(stateName);
-                setShowCongress(false); // Clear congress filter
-                // Reset the feed to load fresh data for this state
+                setShowCongress(false);
                 setUpdates([]);
                 setSkip(0);
                 skipRef.current = 0;
@@ -200,12 +198,14 @@ export function PolicyUpdatesFeed() {
         }
     }, [searchParams]);
 
+    const getLastName = (name: string) => name.trim().split(' ').slice(-1)[0];
     const loadMore = useCallback(async () => {
         if (loadingRef.current || !hasMore) return;
         loadingRef.current = true;
         setLoading(true);
         try {
             const currentSkip = skipRef.current;
+            const sponsorLastName = repFilter ? getLastName(repFilter) : "";
             const newUpdates = await fetchUpdatesFeed({
                 skip: currentSkip,
                 limit: 20,
@@ -215,24 +215,19 @@ export function PolicyUpdatesFeed() {
                 sortDir: sort.dir,
                 classification,
                 jurisdictionName,
-                showCongress
+                showCongress,
+                sponsor: sponsorLastName
             });
-
-            // Filter to only bookmarked items if showOnlyBookmarked is true
             const filteredNewUpdates = showOnlyBookmarked
                 ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
                 : newUpdates;
-
-            // Since the backend now handles all sorting, we can simplify the frontend logic.
             if (filteredNewUpdates.length > 0) {
                 setUpdates((prev) => {
-                    // Merge and ensure no duplicates, maintaining the order from the API.
                     const existingIds = new Set(prev.map((u: PolicyUpdate) => u.id));
-                    const newUniqueUpdates = filteredNewUpdates.filter((u) => !existingIds.has(u.id));
+                    const newUniqueUpdates = filteredNewUpdates.filter((u: PolicyUpdate) => !existingIds.has(u.id));
                     return [...prev, ...newUniqueUpdates];
                 });
             }
-
             skipRef.current = currentSkip + newUpdates.length;
             setSkip(skipRef.current);
             setHasMore(newUpdates.length === 20);
@@ -243,7 +238,7 @@ export function PolicyUpdatesFeed() {
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks]);
+    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
@@ -321,6 +316,7 @@ export function PolicyUpdatesFeed() {
         const fetchAndSet = async () => {
             setLoading(true);
             try {
+                const sponsorLastName = repFilter ? getLastName(repFilter) : "";
                 const newUpdates = await fetchUpdatesFeed({
                     skip: 0,
                     limit: 20,
@@ -330,7 +326,8 @@ export function PolicyUpdatesFeed() {
                     sortDir: sort.dir,
                     classification,
                     jurisdictionName,
-                    showCongress
+                    showCongress,
+                    sponsor: sponsorLastName
                 });
                 if (!isMounted) return;
 
@@ -355,7 +352,7 @@ export function PolicyUpdatesFeed() {
         return () => {
             isMounted = false;
         };
-    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, didRestore.current]);
+    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter, didRestore.current]);
 
 
     // Intersection Observer for infinite scroll
@@ -506,6 +503,39 @@ export function PolicyUpdatesFeed() {
 
     return (
         <>
+            {/* Rep Filter Indicator */}
+            {repFilter && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="default" className="bg-green-600">
+                                Filtered by Representative: {repFilter}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                                Showing bills sponsored by {repFilter}
+                            </span>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setRepFilter("");
+                                const params = new URLSearchParams(Array.from(searchParams.entries()));
+                                params.delete('rep');
+                                router.replace(`/legislation?${params.toString()}`);
+                                setUpdates([]);
+                                setSkip(0);
+                                skipRef.current = 0;
+                                setHasMore(true);
+                                setLoading(true);
+                            }}
+                        >
+                            <X className="h-4 w-4 mr-1"/>
+                            Clear Filter
+                        </Button>
+                    </div>
+                </div>
+            )}
             {/* Congress Filter Indicator */}
             {showCongress && (
                 <div
