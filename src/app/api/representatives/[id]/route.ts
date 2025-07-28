@@ -59,10 +59,10 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
       console.error('[API] Normalization error:', normError, rep);
       return NextResponse.json({ error: 'Normalization error', details: normError instanceof Error ? normError.message : normError, rep }, { status: 500 });
     }
-    // Fetch bills sponsored by this representative
+    // Fetch bills sponsored by this representative (always use canonical rep.id)
     let bills = [];
     try {
-      bills = await getBillsSponsoredByRep(normalizedRep.id);
+      bills = await getBillsSponsoredByRep(rep.id);
     } catch (billsError) {
       console.error('[API] Bills fetch error:', billsError, normalizedRep);
       return NextResponse.json({ error: 'Bills fetch error', details: billsError instanceof Error ? billsError.message : billsError, rep: normalizedRep }, { status: 500 });

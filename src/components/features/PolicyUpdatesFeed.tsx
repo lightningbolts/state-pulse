@@ -66,7 +66,8 @@ async function fetchUpdatesFeed({
     classification = "",
     jurisdictionName = "",
     showCongress = false,
-    sponsor = ""
+    sponsor = "",
+    sponsorId = ""
 }: {
     skip?: number;
     limit?: number;
@@ -78,6 +79,7 @@ async function fetchUpdatesFeed({
     jurisdictionName?: string;
     showCongress?: boolean;
     sponsor?: string;
+    sponsorId?: string;
 }) {
     const params = new URLSearchParams({limit: String(limit), skip: String(skip)});
     if (search) params.append("search", search);
@@ -97,6 +99,7 @@ async function fetchUpdatesFeed({
     if (sortDir) params.append("sortDir", sortDir);
     if (classification) params.append("classification", classification);
     if (sponsor) params.append("sponsor", sponsor);
+    if (sponsorId) params.append("sponsorId", sponsorId);
     const res = await fetch(`/api/legislation?${params.toString()}`);
     if (!res.ok) throw new Error("Failed to fetch updates");
     return await res.json();
@@ -114,6 +117,7 @@ export function PolicyUpdatesFeed() {
     const [showCongress, setShowCongress] = useState(false);
     const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({field: 'createdAt', dir: 'desc'});
     const [repFilter, setRepFilter] = useState<string>("");
+    const [sponsorId, setSponsorId] = useState<string>("");
     const router = useRouter();
     const [showLoadingText, setShowLoadingText] = useState(true);
     const [searchInput, setSearchInput] = useState("");
@@ -146,9 +150,19 @@ export function PolicyUpdatesFeed() {
         const stateAbbrParam = searchParams.get('stateAbbr');
         const congressParam = searchParams.get('congress');
         const repParam = searchParams.get('rep');
+        const sponsorIdParam = searchParams.get('sponsorId');
 
-        if (repParam) {
+        if (sponsorIdParam) {
+            setSponsorId(sponsorIdParam);
+            setRepFilter("");
+            setUpdates([]);
+            setSkip(0);
+            skipRef.current = 0;
+            setHasMore(true);
+            setLoading(true);
+        } else if (repParam) {
             setRepFilter(repParam);
+            setSponsorId("");
             setUpdates([]);
             setSkip(0);
             skipRef.current = 0;
@@ -156,6 +170,7 @@ export function PolicyUpdatesFeed() {
             setLoading(true);
         } else {
             setRepFilter("");
+            setSponsorId("");
         }
 
         // Existing state and congress logic...
@@ -216,7 +231,8 @@ export function PolicyUpdatesFeed() {
                 classification,
                 jurisdictionName,
                 showCongress,
-                sponsor: sponsorLastName
+                sponsor: sponsorLastName,
+                sponsorId
             });
             const filteredNewUpdates = showOnlyBookmarked
                 ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
@@ -327,7 +343,8 @@ export function PolicyUpdatesFeed() {
                     classification,
                     jurisdictionName,
                     showCongress,
-                    sponsor: sponsorLastName
+                    sponsor: sponsorLastName,
+                    sponsorId
                 });
                 if (!isMounted) return;
 

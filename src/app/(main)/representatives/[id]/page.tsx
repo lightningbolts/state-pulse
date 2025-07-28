@@ -119,6 +119,23 @@ export default function RepresentativeDetailPage() {
   const recentBills = bills.slice(0, 3);
   const topTopics = getTopTopics(bills);
 
+  // Only compute filterJurisdiction after rep is confirmed non-null
+  let filterJurisdiction = '';
+  if (!rep) return <div className="py-8 text-center text-red-600">Representative not found.</div>;
+  const office = (rep.office || '').toLowerCase();
+  if (
+    office.includes('u.s. senator') ||
+    office.includes('us senator') ||
+    office.includes('u.s. representative') ||
+    office.includes('us representative')
+  ) {
+    filterJurisdiction = 'United States Congress';
+  } else if (typeof rep.jurisdiction === 'string') {
+    filterJurisdiction = rep.jurisdiction;
+  } else if (rep.jurisdiction && typeof rep.jurisdiction.name === 'string') {
+    filterJurisdiction = rep.jurisdiction.name;
+  }
+
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
       <Card className="w-full max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden">
@@ -214,7 +231,7 @@ export default function RepresentativeDetailPage() {
                 </div>
                 {bills.length > 3 && (
                   <Link
-                    href={`/legislation?rep=${encodeURIComponent(rep.name)}`}
+                    href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
                     className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
                   >
                     View all bills sponsored

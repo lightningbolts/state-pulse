@@ -21,6 +21,18 @@
         export async function GET(request: Request) {
           try {
             const { searchParams } = new URL(request.url);
+            // Parse filtering parameters
+            const filter: Record<string, any> = {};
+            // Always filter by sponsorId if present
+            const sponsorIdParam = searchParams.get('sponsorId');
+            if (sponsorIdParam) {
+              // Normalize id to use slashes (ocd-person/uuid) for matching sponsors.id
+              const normalizedId = sponsorIdParam.replace(/^ocd-person_/, 'ocd-person/').replace(/_/g, '-').replace('ocd-person/-', 'ocd-person/');
+              filter.$or = [
+                { 'sponsors.id': sponsorIdParam },
+                { 'sponsors.id': normalizedId }
+              ];
+            }
 
             // Parse pagination parameters
             const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '100', 10) : 100;
@@ -38,8 +50,6 @@
               sort = { updatedAt: -1 };
             }
 
-            // Parse filtering parameters
-            const filter: Record<string, any> = {};
             // Full text search
             const searchValue = searchParams.get('search');
             if (searchValue) {
@@ -65,7 +75,14 @@
             }
             // Handle Congress vs State filtering
             const showCongressParam = searchParams.get('showCongress');
-            if (showCongressParam === 'true') {
+            const stateParamForCongress = searchParams.get('state');
+            const stateAbbrParamForCongress = searchParams.get('stateAbbr');
+            const isCongress = (
+              showCongressParam === 'true' ||
+              (stateParamForCongress && stateParamForCongress.toLowerCase() === 'united states congress') ||
+              (stateAbbrParamForCongress && stateAbbrParamForCongress.toUpperCase() === 'US')
+            );
+            if (isCongress) {
               console.log('[API] Filtering for ALL Congress sessions');
 
               // For Congress bills, we need to handle multiple scenarios:
@@ -119,16 +136,67 @@
                 ]
               };
 
-              // If a search filter already exists, combine it with the congress filter
+              // Always build a single $and array for all Congress filters
+              const andFilters = [];
               if (filter.$or) {
-                filter.$and = [
-                  { $or: filter.$or }, // The existing search filter
-                  congressFilter      // The new congress filter
-                ];
-                delete filter.$or; // Remove the original $or to avoid conflicts
+                andFilters.push({ $or: filter.$or });
+                delete filter.$or;
+              }
+              andFilters.push(congressFilter);
+              const sponsorId = searchParams.get('sponsorId');
+              if (sponsorId) {
+                // Normalize id to use slashes (ocd-person/uuid) for matching sponsors.id
+                const normalizedId = sponsorId.replace(/^ocd-person_/, 'ocd-person/').replace(/_/g, '-').replace('ocd-person/-', 'ocd-person/');
+                andFilters.push({
+                  $or: [
+                    { 'sponsors.id': sponsorId },
+                    { 'sponsors.id': normalizedId }
+                  ]
+                });
               } else {
-                // Otherwise, just use the congress filter
-                Object.assign(filter, congressFilter);
+                const sponsorName = searchParams.get('sponsor');
+                if (sponsorName) {
+                  const sponsorRegex = { $regex: sponsorName, $options: 'i' };
+                  // For Congress, match by name only (case-insensitive, partial match)
+                  andFilters.push({
+                    $or: [
+                      { sponsors: { $elemMatch: { name: sponsorRegex } } },
+                      { history: { $elemMatch: { name: sponsorRegex } } }
+                    ]
+                  });
+                }
+              }
+              for (const [key, value] of Object.entries(filter)) {
+                if (key !== '$and') andFilters.push({ [key]: value });
+              }
+              filter.$and = andFilters;
+              for (const key of Object.keys(filter)) {
+                if (key !== '$and') delete filter[key];
+              }
+
+              // Debug: log a sample Congress bill with sponsors to inspect sponsor name format
+              try {
+                const { getAllLegislation } = await import('@/services/legislationService');
+                const sample = await getAllLegislation({
+                  limit: 1,
+                  skip: 0,
+                  sort: { updatedAt: -1 },
+                  filter: {
+                    $and: [congressFilter, { sponsors: { $exists: true, $ne: [] } }]
+                  },
+                  showCongress: true
+                });
+                if (sample && sample.length > 0) {
+                  console.log('[DEBUG] Sample Congress bill with sponsors:', JSON.stringify({
+                    title: sample[0].title,
+                    sponsors: sample[0].sponsors,
+                    identifier: sample[0].identifier
+                  }, null, 2));
+                } else {
+                  console.log('[DEBUG] No Congress bill with sponsors found for inspection.');
+                }
+              } catch (e) {
+                console.log('[DEBUG] Error fetching sample Congress bill for inspection:', e);
               }
 
               console.log('[API] Applied comprehensive Congress filter:', JSON.stringify(filter, null, 2));
@@ -155,7 +223,21 @@
               filter.statusText = searchParams.get('statusText');
             }
             if (searchParams.get('sponsor')) {
-              filter['sponsors.name'] = searchParams.get('sponsor');
+              // Only use robust $elemMatch + regex logic for Congress sponsor/cosponsor filtering
+              const sponsorId = searchParams.get('sponsorId');
+              if (showCongressParam === 'true') {
+                // Already handled above in the andFilters logic, so do nothing here
+              } else if (sponsorId) {
+                // Match by sponsor id for non-Congress as well
+                const normalizedId = sponsorId.replace(/^ocd-person_/, 'ocd-person/').replace(/_/g, '-').replace('ocd-person/-', 'ocd-person/');
+                filter.$or = [
+                  { 'sponsors.id': sponsorId },
+                  { 'sponsors.id': normalizedId }
+                ];
+              } else {
+                const sponsorName = searchParams.get('sponsor');
+                filter['sponsors.name'] = sponsorName;
+              }
             }
             // Date range filters (e.g., firstActionAt_gte, firstActionAt_lte)
             const firstActionAtGte = searchParams.get('firstActionAt_gte');
@@ -169,16 +251,16 @@
 
             // console.log('[API] GET /api/legislation filter:', JSON.stringify(filter));
             // Debug: log a sample document matching the filter
-            const legislationCollection = (await import('@/lib/mongodb')).getCollection ? await (await import('@/lib/mongodb')).getCollection('legislation') : null;
-            if (legislationCollection) {
-              const sample = await (await legislationCollection).findOne(filter);
-              // console.log('[API] Sample matching document:', sample);
-            }
-            // Debug: log a sample document from the collection with no filter
-            if (legislationCollection) {
-              const sampleAny = await (await legislationCollection).findOne();
-              // console.log('[API] Sample ANY document:', sampleAny);
-            }
+            // const legislationCollection
+            // if (legislationCollection) {
+            //   const sample = await (await legislationCollection).findOne(filter);
+            //   // console.log('[API] Sample matching document:', sample);
+            // }
+            // // Debug: log a sample document from the collection with no filter
+            // if (legislationCollection) {
+            //   const sampleAny = await (await legislationCollection).findOne();
+            //   // console.log('[API] Sample ANY document:', sampleAny);
+            // }
 
             // Get legislation with the constructed parameters
             const legislations = await getAllLegislation({
