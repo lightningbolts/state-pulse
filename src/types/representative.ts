@@ -1,5 +1,5 @@
 
-import { Pagination } from "@/types/index";
+import { Pagination } from "./index";
 
 // Representative type now matches OpenStatesPerson, plus legacy fields
 export interface Representative {

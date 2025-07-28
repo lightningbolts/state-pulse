@@ -116,16 +116,88 @@ export async function GET(request: NextRequest) {
         ] });
       }
       // Chamber match (office or terms field)
-      if (filterChamber) {
-        if (/senate|upper/i.test(filterChamber)) {
+      if (filterChamber && searchParams.get('showCongress') === 'true') {
+        // Only include current members for each chamber (latest term, no endYear or endYear >= current year)
+        const currentYear = new Date().getFullYear();
+        if (filterChamber === 'Senate') {
+          andFilters.push({
+            $or: [
+              // For OpenStates/state reps, match top-level fields
+              { $and: [
+                { 'terms': { $exists: false } },
+                { jurisdiction: 'US Senate' }
+              ] },
+              // For CongressPeople, only include if latest term is Senate and is current
+              { $and: [
+                { 'terms.item': { $exists: true } },
+                { $expr: {
+                  $let: {
+                    vars: {
+                      lastTerm: { $arrayElemAt: ["$terms.item", { $subtract: [ { $size: "$terms.item" }, 1 ] } ] }
+                    },
+                    in: {
+                      $and: [
+                        { $regexMatch: { input: "$$lastTerm.chamber", regex: '^Senate$', options: 'i' } },
+                        { $or: [
+                          { $not: [ { $ifNull: ["$$lastTerm.endYear", false] } ] },
+                          { $gte: ["$$lastTerm.endYear", currentYear] }
+                        ] }
+                      ]
+                    }
+                  }
+                } }
+              ] }
+            ]
+          });
+        } else if (filterChamber === 'House of Representatives') {
+          andFilters.push({
+            $or: [
+              // For OpenStates/state reps, match top-level fields
+              { $and: [
+                { 'terms': { $exists: false } },
+                { jurisdiction: 'US House' }
+              ] },
+              // For CongressPeople, only include if latest term is House and is current
+              { $and: [
+                { 'terms.item': { $exists: true } },
+                { $expr: {
+                  $let: {
+                    vars: {
+                      lastTerm: { $arrayElemAt: ["$terms.item", { $subtract: [ { $size: "$terms.item" }, 1 ] } ] }
+                    },
+                    in: {
+                      $and: [
+                        { $regexMatch: { input: "$$lastTerm.chamber", regex: '^House of Representatives$', options: 'i' } },
+                        { $or: [
+                          { $not: [ { $ifNull: ["$$lastTerm.endYear", false] } ] },
+                          { $gte: ["$$lastTerm.endYear", currentYear] }
+                        ] }
+                      ]
+                    }
+                  }
+                } }
+              ] }
+            ]
+          });
+        }
+      } else if (filterChamber) {
+        if (
+          /senate|upper/i.test(filterChamber) ||
+          filterChamber === 'Senate'
+        ) {
           andFilters.push({ $or: [
             { office: { $regex: 'senator', $options: 'i' } },
-            { 'terms.memberType': { $regex: 'Senator', $options: 'i' } } // CongressPerson field
+            { 'terms.memberType': { $regex: 'Senator', $options: 'i' } },
+            { chamber: { $regex: 'senate', $options: 'i' } }
           ] });
-        } else if (/house|lower|assembly/i.test(filterChamber)) {
+        } else if (
+          /house|lower|assembly/i.test(filterChamber) ||
+          filterChamber === 'House of Representatives'
+        ) {
           andFilters.push({ $or: [
             { office: { $regex: 'representative|assembly', $options: 'i' } },
-            { 'terms.memberType': { $regex: 'Representative', $options: 'i' } } // CongressPerson field
+            { 'terms.memberType': { $regex: 'Representative', $options: 'i' } },
+            { chamber: { $regex: 'house', $options: 'i' } }
           ] });
         }
       }

@@ -18,7 +18,8 @@ export default function RepresentativesFeed() {
   const [hasMore, setHasMore] = useState(true);
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'name', dir: 'asc' });
   const [jurisdictionName, setJurisdictionName] = useState<string>("");
-  const [showCongress, setShowCongress] = useState(false);
+  const [congressChamber, setCongressChamber] = useState<"" | "us-house" | "us-senate">("");
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const loader = useRef<HTMLDivElement | null>(null);
 
   const fetchReps = useCallback(async (reset = false) => {
@@ -33,9 +34,9 @@ export default function RepresentativesFeed() {
       if (search.trim() !== "") {
         params.set('search', search);
       }
-      if (showCongress) {
+      if (congressChamber === "us-house" || congressChamber === "us-senate") {
         params.set('showCongress', 'true');
-        // Explicitly clear filterState for Congress
+        params.set('chamber', congressChamber === 'us-house' ? 'House of Representatives' : 'Senate');
         params.delete('filterState');
       } else if (jurisdictionName) {
         // Convert state name to abbreviation if possible
@@ -49,12 +50,17 @@ export default function RepresentativesFeed() {
       setReps(reset ? newReps : prev => [...prev, ...newReps]);
       setHasMore(data.pagination?.hasNext ?? false);
       setPage(reset ? 2 : page + 1);
+      if (data.pagination && typeof data.pagination.total === 'number') {
+        setTotalCount(data.pagination.total);
+      } else if (reset) {
+        setTotalCount(newReps.length);
+      }
     } catch (err: any) {
       setError(err.message || 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [search, page, sort, jurisdictionName, showCongress]);
+  }, [search, page, sort, jurisdictionName, congressChamber]);
 
   // Initial fetch and on search
   useEffect(() => {
@@ -126,21 +132,21 @@ export default function RepresentativesFeed() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="w-full sm:w-auto">
-              {showCongress ? "U.S. Congress" : jurisdictionName || "All States"}
+              {congressChamber === "us-house" ? "U.S. House" : congressChamber === "us-senate" ? "U.S. Senate" : jurisdictionName || "All States"}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto">
             <DropdownMenuRadioGroup
-              value={showCongress ? "congress" : jurisdictionName}
+              value={congressChamber ? congressChamber : jurisdictionName}
               onValueChange={value => {
-                if (value === "congress") {
-                  setShowCongress(true);
+                if (value === "us-house" || value === "us-senate") {
+                  setCongressChamber(value);
                   setJurisdictionName("");
                 } else if (value === "all") {
-                  setShowCongress(false);
+                  setCongressChamber("");
                   setJurisdictionName("");
                 } else {
-                  setShowCongress(false);
+                  setCongressChamber("");
                   setJurisdictionName(value);
                 }
                 setReps([]);
@@ -149,7 +155,8 @@ export default function RepresentativesFeed() {
               }}
             >
               <DropdownMenuRadioItem value="all">All States</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="congress">U.S. Congress</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="us-house">U.S. House</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="us-senate">U.S. Senate</DropdownMenuRadioItem>
               {Object.keys(STATE_MAP).sort().map((state) => (
                 <DropdownMenuRadioItem key={state} value={state}>
                   {state}
@@ -160,6 +167,13 @@ export default function RepresentativesFeed() {
         </DropdownMenu>
       </div>
       {error && <div className="text-red-500 text-center mb-4">{error}</div>}
+      <div className="mb-2 text-sm text-muted-foreground text-center">
+        {totalCount === 0 ? (
+          <>No representatives found.</>
+        ) : totalCount != null ? (
+          <>Showing <span className="font-semibold">{reps.length}</span> of <span className="font-semibold">{totalCount}</span> representative{totalCount === 1 ? '' : 's'}</>
+        ) : null}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
         {reps.map((rep, idx) => (
           <RepresentativeCard

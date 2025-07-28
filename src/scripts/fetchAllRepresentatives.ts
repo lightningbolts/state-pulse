@@ -9,48 +9,114 @@ declare global {
 }
 import { MongoClient } from 'mongodb';
 import { Representative, CongressPerson } from '../types/representative';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 import fetch from 'node-fetch';
 
 const CONGRESS_API_KEY = process.env.US_CONGRESS_API_KEY || '';
 
 async function fetchCongressMembers(chamber: 'house' | 'senate'): Promise<CongressPerson[]> {
-  // Use current congress number (e.g., 119th as of 2025)
-  const congress = 119;
-  const url = `https://api.congress.gov/v3/member/congress/${congress}`;
-  const res = await fetch(url, {
-    headers: {
-      'X-Api-Key': CONGRESS_API_KEY,
-      'Accept': 'application/json'
+  // Use correct endpoint for current members in the 119th Congress
+  let url = `https://api.congress.gov/v3/member/congress/119?api_key=${CONGRESS_API_KEY}`;
+  let allMembers: any[] = [];
+  while (url) {
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    if (!res.ok) {
+      console.error(`Failed to fetch Congress members: ${res.status} ${res.statusText}`);
+      break;
     }
-  });
-  if (!res.ok) {
-    console.error(`Failed to fetch Congress ${chamber}: ${res.status} ${res.statusText}`);
-    return [];
+    const data = await res.json() as any;
+    const members = (data.members || []);
+    allMembers = allMembers.concat(members);
+    let nextUrl = data.pagination?.next || null;
+    if (nextUrl) {
+      // If nextUrl is relative, prepend base
+      if (nextUrl.startsWith('/')) {
+        nextUrl = `https://api.congress.gov${nextUrl}`;
+      }
+      // Ensure api_key is present
+      if (!nextUrl.includes('api_key=')) {
+        const sep = nextUrl.includes('?') ? '&' : '?';
+        nextUrl = `${nextUrl}${sep}api_key=${CONGRESS_API_KEY}`;
+      }
+    }
+    url = nextUrl;
   }
-  const data = await res.json() as any;
-  // Congress.gov returns members in data.members array
-  const members = (data.members || []).filter((m: any) => m.chamber && m.chamber.toLowerCase() === chamber);
-  // Normalize to CongressPerson type
-  return members.map((m: any) => ({
-    id: m.bioguideId || m.memberId,
-    birthYear: m.birthYear,
-    cosponsoredLegislation: m.cosponsoredLegislation,
-    depiction: m.depiction,
-    directOrderName: m.directOrderName,
-    firstName: m.firstName,
-    honorificName: m.honorificName,
-    invertedOrderName: m.invertedOrderName,
-    lastName: m.lastName,
-    leadership: m.leadership,
-    partyHistory: m.partyHistory,
-    sponsoredLegislation: m.sponsoredLegislation,
-    state: m.state,
-    terms: m.terms,
-    updateDate: m.updateDate,
-    lastUpdated: m.lastUpdated ? new Date(m.lastUpdated) : undefined
-  }));
+  // Filter by chamber using terms.item[].chamber
+  const chamberLabel = chamber === 'house' ? 'House of Representatives' : 'Senate';
+  const filteredMembers = allMembers.filter((m: any) =>
+    Array.isArray(m.terms?.item) && m.terms.item.some((term: any) => term.chamber === chamberLabel)
+  );
+  // Normalize to CongressPerson type using correct field mapping
+  return filteredMembers.map((m: any) => {
+    // Find the most recent term for this chamber
+    let lastTerm = null;
+    if (Array.isArray(m.terms?.item)) {
+      lastTerm = m.terms.item.filter((term: any) => term.chamber === chamberLabel).slice(-1)[0];
+    }
+    // Name normalization: prefer directOrderName, else name, else constructed
+    let name = m.directOrderName || m.name || (m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : null);
+    // Party
+    let party = m.partyName || (lastTerm && lastTerm.partyName) || null;
+    // State
+    let state = m.state || (lastTerm && (lastTerm.stateName || lastTerm.stateCode)) || null;
+    // District
+    let district = m.district || (lastTerm && lastTerm.district) || null;
+    // Chamber
+    let normalizedChamber = chamberLabel;
+    // Image
+    let image = m.depiction?.imageUrl || null;
+    // Website: check all possible locations
+    let website = m.officialUrl || m.url || (lastTerm && lastTerm.url) || (m.contactInfo && m.contactInfo.url) || null;
+    // Address and phone: check all possible locations
+    let address = null;
+    let phone = null;
+    if (m.addressInformation) {
+      address = m.addressInformation.officeAddress || address;
+      phone = m.addressInformation.phoneNumber || phone;
+    }
+    if (lastTerm) {
+      address = lastTerm.officeAddress || address;
+      phone = lastTerm.phoneNumber || phone;
+    }
+    if (m.contactInfo) {
+      address = m.contactInfo.address || address;
+      phone = m.contactInfo.phone || phone;
+    }
+    // Leadership
+    let leadership = Array.isArray(m.leadership?.item) ? m.leadership.item : [];
+    // Sponsored/Cosponsored
+    let sponsoredLegislation = m.sponsoredLegislation || null;
+    let cosponsoredLegislation = m.cosponsoredLegislation || null;
+    // Terms
+    let terms = m.terms || null;
+    // Dates
+    let updateDate = m.updateDate || null;
+    let lastUpdated = m.lastUpdated ? new Date(m.lastUpdated) : undefined;
+    // Return minimal, robust CongressPerson object
+    return {
+      id: m.bioguideId || m.memberId || m.id || null,
+      name,
+      party,
+      state,
+      district,
+      chamber: normalizedChamber,
+      image,
+      website,
+      address,
+      phone,
+      leadership,
+      sponsoredLegislation,
+      cosponsoredLegislation,
+      terms,
+      updateDate,
+      lastUpdated,
+    };
+  });
 }
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -157,26 +223,29 @@ async function main() {
   const collection = db.collection(COLLECTION_NAME);
 
   // Fetch state reps from OpenStates
-  for (const jurisdiction of JURISDICTIONS) {
-    console.log(`Fetching representatives for ${jurisdiction}...`);
-    const reps = await fetchRepresentativesForState(jurisdiction);
-    if (reps.length > 0) {
-      await collection.deleteMany({
-        jurisdiction: { $regex: new RegExp(jurisdiction, 'i') }
-      });
-      await collection.insertMany(reps);
-      console.log(`Stored ${reps.length} representatives for ${jurisdiction}`);
-    } else {
-      console.log(`No representatives found for ${jurisdiction}`);
-    }
-  }
+  // for (const jurisdiction of JURISDICTIONS) {
+  //   console.log(`Fetching representatives for ${jurisdiction}...`);
+  //   const reps = await fetchRepresentativesForState(jurisdiction);
+  //   if (reps.length > 0) {
+  //     await collection.deleteMany({
+  //       jurisdiction: { $regex: new RegExp(jurisdiction, 'i') }
+  //     });
+  //     await collection.insertMany(reps);
+  //     console.log(`Stored ${reps.length} representatives for ${jurisdiction}`);
+  //   } else {
+  //     console.log(`No representatives found for ${jurisdiction}`);
+  //   }
+  // }
 
   // Fetch US House and Senate reps from ProPublica
   for (const chamber of ['house', 'senate'] as const) {
     console.log(`Fetching US Congress ${chamber} members...`);
-    const reps = await fetchCongressMembers(chamber);
+    let reps = await fetchCongressMembers(chamber);
+    // Add jurisdiction field for compatibility
+    const jurisdictionLabel = chamber === 'house' ? 'US House' : 'US Senate';
+    reps = reps.map(rep => ({ ...rep, jurisdiction: jurisdictionLabel }));
     if (reps.length > 0) {
-      await collection.deleteMany({ jurisdiction: chamber === 'house' ? 'US House' : 'US Senate' });
+      await collection.deleteMany({ jurisdiction: jurisdictionLabel });
       await collection.insertMany(reps);
       console.log(`Stored ${reps.length} US Congress ${chamber} members.`);
     } else {
