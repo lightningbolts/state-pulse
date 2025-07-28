@@ -197,11 +197,16 @@ export default function RepresentativeDetailPage() {
                 <h4 className="text-md font-semibold mb-1">Recent Bills</h4>
                 <div className="space-y-3">
                   {recentBills.map(bill => (
-                    <div key={bill.id} className="border rounded-lg p-3 bg-muted/50 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div key={bill.id} className="border rounded-lg p-3 bg-muted/50 flex flex-col gap-2">
                       <div>
                         <span className="font-bold">{bill.identifier}</span>: {bill.title}
                       </div>
-                      <Link href={`/legislation/${bill.id}`} className="text-blue-600 hover:underline text-sm font-medium mt-2 md:mt-0" target="_blank" rel="noopener noreferrer">
+                      <Link
+                        href={`/legislation/${bill.id}`}
+                        className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         View Details
                       </Link>
                     </div>
