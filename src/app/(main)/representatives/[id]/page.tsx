@@ -5,10 +5,12 @@ import { useParams } from "next/navigation";
 import type { Representative } from '@/types/representative';
 import type { Bill } from '@/types/legislation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import PolicyUpdateCard from '@/components/features/PolicyUpdateCard';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Info, FileText, Tag } from 'lucide-react';
 import Link from 'next/link';
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 
 // Real fetch function for representative detail
 const fetchRepresentativeData = async (id: string) => {
@@ -110,7 +112,7 @@ export default function RepresentativeDetailPage() {
     return () => { mounted = false; };
   }, [id]);
 
-  if (loading) return <div className="py-8 text-center">Loading representative...</div>;
+  if (loading) return <LoadingOverlay text="Loading representative details..." smallText="Please wait..." />;
   if (error) return <div className="py-8 text-center text-red-600">{error}</div>;
   if (!rep) return <div className="py-8 text-center text-red-600">Representative not found.</div>;
 
@@ -183,78 +185,86 @@ export default function RepresentativeDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6 space-y-6 bg-background">
-          <section>
-            <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-              <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Key Details
-            </h3>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {rep.email && (
-                <a href={`mailto:${rep.email}`} className="text-primary underline font-medium">
-                  {rep.email}
-                </a>
-              )}
-              {rep.phone && <Badge variant="secondary">Phone: {rep.phone}</Badge>}
-              {rep.website && (
-                <Link href={rep.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  <Badge variant="secondary">Website</Badge>
-                </Link>
-              )}
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-              <FileText className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Bills Sponsored
-            </h3>
-            <div className="text-md mb-2">Total: <span className="font-bold">{bills.length}</span></div>
-            {bills.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No bills sponsored by this representative.</div>
-            ) : (
-              <>
-                <h4 className="text-md font-semibold mb-1">Recent Bills</h4>
-                <div className="space-y-3">
-                  {recentBills.map(bill => (
-                    <div key={bill.id} className="border rounded-lg p-3 bg-muted/50 flex flex-col gap-2">
-                      <div>
-                        <span className="font-bold">{bill.identifier}</span>: {bill.title}
-                      </div>
-                      <Link
-                        href={`/legislation/${bill.id}`}
-                        className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View Details
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-                {bills.length > 3 && (
-                  <Link
-                    href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
-                    className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
-                  >
-                    View all bills sponsored
+          <AnimatedSection>
+            <section>
+              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Key Details
+              </h3>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {rep.email && (
+                  <a href={`mailto:${rep.email}`} className="text-primary underline font-medium">
+                    {rep.email}
+                  </a>
+                )}
+                {rep.phone && <Badge variant="secondary">Phone: {rep.phone}</Badge>}
+                {rep.website && (
+                  <Link href={rep.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    <Badge variant="secondary">Website</Badge>
                   </Link>
                 )}
-              </>
-            )}
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-              <Tag className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Top Topics
-            </h3>
-            {topTopics.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No topics found for sponsored bills.</div>
-            ) : (
-              <div className="flex gap-2 flex-wrap">
-                {topTopics.map(topic => (
-                  <Badge key={topic} variant="default" className="text-xs break-words">{topic}</Badge>
-                ))}
               </div>
-            )}
-          </section>
+            </section>
+          </AnimatedSection>
+
+          <AnimatedSection>
+            <section>
+              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                <FileText className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Bills Sponsored
+              </h3>
+              <div className="text-md mb-2">Total: <span className="font-bold">{bills.length}</span></div>
+              {bills.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No bills sponsored by this representative.</div>
+              ) : (
+                <>
+                  <h4 className="text-md font-semibold mb-1">Recent Bills</h4>
+                  <div className="space-y-3">
+                    {recentBills.map(bill => (
+                      <AnimatedSection key={bill.id}>
+                        <div className="border rounded-lg p-3 bg-muted/50 flex flex-col gap-2">
+                          <div>
+                            <span className="font-bold">{bill.identifier}</span>: {bill.title}
+                          </div>
+                          <Link
+                            href={`/legislation/${bill.id}`}
+                            className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View Details
+                          </Link>
+                        </div>
+                      </AnimatedSection>
+                    ))}
+                  </div>
+                  {bills.length > 3 && (
+                    <Link
+                      href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
+                      className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
+                    >
+                      View all bills sponsored
+                    </Link>
+                  )}
+                </>
+              )}
+            </section>
+          </AnimatedSection>
+
+          <AnimatedSection>
+            <section>
+              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                <Tag className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Top Topics
+              </h3>
+              {topTopics.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No topics found for sponsored bills.</div>
+              ) : (
+                <div className="flex gap-2 flex-wrap">
+                  {topTopics.map(topic => (
+                    <Badge key={topic} variant="default" className="text-xs break-words">{topic}</Badge>
+                  ))}
+                </div>
+              )}
+            </section>
+          </AnimatedSection>
         </CardContent>
       </Card>
     </div>
