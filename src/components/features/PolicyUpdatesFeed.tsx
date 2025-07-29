@@ -220,7 +220,7 @@ export function PolicyUpdatesFeed() {
         setLoading(true);
         try {
             const currentSkip = skipRef.current;
-            const sponsorLastName = repFilter ? getLastName(repFilter) : "";
+            // Only use sponsorId for filtering by representative
             const newUpdates = await fetchUpdatesFeed({
                 skip: currentSkip,
                 limit: 20,
@@ -231,8 +231,7 @@ export function PolicyUpdatesFeed() {
                 classification,
                 jurisdictionName,
                 showCongress,
-                sponsor: sponsorLastName,
-                sponsorId
+                sponsorId: sponsorId // Only send sponsorId, not sponsor name
             });
             const filteredNewUpdates = showOnlyBookmarked
                 ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
@@ -254,7 +253,7 @@ export function PolicyUpdatesFeed() {
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter]);
+    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
@@ -332,7 +331,7 @@ export function PolicyUpdatesFeed() {
         const fetchAndSet = async () => {
             setLoading(true);
             try {
-                const sponsorLastName = repFilter ? getLastName(repFilter) : "";
+                // Only use sponsorId for filtering by representative
                 const newUpdates = await fetchUpdatesFeed({
                     skip: 0,
                     limit: 20,
@@ -343,8 +342,7 @@ export function PolicyUpdatesFeed() {
                     classification,
                     jurisdictionName,
                     showCongress,
-                    sponsor: sponsorLastName,
-                    sponsorId
+                    sponsorId: sponsorId // Only send sponsorId, not sponsor name
                 });
                 if (!isMounted) return;
 
@@ -369,7 +367,7 @@ export function PolicyUpdatesFeed() {
         return () => {
             isMounted = false;
         };
-    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter, didRestore.current]);
+    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, didRestore.current]);
 
 
     // Intersection Observer for infinite scroll
@@ -520,100 +518,72 @@ export function PolicyUpdatesFeed() {
 
     return (
         <>
-            {/* Rep Filter Indicator */}
-            {repFilter && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Badge variant="default" className="bg-green-600">
-                                Filtered by Representative: {repFilter}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                                Showing bills sponsored by {repFilter}
-                            </span>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setRepFilter("");
-                                const params = new URLSearchParams(Array.from(searchParams.entries()));
-                                params.delete('rep');
-                                router.replace(`/legislation?${params.toString()}`);
-                                setUpdates([]);
-                                setSkip(0);
-                                skipRef.current = 0;
-                                setHasMore(true);
-                                setLoading(true);
-                            }}
-                        >
-                            <X className="h-4 w-4 mr-1"/>
-                            Clear Filter
-                        </Button>
-                    </div>
+            {/* Unified Filter Indicator */}
+            {(repFilter || sponsorId || showCongress || jurisdictionName) && (
+              <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default" className="bg-primary">
+                      {repFilter
+                        ? `Filtered by Representative: ${repFilter}`
+                        : sponsorId
+                          ? `Filtered by Representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
+                          : showCongress
+                            ? "Filtered by U.S. Congress"
+                            : jurisdictionName
+                              ? `Filtered by State: ${jurisdictionName}`
+                              : ""
+                      }
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {repFilter
+                        ? `Showing bills sponsored by ${repFilter}`
+                        : sponsorId
+                          ? `Showing bills sponsored by this representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
+                          : showCongress
+                            ? "Showing federal legislation only"
+                            : jurisdictionName
+                              ? `Showing legislation from ${jurisdictionName} only`
+                              : ""}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Reset all filter-related state to default
+                      setRepFilter("");
+                      setSponsorId("");
+                      setJurisdictionName("");
+                      setShowCongress(false);
+                      setUpdates([]);
+                      setSkip(0);
+                      skipRef.current = 0;
+                      setHasMore(true);
+                      setLoading(true);
+                      setSearch("");
+                      setSubject("");
+                      setClassification("");
+                      setSort({field: 'createdAt', dir: 'desc'});
+                      setShowOnlyBookmarked(false);
+                      // Remove all filter params from URL
+                      const params = new URLSearchParams([...searchParams.entries()]);
+                      params.delete('rep');
+                      params.delete('sponsorId');
+                      params.delete('state');
+                      params.delete('stateAbbr');
+                      params.delete('congress');
+                      router.replace(`/legislation?${params.toString()}`);
+                      // Clear sessionStorage so feed resets after reload
+                      sessionStorage.removeItem('policyUpdatesFeedState');
+                      sessionStorage.removeItem('policyUpdatesFeedScrollY');
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-1"/>
+                    Clear Filter
+                  </Button>
                 </div>
-            )}
-            {/* Congress Filter Indicator */}
-            {showCongress && (
-                <div
-                    className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Badge variant="default" className="bg-blue-600">
-                                Filtered by: U.S. Congress
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                  Showing federal legislation only
-                </span>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setShowCongress(false);
-                                setUpdates([]);
-                                setSkip(0);
-                                skipRef.current = 0;
-                                setHasMore(true);
-                                setLoading(true);
-                            }}
-                        >
-                            <X className="h-4 w-4 mr-1"/>
-                            Clear Filter
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* State Filter Indicator */}
-            {jurisdictionName && (
-                <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Badge variant="default" className="bg-primary">
-                                Filtered by State: {jurisdictionName}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                  Showing legislation from {jurisdictionName} only
-                </span>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setJurisdictionName("");
-                                setUpdates([]);
-                                setSkip(0);
-                                skipRef.current = 0;
-                                setHasMore(true);
-                                setLoading(true);
-                            }}
-                        >
-                            <X className="h-4 w-4 mr-1"/>
-                            Clear Filter
-                        </Button>
-                    </div>
-                </div>
+              </div>
             )}
 
             <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
