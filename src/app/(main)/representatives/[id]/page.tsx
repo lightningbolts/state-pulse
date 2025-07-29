@@ -275,7 +275,7 @@ export default function RepresentativeDetailPage() {
                           className="inline-block mt-2 px-4 py-2 rounded font-semibold shadow transition-colors text-center"
                           style={{
                             background: repColor,
-                            color: '#71A3A1',
+                            color: '#fff',
                             border: `2px solid ${repColor}`,
                           }}
                         >
