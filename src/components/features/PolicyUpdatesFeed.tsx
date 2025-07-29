@@ -166,6 +166,7 @@ export function PolicyUpdatesFeed() {
     const searchParams = useSearchParams();
 
     // Handle URL parameters for state filtering
+
     useEffect(() => {
         const stateParam = searchParams.get('state');
         const stateAbbrParam = searchParams.get('stateAbbr');
@@ -176,7 +177,8 @@ export function PolicyUpdatesFeed() {
         // Only clear sessionStorage if a filter is actually changed, not on navigation
         let filterChanged = false;
 
-        if (sponsorIdParam) {
+        // Only reset if sponsorId actually changes
+        if (sponsorIdParam && sponsorIdParam !== sponsorId) {
             setSponsorId(sponsorIdParam);
             setRepFilter("");
             setUpdates([]);
@@ -187,7 +189,7 @@ export function PolicyUpdatesFeed() {
             // Fetch rep name for filter chip
             fetchRepNameById(sponsorIdParam).then(name => setSponsorName(name || ""));
             filterChanged = true;
-        } else if (sponsorId) {
+        } else if (!sponsorIdParam && sponsorId) {
             // If sponsorId was previously set but now is not, clear sponsor-related state
             setSponsorId("");
             setRepFilter("");
@@ -341,6 +343,7 @@ export function PolicyUpdatesFeed() {
                 }
             } catch {}
         }
+        // Only fetch multiple batches if skipParam > 0 (restoring scroll/page), otherwise just fetch one batch
         if (!restored) {
             const fetchAndSet = async () => {
                 setLoading(true);
@@ -348,8 +351,28 @@ export function PolicyUpdatesFeed() {
                     let allUpdates: PolicyUpdate[] = [];
                     let currentSkip = 0;
                     const sponsorLastName = repFilter ? getLastName(repFilter) : "";
-                    while (currentSkip < skipParam) {
-                        const batch = await fetchUpdatesFeed({
+                    if (skipParam > 0) {
+                        while (currentSkip < skipParam) {
+                            const batch = await fetchUpdatesFeed({
+                                skip: currentSkip,
+                                limit: 20,
+                                search,
+                                subject,
+                                sortField: sort.field,
+                                sortDir: sort.dir,
+                                classification,
+                                jurisdictionName,
+                                showCongress,
+                                sponsor: sponsorLastName,
+                                sponsorId
+                            });
+                            if (batch.length === 0) break;
+                            allUpdates = [...allUpdates, ...batch];
+                            currentSkip += batch.length;
+                            if (batch.length < 20) break;
+                        }
+                        // Fetch the next batch (the visible page)
+                        const nextBatch = await fetchUpdatesFeed({
                             skip: currentSkip,
                             limit: 20,
                             search,
@@ -362,26 +385,24 @@ export function PolicyUpdatesFeed() {
                             sponsor: sponsorLastName,
                             sponsorId
                         });
-                        if (batch.length === 0) break;
-                        allUpdates = [...allUpdates, ...batch];
-                        currentSkip += batch.length;
-                        if (batch.length < 20) break;
+                        allUpdates = [...allUpdates, ...nextBatch];
+                    } else {
+                        // Fresh navigation: just fetch the first batch
+                        const firstBatch = await fetchUpdatesFeed({
+                            skip: 0,
+                            limit: 20,
+                            search,
+                            subject,
+                            sortField: sort.field,
+                            sortDir: sort.dir,
+                            classification,
+                            jurisdictionName,
+                            showCongress,
+                            sponsor: sponsorLastName,
+                            sponsorId
+                        });
+                        allUpdates = firstBatch;
                     }
-                    // Fetch the next batch (the visible page)
-                    const nextBatch = await fetchUpdatesFeed({
-                        skip: currentSkip,
-                        limit: 20,
-                        search,
-                        subject,
-                        sortField: sort.field,
-                        sortDir: sort.dir,
-                        classification,
-                        jurisdictionName,
-                        showCongress,
-                        sponsor: sponsorLastName,
-                        sponsorId
-                    });
-                    allUpdates = [...allUpdates, ...nextBatch];
                     // Filter to only bookmarked items if showOnlyBookmarked is true
                     const filteredUpdates = showOnlyBookmarked
                         ? allUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
@@ -389,7 +410,7 @@ export function PolicyUpdatesFeed() {
                     setUpdates(filteredUpdates);
                     skipRef.current = filteredUpdates.length;
                     setSkip(filteredUpdates.length);
-                    setHasMore(nextBatch.length === 20 && (!showOnlyBookmarked || filteredUpdates.length === 20));
+                    setHasMore(filteredUpdates.length === 20);
                 } catch {
                     if (!isMounted) return;
                     setHasMore(false);
