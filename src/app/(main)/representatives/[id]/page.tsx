@@ -244,7 +244,6 @@ export default function RepresentativeDetailPage() {
                         const h = hash % 360;
                         return `hsl(${h}, ${s}%, ${l}%)`;
                       }
-                      const repColor = rep && rep.name ? stringToHslColor(rep.name) : '#2563eb';
                       // Add both sponsorId and rep name for PolicyUpdatesFeed filter
                       const sponsorLink = rep && rep.id && rep.name
                         ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}&rep=${encodeURIComponent(rep.name)}`
@@ -254,9 +253,8 @@ export default function RepresentativeDetailPage() {
                           href={sponsorLink}
                           className="inline-block mt-2 px-4 py-2 rounded font-semibold shadow transition-colors text-center"
                           style={{
-                            background: repColor,
-                            color: '#fff',
-                            border: `2px solid ${repColor}`,
+                            background: '#71A3A1',
+                            color: '#fff'
                           }}
                         >
                           View all bills sponsored
