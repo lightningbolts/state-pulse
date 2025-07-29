@@ -237,31 +237,12 @@ export default function RepresentativeDetailPage() {
                     ))}
                   </div>
                   {bills.length > 3 && (
-                    (() => {
-                      // Generate a color from the rep's name
-                      function stringToHslColor(str: string, s = 70, l = 50) {
-                        let hash = 0;
-                        for (let i = 0; i < str.length; i++) {
-                          hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                        }
-                        const h = hash % 360;
-                        return `hsl(${h}, ${s}%, ${l}%)`;
-                      }
-                      const repColor = rep && rep.name ? stringToHslColor(rep.name) : '#2563eb';
-                      return (
-                        <Link
-                          href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
-                          className="inline-block mt-2 px-4 py-2 rounded font-semibold shadow transition-colors text-center"
-                          style={{
-                            background: repColor,
-                            color: '#fff',
-                            border: `2px solid ${repColor}`,
-                          }}
-                        >
-                          View all bills sponsored
-                        </Link>
-                      );
-                    })()
+                    <Link
+                      href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
+                      className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
+                    >
+                      View all bills sponsored
+                    </Link>
                   )}
                 </>
               )}

@@ -7,18 +7,6 @@ import {Button} from "@/components/ui/button";
 import {Bookmark, MapPin, Plus, Search, X} from "lucide-react";
 import {BookmarkButton, BookmarksContext} from "@/components/features/BookmarkButton";
 import React, {useCallback, useContext, useEffect, useLayoutEffect, useRef, useState} from "react";
-import { useScrollRestoration } from "@/hooks/useScrollRestoration";
-// Helper to fetch rep name by sponsorId
-async function fetchRepNameById(id: string): Promise<string | null> {
-  try {
-    const res = await fetch(`/api/representatives/${id}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.representative?.name || null;
-  } catch {
-    return null;
-  }
-}
 import {useSearchParams, useRouter} from "next/navigation";
 import {
   DropdownMenu,
@@ -118,14 +106,6 @@ async function fetchUpdatesFeed({
 }
 
 export function PolicyUpdatesFeed() {
-    // --- Seamless state/scroll restore ---
-    // Use a ref to block the initial fetch until state/scroll is restored
-    const didRestore = useRef(false);
-    // Track if we just restored feed state from sessionStorage (for scroll restoration)
-    const justRestoredFeedState = useRef(false);
-    // Use the new scroll restoration hook (restores window scroll by default)
-    useScrollRestoration();
-
     const [updates, setUpdates] = useState<PolicyUpdate[]>([]);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
@@ -139,7 +119,6 @@ export function PolicyUpdatesFeed() {
     const [repFilter, setRepFilter] = useState<string>("");
     const [sponsorId, setSponsorId] = useState<string>("");
     const router = useRouter();
-    const [sponsorName, setSponsorName] = useState<string>("");
     const [showLoadingText, setShowLoadingText] = useState(true);
     const [searchInput, setSearchInput] = useState("");
     const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false);
@@ -173,9 +152,6 @@ export function PolicyUpdatesFeed() {
         const repParam = searchParams.get('rep');
         const sponsorIdParam = searchParams.get('sponsorId');
 
-        // Only clear sessionStorage if a filter is actually changed, not on navigation
-        let filterChanged = false;
-
         if (sponsorIdParam) {
             setSponsorId(sponsorIdParam);
             setRepFilter("");
@@ -184,22 +160,20 @@ export function PolicyUpdatesFeed() {
             skipRef.current = 0;
             setHasMore(true);
             setLoading(true);
-            // Fetch rep name for filter chip
-            fetchRepNameById(sponsorIdParam).then(name => setSponsorName(name || ""));
-            filterChanged = true;
-        } else if (sponsorId) {
-            // If sponsorId was previously set but now is not, clear sponsor-related state
+        } else if (repParam) {
+            setRepFilter(repParam);
             setSponsorId("");
-            setRepFilter("");
-            setSponsorName("");
             setUpdates([]);
             setSkip(0);
             skipRef.current = 0;
             setHasMore(true);
             setLoading(true);
-            filterChanged = true;
+        } else {
+            setRepFilter("");
+            setSponsorId("");
         }
 
+        // Existing state and congress logic...
         if (congressParam === 'true') {
             setShowCongress(true);
             setJurisdictionName('');
@@ -208,7 +182,6 @@ export function PolicyUpdatesFeed() {
             skipRef.current = 0;
             setHasMore(true);
             setLoading(true);
-            filterChanged = true;
             return;
         }
         if (stateParam || stateAbbrParam) {
@@ -236,16 +209,7 @@ export function PolicyUpdatesFeed() {
                 skipRef.current = 0;
                 setHasMore(true);
                 setLoading(true);
-                filterChanged = true;
             }
-        }
-
-        // Only clear sessionStorage if a filter was actually changed
-        if (filterChanged) {
-            sessionStorage.removeItem('policyUpdatesFeedState');
-            sessionStorage.removeItem('policyUpdatesFeedScrollY');
-            // Reset didRestore so restoration can happen after navigation
-            didRestore.current = false;
         }
     }, [searchParams]);
 
@@ -279,10 +243,6 @@ export function PolicyUpdatesFeed() {
                     const newUniqueUpdates = filteredNewUpdates.filter((u: PolicyUpdate) => !existingIds.has(u.id));
                     return [...prev, ...newUniqueUpdates];
                 });
-                // Update URL with new skip/page, but do not scroll
-                const params = new URLSearchParams(Array.from(searchParams.entries()));
-                params.set('skip', String(currentSkip + newUpdates.length));
-                router.push(`/legislation?${params.toString()}`, { scroll: false });
             }
             skipRef.current = currentSkip + newUpdates.length;
             setSkip(skipRef.current);
@@ -294,7 +254,7 @@ export function PolicyUpdatesFeed() {
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter, router, searchParams]);
+    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
@@ -304,173 +264,65 @@ export function PolicyUpdatesFeed() {
         setSkip(0);
         skipRef.current = 0;
         setHasMore(true);
-        // Update URL with new search param, but do not scroll
-        const params = new URLSearchParams(Array.from(searchParams.entries()));
-        params.set('search', searchInput);
-        params.set('skip', '0');
-        router.push(`/legislation?${params.toString()}`, { scroll: false });
-    }, [searchInput, search, setUpdates, router, searchParams]);
+    }, [searchInput, search, setUpdates]);
 
+    // --- Seamless state/scroll restore ---
+    // Use a ref to block the initial fetch until state/scroll is restored
+    const didRestore = useRef(false);
 
-    // On mount, try to restore feed state from sessionStorage if filters match, else fetch from URL
-    useEffect(() => {
-        let isMounted = true;
-        const params = new URLSearchParams(Array.from(searchParams.entries()));
-        const skipParam = parseInt(params.get('skip') || '0', 10);
-        const sessionKey = 'policyUpdatesFeedState';
-        const saved = sessionStorage.getItem(sessionKey);
-        let restored = false;
-        if (saved) {
+    useLayoutEffect(() => {
+        if (didRestore.current) return;
+
+        // Check for URL parameters first - these should take precedence
+        const stateParam = searchParams.get('state');
+        const stateAbbrParam = searchParams.get('stateAbbr');
+        const hasUrlParams = stateParam || stateAbbrParam;
+
+        const saved = sessionStorage.getItem('policyUpdatesFeedState');
+        if (saved && !hasUrlParams) { // Only restore from sessionStorage if no URL params
             try {
                 const state = JSON.parse(saved);
-                // Only restore if filters match
-                const filtersMatch =
-                  state.search === search &&
-                  state.subject === subject &&
-                  state.classification === classification &&
-                  state.jurisdictionName === jurisdictionName &&
-                  state.showCongress === showCongress &&
-                  state.sponsorId === sponsorId &&
-                  state.skip === skipParam;
-                if (filtersMatch && Array.isArray(state.updates)) {
+                setSearch(state.search || "");
+                setSubject(state.subject || "");
+                setClassification(state.classification || "");
+                setJurisdictionName(state.jurisdictionName || "");
+                setShowCongress(state.showCongress || false);
+                setSort(state.sort || {field: 'createdAt', dir: 'desc'});
+                setSkip(state.skip || 0);
+                skipRef.current = state.skip || 0;
+                setSearchInput(state.searchInput || "");
+                if (state.updates && Array.isArray(state.updates)) {
                     setUpdates(state.updates);
+                    // Crucial fix: set skipRef to actual length of updates
                     skipRef.current = state.updates.length;
-                    setSkip(state.updates.length);
-                    setHasMore(state.hasMore !== undefined ? state.hasMore : true);
-                    restored = true;
+                } else {
+                    setUpdates([]);
                 }
-            } catch {}
-        }
-        if (!restored) {
-            const fetchAndSet = async () => {
-                setLoading(true);
-                try {
-                    let allUpdates: PolicyUpdate[] = [];
-                    let currentSkip = 0;
-                    const sponsorLastName = repFilter ? getLastName(repFilter) : "";
-                    while (currentSkip < skipParam) {
-                        const batch = await fetchUpdatesFeed({
-                            skip: currentSkip,
-                            limit: 20,
-                            search,
-                            subject,
-                            sortField: sort.field,
-                            sortDir: sort.dir,
-                            classification,
-                            jurisdictionName,
-                            showCongress,
-                            sponsor: sponsorLastName,
-                            sponsorId
-                        });
-                        if (batch.length === 0) break;
-                        allUpdates = [...allUpdates, ...batch];
-                        currentSkip += batch.length;
-                        if (batch.length < 20) break;
-                    }
-                    // Fetch the next batch (the visible page)
-                    const nextBatch = await fetchUpdatesFeed({
-                        skip: currentSkip,
-                        limit: 20,
-                        search,
-                        subject,
-                        sortField: sort.field,
-                        sortDir: sort.dir,
-                        classification,
-                        jurisdictionName,
-                        showCongress,
-                        sponsor: sponsorLastName,
-                        sponsorId
-                    });
-                    allUpdates = [...allUpdates, ...nextBatch];
-                    // Filter to only bookmarked items if showOnlyBookmarked is true
-                    const filteredUpdates = showOnlyBookmarked
-                        ? allUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
-                        : allUpdates;
-                    setUpdates(filteredUpdates);
-                    skipRef.current = filteredUpdates.length;
-                    setSkip(filteredUpdates.length);
-                    setHasMore(nextBatch.length === 20 && (!showOnlyBookmarked || filteredUpdates.length === 20));
-                } catch {
-                    if (!isMounted) return;
-                    setHasMore(false);
-                } finally {
-                    if (!isMounted) return;
-                    setLoading(false);
-                }
-            };
-            fetchAndSet();
-        }
-        return () => {
-            isMounted = false;
-        };
-    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter, searchParams, sponsorId]);
-    // Persist feed state in sessionStorage on every change
-    useEffect(() => {
-        try {
-            sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-                search,
-                subject,
-                classification,
-                sort,
-                skip,
-                hasMore,
-                jurisdictionName,
-                showCongress,
-                sponsorId,
-                updates
-            }));
-        } catch {}
-    }, [search, subject, classification, sort, skip, hasMore, jurisdictionName, showCongress, sponsorId, updates]);
-
-
-    // Intersection Observer for infinite scroll
-    useEffect(() => {
-        if (!loader.current) return;
-        const observer = new window.IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
-                    loadMore();
-                }
-            },
-            {
-                threshold: 0, // Trigger as soon as any part is visible
-                rootMargin: '400px' // Expand margin to trigger earlier (near bottom)
+                setHasMore(state.hasMore !== undefined ? state.hasMore : true);
+            } catch (e) {
+                console.error('Error parsing feed state:', e);
+                setUpdates([]);
+                skipRef.current = 0;
+                setSkip(0);
             }
-        );
-        const currentLoader = loader.current;
-        observer.observe(currentLoader);
-        return () => {
-            if (currentLoader) {
-                observer.unobserve(currentLoader);
-            }
-        };
-    }, [loadMore, hasMore]); // Simplified dependencies
-
-    // Hide loading text if no more data and not loading
-    useEffect(() => {
-        if (!hasMore && !loading) {
-            setShowLoadingText(false);
+        } else if (hasUrlParams) {
+            // Clear any existing state when URL params are present
+            setUpdates([]);
+            skipRef.current = 0;
+            setSkip(0);
+            // console.log('URL parameters detected, clearing existing state to prioritize URL params');
         }
-    }, [hasMore, loading]);
 
-    useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-        if (loading) {
-            setShowLoadingText(true);
-            timer = setInterval(() => {
-                setShowLoadingText(prev => !prev);
-            }, 1000);
-        } else {
-            setShowLoadingText(false);
+        // Restore scroll position *before* paint for seamlessness
+        const scrollY = sessionStorage.getItem('policyUpdatesFeedScrollY');
+        if (scrollY && !hasUrlParams) { // Only restore scroll if not coming from URL navigation
+            window.scrollTo(0, parseInt(scrollY, 10));
         }
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [loading]);
 
-
-    // (Removed sessionStorage feed state persistence)
-
+        didRestore.current = true;
+        hasRestored.current = true;
+        prevDeps.current = {search, subject, classification, sort, jurisdictionName};
+    }, [searchParams]);
 
     // Block the initial fetch until after restore, and only fetch if updates are empty
     useEffect(() => {
@@ -519,6 +371,90 @@ export function PolicyUpdatesFeed() {
         };
     }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, repFilter, didRestore.current]);
 
+
+    // Intersection Observer for infinite scroll
+    useEffect(() => {
+        if (!loader.current) return;
+        const observer = new window.IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+                    loadMore();
+                }
+            },
+            {
+                threshold: 0, // Trigger as soon as any part is visible
+                rootMargin: '400px' // Expand margin to trigger earlier (near bottom)
+            }
+        );
+        const currentLoader = loader.current;
+        observer.observe(currentLoader);
+        return () => {
+            if (currentLoader) {
+                observer.unobserve(currentLoader);
+            }
+        };
+    }, [loadMore, hasMore]); // Simplified dependencies
+
+    // Hide loading text if no more data and not loading
+    useEffect(() => {
+        if (!hasMore && !loading) {
+            setShowLoadingText(false);
+        }
+    }, [hasMore, loading]);
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+        if (loading) {
+            setShowLoadingText(true);
+            timer = setInterval(() => {
+                setShowLoadingText(prev => !prev);
+            }, 1000);
+        } else {
+            setShowLoadingText(false);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [loading]);
+
+
+    // Save state to sessionStorage on change (excluding large updates array)
+    useEffect(() => {
+        try {
+            sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
+                search,
+                subject,
+                classification,
+                sort,
+                skip,
+                searchInput,
+                hasMore,
+                jurisdictionName,
+                showCongress,
+                updates
+            }));
+        } catch (error) {
+            console.warn('Failed to save state to sessionStorage:', error);
+            // If storage fails, try to clear old data and retry with minimal state
+            try {
+                sessionStorage.removeItem('policyUpdatesFeedState');
+                sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
+                    search, subject, classification, sort, showCongress
+                }));
+            } catch (retryError) {
+                console.error('Failed to save even minimal state:', retryError);
+            }
+        }
+    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, updates]);
+
+    // Save scroll position
+    useEffect(() => {
+        const handleScroll = () => {
+            sessionStorage.setItem('policyUpdatesFeedScrollY', String(window.scrollY));
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
 
     // Helper function to get sort label
@@ -584,36 +520,31 @@ export function PolicyUpdatesFeed() {
 
     return (
         <>
-            {/* Rep Filter Indicator (by sponsorId) */}
-            {sponsorId && sponsorName && (
+            {/* Rep Filter Indicator */}
+            {repFilter && (
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Badge variant="default" className="bg-green-600">
-                                Filtered by {sponsorName}
+                                Filtered by Representative: {repFilter}
                             </Badge>
                             <span className="text-sm text-muted-foreground">
-                                Showing bills sponsored by {sponsorName}
+                                Showing bills sponsored by {repFilter}
                             </span>
                         </div>
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                                setSponsorId("");
-                                setSponsorName("");
+                                setRepFilter("");
+                                const params = new URLSearchParams(Array.from(searchParams.entries()));
+                                params.delete('rep');
+                                router.replace(`/legislation?${params.toString()}`);
                                 setUpdates([]);
                                 setSkip(0);
                                 skipRef.current = 0;
                                 setHasMore(true);
                                 setLoading(true);
-                                sessionStorage.removeItem('policyUpdatesFeedState');
-                                sessionStorage.removeItem('policyUpdatesFeedScrollY');
-                                // Remove sponsorId from URL and force reload
-                                const params = new URLSearchParams(Array.from(searchParams.entries()));
-                                params.delete('sponsorId');
-                                // Always reload the page to guarantee a true reset
-                                window.location.href = `/legislation?${params.toString()}`;
                             }}
                         >
                             <X className="h-4 w-4 mr-1"/>

@@ -23,39 +23,15 @@
             const { searchParams } = new URL(request.url);
             // Parse filtering parameters
             const filter: Record<string, any> = {};
+            // Always filter by sponsorId if present
             const sponsorIdParam = searchParams.get('sponsorId');
-            const searchValue = searchParams.get('search');
-            let sponsorOr: any = null;
             if (sponsorIdParam) {
               // Normalize id to use slashes (ocd-person/uuid) for matching sponsors.id
               const normalizedId = sponsorIdParam.replace(/^ocd-person_/, 'ocd-person/').replace(/_/g, '-').replace('ocd-person/-', 'ocd-person/');
-              sponsorOr = [
+              filter.$or = [
                 { 'sponsors.id': sponsorIdParam },
                 { 'sponsors.id': normalizedId }
               ];
-            }
-            let searchOr: any = null;
-            if (searchValue) {
-              searchOr = [
-                { title: { $regex: searchValue, $options: 'i' } },
-                { summary: { $regex: searchValue, $options: 'i' } },
-                { identifier: { $regex: searchValue, $options: 'i' } },
-                { classification: searchValue },
-                { classification: { $regex: searchValue, $options: 'i' } },
-                { subjects: searchValue },
-                { subjects: { $regex: searchValue, $options: 'i' } }
-              ];
-            }
-            if (sponsorOr && searchOr) {
-              filter.$and = [ { $or: sponsorOr }, { $or: searchOr } ];
-            } else if (sponsorOr) {
-              filter.$or = sponsorOr;
-            } else if (searchOr) {
-              filter.$or = searchOr;
-            } else {
-              // Guarantee a true reset: remove any $or/$and keys if present
-              if ('$or' in filter) delete filter.$or;
-              if ('$and' in filter) delete filter.$and;
             }
 
             // Parse pagination parameters
@@ -72,6 +48,20 @@
             } else {
               // Default sort if not provided
               sort = { updatedAt: -1 };
+            }
+
+            // Full text search
+            const searchValue = searchParams.get('search');
+            if (searchValue) {
+              filter.$or = [
+                { title: { $regex: searchValue, $options: 'i' } },
+                { summary: { $regex: searchValue, $options: 'i' } },
+                { identifier: { $regex: searchValue, $options: 'i' } },
+                { classification: searchValue },
+                { classification: { $regex: searchValue, $options: 'i' } },
+                { subjects: searchValue },
+                { subjects: { $regex: searchValue, $options: 'i' } }
+              ];
             }
             // Common filters
             if (searchParams.get('session')) {
@@ -148,13 +138,10 @@
 
               // Always build a single $and array for all Congress filters
               const andFilters = [];
-              // Only push $or if it exists and is non-empty
-              if (Array.isArray(filter.$or) && filter.$or.length > 0) {
+              if (filter.$or) {
                 andFilters.push({ $or: filter.$or });
+                delete filter.$or;
               }
-              // Remove $or and $and from filter to avoid stale keys
-              delete filter.$or;
-              delete filter.$and;
               andFilters.push(congressFilter);
               const sponsorId = searchParams.get('sponsorId');
               if (sponsorId) {
@@ -179,13 +166,13 @@
                   });
                 }
               }
-              // Only push other filter keys if they are not $and/$or and are not empty
               for (const [key, value] of Object.entries(filter)) {
-                if (key !== '$and' && key !== '$or' && value !== undefined && value !== null && value !== '') {
-                  andFilters.push({ [key]: value });
-                }
+                if (key !== '$and') andFilters.push({ [key]: value });
               }
               filter.$and = andFilters;
+              for (const key of Object.keys(filter)) {
+                if (key !== '$and') delete filter[key];
+              }
 
               // Debug: log a sample Congress bill with sponsors to inspect sponsor name format
               try {
