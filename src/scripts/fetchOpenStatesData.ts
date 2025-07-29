@@ -1,4 +1,4 @@
-import { upsertLegislationSelective } from '../services/legislationService';
+import { getLegislationById, upsertLegislationSelective } from '../services/legislationService';
 import { config } from 'dotenv';
 import { ai } from '../ai/genkit';
 import fetch from 'node-fetch';
@@ -560,6 +560,27 @@ async function fetchAndStoreUpdatedBills(
         for (const osBill of data.results) {
           try {
             const legislationToStore = transformOpenStatesBillToMongoDB(osBill);
+            // check if the bill already exists in the database
+            if (!legislationToStore.id) {
+              console.warn(`Skipping bill with missing ID: ${osBill.id}`);
+              continue;
+            }
+            // Check if the bill already exists in the database
+            const existingLegislation = await getLegislationById(legislationToStore.id)
+            if (existingLegislation) {
+              if (existingLegislation.geminiSummary && existingLegislation.geminiSummary.length > 100) {
+                // If it exists and has a good summary, skip it
+                console.log(`Bill ${legislationToStore.identifier} already exists with a good summary. Skipping.`);
+                billsProcessed++;
+                // Upsert the existing bill to update timestamps
+                legislationToStore.updatedAt = new Date();
+                await upsertLegislationSelective(legislationToStore);
+                console.log(`Upserted existing bill: ${legislationToStore.identifier} (${legislationToStore.jurisdictionName}) - OS ID: ${osBill.id}`);
+                continue;
+              } else {
+                console.log(`Bill ${legislationToStore.identifier} exists but needs summary update. Proceeding to summarize.`);
+              }
+            }
             // Only summarize if geminiSummary is missing or less than 100 chars
             if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
               const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
@@ -1032,6 +1053,26 @@ async function fetchCongressBills(updatedSince: string) {
             }
 
             const legislationToStore = transformCongressBillToMongoDB(congressBill);
+            // Check if the bill already exists in the database
+            if (!legislationToStore.id) {
+              console.warn(`Skipping bill with missing ID: ${bill.type} ${bill.number}`);
+              continue;
+            }
+            const existingLegislation = await getLegislationById(legislationToStore.id);
+            if (existingLegislation) {
+              if (existingLegislation.geminiSummary && existingLegislation.geminiSummary.length > 100) {
+                // If it exists and has a good summary, skip it
+                console.log(`Bill ${legislationToStore.identifier} already exists with a good summary. Skipping.`);
+                billsProcessed++;
+                // Upsert the existing bill to update timestamps
+                legislationToStore.updatedAt = new Date();
+                await upsertLegislationSelective(legislationToStore);
+                console.log(`Upserted existing bill: ${legislationToStore.identifier} (Congress)`);
+                continue;
+              } else {
+                console.log(`Bill ${legislationToStore.identifier} exists but needs summary update. Proceeding to summarize.`);
+              }
+            }
             // Only summarize if geminiSummary is missing or less than 100 chars
             if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
               const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
