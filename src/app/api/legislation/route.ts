@@ -200,11 +200,11 @@
                   showCongress: true
                 });
                 if (sample && sample.length > 0) {
-                  console.log('[DEBUG] Sample Congress bill with sponsors:', JSON.stringify({
-                    title: sample[0].title,
-                    sponsors: sample[0].sponsors,
-                    identifier: sample[0].identifier
-                  }, null, 2));
+                  // console.log('[DEBUG] Sample Congress bill with sponsors:', JSON.stringify({
+                  //   title: sample[0].title,
+                  //   sponsors: sample[0].sponsors,
+                  //   identifier: sample[0].identifier
+                  // }, null, 2));
                 } else {
                   console.log('[DEBUG] No Congress bill with sponsors found for inspection.');
                 }
@@ -212,7 +212,7 @@
                 console.log('[DEBUG] Error fetching sample Congress bill for inspection:', e);
               }
 
-              console.log('[API] Applied comprehensive Congress filter:', JSON.stringify(filter, null, 2));
+              // console.log('[API] Applied comprehensive Congress filter:', JSON.stringify(filter, null, 2));
 
             } else if (searchParams.get('jurisdictionName')) {
               const jurisdictionNameParam = searchParams.get('jurisdictionName');
