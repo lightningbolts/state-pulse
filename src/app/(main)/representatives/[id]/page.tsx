@@ -19,26 +19,13 @@ const fetchRepresentativeData = async (id: string) => {
   return await res.json();
 };
 
-const getTimeInOffice = (rep: any) => {
-  // Congress: Use earliest startYear in terms.item
-  if (rep?.terms?.item && Array.isArray(rep.terms.item) && rep.terms.item.length > 0) {
-    const startYears = rep.terms.item
-      .map((term: any) => term.startYear)
-      .filter((y: any) => typeof y === 'number' && !isNaN(y));
-    if (startYears.length > 0) {
-      const earliest = Math.min(...startYears);
-      const now = new Date();
-      let years = now.getFullYear() - earliest;
-      return years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : '<1 year';
-    }
-  }
-  // State: Prefer current_role.start_date, fallback to rep.created_at
-  const startDate = rep?.current_role?.start_date || rep?.created_at;
-  if (!startDate) return 'N/A';
-  const start = new Date(startDate);
+const getTimeInOffice = (role: any) => {
+  if (!role || !role.start_date) return 'N/A';
+  const start = new Date(role.start_date);
   if (isNaN(start.getTime())) return 'N/A';
   const now = new Date();
   let years = now.getFullYear() - start.getFullYear();
+  // Adjust if the current month/day is before the start month/day
   if (
     now.getMonth() < start.getMonth() ||
     (now.getMonth() === start.getMonth() && now.getDate() < start.getDate())
@@ -125,20 +112,12 @@ export default function RepresentativeDetailPage() {
     return () => { mounted = false; };
   }, [id]);
 
-  // Debug: Log rep object to inspect structure
-  useEffect(() => {
-    if (rep) {
-      // eslint-disable-next-line no-console
-      console.log('DEBUG rep:', rep);
-    }
-  }, [rep]);
-
   if (loading) return <LoadingOverlay text="Loading representative details..." smallText="Please wait..." />;
   if (error) return <div className="py-8 text-center text-red-600">{error}</div>;
   if (!rep) return <div className="py-8 text-center text-red-600">Representative not found.</div>;
 
   // Section: Normalize data for display
-  const timeInOffice = getTimeInOffice(rep);
+  const timeInOffice = getTimeInOffice(rep.current_role);
   const recentBills = bills.slice(0, 3);
   const topTopics = getTopTopics(bills);
 
@@ -201,7 +180,7 @@ export default function RepresentativeDetailPage() {
                   <span>{((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) ? ' - ' : ''}District {rep.current_role.district}</span>
                 )}
               </div>
-              <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
+              <div className="text-md text-gray-200 mt-2 text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
             </div>
           </div>
         </CardHeader>
