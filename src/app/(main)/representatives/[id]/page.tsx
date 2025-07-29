@@ -274,9 +274,9 @@ export default function RepresentativeDetailPage() {
                           href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
                           className="inline-block mt-2 px-4 py-2 rounded font-semibold shadow transition-colors text-center"
                           style={{
-                            background: repColor,
-                            color: '#71A3A1',
-                            border: `2px solid ${repColor}`,
+                            background: '#71A3A1',
+                            color: '#fff',
+                            // border: `2px solid ${repColor}`,
                           }}
                         >
                           View all bills sponsored
