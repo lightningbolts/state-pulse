@@ -19,13 +19,26 @@ const fetchRepresentativeData = async (id: string) => {
   return await res.json();
 };
 
-const getTimeInOffice = (role: any) => {
-  if (!role || !role.start_date) return 'N/A';
-  const start = new Date(role.start_date);
+const getTimeInOffice = (rep: any) => {
+  // Congress: Use earliest startYear in terms.item
+  if (rep?.terms?.item && Array.isArray(rep.terms.item) && rep.terms.item.length > 0) {
+    const startYears = rep.terms.item
+      .map((term: any) => term.startYear)
+      .filter((y: any) => typeof y === 'number' && !isNaN(y));
+    if (startYears.length > 0) {
+      const earliest = Math.min(...startYears);
+      const now = new Date();
+      let years = now.getFullYear() - earliest;
+      return years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : '<1 year';
+    }
+  }
+  // State: Prefer current_role.start_date, fallback to rep.created_at
+  const startDate = rep?.current_role?.start_date || rep?.created_at;
+  if (!startDate) return 'N/A';
+  const start = new Date(startDate);
   if (isNaN(start.getTime())) return 'N/A';
   const now = new Date();
   let years = now.getFullYear() - start.getFullYear();
-  // Adjust if the current month/day is before the start month/day
   if (
     now.getMonth() < start.getMonth() ||
     (now.getMonth() === start.getMonth() && now.getDate() < start.getDate())
@@ -49,30 +62,6 @@ const getTopTopics = (bills: Bill[], count = 3) => {
     .slice(0, count)
     .map(([topic]) => topic);
 };
-
-function RepresentativeCard({ rep, timeInOffice }: {
-  rep: Representative,
-  timeInOffice: string
-}) {
-  return (
-    <div className="flex items-center gap-6 mb-8">
-      <img
-        src={rep.image || rep.photo || 'https://via.placeholder.com/150'}
-        alt={rep.name}
-        className="w-32 h-32 rounded-full object-cover border"
-      />
-      <div>
-        <h1 className="text-3xl font-bold mb-2">{rep.name}</h1>
-        <div className="text-lg text-gray-700 mb-1">{rep.office} ({rep.party})</div>
-        <div className="text-md text-gray-500 mb-1">
-          District {rep.district}, {typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name}
-        </div>
-        <div className="text-md text-gray-500">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
-      </div>
-    </div>
-  );
-}
-
 
 export default function RepresentativeDetailPage() {
   const params = useParams<{ id: string }>();
@@ -112,12 +101,20 @@ export default function RepresentativeDetailPage() {
     return () => { mounted = false; };
   }, [id]);
 
+  // Debug: Log rep object to inspect structure
+  useEffect(() => {
+    if (rep) {
+      // eslint-disable-next-line no-console
+      console.log('DEBUG rep:', rep);
+    }
+  }, [rep]);
+
   if (loading) return <LoadingOverlay text="Loading representative details..." smallText="Please wait..." />;
   if (error) return <div className="py-8 text-center text-red-600">{error}</div>;
   if (!rep) return <div className="py-8 text-center text-red-600">Representative not found.</div>;
 
   // Section: Normalize data for display
-  const timeInOffice = getTimeInOffice(rep.current_role);
+  const timeInOffice = getTimeInOffice(rep);
   const recentBills = bills.slice(0, 3);
   const topTopics = getTopTopics(bills);
 
@@ -180,7 +177,7 @@ export default function RepresentativeDetailPage() {
                   <span>{((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) ? ' - ' : ''}District {rep.current_role.district}</span>
                 )}
               </div>
-              <div className="text-md text-gray-200 mt-2 text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
+              <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
             </div>
           </div>
         </CardHeader>
@@ -237,12 +234,31 @@ export default function RepresentativeDetailPage() {
                     ))}
                   </div>
                   {bills.length > 3 && (
-                    <Link
-                      href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
-                      className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
-                    >
-                      View all bills sponsored
-                    </Link>
+                    (() => {
+                      // Generate a color from the rep's name
+                      function stringToHslColor(str: string, s = 70, l = 50) {
+                        let hash = 0;
+                        for (let i = 0; i < str.length; i++) {
+                          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                        }
+                        const h = hash % 360;
+                        return `hsl(${h}, ${s}%, ${l}%)`;
+                      }
+                      const repColor = rep && rep.name ? stringToHslColor(rep.name) : '#2563eb';
+                      return (
+                        <Link
+                          href={rep && rep.id ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}` : '#'}
+                          className="inline-block mt-2 px-4 py-2 rounded font-semibold shadow transition-colors text-center"
+                          style={{
+                            background: repColor,
+                            color: '#fff',
+                            border: `2px solid ${repColor}`,
+                          }}
+                        >
+                          View all bills sponsored
+                        </Link>
+                      );
+                    })()
                   )}
                 </>
               )}
