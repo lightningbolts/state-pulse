@@ -44,48 +44,48 @@ export default function HomePageClient() {
           <p className="text-muted-foreground text-lg mb-16 max-w-2xl mx-auto leading-relaxed">
             We provide the tools and insights you need to navigate the complex world of state-level policy.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10">
-            <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+            <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg min-h-[220px] h-auto overflow-visible">
               <CardHeader className="pb-4">
                 <div className="flex items-center mb-3">
                   <Newspaper className="h-10 w-10 text-primary mr-4" />
                   <div>
-                    <CardTitle className="text-2xl font-semibold">Quick Updates</CardTitle>
+                    <CardTitle className="text-2xl font-semibold break-words">Quick Updates</CardTitle>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
+              <CardContent className="break-words overflow-visible h-auto">
+                <p className="text-muted-foreground leading-relaxed break-words">
                   Access the latest information on bills, resolutions, and policy changes as they happen.
                 </p>
               </CardContent>
             </Card>
-            <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg">
+            <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg min-h-[220px] h-auto overflow-visible">
               <CardHeader className="pb-4">
                 <div className="flex items-center mb-3">
                   <Landmark className="h-10 w-10 text-primary mr-4" />
                   <div>
-                    <CardTitle className="text-2xl font-semibold">Comprehensive Coverage</CardTitle>
+                    <CardTitle className="text-2xl font-semibold break-words">Comprehensive Coverage</CardTitle>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
+              <CardContent className="break-words overflow-visible h-auto">
+                <p className="text-muted-foreground leading-relaxed break-words">
                   Track legislation across multiple states and jurisdictions from a single platform.
                 </p>
               </CardContent>
             </Card>
-            <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg">
+            <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg min-h-[220px] h-auto overflow-visible">
               <CardHeader className="pb-4">
                 <div className="flex items-center mb-3">
                   <BarChart3 className="h-10 w-10 text-primary mr-4" />
                   <div>
-                    <CardTitle className="text-2xl font-semibold">Insightful Analytics</CardTitle>
+                    <CardTitle className="text-2xl font-semibold break-words">Insightful Analytics</CardTitle>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
+              <CardContent className="break-words overflow-visible h-auto">
+                <p className="text-muted-foreground leading-relaxed break-words">
                   Understand trends and impacts with our data visualization tools.
                   <span className="block text-sm text-primary/80 mt-1 font-medium">(Coming Soon!)</span>
                 </p>
