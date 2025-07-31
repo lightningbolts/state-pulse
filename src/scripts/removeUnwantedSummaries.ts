@@ -8,6 +8,8 @@ const TARGET_PHRASES = [
   'code of ethics',
   'zoom',
   'general assembly',
+  'new bill status inquiry',
+  'unicameral legislature'
 ];
 
 async function removeUnwantedSummaries() {
