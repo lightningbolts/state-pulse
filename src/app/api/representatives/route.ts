@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { OpenStatesPerson, Representative, CongressPerson } from "@/types/representative";
+import Fuse from 'fuse.js';
 
 // US State mapping and validation
 export const stateMap: Record<string, string> = {
@@ -96,17 +97,11 @@ export async function GET(request: NextRequest) {
       // Build robust filter for all reps with support for name, state, chamber, party
       const filter: any = {};
       const andFilters: any[] = [];
-      // Multi-field search (name, office, district, party)
+      // Multi-field search (name, office, district, party) using Fuse.js for fuzzy search
+      let fuseSearch = null;
       if (search) {
-        const regex = { $regex: search, $options: 'i' };
-        andFilters.push({ $or: [
-          { name: regex },
-          { office: regex },
-          { district: regex },
-          { party: regex },
-          { lastName: regex }, // CongressPerson field
-          { firstName: regex } // CongressPerson field
-        ] });
+        // We'll apply Fuse.js after fetching the results from MongoDB
+        fuseSearch = search;
       }
       // Party substring match (case-insensitive)
       if (filterParty) {
@@ -225,14 +220,30 @@ export async function GET(request: NextRequest) {
       // Pagination
       const skip = (pageParam - 1) * pageSize;
       const total = await representativesCollection.countDocuments(filter);
-      const reps = await representativesCollection
+      let reps = await representativesCollection
         .find(filter)
         .sort(sortObj)
-        .skip(skip)
-        .limit(pageSize)
         .toArray();
+      // Fuzzy search with Fuse.js if search is present
+      if (fuseSearch) {
+        const fuse = new Fuse(reps, {
+          keys: [
+            'name',
+            'office',
+            'district',
+            'party',
+            'lastName',
+            'firstName'
+          ],
+          threshold: 0.4,
+          ignoreLocation: true,
+        });
+        reps = fuse.search(fuseSearch).map(result => result.item);
+      }
+      // Pagination after fuzzy search
+      const paginatedReps = reps.slice(skip, skip + pageSize);
       // Normalize results for frontend compatibility
-      const normalizedReps = reps.map(rep => {
+      const normalizedReps = paginatedReps.map(rep => {
         // CongressPerson normalization
         if ('terms' in rep && Array.isArray(rep.terms)) {
           const latestTerm = rep.terms[rep.terms.length - 1] || {};
@@ -279,9 +290,9 @@ export async function GET(request: NextRequest) {
         pagination: {
           page: pageParam,
           pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize),
-          hasNext: skip + pageSize < total,
+          total: fuseSearch ? reps.length : total,
+          totalPages: Math.ceil((fuseSearch ? reps.length : total) / pageSize),
+          hasNext: skip + pageSize < (fuseSearch ? reps.length : total),
           hasPrev: pageParam > 1
         }
       });
@@ -935,13 +946,17 @@ export async function GET(request: NextRequest) {
 
     let filteredReps = representatives;
     if (search) {
-      const regex = new RegExp(search, 'i');
-      filteredReps = filteredReps.filter(rep =>
-        regex.test(rep.name) ||
-        (rep.office && regex.test(rep.office)) ||
-        (rep.district && regex.test(rep.district)) ||
-        (rep.party && regex.test(rep.party))
-      );
+      const fuse = new Fuse(filteredReps, {
+        keys: [
+          'name',
+          'office',
+          'district',
+          'party'
+        ],
+        threshold: 0.4,
+        ignoreLocation: true,
+      });
+      filteredReps = fuse.search(search).map(result => result.item);
     }
     // Sorting
     const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction'];
