@@ -276,7 +276,7 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
   console.log('[DEBUG] Bill title:', bill.title);
 
   // For Illinois, skip all sources, PDFs, and versions; use abstracts (or title)
-  if (bill.jurisdictionName === 'Illinois' || bill.jurisdictionName === 'Ohio' || bill.jurisdictionName === 'Minnesota' || bill.jurisdictionName === 'Vermont' || bill.jurisdictionName === 'Arizona') {
+  if (bill.jurisdictionName === 'Illinois' || bill.jurisdictionName === 'Ohio' || bill.jurisdictionName === 'Minnesota' || bill.jurisdictionName === 'Vermont' || bill.jurisdictionName === 'Arizona' || bill.jurisdictionName === 'Delaware') {
     if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
       const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
       if (abstractsText.trim().length > 20) {
