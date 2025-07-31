@@ -27,32 +27,9 @@ export async function GET() {
     // Also look ahead to the next session in case data is loaded early
     const nextCongressSession = `${congressNumber + 1}th Congress`;
 
-    // Define a comprehensive query for all US Congress legislation,
-    // including sessions that may not have a `jurisdictionName`.
+    // Only match bills with jurisdictionName === 'United States Congress'
     const allCongressQuery = {
-      $or: [
-        // Matches older data with explicit jurisdiction names
-        {
-          jurisdictionName: {
-            $regex: "United States|US|USA|Federal|Congress",
-            $options: "i"
-          }
-        },
-        // Matches newer data (like 119th Congress) that lacks a jurisdictionName
-        // but has a session field and other federal indicators.
-        {
-          $and: [
-            {
-              $or: [
-                { jurisdictionName: { $exists: false } },
-                { jurisdictionName: null },
-                { jurisdictionName: "" }
-              ]
-            },
-            { session: { $regex: "Congress", $options: "i" } }
-          ]
-        }
-      ]
+      jurisdictionName: "United States Congress"
     };
 
     // A specific query for the current and upcoming Congress for "Recent Bills"

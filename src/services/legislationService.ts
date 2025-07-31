@@ -218,92 +218,41 @@ export async function getAllLegislation({
 
     const isMostRecentSort = sort.updatedAt === -1 || sort.createdAt === -1;
 
-    // If showCongress is true, always use the aggregation pipeline for proper sorting.
+    // If showCongress is true, use robust query to match all Congress bills
     if (showCongress) {
-      console.log('[Service] Using aggregation pipeline for Congress sorting');
-
-      const sortStage: Record<string, any> = {};
-      if (isMostRecentSort) {
-        sortStage['sessionNumber'] = -1;
-        sortStage['mostRecentDate'] = -1;
-      } else if (sort.title) {
-        sortStage['title'] = sort.title;
-      } else {
-        // Fallback or other sort fields can be added here
-        sortStage['sessionNumber'] = -1;
-        sortStage['mostRecentDate'] = -1;
-      }
-
-      const pipeline = [
-        { $match: filter },
-        {
-          $addFields: {
-            sessionNumber: {
-              $let: {
-                vars: {
-                  sessionString: { $ifNull: ["$session", "0"] }
-                },
-                in: {
-                  $let: {
-                    vars: {
-                      match: { $regexFind: { input: "$$sessionString", regex: "\\d+" } }
-                    },
-                    in: { $toInt: { $ifNull: ["$$match.match", "0"] } }
-                  }
-                }
-              }
-            },
-            mostRecentDate: {
-              $max: [
-                { $ifNull: ["$firstActionAt", new Date(0)] },
-                { $ifNull: ["$latestActionAt", new Date(0)] },
-                { $ifNull: ["$createdAt", new Date(0)] },
-                {
-                  $ifNull: [ // Max from history
-                    {
-                      $max: {
-                        $map: {
-                          input: { $ifNull: ["$history", []] },
-                          in: {
-                            $dateFromString: {
-                              dateString: "$$this.date",
-                              onError: new Date(0)
-                            }
-                          }
-                        }
-                      }
-                    },
-                    new Date(0)
-                  ]
-                },
-                {
-                  $ifNull: [ // Max from versions
-                    {
-                      $max: {
-                        $map: {
-                          input: { $ifNull: ["$versions", []] },
-                          in: {
-                            $dateFromString: {
-                              dateString: "$$this.date",
-                              onError: new Date(0)
-                            }
-                          }
-                        }
-                      }
-                    },
-                    new Date(0)
-                  ]
-                }
-              ]
+      console.log('[Service] Using robust query for Congress bills');
+      const congressQuery = {
+        $or: [
+          {
+            jurisdictionName: {
+              $regex: "United States|US|USA|Federal|Congress",
+              $options: "i"
             }
+          },
+          {
+            $and: [
+              {
+                $or: [
+                  { jurisdictionName: { $exists: false } },
+                  { jurisdictionName: null },
+                  { jurisdictionName: "" }
+                ]
+              },
+              { session: { $regex: "Congress", $options: "i" } }
+            ]
           }
-        },
-        { $sort: sortStage },
-        { $skip: skip },
-        { $limit: limit }
-      ];
-
-      const results = await legislationCollection.aggregate(pipeline).toArray();
+        ]
+      };
+      // Merge with any additional filters (e.g., search, classification, chamber)
+      const mergedFilter = filter && Object.keys(filter).length > 0
+        ? { $and: [congressQuery, filter] }
+        : congressQuery;
+      const results = await legislationCollection
+        .find(mergedFilter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .toArray();
       return results as Legislation[];
     }
 
@@ -373,23 +322,19 @@ export async function searchLegislationByTopic(topic: string, daysBack: number =
 
     let docs = [];
 
-    // Try federal search first if detected
+    // Simplified Congress search: only match jurisdictionName: 'United States Congress'
     if (detectedFederal.length > 0) {
       const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
-      const query = {
-        $and: [
-          { jurisdictionName: { $in: [/united states congress/i, /congress/i, /federal/i] } },
-          searchTerms.length > 0 ? {
-            $or: [
-              { title: { $in: regexPatterns } },
-              { subjects: { $in: regexPatterns } },
-              { summary: { $in: regexPatterns } },
-              { geminiSummary: { $in: regexPatterns } },
-              { latestActionDescription: { $in: regexPatterns } }
-            ]
-          } : {}
-        ].filter(Boolean)
-      };
+      let query: Record<string, any> = { jurisdictionName: "United States Congress" };
+      if (searchTerms.length > 0) {
+        query.$or = [
+          { title: { $in: regexPatterns } },
+          { subjects: { $in: regexPatterns } },
+          { summary: { $in: regexPatterns } },
+          { geminiSummary: { $in: regexPatterns } },
+          { latestActionDescription: { $in: regexPatterns } }
+        ];
+      }
       docs = await legislationCollection
         .find(query)
         .sort({ latestActionAt: -1, createdAt: -1 })

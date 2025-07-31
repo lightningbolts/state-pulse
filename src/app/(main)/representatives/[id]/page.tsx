@@ -105,7 +105,7 @@ export default function RepresentativeDetailPage() {
   useEffect(() => {
     if (rep) {
       // eslint-disable-next-line no-console
-      console.log('DEBUG rep:', rep);
+      // console.log('DEBUG rep:', rep);
     }
   }, [rep]);
 

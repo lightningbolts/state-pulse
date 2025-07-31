@@ -63,23 +63,36 @@ async function main() {
   const collection = await getCollection('legislation');
   let totalRestored = 0;
 
+  const dryRun = process.env.DRY_RUN === "1";
   for (const state of states) {
-    const result = await collection.updateMany(
-      {
-        jurisdictionName: "United States",
-        $or: [
-          { state: state.abbr },
-          { jurisdictionId: new RegExp(state.abbr, "i") },
-          { openstatesUrl: new RegExp(state.abbr, "i") },
-          { "versions.links.url": new RegExp(state.source, "i") },
-          { "sources.url": new RegExp(state.source, "i") }
-        ]
-      },
-      { $set: { jurisdictionName: state.name } }
-    );
-    if (result.modifiedCount > 0) {
-      console.log(`Restored jurisdictionName for ${result.modifiedCount} ${state.name} bills.`);
-      totalRestored += result.modifiedCount;
+    // Build a highly specific query for each state
+    const query = {
+      $or: [
+        { state: state.abbr },
+        { "versions.links.url": new RegExp(state.source, "i") },
+        { "sources.url": new RegExp(state.source, "i") }
+      ]
+    };
+    // For states with unique sources, add extra clues to $or array
+    if (state.abbr === "MA") {
+      query.$or.push({ "sources.url": /malegislature.gov/i });
+    }
+    if (state.abbr === "NY") {
+      query.$or.push({ "sources.url": /nyassembly.gov/i });
+      query.$or.push({ "sources.url": /nysenate.gov/i });
+    }
+    // Dry run: log affected document IDs
+    if (dryRun) {
+      const docs = await collection.find(query).project({ _id: 1 }).toArray();
+      if (docs.length > 0) {
+        console.log(`[DRY RUN] Would restore jurisdictionName for ${docs.length} ${state.name} bills. IDs:`, docs.map(d => d._id));
+      }
+    } else {
+      const result = await collection.updateMany(query, { $set: { jurisdictionName: state.name } });
+      if (result.modifiedCount > 0) {
+        console.log(`Restored jurisdictionName for ${result.modifiedCount} ${state.name} bills.`);
+        totalRestored += result.modifiedCount;
+      }
     }
   }
   console.log(`Total restored: ${totalRestored} bills.`);
