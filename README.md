@@ -1,22 +1,23 @@
-# StatePulse 🏛️
+
+# StatePulse
 
 **Empowering civic engagement through accessible state legislation tracking**
 
 StatePulse is a comprehensive web application designed to encourage and facilitate citizen engagement with state-level politics across the United States. By aggregating legislation from all 50 U.S. states and making it accessible through AI-powered summaries and intuitive tools, StatePulse bridges the gap between complex legislative processes and everyday citizens.
 
-## 🎯 Mission
+## Mission
 
 Our mission is to democratize access to state legislation information and empower citizens to actively participate in their state's political processes through informed engagement.
 
-## ✨ Features
+## Features
 
-### 📊 **Comprehensive Legislation Database**
+### **Comprehensive Legislation Database**
 - **100,000+ Bills**: Aggregated legislation from all 50 U.S. states (2024 data)
 - **Quick and Timely Updates**: Continuous tracking of legislative changes and new bills
 - **Advanced Search**: Find legislation by keywords, sponsors, or bill numbers
 - **Bill Linking**: Connect related bills and track legislative families
 
-### 🤖 **AI-Powered Understanding**
+### **AI-Powered Understanding**
 - **Multiple Summary Styles**:
   - Plain English explanations for everyday understanding
   - Legal-dense summaries for detailed analysis
@@ -25,31 +26,31 @@ Our mission is to democratize access to state legislation information and empowe
 - **Gemini AI Integration**: High-quality, contextual bill summaries
 - **Local LLM Support**: Privacy-focused AI processing options
 
-### 👥 **Community Engagement**
+### **Community Engagement**
 - **Community Posts**: Share thoughts, analysis, and questions about legislation
 - **Bill Discussions**: Link specific bills to community conversations
 - **Bug Reports**: Help improve the platform through user feedback
 - **Social Features**: Like, comment, and engage with other users' posts
 
-### 🏛️ **Civic Tools**
+### **Civic Tools**
 - **Representative Finder**: Locate your state-level representatives
 - **Message Generator**: AI-assisted tool to craft personalized messages to legislators
 - **Contact Information**: Direct access to representative contact details
 - **Civic Engagement Guidance**: Tools and resources for effective political participation
 
-### 📈 **Personal Tracking & Organization**
+### **Personal Tracking & Organization**
 - **Policy Tracking**: Subscribe to specific topics and receive updates
 - **Bookmarking System**: Save and organize legislation you care about
 - **Personalized Dashboard**: Customized view of your tracked policies and bookmarks
 - **Activity Feed**: Stay updated on changes to your followed legislation
 
-### 🔐 **User Experience**
+### **User Experience**
 - **OAuth Authentication**: Secure account creation with Clerk integration
 - **Responsive Design**: Optimized for desktop, tablet, and mobile devices
 - **Privacy-Focused**: Transparent data handling and user privacy protection
 - **Accessible Interface**: Designed for users of all technical backgrounds
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### **Frontend**
 - **Next.js** with App Router
@@ -77,7 +78,7 @@ Our mission is to democratize access to state legislation information and empowe
 - **User-generated content** for community engagement
 - **Leaflet.js** for interactive maps
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js 18.x or higher
@@ -146,31 +147,14 @@ Our mission is to democratize access to state legislation information and empowe
 
 [//]: # (```)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 state-pulse/
 ├── src/
 │   ├── app/                    # Next.js app router pages
 │   │   ├── (main)/            # Main application routes
-│   │   │   ├── about/         # About page
-│   │   │   ├── auth/          # Authentication pages
-│   │   │   ├── civic/         # Civic engagement tools
-│   │   │   ├── dashboard/     # User dashboard
-│   │   │   ├── home/          # Home page
-│   │   │   ├── legislation/   # Legislation browsing
-│   │   │   ├── posts/         # Community posts
-│   │   │   ├── privacy/       # Privacy policy
-│   │   │   ├── sign-in/       # Sign in page
-│   │   │   ├── sign-up/       # Sign up page
-│   │   │   ├── summaries/     # AI summary tools
-│   │   │   ├── terms/         # Terms of service
-│   │   │   ├── tracker/       # Policy tracking
-│   │   │   └── users/         # User management
 │   │   └── api/               # API routes
-│   │       ├── admin/         # Admin endpoints
-│   │       ├── auth/          # Authentication API
-│   │       └── ballot-info/   # Ballot information API
 │   ├── components/            # React components
 │   │   ├── auth/              # Authentication components
 │   │   ├── features/          # Feature-specific components
@@ -198,7 +182,7 @@ state-pulse/
     └── src/
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions from developers, civic enthusiasts, and anyone passionate about democratic engagement!
 
@@ -235,7 +219,7 @@ We welcome contributions from developers, civic enthusiasts, and anyone passiona
 6. Push to your branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
 
-## 📊 Data & Privacy
+## Data & Privacy
 
 ### Data Sources
 - **OpenStates**: Primary source for legislation and representative data
@@ -248,7 +232,7 @@ We welcome contributions from developers, civic enthusiasts, and anyone passiona
 - **User Control**: Users can delete their data at any time
 - **Secure Processing**: All data encrypted in transit and at rest
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 **Special thanks to the [OpenStates](https://openstates.org/) community** for providing an incredible API for aggregating legislation, representatives, and jurisdictions across all 50 states. Their custom web scrapers and dedication to government transparency make StatePulse possible.
 
@@ -257,17 +241,17 @@ Additional thanks to:
 - Beta testers and early users for valuable feedback
 - Civic engagement organizations for guidance and support
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🔗 Links
+## Links
 
 - **Website**: [statepulse.me](https://statepulse.me)
 - **OpenStates**: [openstates.org](https://openstates.org/)
 - **Report Issues**: [GitHub Issues](https://github.com/yourusername/state-pulse/issues)
 
-## 📞 Contact
+## Contact
 
 For questions, suggestions, or partnership opportunities:
 - **Email**: contact@statepulse.me
@@ -275,6 +259,6 @@ For questions, suggestions, or partnership opportunities:
 
 ---
 
-**Built with civic engagement in mind** 🗳️
+**Built with civic engagement in mind**
 
 *StatePulse - Empowering citizens through accessible government transparency*
