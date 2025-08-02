@@ -305,10 +305,10 @@ export function InteractiveMap() {
                     <CardHeader>
                         <CardTitle className="font-headline text-2xl flex items-center">
                             <MapPin className="mr-3 h-7 w-7"/>
-                            Interactive State Dashboard
+                            Interactive Dashboard
                         </CardTitle>
                         <CardDescription>
-                            Explore state-level legislative activity, representatives, and policy trends across the
+                            Explore legislative activity, representatives, and policy trends across the
                             United States.
                         </CardDescription>
                     </CardHeader>
@@ -330,16 +330,16 @@ export function InteractiveMap() {
             <div className="space-y-6">
                 <Card className="shadow-lg">
                     <CardHeader className="pb-3 md:pb-6">
-                        <CardTitle className="text-lg md:text-xl">
-                            <span className="hidden sm:inline">Interactive State Dashboard</span>
-                            <span className="sm:hidden">State Dashboard</span>
+                        <CardTitle className="font-headline text-lg md:text-xl">
+                            <span className="hidden sm:inline">Interactive Dashboard</span>
+                            {/* <span className="sm:hidden">Interactive Dashboard</span> */}
                         </CardTitle>
                         <CardDescription className="text-xs md:text-sm">
               <span className="hidden sm:inline">
-                Explore state-level legislative activity, representatives, and policy trends across the United States.
+                Explore legislative activity, representatives, and policy trends across the United States.
               </span>
                             <span className="sm:hidden">
-                Explore state legislative activity and trends.
+                Explore legislative activity and trends.
               </span>
                         </CardDescription>
                     </CardHeader>

@@ -341,7 +341,7 @@ function DashboardContent() {
                   {/* Recent Legislation */}
                   <Card className="shadow-lg">
                     <CardHeader className="pb-3 md:pb-6">
-                      <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                      <CardTitle className="font-headline flex items-center gap-2 text-lg md:text-xl">
                         <FileText className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="hidden sm:inline">Recent Legislation</span>
                         <span className="sm:hidden">Recent Bills</span>
@@ -431,7 +431,7 @@ function DashboardContent() {
                   {/* Trending Topics */}
                   <Card className="shadow-lg">
                     <CardHeader className="pb-3 md:pb-6">
-                      <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                      <CardTitle className="font-headline flex items-center gap-2 text-lg md:text-xl">
                         <TrendingUp className="h-4 w-4 md:h-5 md:w-5" />
                         Trending Topics
                       </CardTitle>
@@ -479,7 +479,7 @@ function DashboardContent() {
                 {/* Top Sponsors */}
                 <Card className="shadow-lg">
                   <CardHeader className="pb-3 md:pb-6">
-                    <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <CardTitle className="font-headline flex items-center gap-2 text-lg md:text-xl">
                       <Users className="h-4 w-4 md:h-5 md:w-5" />
                       <span className="hidden sm:inline">Most Active Sponsors</span>
                       <span className="sm:hidden">Active Sponsors</span>
