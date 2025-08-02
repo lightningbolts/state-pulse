@@ -8,9 +8,9 @@ import dynamic from 'next/dynamic';
 import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
 // Helper: API URLs for district GeoJSON overlays
 const DISTRICT_GEOJSON_URLS: Record<string, string> = {
-  'congressional-districts': '/api/districts/congressional-districts',
-  'state-upper-districts': '/api/districts/state-upper-districts',
-  'state-lower-districts': '/api/districts/state-lower-districts',
+  'congressional-districts': '/districts/congressional-districts.geojson',
+  'state-upper-districts': '/districts/state-upper-districts.geojson',
+  'state-lower-districts': '/districts/state-lower-districts.geojson',
 };
 
 // Helper: Color by district type
