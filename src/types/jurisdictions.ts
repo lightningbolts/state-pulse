@@ -42,4 +42,34 @@ export interface StateDetailData {
         recentBills: number;
         activity: string;
     }>;
+
+    // Optional: district-type-indexed fields for dashboard filtering
+    recentLegislationByDistrictType?: {
+        [key in "congress" | "lower" | "upper"]?: Array<{
+            id: string;
+            identifier: string;
+            title: string;
+            lastAction: string;
+            lastActionDate: string;
+            subjects: string[];
+            primarySponsor: string;
+            chamber: string;
+        }>;
+    };
+    trendingTopicsByDistrictType?: {
+        [key in "congress" | "lower" | "upper"]?: Array<{
+            name: string;
+            totalCount: number;
+            recentCount: number;
+            trend: string;
+        }>;
+    };
+    topSponsorsByDistrictType?: {
+        [key in "congress" | "lower" | "upper"]?: Array<{
+            name: string;
+            totalBills: number;
+            recentBills: number;
+            activity: string;
+        }>;
+    };
 }

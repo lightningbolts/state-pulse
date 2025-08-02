@@ -525,27 +525,27 @@ function DashboardContent() {
                         </AnimatedSection>
                       ))}
                     </div>
-                    {!isCongressDashboard && (
-                      <div className="mt-4 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
+                    <div className="mt-4 pt-4 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (isCongressDashboard) {
+                            router.push("/representatives?congress=true");
+                          } else {
                             router.push(
-                              `/civic?state=${encodeURIComponent(
-                                stateParam || stateAbbrParam || ""
-                              )}&stateAbbr=${stateAbbrParam || ""}`
-                            )
+                              `/representatives?state=${encodeURIComponent(stateParam || stateAbbrParam || "")}&stateAbbr=${stateAbbrParam || ""}`
+                            );
                           }
-                          className="w-full"
-                        >
-                          <span className="hidden sm:inline">
-                            View All Representatives
-                          </span>
-                          <span className="sm:hidden">View Representatives</span>
-                        </Button>
-                      </div>
-                    )}
+                        }}
+                        className="w-full"
+                      >
+                        <span className="hidden sm:inline">
+                          View All Representatives
+                        </span>
+                        <span className="sm:hidden">View Representatives</span>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </AnimatedSection>
