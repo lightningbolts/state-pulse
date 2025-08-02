@@ -127,7 +127,8 @@ export function InteractiveMap() {
         if (mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') {
             setDistrictLoading(true);
             setDistrictError(null);
-            const url = DISTRICT_GEOJSON_URLS[mapMode];
+            // Add cache-busting query param
+            const url = DISTRICT_GEOJSON_URLS[mapMode] + '?cb=' + Date.now();
             fetch(url)
                 .then(res => {
                     if (!res.ok) throw new Error('Failed to fetch district boundaries');
@@ -399,7 +400,7 @@ export function InteractiveMap() {
                                     {/* District overlays */}
                                     {districtGeoJson && (mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
                                         <GeoJSON
-                                            key={mapMode}
+                                            key={mapMode + '-' + (districtGeoJson?.features?.length || 0)}
                                             data={districtGeoJson}
                                             style={() => ({
                                                 color: DISTRICT_COLORS[mapMode],
