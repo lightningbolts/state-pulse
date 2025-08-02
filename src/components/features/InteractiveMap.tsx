@@ -607,18 +607,24 @@ export function InteractiveMap() {
                         aria-label="Close"
                       >×</button>
                     </h3>
-                    <RepresentativesResults
-                      representatives={districtReps}
-                      closestReps={[]}
-                      loading={districtLoading}
-                      error={districtError}
-                      showMap={false}
-                      userLocation={null}
-                      dataSource={null}
-                      pagination={undefined}
-                      onPageChange={() => {}}
-                      districtType={selectedDistrict.properties.chamber || selectedDistrict.properties.CHAMBER || ''}
-                    />
+                    {/* Show a custom message and hide results if marker is outside US and no reps found */}
+                    {(!districtLoading && Array.isArray(districtReps) && districtReps.length === 0 && districtPopupLatLng &&
+                      (districtPopupLatLng.lat < 24 || districtPopupLatLng.lat > 49 || districtPopupLatLng.lng < -125 || districtPopupLatLng.lng > -66)) ? (
+                      <div className="text-sm text-muted-foreground mb-2">No representatives found for this location.</div>
+                    ) : (
+                      <RepresentativesResults
+                        representatives={districtReps}
+                        closestReps={[]}
+                        loading={districtLoading}
+                        error={districtError}
+                        showMap={false}
+                        userLocation={null}
+                        dataSource={null}
+                        pagination={undefined}
+                        onPageChange={() => {}}
+                        districtType={selectedDistrict.properties.chamber || selectedDistrict.properties.CHAMBER || ''}
+                      />
+                    )}
                   </div>
                 )}
                         </div>
