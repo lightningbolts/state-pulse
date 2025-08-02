@@ -26,6 +26,7 @@ import {MapMode} from "@/types/geo";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
 
 // Import Leaflet for custom icons
+import { RepresentativesResults } from "./RepresentativesResults";
 let L: any = null;
 if (typeof window !== 'undefined') {
     L = require('leaflet');
@@ -121,6 +122,9 @@ export function InteractiveMap() {
     const [districtGeoJson, setDistrictGeoJson] = useState<any>(null);
     const [districtLoading, setDistrictLoading] = useState(false);
     const [districtError, setDistrictError] = useState<string | null>(null);
+    const [selectedDistrict, setSelectedDistrict] = useState<any>(null); // Store clicked district feature
+    const [districtReps, setDistrictReps] = useState<any[]>([]); // Store reps for selected district
+    const [districtPopupLatLng, setDistrictPopupLatLng] = useState<any>(null); // Popup position
     const mapRef = useRef<any>(null);
     // Fetch district GeoJSON when district map mode is selected
     useEffect(() => {
@@ -334,6 +338,42 @@ export function InteractiveMap() {
         );
     }
 
+    // Handler for district click
+    const onDistrictClick = async (event: any) => {
+        const feature = event.sourceTarget.feature;
+        setSelectedDistrict(feature);
+        setDistrictPopupLatLng(event.latlng);
+        setDistrictReps([]); // Clear while loading
+        try {
+            // Get lat/lng from click event
+            const lat = event.latlng.lat;
+            const lng = event.latlng.lng;
+            // Map FIPS code to state abbreviation if needed
+            const FIPS_TO_ABBR: Record<string, string> = {
+                '01': 'AL','02': 'AK','04': 'AZ','05': 'AR','06': 'CA','08': 'CO','09': 'CT','10': 'DE','11': 'DC','12': 'FL','13': 'GA','15': 'HI','16': 'ID','17': 'IL','18': 'IN','19': 'IA','20': 'KS','21': 'KY','22': 'LA','23': 'ME','24': 'MD','25': 'MA','26': 'MI','27': 'MN','28': 'MS','29': 'MO','30': 'MT','31': 'NE','32': 'NV','33': 'NH','34': 'NJ','35': 'NM','36': 'NY','37': 'NC','38': 'ND','39': 'OH','40': 'OK','41': 'OR','42': 'PA','44': 'RI','45': 'SC','46': 'SD','47': 'TN','48': 'TX','49': 'UT','50': 'VT','51': 'VA','53': 'WA','54': 'WV','55': 'WI','56': 'WY','72': 'PR'
+            };
+            let state = feature.properties.state || feature.properties.STATE || feature.properties.STATEFP || '';
+            if (!state && feature.properties.STATEFP) {
+                state = FIPS_TO_ABBR[feature.properties.STATEFP] || '';
+            } else if (/^\d{2}$/.test(state)) {
+                state = FIPS_TO_ABBR[state] || '';
+            }
+            // Compose API call to internal civic endpoint
+            const url = `/api/civic?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&state=${encodeURIComponent(state)}`;
+            const resp = await fetch(url);
+            let reps = [];
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.representatives) {
+                    reps = data.representatives;
+                }
+            }
+            setDistrictReps(reps);
+        } catch (e) {
+            setDistrictReps([]);
+        }
+    };
+
     return (
         <AnimatedSection>
             <div className="space-y-6">
@@ -406,6 +446,7 @@ export function InteractiveMap() {
                                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                     />
 
+
                                     {/* District overlays */}
                                     {districtGeoJson && (mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
                                         <GeoJSON
@@ -416,10 +457,58 @@ export function InteractiveMap() {
                                                 weight: 2,
                                                 fillOpacity: 0,
                                             })}
+                                            eventHandlers={{
+                                                click: onDistrictClick
+                                            }}
                                         />
                                     )}
 
-                                    {/* State Markers (hide if in district mode) */}
+                                    {districtPopupLatLng && (
+                                        <Marker
+                                            position={districtPopupLatLng}
+                                            draggable={true}
+                                            eventHandlers={{
+                                                dragend: async (e: any) => {
+                                                    const latlng = e.target.getLatLng();
+                                                    setDistrictPopupLatLng(latlng);
+                                                    // Simulate a map click at the new location to update reps
+                                                    try {
+                                                        // Map FIPS code to state abbreviation if needed
+                                                        const FIPS_TO_ABBR: Record<string, string> = {
+                                                            '01': 'AL','02': 'AK','04': 'AZ','05': 'AR','06': 'CA','08': 'CO','09': 'CT','10': 'DE','11': 'DC','12': 'FL','13': 'GA','15': 'HI','16': 'ID','17': 'IL','18': 'IN','19': 'IA','20': 'KS','21': 'KY','22': 'LA','23': 'ME','24': 'MD','25': 'MA','26': 'MI','27': 'MN','28': 'MS','29': 'MO','30': 'MT','31': 'NE','32': 'NV','33': 'NH','34': 'NJ','35': 'NM','36': 'NY','37': 'NC','38': 'ND','39': 'OH','40': 'OK','41': 'OR','42': 'PA','44': 'RI','45': 'SC','46': 'SD','47': 'TN','48': 'TX','49': 'UT','50': 'VT','51': 'VA','53': 'WA','54': 'WV','55': 'WI','56': 'WY','72': 'PR'
+                                                        };
+                                                        let state = selectedDistrict?.properties?.state || selectedDistrict?.properties?.STATE || selectedDistrict?.properties?.STATEFP || '';
+                                                        if (!state && selectedDistrict?.properties?.STATEFP) {
+                                                            state = FIPS_TO_ABBR[selectedDistrict.properties.STATEFP] || '';
+                                                        } else if (/^\d{2}$/.test(state)) {
+                                                            state = FIPS_TO_ABBR[state] || '';
+                                                        }
+                                                        const url = `/api/civic?lat=${encodeURIComponent(latlng.lat)}&lng=${encodeURIComponent(latlng.lng)}&state=${encodeURIComponent(state)}`;
+                                                        setDistrictReps([]);
+                                                        const resp = await fetch(url);
+                                                        let reps = [];
+                                                        if (resp.ok) {
+                                                            const data = await resp.json();
+                                                            if (data && data.representatives) {
+                                                                reps = data.representatives;
+                                                            }
+                                                        }
+                                                        setDistrictReps(reps);
+                                                    } catch (e) {
+                                                        setDistrictReps([]);
+                                                    }
+                                                }
+                                            }}
+                                            icon={L && L.divIcon ? L.divIcon({
+                                                className: 'selected-point-marker',
+                                                html: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`,
+                                                iconSize: [28, 28],
+                                                iconAnchor: [14, 28],
+                                                popupAnchor: [0, -28],
+                                            }) : undefined}
+                                        />
+                                    )}
+
     {!(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') &&
         Object.entries(stateStats).map(([abbr, state]) => (
             <Marker
@@ -508,6 +597,30 @@ export function InteractiveMap() {
                                     <span className="text-xs text-red-500">{districtError}</span>
                                 </div>
                             )}
+                {selectedDistrict && (
+                  <div className="mt-4">
+                    <h3 className="font-semibold text-base md:text-lg mb-2">
+                      {districtPopupLatLng ? ` (${districtPopupLatLng.lat.toFixed(5)}, ${districtPopupLatLng.lng.toFixed(5)})` : ''}
+                      <button
+                        className="ml-2 text-lg text-gray-400 hover:text-gray-700"
+                        onClick={() => { setSelectedDistrict(null); setDistrictPopupLatLng(null); }}
+                        aria-label="Close"
+                      >×</button>
+                    </h3>
+                    <RepresentativesResults
+                      representatives={districtReps}
+                      closestReps={[]}
+                      loading={districtLoading}
+                      error={districtError}
+                      showMap={false}
+                      userLocation={null}
+                      dataSource={null}
+                      pagination={undefined}
+                      onPageChange={() => {}}
+                      districtType={selectedDistrict.properties.chamber || selectedDistrict.properties.CHAMBER || ''}
+                    />
+                  </div>
+                )}
                         </div>
 
                         {/* Legend */}
