@@ -6,26 +6,34 @@ import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import RepresentativeCard from "@/components/features/RepresentativeCard";
 
 export function RepresentativesResults({
-                                           representatives,
-                                           closestReps,
-                                           loading,
-                                           error,
-                                           showMap,
-                                           showAllMode,
-                                           userLocation,
-                                           dataSource,
-                                           pagination,
-                                           onShowAllToggle,
-                                           onPageChange,
-                                       }: RepresentativesResultsProps) {
-    const displayedReps = showAllMode ? representatives : (showMap ? closestReps : representatives);
+    representatives,
+    closestReps,
+    loading,
+    error,
+    showMap,
+    userLocation,
+    dataSource,
+    pagination,
+    onPageChange,
+}: Omit<RepresentativesResultsProps, 'showAllMode' | 'onShowAllToggle'>) {
+    const displayedReps = showMap ? closestReps : representatives;
+    // Deduplicate by rep.id to avoid React key errors
+    const uniqueReps = displayedReps.filter((rep, idx, arr) =>
+      arr.findIndex(r => r.id === rep.id) === idx
+    );
+
+    // Suppress distances if userLocation is a state capital (type === 'state' or lat/lon is 0)
+    const suppressDistance = userLocation && (
+      (typeof userLocation === 'object' && 'type' in userLocation && userLocation.type === 'state') ||
+      (userLocation.lat === 0 && userLocation.lon === 0)
+    );
 
     return (
         <div>
             {/* Results Header */}
             <div className="flex items-center justify-between mb-4">
                 <h4 className="font-semibold">
-                    {showMap ? 'Top 10 Closest Representatives:' : 'Your State Representatives:'}
+                    {'Your Representatives:'}
                 </h4>
                 {dataSource && (
                     <div className="flex items-center text-xs text-muted-foreground">
@@ -73,13 +81,14 @@ export function RepresentativesResults({
 
             {/* Representatives List */}
             <div className="space-y-4">
-                {displayedReps.map((rep, index) => (
+                {uniqueReps.map((rep, index) => (
                   <RepresentativeCard
                     key={rep.id}
                     rep={rep}
                     index={index}
                     showMap={showMap}
                     href={`/representatives/${rep.id}`}
+                    suppressDistance={!!suppressDistance}
                   />
                 ))}
             </div>
@@ -87,7 +96,7 @@ export function RepresentativesResults({
             {/* Results Summary and Controls */}
             {representatives.length > 0 && (
                 <div className="mt-4 space-y-3">
-                    <div
+                    {/* <div
                         className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                         <p className="text-sm text-blue-800 dark:text-blue-200">
                             <strong>Found {pagination ? pagination.total : representatives.length} representatives</strong> from
@@ -95,23 +104,12 @@ export function RepresentativesResults({
                             {showMap && userLocation && ` Showing top 10 closest to your location.`}
                             {dataSource === 'cache' && ' This data is cached and refreshed daily.'}
                         </p>
-                    </div>
+                    </div> */}
 
-                    {/* Show All Toggle Button */}
-                    {userLocation && (
-                        <div className="flex justify-center">
-                            <button
-                                onClick={onShowAllToggle}
-                                disabled={loading}
-                                className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                            >
-                                {showAllMode ? 'Show Closest Representatives' : 'Show All State Representatives'}
-                            </button>
-                        </div>
-                    )}
+                    {/* Show All Toggle Button removed */}
 
                     {/* Pagination Controls */}
-                    {pagination && showAllMode && (
+                    {pagination && (
                         <div
                             className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-4 bg-muted/50 dark:bg-muted/20 rounded-lg">
                             <div className="flex items-center gap-3">
@@ -124,14 +122,14 @@ export function RepresentativesResults({
                   Page {pagination.page} of {pagination.totalPages}
                 </span>
                                 <button
-                                    onClick={() => onPageChange(pagination.page - 1)}
+                                    onClick={() => onPageChange && pagination && onPageChange(pagination.page - 1)}
                                     disabled={!pagination.hasPrev || loading}
                                     className="px-3 py-1 text-sm rounded-md border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     Previous
                                 </button>
                                 <button
-                                    onClick={() => onPageChange(pagination.page + 1)}
+                                    onClick={() => onPageChange && pagination && onPageChange(pagination.page + 1)}
                                     disabled={!pagination.hasNext || loading}
                                     className="px-3 py-1 text-sm rounded-md border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >

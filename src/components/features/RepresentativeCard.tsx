@@ -13,13 +13,13 @@ type RepresentativeCardProps = {
   index?: number;
   showMap?: boolean;
   href?: string;
+  suppressDistance?: boolean;
 };
 
 
-const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href }) => {
+const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href, suppressDistance }) => {
 
   // --- Robust normalization for both Congress and state reps ---
-  // Name
   let name = rep.name || '';
   if (!name && (rep as any).directOrderName) name = (rep as any).directOrderName;
   if (!name && (rep as any).firstName) name = `${(rep as any).firstName || ''} ${(rep as any).lastName || ''}`.trim();
@@ -29,7 +29,6 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
   }
   if (!name && (rep as any).display_name) name = (rep as any).display_name;
 
-  // Party
   let party = rep.party || '';
   if (!party && Array.isArray((rep as any).partyHistory) && (rep as any).partyHistory.length > 0) {
     const lastParty = (rep as any).partyHistory[(rep as any).partyHistory.length - 1];
@@ -37,17 +36,14 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
   }
   if (!party && (rep as any).party) party = (rep as any).party;
 
-  // State & District
   let state = (rep as any).state || (rep as any).stateName || '';
   let district = rep.district || (rep as any).district || '';
-  // For CongressPeople, try to get state/district from last term if missing
   if ((!state || !district) && (rep as any).terms && Array.isArray((rep as any).terms.item)) {
     const lastTerm = (rep as any).terms.item.slice(-1)[0];
     if (!state && (lastTerm?.stateName || lastTerm?.stateCode)) state = lastTerm.stateName || lastTerm.stateCode;
     if (!district && lastTerm?.district) district = lastTerm.district;
   }
 
-  // Chamber
   let chamber = (rep as any).chamber || '';
   if (!chamber && (rep as any).role) chamber = (rep as any).role;
   if (!chamber && (rep as any).current_role && (rep as any).current_role.chamber) chamber = (rep as any).current_role.chamber;
@@ -56,7 +52,6 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     if ((rep as any).title.toLowerCase().includes('representative')) chamber = 'House';
   }
 
-  // Office
   let office = '';
   if (typeof rep.office === 'string') {
     office = rep.office;
@@ -73,14 +68,12 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     if (lastTerm?.officeAddress) office = lastTerm.officeAddress;
   }
 
-  // Email
   let email = rep.email || '';
   if (!email && rep.addresses && rep.addresses.length > 0 && 'email' in rep.addresses[0]) {
     email = (rep.addresses[0] as any).email;
   }
   if (!email && (rep as any).contact_form) email = (rep as any).contact_form;
 
-  // Addresses: robustly extract for CongressPeople
   let addresses = Array.isArray(rep.addresses) ? rep.addresses : [];
   if ((!addresses || addresses.length === 0) && ((rep as any).office || (rep as any).phone)) {
     addresses = [{
@@ -99,7 +92,6 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
       email: o.email || '',
     }));
   }
-  // Congress.gov: addressInformation
   if ((!addresses || addresses.length === 0) && (rep as any).addressInformation) {
     addresses = [{
       type: 'Capitol Office',
@@ -108,7 +100,6 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
       fax: '',
     }];
   }
-  // Congress.gov: last term office info
   if ((!addresses || addresses.length === 0) && (rep as any).terms && Array.isArray((rep as any).terms.item)) {
     const lastTerm = (rep as any).terms.item.slice(-1)[0];
     if (lastTerm && (lastTerm.officeAddress || lastTerm.phoneNumber)) {
@@ -121,7 +112,6 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     }
   }
 
-  // Website: check all possible fields
   let website = rep.website || (rep as any).officialUrl || (rep as any).url || '';
   if (!website && (rep as any).contactInfo && (rep as any).contactInfo.url) website = (rep as any).contactInfo.url;
   if (!website && (rep as any).terms && Array.isArray((rep as any).terms.item)) {
@@ -129,10 +119,8 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     if (lastTerm?.url) website = lastTerm.url;
   }
 
-  // Image
   let image = rep.image || rep.photo || (rep as any).depiction?.imageUrl || 'https://via.placeholder.com/150';
 
-  // Jurisdiction/Chamber
   let jurisdiction = '';
   if (typeof rep.jurisdiction === 'string') {
     jurisdiction = rep.jurisdiction;
@@ -189,11 +177,6 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h5 className="font-semibold text-lg break-words">{normalized.name}</h5>
-                      {showMap && normalized.distance && (
-                        <Badge variant="secondary" className="text-xs">
-                          #{index !== undefined ? index + 1 : ''} - {normalized.distance.toFixed(1)} mi
-                        </Badge>
-                      )}
                     </div>
                     <Badge variant="outline" className="w-fit mt-1 md:mt-0">
                       {normalized.party}

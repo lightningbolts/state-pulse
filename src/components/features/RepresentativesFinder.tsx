@@ -42,6 +42,7 @@ export function RepresentativesFinder() {
     const [userLocation, setUserLocation] = useState<AddressSuggestion | null>(null);
     const [showMap, setShowMap] = useState(false);
     const [closestReps, setClosestReps] = useState<Representative[]>([]);
+    const [districts, setDistricts] = useState<any[]>([]);
     // New pagination state
     const [showAllMode, setShowAllMode] = useState(false);
     const [pagination, setPagination] = useState<ApiResponse['pagination'] | undefined>(undefined);
@@ -54,75 +55,102 @@ export function RepresentativesFinder() {
     const displayedRepresentatives = showAllMode ? representatives : (showMap ? closestReps : representatives);
 
     const fetchRepresentatives = async (location: AddressSuggestion) => {
+
         setLoading(true);
         setError(null);
         setRepresentatives([]);
         setClosestReps([]);
-        // Reset pagination state for fresh searches
         setShowAllMode(false);
         setPagination(undefined);
         setCurrentPage(1);
 
+
         try {
-            // Extract state from the selected address - prioritize the structured address data
-            let state = location.address.state;
-
-            // If no structured state, try to extract from display_name
-            if (!state) {
-                // Check if display_name contains a full state name
-                for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
-                    if (location.display_name.includes(fullName)) {
-                        state = abbrev;
-                        break;
-                    }
+            let apiUrl = '';
+            // Always try to extract the full state name for the stateName param
+            let stateName = '';
+            for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
+                if (location.display_name.includes(fullName)) {
+                    stateName = fullName;
+                    break;
                 }
-
-                // Last resort: try to find 2-letter state code in display_name
+            }
+            // If lat/lng are available and nonzero, use them for geospatial lookup
+            if (location.lat && location.lon && location.lat !== 0 && location.lon !== 0) {
+                apiUrl = `/api/civic?lat=${location.lat}&lng=${location.lon}`;
+                if (stateName) apiUrl += `&stateName=${encodeURIComponent(stateName)}`;
+            } else {
+                // Fallback to state-based lookup
+                let state = location.address.state;
                 if (!state) {
-                    const stateMatch = location.display_name.match(/\b([A-Z]{2})\b/);
-                    if (stateMatch) {
-                        state = stateMatch[1];
+                    for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
+                        if (location.display_name.includes(fullName)) {
+                            state = abbrev;
+                            if (!stateName) stateName = fullName;
+                            break;
+                        }
+                    }
+                    if (!state) {
+                        const stateMatch = location.display_name.match(/\b([A-Z]{2})\b/);
+                        if (stateMatch) {
+                            state = stateMatch[1];
+                        }
                     }
                 }
+                if (!state) {
+                    throw new Error('Unable to determine state from the selected address.');
+                }
+                const finalState = STATE_MAP[state] || state;
+                apiUrl = `/api/civic?address=${encodeURIComponent(finalState)}`;
+                if (stateName) apiUrl += `&stateName=${encodeURIComponent(stateName)}`;
             }
 
-            if (!state) {
-                throw new Error('Unable to determine state from the selected address.');
-            }
-
-            // Convert full state name to abbreviation if needed
-            const finalState = STATE_MAP[state] || state;
-
-            // console.log('Searching for representatives in state:', finalState, 'for location:', location.display_name);
-
-            const response = await fetch(`/api/civic?address=${encodeURIComponent(finalState)}`);
+            const response = await fetch(apiUrl);
 
             if (!response.ok) {
                 let errorMessage = 'Failed to fetch representatives';
-
+                let contextState = '';
+                if (location.lat && location.lon && location.lat !== 0 && location.lon !== 0) {
+                    contextState = `${location.lat},${location.lon}`;
+                } else {
+                    let state = location.address.state;
+                    if (!state) {
+                        for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
+                            if (location.display_name.includes(fullName)) {
+                                state = abbrev;
+                                break;
+                            }
+                        }
+                        if (!state) {
+                            const stateMatch = location.display_name.match(/\b([A-Z]{2})\b/);
+                            if (stateMatch) {
+                                state = stateMatch[1];
+                            }
+                        }
+                    }
+                    contextState = state || '';
+                }
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || errorMessage;
-
-                    // Provide more specific error messages based on status
                     if (response.status === 503) {
                         errorMessage = 'Service temporarily unavailable. This may be due to missing API configuration or database connection issues.';
                     } else if (response.status === 500) {
-                        errorMessage = `Unable to fetch representative data for ${finalState}. This might be due to API rate limits or configuration issues. Please try again in a few minutes.`;
+                        errorMessage = `Unable to fetch representative data for ${contextState}. This might be due to API rate limits or configuration issues. Please try again in a few minutes.`;
                     } else if (response.status === 404) {
-                        errorMessage = `No representative data found for ${finalState}. This state may not be available in our data source.`;
+                        errorMessage = `No representative data found for ${contextState}. This state may not be available in our data source.`;
                     } else if (response.status === 400) {
-                        errorMessage = `Invalid request for ${finalState}. Please try a different location.`;
+                        errorMessage = `Invalid request for ${contextState}. Please try a different location.`;
                     }
                 } catch (parseError) {
                     console.error('Error parsing error response:', parseError);
                 }
-
                 throw new Error(errorMessage);
             }
 
             const data: ApiResponse = await response.json();
             let reps = data.representatives || [];
+            if (data.districts) setDistricts(data.districts);
 
             // console.log('Received representatives:', reps.length, 'for state:', finalState);
             if (reps.length > 0) {
@@ -193,8 +221,18 @@ export function RepresentativesFinder() {
                     };
 
                     // Use the state we searched for instead of trying to parse from jurisdiction
-                    const stateAbbrev = state;
-
+                    // Use the state we searched for instead of trying to parse from jurisdiction
+                    let stateAbbrev = '';
+                    if (location.address.state) {
+                        stateAbbrev = location.address.state;
+                    } else {
+                        for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
+                            if (location.display_name.includes(fullName)) {
+                                stateAbbrev = abbrev;
+                                break;
+                            }
+                        }
+                    }
                     // Convert full state name to abbreviation if needed
                     const finalStateAbbrev = STATE_MAP[stateAbbrev] || stateAbbrev;
 
@@ -219,6 +257,7 @@ export function RepresentativesFinder() {
 
                     return {
                         ...rep,
+                        office: rep.office ?? '',
                         lat: repLat,
                         lon: repLon,
                         distance
@@ -561,13 +600,18 @@ export function RepresentativesFinder() {
                     >
                         <div className="flex items-center gap-2">
                             <Map className="h-5 w-5 text-primary"/>
-                            <h4 className="font-semibold">Interactive Map - Top 10 Closest Representatives</h4>
+                            <h4 className="font-semibold">Interactive Map - District Boundaries</h4>
                         </div>
                         <RepresentativesMap
                             center={[userLocation.lat, userLocation.lon]}
                             zoom={10}
-                            representatives={closestReps}
+                            representatives={userLocation.lat !== 0 && userLocation.lon !== 0 ? closestReps.map(rep => ({
+                                ...rep,
+                                office: rep.office ?? '',
+                                party: rep.party ?? ''
+                            })) : []}
                             userLocation={[userLocation.lat, userLocation.lon]}
+                            districts={districts}
                         />
                     </motion.div>
                 )}
@@ -578,11 +622,9 @@ export function RepresentativesFinder() {
                 loading={loading}
                 error={error}
                 showMap={showMap}
-                showAllMode={showAllMode}
                 userLocation={userLocation}
                 dataSource={dataSource}
                 pagination={pagination}
-                onShowAllToggle={handleShowAllToggle}
                 onPageChange={handlePageChange}
             />
             <motion.div

@@ -119,6 +119,7 @@ export interface ApiResponse {
     representatives: Representative[];
     source: 'cache' | 'api';
     count?: number;
+    districts?: any[];
     pagination?: {
         page: number;
         pageSize: number;
