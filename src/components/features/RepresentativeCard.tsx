@@ -14,10 +14,11 @@ type RepresentativeCardProps = {
   showMap?: boolean;
   href?: string;
   suppressDistance?: boolean;
+  districtType?: string;
 };
 
 
-const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href, suppressDistance }) => {
+const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href, suppressDistance, districtType }) => {
 
   // --- Robust normalization for both Congress and state reps ---
   let name = rep.name || '';
@@ -146,9 +147,15 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     id: rep.id,
   };
 
+  // Determine background shade based on districtType
+  let districtBg = '';
+  if (districtType === 'congressional-districts') districtBg = 'bg-blue-50 dark:bg-blue-900/20';
+  else if (districtType === 'state-upper-districts') districtBg = 'bg-purple-50 dark:bg-purple-900/20';
+  else if (districtType === 'state-lower-districts') districtBg = 'bg-green-50 dark:bg-green-900/20';
+
   return (
     <AnimatedSection key={normalized.id}>
-      <Card className="border-l-4 border-l-primary hover:shadow-lg transition-shadow">
+      <Card className={`border-l-4 border-l-primary hover:shadow-lg transition-shadow ${districtBg}`}>
         <CardContent className="p-4">
           {/* DEBUG: Show rep.id for troubleshooting */}
           {/* <div className="mb-2 text-xs text-red-500">DEBUG: rep.id = {String(rep.id)}</div> */}

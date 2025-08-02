@@ -2,6 +2,7 @@
 
 import {AlertCircle, Database, MapPin} from "lucide-react";
 import {RepresentativesResultsProps} from "@/types/representative";
+
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import RepresentativeCard from "@/components/features/RepresentativeCard";
 
@@ -15,7 +16,8 @@ export function RepresentativesResults({
     dataSource,
     pagination,
     onPageChange,
-}: Omit<RepresentativesResultsProps, 'showAllMode' | 'onShowAllToggle'>) {
+    districtType,
+}: Omit<RepresentativesResultsProps, 'showAllMode' | 'onShowAllToggle'> & { districtType?: string }) {
     const displayedReps = showMap ? closestReps : representatives;
     // Deduplicate by rep.id to avoid React key errors
     const uniqueReps = displayedReps.filter((rep, idx, arr) =>
@@ -81,16 +83,29 @@ export function RepresentativesResults({
 
             {/* Representatives List */}
             <div className="space-y-4">
-                {uniqueReps.map((rep, index) => (
-                  <RepresentativeCard
-                    key={rep.id}
-                    rep={rep}
-                    index={index}
-                    showMap={showMap}
-                    href={`/representatives/${rep.id}`}
-                    suppressDistance={!!suppressDistance}
-                  />
-                ))}
+                {uniqueReps.map((rep, index) => {
+                  // Determine the district type for this representative
+                  let repDistrictType: string | undefined = undefined;
+                  const type = (rep as any).map_boundary?.type || rep.current_role?.org_classification;
+                  if (type === 'congressional') repDistrictType = 'congressional-districts';
+                  else if (type === 'state_leg_upper' || type === 'upper') repDistrictType = 'state-upper-districts';
+                  else if (type === 'state_leg_lower' || type === 'lower') repDistrictType = 'state-lower-districts';
+                  else if ((rep as any).jurisdictionName?.toLowerCase().includes('congress') ||
+                           (typeof rep.jurisdiction === 'string' && (rep.jurisdiction as string).toLowerCase().includes('congress'))) {
+                    repDistrictType = 'congressional-districts';
+                  }
+                  return (
+                    <RepresentativeCard
+                      key={rep.id}
+                      rep={rep}
+                      index={index}
+                      showMap={showMap}
+                      href={`/representatives/${rep.id}`}
+                      suppressDistance={!!suppressDistance}
+                      districtType={repDistrictType}
+                    />
+                  );
+                })}
             </div>
 
             {/* Results Summary and Controls */}
