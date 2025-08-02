@@ -92,18 +92,18 @@ const mapModes: MapMode[] = [
         description: 'View all U.S. congressional districts',
         icon: MapPin
     },
-    // {
-    //     id: 'state-upper-districts',
-    //     label: 'State Upper Districts',
-    //     description: 'View all state senate (upper chamber) districts',
-    //     icon: MapPin
-    // },
-    // {
-    //     id: 'state-lower-districts',
-    //     label: 'State Lower Districts',
-    //     description: 'View all state house (lower chamber) districts',
-    //     icon: MapPin
-    // }
+    {
+        id: 'state-upper-districts',
+        label: 'State Upper Districts',
+        description: 'View all state senate (upper chamber) districts',
+        icon: MapPin
+    },
+    {
+        id: 'state-lower-districts',
+        label: 'State Lower Districts',
+        description: 'View all state house (lower chamber) districts',
+        icon: MapPin
+    }
 ];
 
 export function InteractiveMap() {
