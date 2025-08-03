@@ -43,3 +43,5 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+src/data/legislation1.json
+src/data/legislation2.json
