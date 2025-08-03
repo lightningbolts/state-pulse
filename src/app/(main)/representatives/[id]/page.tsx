@@ -12,7 +12,6 @@ import { ExternalLink, Info, FileText, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 
-// Real fetch function for representative detail
 const fetchRepresentativeData = async (id: string) => {
   const res = await fetch(`/api/representatives/${id}`);
   if (!res.ok) throw new Error('Failed to fetch representative data');
@@ -64,13 +63,15 @@ const getTopTopics = (bills: Bill[], count = 3) => {
 };
 
 export default function RepresentativeDetailPage() {
-  const params = useParams<{ id: string }>();
-  const { id } = params;
+  const params = useParams<{ id?: string }>() ?? {};
+  const id = typeof params === 'object' && params !== null && 'id' in params ? (params as any).id : undefined;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rep, setRep] = useState<Representative | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
   const [showAllBills, setShowAllBills] = useState(false);
+  // Party badge hover state
+  const [partyHover, setPartyHover] = useState(false);
 
   // Guard: check if id is a non-empty string
   const isLikelyRepId = typeof id === 'string' && id.length > 0;
@@ -101,7 +102,6 @@ export default function RepresentativeDetailPage() {
     return () => { mounted = false; };
   }, [id]);
 
-  // Debug: Log rep object to inspect structure
   useEffect(() => {
     if (rep) {
       // eslint-disable-next-line no-console
@@ -118,7 +118,6 @@ export default function RepresentativeDetailPage() {
   const recentBills = bills.slice(0, 3);
   const topTopics = getTopTopics(bills);
 
-  // Only compute filterJurisdiction after rep is confirmed non-null
   let filterJurisdiction = '';
   if (!rep) return <div className="py-8 text-center text-red-600">Representative not found.</div>;
   const office = (rep.office || '').toLowerCase();
@@ -152,8 +151,21 @@ export default function RepresentativeDetailPage() {
                 <CardTitle className="text-2xl md:text-3xl font-bold tracking-tight break-words text-center sm:text-left">{rep.name}</CardTitle>
                 {rep.party && (
                   <Badge
-                    className="bg-black text-white border-black text-base font-semibold px-4 py-1 mt-2 sm:mt-0 sm:ml-4 whitespace-nowrap mx-auto sm:mx-0"
-                    style={{ minWidth: 64, textAlign: 'center' }}
+                    className="text-white border-black text-base font-semibold px-4 py-1 mt-2 sm:mt-0 sm:ml-4 whitespace-nowrap mx-auto sm:mx-0"
+                    style={{
+                      minWidth: 64,
+                      textAlign: 'center',
+                      backgroundColor: partyHover
+                        ? rep.party.toLowerCase().includes('republican')
+                          ? '#C81E1E' // Red
+                          : rep.party.toLowerCase().includes('democrat')
+                            ? '#1e96ffff' // Blue
+                            : '#222' // Default dark
+                        : '#000',
+                      borderColor: '#000',
+                    }}
+                    onMouseEnter={() => setPartyHover(true)}
+                    onMouseLeave={() => setPartyHover(false)}
                   >
                     {rep.party}
                   </Badge>
@@ -203,12 +215,81 @@ export default function RepresentativeDetailPage() {
             </section>
           </AnimatedSection>
 
+          {(rep as any).terms && (Array.isArray((rep as any).terms) || (rep as any).terms.item) && (
+            <AnimatedSection>
+              <section>
+                <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                  <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Past Terms
+                </h3>
+                <div className="overflow-x-auto rounded-lg bg-muted/50">
+                  <table className="min-w-full text-sm border">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Chamber</th>
+                        <th className="px-3 py-2 text-left">Congress</th>
+                        <th className="px-3 py-2 text-left">Years</th>
+                        <th className="px-3 py-2 text-left">Party</th>
+                        <th className="px-3 py-2 text-left">State</th>
+                        <th className="px-3 py-2 text-left">District</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(Array.isArray((rep as any).terms)
+                        ? (rep as any).terms
+                        : Array.isArray((rep as any).terms.item)
+                          ? (rep as any).terms.item
+                          : [])
+                        .map((term: any, idx: number) => (
+                          <tr key={idx} className="border-t">
+                            <td className="px-3 py-2">{term.chamber || '-'}</td>
+                            <td className="px-3 py-2">{term.congress || '-'}</td>
+                            <td className="px-3 py-2">{term.startYear || '-'}{term.endYear ? `–${term.endYear}` : ''}</td>
+                            <td className="px-3 py-2">{term.partyName || term.party || '-'}</td>
+                            <td className="px-3 py-2">{term.stateName || term.stateCode || '-'}</td>
+                            <td className="px-3 py-2">{term.district || '-'}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </AnimatedSection>
+          )}
+
+          {(rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0 && (
+            <AnimatedSection>
+              <section className="">
+                <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                  <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Leadership Roles
+                </h3>
+                <div className="overflow-x-auto rounded-lg bg-muted/50">
+                  <table className="min-w-full text-sm border">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Type</th>
+                        <th className="px-3 py-2 text-left">Congress</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(rep as any).leadership.map((role: any, idx: number) => (
+                        <tr key={idx} className="border-t">
+                          <td className="px-3 py-2">{role.type || '-'}</td>
+                          <td className="px-3 py-2">{role.congress || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </AnimatedSection>
+          )}
+
           <AnimatedSection>
             <section>
               <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
                 <FileText className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Bills Sponsored
               </h3>
-              <div className="text-md mb-2">Total: <span className="font-bold">{bills.length}</span></div>
+              <div className="text-md mb-2">Total (this year): <span className="font-bold">{bills.length}</span></div>
               {bills.length === 0 ? (
                 <div className="text-sm text-muted-foreground">No bills sponsored by this representative.</div>
               ) : (
@@ -235,7 +316,6 @@ export default function RepresentativeDetailPage() {
                   </div>
                   {bills.length > 3 && (
                     (() => {
-                      // Generate a color from the rep's name
                       function stringToHslColor(str: string, s = 70, l = 50) {
                         let hash = 0;
                         for (let i = 0; i < str.length; i++) {
@@ -244,14 +324,13 @@ export default function RepresentativeDetailPage() {
                         const h = hash % 360;
                         return `hsl(${h}, ${s}%, ${l}%)`;
                       }
-                      // Add both sponsorId and rep name for PolicyUpdatesFeed filter
                       const sponsorLink = rep && rep.id && rep.name
                         ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}&rep=${encodeURIComponent(rep.name)}`
                         : '#';
                       return (
                         <Link
                           href={sponsorLink}
-                          className="inline-block mt-2 px-4 py-2 rounded font-semibold shadow transition-colors text-center"
+                          className="inline-block mt-2 px-4 py-2 rounded-lg font-semibold shadow transition-colors text-center"
                           style={{
                             background: '#71A3A1',
                             color: '#fff'
@@ -282,7 +361,7 @@ export default function RepresentativeDetailPage() {
                 </div>
               )}
             </section>
-          </AnimatedSection>
+          </AnimatedSection>          
         </CardContent>
       </Card>
     </div>
