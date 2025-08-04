@@ -22,6 +22,7 @@ async function connectToDatabase() {
 }
 
 // Interface for OpenStates person data
+let stateAbbr: string | null = null;
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get('lat');
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
       const representatives = db.collection('representatives');
 
       // Find all districts containing the point
+
       const foundDistricts = await boundaries.find({
         geometry: {
           $geoIntersects: {
@@ -65,32 +67,8 @@ export async function GET(request: NextRequest) {
         }
       }).toArray();
 
-      // console.log('[API] Geospatial lookup: foundDistricts:', JSON.stringify(foundDistricts, null, 2));
-
-      if (!foundDistricts.length) {
-        return NextResponse.json({ error: 'No districts found for this location.' }, { status: 404 });
-      }
-
-      // Build queries to find representatives for each district
-      const repOrs = [];
-      let stateCodeForSenators = null;
-      for (const district of foundDistricts) {
-        if (district.properties && district.properties.GEOID) {
-          repOrs.push({ 'map_boundary.district': district.properties.GEOID, 'map_boundary.type': district.type });
-        }
-        // Try to extract state code from district properties (should be present in GEOID or properties)
-        if (!stateCodeForSenators && district.properties && district.properties.STATEFP) {
-          // STATEFP is a FIPS code; map to state abbreviation if possible
-          // We'll use the stateMap below for this
-          stateCodeForSenators = district.properties.STATEFP;
-        }
-        if (!stateCodeForSenators && district.properties && district.properties.STATE) {
-          stateCodeForSenators = district.properties.STATE;
-        }
-      }
-
       // Fallback: try to get state code from the first found district's properties
-      let stateAbbr = null;
+      // stateAbbr is already declared above, do not redeclare
       if (foundDistricts.length && foundDistricts[0].properties) {
         // Try to get state abbreviation from properties
         if (foundDistricts[0].properties.STATE) {
@@ -110,9 +88,85 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Always include U.S. senators for the state (chamber: Senate, state: stateAbbr, district: null/at-large, no map_boundary required)
+      // console.log('[API] Geospatial lookup: foundDistricts:', JSON.stringify(foundDistricts, null, 2));
+
+      if (!foundDistricts.length) {
+        return NextResponse.json({ error: 'No districts found for this location.' }, { status: 404 });
+      }
+
+      // Build queries to find representatives for each district
+      const repOrs = [];
+      let stateCodeForSenators = null;
+      for (const district of foundDistricts) {
+        if (district.properties && district.properties.GEOID) {
+          repOrs.push({ 'map_boundary.district': district.properties.GEOID, 'map_boundary.type': district.type });
+        }
+        // Try to extract state code from district properties (should be present in GEOID or properties)
+        if (!stateCodeForSenators && district.properties && district.properties.STATEFP) {
+          stateCodeForSenators = district.properties.STATEFP;
+        }
+        if (!stateCodeForSenators && district.properties && district.properties.STATE) {
+          stateCodeForSenators = district.properties.STATE;
+        }
+      }
+
+      // Always include at-large House rep for at-large states (AK, WY, VT, ND, SD, DE, MT)
+      const atLargeStates = ['AK', 'WY', 'VT', 'ND', 'SD', 'DE', 'MT'];
+      const abbr = (stateAbbr || '').toUpperCase();
+      if (atLargeStates.includes(abbr)) {
+        // Also match full state name and jurisdiction for at-large reps
+        const stateFullNameMap: Record<string, string> = {
+          'AK': 'Alaska', 'WY': 'Wyoming', 'VT': 'Vermont', 'ND': 'North Dakota', 'SD': 'South Dakota', 'DE': 'Delaware', 'MT': 'Montana'
+        };
+        const fullName = stateFullNameMap[abbr] || abbr;
+        repOrs.push({
+          $and: [
+            {
+              $or: [
+                { state: { $regex: new RegExp(`^${abbr}$`, 'i') } },
+                { state: { $regex: new RegExp(`^${fullName}$`, 'i') } }
+              ]
+            },
+            {
+              $or: [
+                { chamber: { $regex: /house/i } },
+                { role: { $regex: /representative/i } },
+                { 'terms.item.chamber': { $regex: /house/i } },
+                { jurisdiction: { $regex: /house/i } },
+                { jurisdiction: { $regex: /us house/i } }
+              ]
+            },
+            {
+              $or: [
+                { district: null },
+                { district: { $exists: false } }
+              ]
+            }
+          ]
+        });
+      } else if (foundDistricts.length === 1 && stateAbbr) {
+        // For non-at-large states, keep the original logic
+        repOrs.push({
+          $and: [
+            { state: { $regex: new RegExp(`^${stateAbbr}$`, 'i') } },
+            {
+              $or: [
+                { chamber: { $regex: /house/i } },
+                { role: { $regex: /representative/i } },
+                { 'terms.item.chamber': { $regex: /house/i } }
+              ]
+            },
+            {
+              $or: [
+                { district: null },
+                { district: { $exists: false } }
+              ]
+            }
+          ]
+        });
+      }
+
       const senatorOrs = [];
-      // Map full state name to abbreviation if stateName is provided
       const stateMap: Record<string, string> = {
         'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
         'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
@@ -141,16 +195,20 @@ export async function GET(request: NextRequest) {
         const fullStateName = Object.keys(stateMap).find(name => stateMap[name] === senatorState.toUpperCase()) || senatorState;
         senatorOrs.push({
           $and: [
-            { $or: [
-              { 'chamber': { $regex: /senate/i } },
-              { 'role': { $regex: /senator/i } },
-              { 'jurisdiction': { $regex: /senate/i } },
-              { 'terms.item.chamber': { $regex: /senate/i } }
-            ] },
-            { $or: [
-              { 'state': { $regex: new RegExp(`^${senatorState}$`, 'i') } },
-              { 'state': { $regex: new RegExp(`^${fullStateName}$`, 'i') } }
-            ] }
+            {
+              $or: [
+                { 'chamber': { $regex: /senate/i } },
+                { 'role': { $regex: /senator/i } },
+                { 'jurisdiction': { $regex: /senate/i } },
+                { 'terms.item.chamber': { $regex: /senate/i } }
+              ]
+            },
+            {
+              $or: [
+                { 'state': { $regex: new RegExp(`^${senatorState}$`, 'i') } },
+                { 'state': { $regex: new RegExp(`^${fullStateName}$`, 'i') } }
+              ]
+            }
             // No district restriction: match all senators for the state
           ]
         });
@@ -277,276 +335,59 @@ export async function GET(request: NextRequest) {
     const db = client.db('statepulse');
     const representativesCollection = db.collection('representatives');
 
-    // Check for cached data first - ALWAYS check cache before hitting external API
-    if (!forceRefresh) {
-      try {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
+    // Only use cached data, never fetch from OpenStates API
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
 
-        // Create a more comprehensive regex that matches both state abbreviation and full name
-        const stateFullName = Object.keys(stateMap).find(name => stateMap[name] === stateCode) || stateCode;
-        // Use word boundaries to avoid partial matches (e.g., IA in California)
-        const stateRegex = new RegExp(`\\b(${stateCode}|${stateFullName.replace(/\s+/g, '\\s+')}|${stateCode}\\s+State)\\b`, 'i');
+    const stateFullName = Object.keys(stateMap).find(name => stateMap[name] === stateCode) || stateCode;
+    const stateRegex = new RegExp(`\\b(${stateCode}|${stateFullName.replace(/\\s+/g, '\\s+')}|${stateCode}\\s+State)\\b`, 'i');
 
-        const totalCachedReps = await representativesCollection.countDocuments({
-          jurisdiction: { $regex: stateRegex },
-          lastUpdated: { $gte: yesterday }
+    const totalCachedReps = await representativesCollection.countDocuments({
+      jurisdiction: { $regex: stateRegex },
+      lastUpdated: { $gte: yesterday }
+    });
+
+    if (totalCachedReps > 0) {
+      if (showAll) {
+        const skip = (pageParam - 1) * pageSize;
+        const cachedReps = await representativesCollection
+          .find({
+            jurisdiction: { $regex: stateRegex },
+            lastUpdated: { $gte: yesterday }
+          })
+          .skip(skip)
+          .limit(pageSize)
+          .toArray();
+        return NextResponse.json({
+          representatives: cachedReps,
+          source: 'cache',
+          pagination: {
+            page: pageParam,
+            pageSize,
+            total: totalCachedReps,
+            totalPages: Math.ceil(totalCachedReps / pageSize),
+            hasNext: skip + pageSize < totalCachedReps,
+            hasPrev: pageParam > 1
+          }
         });
-
-        // console.log(`[API] Found ${totalCachedReps} cached representatives for ${stateCode} using regex: ${stateRegex}`);
-
-        if (totalCachedReps > 0) {
-          if (showAll) {
-            const skip = (pageParam - 1) * pageSize;
-            const cachedReps = await representativesCollection
-              .find({
-                jurisdiction: { $regex: stateRegex },
-                lastUpdated: { $gte: yesterday }
-              })
-              .skip(skip)
-              .limit(pageSize)
-              .toArray();
-
-            // console.log(`[API] Returning ${cachedReps.length} cached representatives (paginated) for page ${pageParam}`);
-            return NextResponse.json({
-              representatives: cachedReps,
-              source: 'cache',
-              pagination: {
-                page: pageParam,
-                pageSize,
-                total: totalCachedReps,
-                totalPages: Math.ceil(totalCachedReps / pageSize),
-                hasNext: skip + pageSize < totalCachedReps,
-                hasPrev: pageParam > 1
-              }
-            });
-          } else {
-            const cachedReps = await representativesCollection
-              .find({
-                jurisdiction: { $regex: stateRegex },
-                lastUpdated: { $gte: yesterday }
-              })
-              .limit(10)
-              .toArray();
-
-            // console.log(`[API] Returning ${cachedReps.length} cached representatives (first 10)`);
-            return NextResponse.json({
-              representatives: cachedReps,
-              source: 'cache'
-            });
-          }
-        } else {
-          // console.log(`[API] No cached data found for ${stateCode}`);
-
-          // For pagination requests (showAll=true), we'll fetch fresh data and then paginate
-          // This ensures pagination always works even if cache is missing
-          if (showAll) {
-            // console.log(`[API] Pagination request with no cached data - will fetch fresh data and then paginate`);
-          } else {
-            // console.log(`[API] Initial request with no cached data, will fetch from OpenStates API`);
-          }
-        }
-      } catch (cacheError) {
-        console.error(`[API] Cache check failed:`, cacheError);
-
-        // If this is a pagination request and cache fails, return error
-        if (showAll) {
-          return NextResponse.json({
-            error: 'Database error occurred while checking for cached data. Please try again.',
-            details: 'Cache check failed for pagination request.'
-          }, { status: 500 });
-        }
-
-        // Continue to fetch from API if cache fails and this is not a pagination request
+      } else {
+        const cachedReps = await representativesCollection
+          .find({
+            jurisdiction: { $regex: stateRegex },
+            lastUpdated: { $gte: yesterday }
+          })
+          .limit(10)
+          .toArray();
+        return NextResponse.json({
+          representatives: cachedReps,
+          source: 'cache'
+        });
       }
     } else {
-      // console.log(`[API] Force refresh requested for ${stateCode}, clearing cache and fetching fresh data`);
-      // Clear old representatives for this state when force refresh is requested
-      await representativesCollection.deleteMany({
-        jurisdiction: { $regex: new RegExp(stateCode, 'i') }
-      });
+      return NextResponse.json({ error: 'No cached representative data found for this state or location.' }, { status: 404 });
     }
-
-    // Only reach here if no cached data was found or force refresh was requested
-    // console.log(`[API] Proceeding to fetch from OpenStates API for ${stateCode}`);
-
-    // Check OpenStates API key
-    const openStatesApiKey = process.env.OPENSTATES_API_KEY;
-    if (!openStatesApiKey) {
-      console.error('[API] OPENSTATES_API_KEY not found in environment variables');
-      return NextResponse.json(
-        { error: 'OpenStates API key not configured. Please contact support.' },
-        { status: 503 }
-      );
-    }
-
-    // console.log(`[API] Fetching representatives from OpenStates API for state: ${stateCode}`);
-
-    // Fetch all pages of representatives from OpenStates API
-    let allPeople: OpenStatesPerson[] = [];
-    let currentPage = 1;
-    let hasMorePages = true;
-    const perPage = 50; // OpenStates API maximum is 50 per page
-
-    while (hasMorePages) {
-      // console.log(`[API] Fetching page ${currentPage} for ${stateCode}...`);
-
-      let openStatesUrl: string;
-      let response: Response;
-
-      // First try with lowercase state abbreviation
-      openStatesUrl = `https://v3.openstates.org/people?jurisdiction=${stateCode.toLowerCase()}&per_page=${perPage}&page=${currentPage}`;
-
-      try {
-        response = await fetch(openStatesUrl, {
-          headers: {
-            'X-API-KEY': openStatesApiKey,
-            'Accept': 'application/json'
-          },
-          timeout: 10000 // 10 second timeout
-        } as any);
-
-        // If that fails, try with the ocd-division format
-        if (!response.ok && response.status === 400) {
-          // console.log(`[API] First attempt failed for page ${currentPage}, trying alternative format for ${stateCode}`);
-
-          openStatesUrl = `https://v3.openstates.org/people?jurisdiction=ocd-division/country:us/state:${stateCode.toLowerCase()}&per_page=${perPage}&page=${currentPage}`;
-
-          response = await fetch(openStatesUrl, {
-            headers: {
-              'X-API-KEY': openStatesApiKey,
-              'Accept': 'application/json'
-            },
-            timeout: 10000
-          } as any);
-        }
-
-        if (!response.ok) {
-          console.error(`[API] OpenStates API error:`, response.status, response.statusText);
-          const errorText = await response.text();
-          console.error(`[API] Error response body:`, errorText);
-
-          if (response.status === 401) {
-            return NextResponse.json(
-              { error: 'API authentication failed. Please check your OpenStates API key.' },
-              { status: 401 }
-            );
-          }
-
-          if (response.status === 400) {
-            return NextResponse.json(
-              { error: `Invalid request for state ${stateCode}. The OpenStates API may not have data for this jurisdiction.` },
-              { status: 400 }
-            );
-          }
-
-          if (response.status === 404) {
-            return NextResponse.json(
-              { error: `No data found for state ${stateCode}. This state may not be available in OpenStates.` },
-              { status: 404 }
-            );
-          }
-
-          return NextResponse.json(
-            { error: `Unable to fetch representative data for ${stateCode}. Please try again later.` },
-            { status: 500 }
-          );
-        }
-
-        const data = await response.json();
-        const pagePeople: OpenStatesPerson[] = data.results || [];
-
-        // console.log(`[API] Fetched ${pagePeople.length} representatives from page ${currentPage} for ${stateCode}`);
-
-        // Add this page's results to our collection
-        allPeople = allPeople.concat(pagePeople);
-
-        // Check if we have more pages
-        // OpenStates API typically returns fewer results than per_page when we've reached the end
-        if (pagePeople.length < perPage) {
-          hasMorePages = false;
-          // console.log(`[API] Reached end of results for ${stateCode}. Total fetched: ${allPeople.length}`);
-        } else {
-          currentPage++;
-          // Add a small delay to be respectful to the API
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        // Safety check to prevent infinite loops
-        if (currentPage > 10) {
-          console.warn(`[API] Stopping pagination after ${currentPage - 1} pages for ${stateCode} to prevent infinite loop`);
-          hasMorePages = false;
-        }
-      } catch (fetchError) {
-        console.error(`[API] Network error fetching from OpenStates:`, fetchError);
-        return NextResponse.json(
-          { error: `Network error fetching representative data for ${stateCode}. Please try again later.` },
-          { status: 500 }
-        );
-      }
-    }
-
-    // console.log(`[API] Total representatives fetched for ${stateCode}: ${allPeople.length}`);
-
-    // Transform only ocd-person/xxxx to ocd-person_xxxx for person.id
-    const transformOcdPersonId = (id: string) =>
-      typeof id === 'string' ? id.replace(/^ocd-person\//, 'ocd-person_') : id;
-
-    const representatives: OpenStatesPerson[] = allPeople.map(person => ({
-      ...person,
-      id: person.id ? transformOcdPersonId(person.id) : person.id
-    }));
-
-    // Store in MongoDB
-    if (representatives.length > 0) {
-      try {
-        await representativesCollection.deleteMany({
-          jurisdiction: { $regex: new RegExp(stateCode, 'i') }
-        });
-
-        await representativesCollection.insertMany(representatives);
-        // console.log(`[API] Stored ${representatives.length} representatives for ${stateCode}`);
-      } catch (storageError) {
-        console.error(`[API] Failed to store representatives:`, storageError);
-        // Continue without caching if storage fails
-      }
-    }
-
-    // Return response
-    if (showAll) {
-      const total = representatives.length;
-      const skip = (pageParam - 1) * pageSize;
-      const paginatedReps = representatives.slice(skip, skip + pageSize);
-
-      // console.log(`[API] Returning ${paginatedReps.length} representatives (paginated)`);
-      return NextResponse.json({
-        representatives: paginatedReps,
-        source: 'api',
-        pagination: {
-          page: pageParam,
-          pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize),
-          hasNext: skip + pageSize < total,
-          hasPrev: pageParam > 1
-        }
-      });
-    } else {
-      // console.log(`[API] Returning ${Math.min(representatives.length, 10)} representatives`);
-      return NextResponse.json({
-        representatives: representatives.slice(0, 10),
-        source: 'api'
-      });
-    }
-
   } catch (error) {
-    console.error('[API] Unexpected error in representatives API:', error);
-    return NextResponse.json(
-      {
-        error: 'An unexpected error occurred while fetching representatives. Please try again later.',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    console.error(`[API] Error during database operations:`, error);
+    return NextResponse.json({ error: 'Database error occurred. Please try again later.', details: (error as Error).message }, { status: 500 });
   }
 }
