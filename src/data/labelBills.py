@@ -1,5 +1,3 @@
-
-# GPU-accelerated multi-label bill topic classifier using Hugging Face Transformers and PyTorch
 import json
 import os
 import torch
@@ -8,6 +6,16 @@ from transformers import DistilBertTokenizerFast, DistilBertForSequenceClassific
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.metrics import classification_report
 import numpy as np
+import resource
+
+print("CUDA available:", torch.cuda.is_available())
+print("CUDA device count:", torch.cuda.device_count())
+if torch.cuda.is_available():
+    print("Using GPU:", torch.cuda.get_device_name(0))
+else:
+    print("Using CPU")
+hard= 30 * 1024 * 1024 * 1024
+resource.setrlimit(resource.RLIMIT_AS, (hard, hard))
 
 def load_bills(path):
     with open(path, 'r', encoding='utf-8') as f:
@@ -94,9 +102,9 @@ def main():
     training_args = TrainingArguments(
         output_dir='./results',
         num_train_epochs=2,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        evaluation_strategy='epoch',
+        per_device_train_batch_size=2,
+        per_device_eval_batch_size=2,
+        eval_strategy='epoch',
         save_strategy='no',
         logging_dir='./logs',
         logging_steps=50,
