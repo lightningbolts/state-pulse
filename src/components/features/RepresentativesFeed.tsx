@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
+import { STATE_NAMES } from '@/types/geo';
 import { STATE_MAP } from '@/types/geo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,12 @@ export default function RepresentativesFeed() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'name', dir: 'asc' });
+  const sortOptions = [
+    { label: 'Name (A-Z)', field: 'name', dir: 'asc' },
+    { label: 'Name (Z-A)', field: 'name', dir: 'desc' },
+    { label: 'State (A-Z)', field: 'state', dir: 'asc' },
+    { label: 'State (Z-A)', field: 'state', dir: 'desc' },
+  ];
   const [jurisdictionName, setJurisdictionName] = useState<string>("");
   const [congressChamber, setCongressChamber] = useState<"" | "us-house" | "us-senate">("");
   const [totalCount, setTotalCount] = useState<number | null>(null);
@@ -105,7 +112,6 @@ export default function RepresentativesFeed() {
           />
           <Button className="ml-2" variant="default" onClick={handleSearch} aria-label="Search">Search</Button>
         </div>
-        {/* Sort Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="w-full sm:w-auto">
@@ -123,12 +129,12 @@ export default function RepresentativesFeed() {
                 setHasMore(true);
               }}
             >
-              <DropdownMenuRadioItem value="name:asc">Alphabetical (A-Z)</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="name:desc">Alphabetical (Z-A)</DropdownMenuRadioItem>
+              {sortOptions.map(opt => (
+                <DropdownMenuRadioItem key={`${opt.field}:${opt.dir}`} value={`${opt.field}:${opt.dir}`}>{opt.label}</DropdownMenuRadioItem>
+              ))}
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* State Filter Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="w-full sm:w-auto">

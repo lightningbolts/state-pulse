@@ -196,27 +196,31 @@ export async function GET(request: NextRequest) {
           ] });
         }
       }
-      // State match (jurisdiction or state field)
+      
       if (filterState && validStates.includes(filterState.toUpperCase())) {
-        // Match jurisdiction containing state abbreviation or full name, CongressPerson state field, terms.stateCode, and terms.stateName
         const abbr = filterState.toUpperCase();
         const fullName = Object.keys(stateMap).find(name => stateMap[name] === abbr) || abbr;
         const stateRegex = new RegExp(`\\b(${abbr}|${fullName})\\b`, 'i');
         andFilters.push({ $or: [
-          { 'jurisdiction.name': { $regex: fullName, $options: 'i' } }, // OpenStates full state name
-          { jurisdiction: { $regex: stateRegex } }, // fallback for string jurisdiction
-          { state: { $regex: stateRegex } }, // CongressPerson field
-          { 'terms.stateCode': abbr }, // CongressPerson field
-          { 'terms.stateName': { $regex: fullName, $options: 'i' } } // CongressPerson field
+          { 'jurisdiction.name': { $regex: fullName, $options: 'i' } }, 
+          { jurisdiction: { $regex: stateRegex } }, 
+          { state: { $regex: stateRegex } },
+          { 'terms.stateCode': abbr }, 
+          { 'terms.stateName': { $regex: fullName, $options: 'i' } }
         ] });
       }
       if (andFilters.length > 0) {
         filter.$and = andFilters;
       }
       // Sorting
-      const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction', 'lastName', 'firstName'];
-      const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
-      const sortObj: Record<string, 1 | -1> = { [sortField]: sortDir };
+      const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction', 'lastName', 'firstName', 'state'];
+      let sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
+      let sortObj: Record<string, 1 | -1>;
+      if (sortField === 'state') {
+        sortObj = { 'jurisdiction': sortDir, 'state': sortDir };
+      } else {
+        sortObj = { [sortField]: sortDir };
+      }
       // Pagination
       const skip = (pageParam - 1) * pageSize;
       const total = await representativesCollection.countDocuments(filter);
