@@ -27,6 +27,7 @@ import {AnimatedSection} from "@/components/ui/AnimatedSection";
 
 // Import Leaflet for custom icons
 import { RepresentativesResults } from "./RepresentativesResults";
+import { ChamberMakeup } from "./ChamberMakeup";
 let L: any = null;
 if (typeof window !== 'undefined') {
     L = require('leaflet');
@@ -757,6 +758,11 @@ export function InteractiveMap() {
                             </div>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* Party Makeup for Selected State */}
+                {selectedState && stateStats[selectedState] && (
+                    <ChamberMakeup state={selectedState} />
                 )}
 
                 {/* Quick Stats Overview */}

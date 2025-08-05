@@ -66,10 +66,9 @@ export function RepresentativesResults({
             {!loading && !error && representatives.length === 0 && !userLocation && (
                 <div className="text-center py-12">
                     <MapPin className="mx-auto h-12 w-12 text-muted-foreground mb-4"/>
-                    <h3 className="text-lg font-semibold mb-2">Start by entering your address</h3>
+                    <h3 className="text-lg font-semibold mb-2">Enter a location.</h3>
                     <p className="text-sm text-muted-foreground">
-                        Type your address in the search box above to see instant suggestions and find your
-                        representatives.
+                        Find your representatives.
                     </p>
                 </div>
             )}
