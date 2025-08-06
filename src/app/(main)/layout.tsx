@@ -40,7 +40,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-    { id: "home", path: "/home", label: "Home", icon: Gavel },
+    { id: "home", path: "/", label: "Home", icon: Gavel },
     { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "updates", path: "/legislation", label: "Policy Updates", icon: Newspaper },
     { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },

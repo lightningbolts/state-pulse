@@ -130,7 +130,7 @@ export async function GET(request: Request) {
     }
 
     // Debug: log the final filter/query before running the search
-    console.log('[API] Final MongoDB filter:', JSON.stringify(finalFilter, null, 2));
+    // console.log('[API] Final MongoDB filter:', JSON.stringify(finalFilter, null, 2));
     let legislations = await getAllLegislation({
       limit,
       skip,
