@@ -69,13 +69,10 @@ export default function RepresentativesFeed() {
     }
   }, [search, page, sort, jurisdictionName, congressChamber]);
 
-  // Initial fetch and on search
   useEffect(() => {
     fetchReps(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, []);
 
-  // Infinite scroll
   useEffect(() => {
     if (!loader.current) return;
     const observer = new window.IntersectionObserver(
