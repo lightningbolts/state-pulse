@@ -31,6 +31,30 @@ import { ChamberMakeup } from "./ChamberMakeup";
 let L: any = null;
 if (typeof window !== 'undefined') {
     L = require('leaflet');
+    // Inject custom marker hover CSS if not already present
+    if (!document.getElementById('custom-marker-hover-style')) {
+      const style = document.createElement('style');
+      style.id = 'custom-marker-hover-style';
+      style.innerHTML = `
+        .custom-marker {
+          transition: transform 0.18s cubic-bezier(0.4,0.2,0.2,1), box-shadow 0.18s cubic-bezier(0.4,0.2,0.2,1);
+          border-radius: 50%;
+          overflow: hidden;
+          box-sizing: border-box;
+          background-clip: padding-box;
+          background-color: inherit;
+        }
+        .custom-marker-inner {
+          transform: translate(-50%, -50%);
+        }
+        .custom-marker:hover {
+          transform: scale(1.18);
+          z-index: 10;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+      `;
+      document.head.appendChild(style);
+    }
 }
 
 // Dynamically import map components
@@ -258,7 +282,7 @@ export function InteractiveMap() {
             icons[abbr] = L.divIcon({
                 className: 'custom-marker',
                 html: `
-            <div class="marker-pin" style="
+            <div class="marker-pin custom-marker" style="
               width: ${size}px;
               height: ${size}px;
               background-color: ${color};
@@ -266,16 +290,21 @@ export function InteractiveMap() {
               border-radius: 50%;
               box-shadow: 0 2px 4px rgba(0,0,0,0.3);
               position: relative;
+              overflow: hidden;
+              box-sizing: border-box;
             ">
-              <div style="
+              <div class="custom-marker-inner" style="
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                transform: translate(-50%, -50%);
                 width: ${Math.max(8, size * 0.4)}px;
                 height: ${Math.max(8, size * 0.4)}px;
+                background: none;
                 background-color: hsl(var(--background));
                 border-radius: 50%;
+                overflow: hidden;
+                outline: none;
+                box-sizing: border-box;
               "></div>
             </div>
           `,
