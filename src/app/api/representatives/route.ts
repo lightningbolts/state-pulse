@@ -230,14 +230,53 @@ export async function GET(request: NextRequest) {
         .toArray();
       // Fuzzy search with Fuse.js if search is present
       if (fuseSearch) {
-        const fuse = new Fuse(reps, {
+        const normalizeName = (name: string) => {
+          if (!name) return [];
+          const cleaned = name.replace(/[.,]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const parts = cleaned.split(' ');
+          if (parts.length < 2) return [cleaned];
+          const perms = [
+            parts.join(' '),
+            parts.slice().reverse().join(' '),
+            parts.join(', '),
+            parts.slice().reverse().join(', '),
+            `${parts[1]} ${parts[0]}`,
+            `${parts[0]} ${parts[1]}`,
+            `${parts[1]}, ${parts[0]}`,
+            `${parts[0]}, ${parts[1]}`
+          ];
+          return Array.from(new Set([...perms, ...parts]));
+        };
+        const getSafe = (obj: any, ...keys: string[]) => {
+          for (const key of keys) {
+            if (obj && typeof obj[key] === 'string') return obj[key];
+          }
+          return '';
+        };
+        const repsWithNormalized = reps.map(rep => {
+          const name = getSafe(rep, 'name', 'directOrderName');
+          const firstName = getSafe(rep, 'firstName', 'first_name');
+          const lastName = getSafe(rep, 'lastName', 'last_name');
+          let normalizedNames: string[] = [];
+          if (name) normalizedNames = normalizeName(name);
+          if (firstName && lastName) {
+            normalizedNames = normalizedNames.concat(normalizeName(`${firstName} ${lastName}`));
+            normalizedNames = normalizedNames.concat(normalizeName(`${lastName} ${firstName}`));
+            normalizedNames = normalizedNames.concat(normalizeName(`${firstName}, ${lastName}`));
+            normalizedNames = normalizedNames.concat(normalizeName(`${lastName}, ${firstName}`));
+          }
+          normalizedNames = Array.from(new Set(normalizedNames));
+          return { ...rep, normalizedNames };
+        });
+        const fuse = new Fuse(repsWithNormalized, {
           keys: [
             'name',
             'office',
             'district',
             'party',
             'lastName',
-            'firstName'
+            'firstName',
+            'normalizedNames'
           ],
           threshold: 0.4,
           ignoreLocation: true,
