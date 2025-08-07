@@ -1,4 +1,4 @@
-# **App Name**: State Lens
+# **App Name**: StatePulse
 
 ## Core Features:
 
