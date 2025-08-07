@@ -44,7 +44,7 @@ export default function HomePageClient() {
           <p className="text-muted-foreground text-lg mb-16 max-w-2xl mx-auto leading-relaxed">
             We provide the tools and insights you need to navigate the complex world of state-level policy.
           </p>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+          <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10 min-w-0">
             <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg min-h-[220px] h-auto overflow-visible">
               <CardHeader className="pb-4">
                 <div className="flex items-center mb-3">
@@ -87,7 +87,7 @@ export default function HomePageClient() {
               <CardContent className="break-words overflow-visible h-auto">
                 <p className="text-muted-foreground leading-relaxed break-words">
                   Understand trends and impacts with our data visualization tools.
-                  <span className="block text-sm text-primary/80 mt-1 font-medium">(Coming Soon!)</span>
+                  {/* <span className="block text-sm text-primary/80 mt-1 font-medium">(Coming Soon!)</span> */}
                 </p>
               </CardContent>
             </Card>
