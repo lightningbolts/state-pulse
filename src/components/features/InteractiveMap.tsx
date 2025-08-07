@@ -1,13 +1,15 @@
 "use client";
 
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Button} from "@/components/ui/button";
-import type {LatLngExpression} from 'leaflet';
-import dynamic from 'next/dynamic';
-import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar, FileText, MapPin, TrendingUp, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { StateData } from '@/types/jurisdictions';
+import { MapMode } from "@/types/geo";
+import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { DistrictMapGL } from './DistrictMapGL';
-// Helper: API URLs for district GeoJSON overlays
 const DISTRICT_GEOJSON_URLS: Record<string, string> = {
   'congressional-districts': '/districts/congressional-districts.geojson',
   'state-upper-districts': '/districts/state-upper-districts.geojson',
@@ -20,72 +22,12 @@ const DISTRICT_COLORS: Record<string, string> = {
   'state-upper-districts': '#a21caf',   // purple
   'state-lower-districts': '#16a34a',   // green
 };
-import {Calendar, FileText, MapPin, TrendingUp, Users} from 'lucide-react';
-import {useRouter} from 'next/navigation';
-import {StateData} from '@/types/jurisdictions';
-import {MapMode} from "@/types/geo";
-import {AnimatedSection} from "@/components/ui/AnimatedSection";
-
-// Import Leaflet for custom icons
 import { RepresentativesResults } from "./RepresentativesResults";
 import { ChamberMakeup } from "./ChamberMakeup";
-let L: any = null;
-if (typeof window !== 'undefined') {
-    L = require('leaflet');
-    // Inject custom marker hover CSS if not already present
-    if (!document.getElementById('custom-marker-hover-style')) {
-      const style = document.createElement('style');
-      style.id = 'custom-marker-hover-style';
-      style.innerHTML = `
-        .custom-marker {
-          transition: transform 0.18s cubic-bezier(0.4,0.2,0.2,1), box-shadow 0.18s cubic-bezier(0.4,0.2,0.2,1);
-          border-radius: 50%;
-          overflow: hidden;
-          box-sizing: border-box;
-          background-clip: padding-box;
-          background-color: inherit;
-        }
-        .custom-marker-inner {
-          transform: translate(-50%, -50%);
-        }
-        .custom-marker:hover {
-          transform: scale(1.18);
-          z-index: 10;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-        }
-      `;
-      document.head.appendChild(style);
-    }
-}
+import Map, { Marker as MapLibreMarker, Popup as MapLibrePopup, MapRef } from 'react-map-gl/maplibre';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
-// Dynamically import map components
-const MapContainer = dynamic(
-    () => import('react-leaflet').then((mod) => mod.MapContainer),
-    {
-        ssr: false,
-        loading: () => <div
-            className="h-[500px] w-full rounded-md overflow-hidden border flex items-center justify-center bg-muted">
-            <p>Loading map assets...</p></div>,
-    }
-);
-
-const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), {
-    ssr: false,
-});
-
-const GeoJSON = dynamic(() => import('react-leaflet').then(mod => mod.GeoJSON), {
-    ssr: false,
-});
-
-const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), {
-    ssr: false,
-});
-
-const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), {
-    ssr: false,
-});
-
-const DEFAULT_POSITION: LatLngExpression = [39.8283, -98.5795];
+const DEFAULT_POSITION: [number, number] = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
 
 const mapModes: MapMode[] = [
@@ -136,6 +78,7 @@ const mapModes: MapMode[] = [
 export function InteractiveMap() {
     const [isClient, setIsClient] = useState(false);
     const [selectedState, setSelectedState] = useState<string | null>(null);
+    const [selectedStatePopupCoords, setSelectedStatePopupCoords] = useState<[number, number] | null>(null);
     const [mapMode, setMapMode] = useState<string>('legislation');
     const [stateStats, setStateStats] = useState<Record<string, StateData>>({});
     const [stateDetails, setStateDetails] = useState<any>(null);
@@ -205,8 +148,18 @@ export function InteractiveMap() {
         }
     };
 
-    const handleStateClick = (stateAbbr: string) => {
+    const handleStateClick = (stateAbbr: string, coords?: [number, number]) => {
+        // console.log('[handleStateClick] Clicked:', stateAbbr, coords);
         setSelectedState(stateAbbr);
+        if (coords) {
+            setSelectedStatePopupCoords(coords);
+            // console.log('[handleStateClick] Setting popup coords:', coords);
+        } else {
+            setSelectedStatePopupCoords(null);
+            // console.log('[handleStateClick] No coords provided');
+        }
+        setDetailsLoading(true);
+        setStateDetails(null);
         fetchStateDetails(stateAbbr);
     };
 
@@ -236,61 +189,25 @@ export function InteractiveMap() {
         }
     }, [mapMode, stateStats]);
 
-    // Memoize icons to prevent re-creating them on every render
-    const memoizedIcons = useMemo(() => {
-        if (!L) return {};
-
-        const icons: Record<string, any> = {};
+    // Memoize marker sizes/colors for MapLibre
+    const memoizedMarkers = useMemo(() => {
+        const markers: Record<string, { color: string, size: number }> = {};
         Object.entries(stateStats).forEach(([abbr, state]) => {
             const color = getStateColor(abbr);
             let size = 20;
             if (mapMode === 'legislation') {
-                // Area ∝ count, so diameter ∝ sqrt(count)
                 const minSize = 5;
                 const count = state.legislationCount || 0;
-                // Choose a scaling constant so that 1000 bills = reasonable size (e.g., 20px)
-                const k = 0.63; // sqrt(1000) * 0.63 ≈ 20
+                const k = 0.63;
                 if (count < 1) {
                     size = minSize;
                 } else {
                     size = Math.max(minSize, k * Math.sqrt(count));
                 }
             }
-            icons[abbr] = L.divIcon({
-                className: 'custom-marker',
-                html: `
-            <div class="marker-pin custom-marker" style="
-              width: ${size}px;
-              height: ${size}px;
-              background-color: ${color};
-              border: 2px solid hsl(var(--background));
-              border-radius: 50%;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              position: relative;
-              overflow: hidden;
-              box-sizing: border-box;
-            ">
-              <div class="custom-marker-inner" style="
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                width: ${Math.max(8, size * 0.4)}px;
-                height: ${Math.max(8, size * 0.4)}px;
-                background: none;
-                background-color: hsl(var(--background));
-                border-radius: 50%;
-                overflow: hidden;
-                outline: none;
-                box-sizing: border-box;
-              "></div>
-            </div>
-          `,
-                iconSize: [size, size],
-                iconAnchor: [size / 2, size / 2],
-                popupAnchor: [0, -size / 2],
-            });
+            markers[abbr] = { color, size };
         });
-        return icons;
+        return markers;
     }, [getStateColor, stateStats, mapMode]);
 
     const getActivityLevel = (stateAbbr: string) => {
@@ -447,7 +364,6 @@ export function InteractiveMap() {
                                             draggable: true,
                                             onDragEnd: (lngLat) => {
                                                 setDistrictPopupLatLng(lngLat);
-                                                // Simulate a map click at the new location to update reps
                                                 if (selectedDistrict) {
                                                     onDistrictClickGL(selectedDistrict, lngLat);
                                                 }
@@ -455,87 +371,136 @@ export function InteractiveMap() {
                                         } : undefined}
                                     />
                                 ) : (
-                                    <MapContainer
-                                        key="dashboard-map"
-                                        center={DEFAULT_POSITION}
-                                        zoom={DEFAULT_ZOOM}
-                                        style={{height: '100%', width: '100%'}}
-                                        className="z-0"
+                                    <Map
                                         ref={mapRef}
+                                        initialViewState={{ longitude: DEFAULT_POSITION[1], latitude: DEFAULT_POSITION[0], zoom: DEFAULT_ZOOM }}
+                                        style={{ height: '100%', width: '100%' }}
+                                        mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
                                     >
-                                        <TileLayer
-                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                        />
-                                        {Object.entries(stateStats).map(([abbr, state]) => (
-                                            <Marker
-                                                key={abbr}
-                                                position={state.center}
-                                                eventHandlers={{
-                                                    click: () => handleStateClick(abbr),
-                                                }}
-                                                icon={memoizedIcons[abbr]}
-                                            >
-                                                <Popup>
-                                                    <div className="p-2 min-w-[180px] sm:min-w-[200px]">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <h3 className="font-semibold text-sm md:text-lg line-clamp-1">{state.name}</h3>
-                                                            <div className="flex items-center space-x-1">
-                                                                <div
-                                                                    className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
-                                                                        getActivityLevel(abbr) === 'High Activity' ? 'bg-primary' :
-                                                                            getActivityLevel(abbr) === 'Medium Activity' ? 'bg-primary/50' :
-                                                                                getActivityLevel(abbr) === 'Low Activity' ? 'bg-primary/20' :
-                                                                                    'bg-gray-300'
-                                                                    }`}
-                                                                ></div>
-                                                                <span
-                                                                    className="text-xs text-muted-foreground hidden sm:inline">
-                                                                    {getActivityLevel(abbr)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-1 md:space-y-2 text-xs md:text-sm">
-                                                            <div className="flex justify-between">
-                                                                <span>Bills:</span>
-                                                                <Badge variant="secondary"
-                                                                       className="text-xs">{state.legislationCount}</Badge>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                                <span>Reps:</span>
-                                                                <Badge variant="secondary"
-                                                                       className="text-xs">{state.activeRepresentatives}</Badge>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                                <span>Recent:</span>
-                                                                <Badge variant="secondary"
-                                                                       className="text-xs">{state.recentActivity}</Badge>
-                                                            </div>
-                                                            <div className="pt-1 md:pt-2">
-                                                                <div className="text-xs text-muted-foreground mb-1">
-                                                                    <span className="hidden sm:inline">Key Topics:</span>
-                                                                    <span className="sm:hidden">Topics:</span>
-                                                                </div>
-                                                                <div className="flex flex-wrap gap-1">
-                                                                    {[...new Set(state.keyTopics)].slice(0, 3).map((topic, index) => (
-                                                                        <Badge key={`${topic}-${index}`} variant="secondary"
-                                                                               className="text-xs">
-                                                                            {topic}
-                                                                        </Badge>
-                                                                    ))}
-                                                                    {state.keyTopics.length > 3 && (
-                                                                        <Badge variant="outline" className="text-xs">
-                                                                            +{state.keyTopics.length - 3}
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                        {Object.entries(stateStats).map(([abbr, state]) => {
+                                            const { color, size } = memoizedMarkers[abbr] || { color: '#e0e0e0', size: 20 };
+                                            const coords: [number, number] = [
+                                                (state.center as [number, number])[0],
+                                                (state.center as [number, number])[1],
+                                            ];
+                                            return (
+                                                <MapLibreMarker
+                                                    key={abbr}
+                                                    longitude={coords[1]}
+                                                    latitude={coords[0]}
+                                                    anchor="center"
+                                                    onClick={() => handleStateClick(abbr, coords)}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            width: size,
+                                                            height: size,
+                                                            backgroundColor: color,
+                                                            border: '2px solid #fff',
+                                                            borderRadius: '50%',
+                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                                            position: 'relative',
+                                                            overflow: 'hidden',
+                                                            boxSizing: 'border-box',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: '50%',
+                                                                left: '50%',
+                                                                width: Math.max(8, size * 0.4),
+                                                                height: Math.max(8, size * 0.4),
+                                                                background: '#fff',
+                                                                borderRadius: '50%',
+                                                                transform: 'translate(-50%, -50%)',
+                                                            }}
+                                                        />
                                                     </div>
-                                                </Popup>
-                                            </Marker>
-                                        ))}
-                                    </MapContainer>
+                                                </MapLibreMarker>
+                                            );
+                                        })}
+                                        {/* State popup */}
+                                        {/* Log and compare popups at fixed and dynamic coordinates */}
+                                        {selectedState && selectedStatePopupCoords && (
+                                            <MapLibrePopup
+                                                longitude={selectedStatePopupCoords[1]}
+                                                latitude={selectedStatePopupCoords[0]}
+                                                anchor="bottom"
+                                                onClose={() => { setSelectedState(null); setSelectedStatePopupCoords(null); }}
+                                                closeOnClick={false}
+                                                maxWidth="260px"
+                                            >
+                                                <div className="p-2 min-w-[180px] sm:min-w-[200px]">
+                                                    {detailsLoading || !stateDetails ? (
+                                                        <div className="flex items-center justify-center min-h-[60px]">
+                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                                            <span className="text-xs text-muted-foreground">Loading details...</span>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <h3 className="font-semibold text-sm md:text-lg line-clamp-1">{stateStats[selectedState].name}</h3>
+                                                                <div className="flex items-center space-x-1">
+                                                                    <div
+                                                                        className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
+                                                                            getActivityLevel(selectedState) === 'High Activity' ? 'bg-primary' :
+                                                                                getActivityLevel(selectedState) === 'Medium Activity' ? 'bg-primary/50' :
+                                                                                    getActivityLevel(selectedState) === 'Low Activity' ? 'bg-primary/20' :
+                                                                                        'bg-gray-300'
+                                                                        }`}
+                                                                    ></div>
+                                                                    <span
+                                                                        className="text-xs text-muted-foreground hidden sm:inline">
+                                                                        {getActivityLevel(selectedState)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-1 md:space-y-2 text-xs md:text-sm">
+                                                                <div className="flex justify-between">
+                                                                    <span>Bills:</span>
+                                                                    <Badge variant="secondary"
+                                                                        className="text-xs">{stateStats[selectedState].legislationCount}</Badge>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span>Reps:</span>
+                                                                    <Badge variant="secondary"
+                                                                        className="text-xs">{stateStats[selectedState].activeRepresentatives}</Badge>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span>Recent:</span>
+                                                                    <Badge variant="secondary"
+                                                                        className="text-xs">{stateStats[selectedState].recentActivity}</Badge>
+                                                                </div>
+                                                                <div className="pt-1 md:pt-2">
+                                                                    <div className="text-xs text-muted-foreground mb-1">
+                                                                        <span className="hidden sm:inline">Key Topics:</span>
+                                                                        <span className="sm:hidden">Topics:</span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {[...new Set(stateStats[selectedState].keyTopics)].slice(0, 3).map((topic, index) => (
+                                                                            <Badge key={`${topic}-${index}`} variant="secondary"
+                                                                                className="text-xs">
+                                                                                {topic}
+                                                                            </Badge>
+                                                                        ))}
+                                                                        {stateStats[selectedState].keyTopics.length > 3 && (
+                                                                            <Badge variant="outline" className="text-xs">
+                                                                                +{stateStats[selectedState].keyTopics.length - 3}
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </MapLibrePopup>
+                                        )}
+                                    </Map>
                                 )}
                             </div>
 
