@@ -6,6 +6,7 @@ import {Button} from "@/components/ui/button";
 import type {LatLngExpression} from 'leaflet';
 import dynamic from 'next/dynamic';
 import {useCallback, useEffect, useMemo, useState, useRef} from 'react';
+import { DistrictMapGL } from './DistrictMapGL';
 // Helper: API URLs for district GeoJSON overlays
 const DISTRICT_GEOJSON_URLS: Record<string, string> = {
   'congressional-districts': '/districts/congressional-districts.geojson',
@@ -151,31 +152,7 @@ export function InteractiveMap() {
     const [districtReps, setDistrictReps] = useState<any[]>([]); // Store reps for selected district
     const [districtPopupLatLng, setDistrictPopupLatLng] = useState<any>(null); // Popup position
     const mapRef = useRef<any>(null);
-    // Fetch district GeoJSON when district map mode is selected
-    useEffect(() => {
-        if (mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') {
-            setDistrictLoading(true);
-            setDistrictError(null);
-            // Add cache-busting query param
-            const url = DISTRICT_GEOJSON_URLS[mapMode] + '?cb=' + Date.now();
-            fetch(url)
-                .then(res => {
-                    if (!res.ok) throw new Error('Failed to fetch district boundaries');
-                    return res.json();
-                })
-                .then(geojson => {
-                    setDistrictGeoJson(geojson);
-                    setDistrictLoading(false);
-                })
-                .catch(err => {
-                    setDistrictError('Failed to load district boundaries');
-                    setDistrictGeoJson(null);
-                    setDistrictLoading(false);
-                });
-        } else {
-            setDistrictGeoJson(null);
-        }
-    }, [mapMode]);
+    // No need to fetch districtGeoJson here; handled by DistrictMapGL via URL
 
     useEffect(() => {
         setIsClient(true);
@@ -368,16 +345,12 @@ export function InteractiveMap() {
         );
     }
 
-    // Handler for district click
-    const onDistrictClick = async (event: any) => {
-        const feature = event.sourceTarget.feature;
+    // Handler for district click (for MapLibre GL)
+    const onDistrictClickGL = async (feature: any, lngLat: {lng: number, lat: number}) => {
         setSelectedDistrict(feature);
-        setDistrictPopupLatLng(event.latlng);
+        setDistrictPopupLatLng(lngLat);
         setDistrictReps([]); // Clear while loading
         try {
-            // Get lat/lng from click event
-            const lat = event.latlng.lat;
-            const lng = event.latlng.lng;
             // Map FIPS code to state abbreviation if needed
             const FIPS_TO_ABBR: Record<string, string> = {
                 '01': 'AL','02': 'AK','04': 'AZ','05': 'AR','06': 'CA','08': 'CO','09': 'CT','10': 'DE','11': 'DC','12': 'FL','13': 'GA','15': 'HI','16': 'ID','17': 'IL','18': 'IN','19': 'IA','20': 'KS','21': 'KY','22': 'LA','23': 'ME','24': 'MD','25': 'MA','26': 'MI','27': 'MN','28': 'MS','29': 'MO','30': 'MT','31': 'NE','32': 'NV','33': 'NH','34': 'NJ','35': 'NM','36': 'NY','37': 'NC','38': 'ND','39': 'OH','40': 'OK','41': 'OR','42': 'PA','44': 'RI','45': 'SC','46': 'SD','47': 'TN','48': 'TX','49': 'UT','50': 'VT','51': 'VA','53': 'WA','54': 'WV','55': 'WI','56': 'WY','72': 'PR'
@@ -388,8 +361,7 @@ export function InteractiveMap() {
             } else if (/^\d{2}$/.test(state)) {
                 state = FIPS_TO_ABBR[state] || '';
             }
-            // Compose API call to internal civic endpoint
-            const url = `/api/civic?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&state=${encodeURIComponent(state)}`;
+            const url = `/api/civic?lat=${encodeURIComponent(lngLat.lat)}&lng=${encodeURIComponent(lngLat.lng)}&state=${encodeURIComponent(state)}`;
             const resp = await fetch(url);
             let reps = [];
             if (resp.ok) {
@@ -463,152 +435,108 @@ export function InteractiveMap() {
                         {/* Map Container with district overlays */}
                         <div className="relative">
                             <div className="h-[300px] sm:h-[400px] md:h-[500px] w-full rounded-md overflow-hidden border">
-                                <MapContainer
-                                    key="dashboard-map"
-                                    center={DEFAULT_POSITION}
-                                    zoom={DEFAULT_ZOOM}
-                                    style={{height: '100%', width: '100%'}}
-                                    className="z-0"
-                                    ref={mapRef}
-                                >
-                                    <TileLayer
-                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                    />
-
-
-                                    {/* District overlays */}
-                                    {districtGeoJson && (mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
-                                        <GeoJSON
-                                            key={mapMode + '-' + (districtGeoJson?.features?.length || 0)}
-                                            data={districtGeoJson}
-                                            style={() => ({
-                                                color: DISTRICT_COLORS[mapMode],
-                                                weight: 2,
-                                                fillOpacity: 0,
-                                            })}
-                                            eventHandlers={{
-                                                click: onDistrictClick
-                                            }}
-                                        />
-                                    )}
-
-                                    {districtPopupLatLng && (
-                                        <Marker
-                                            position={districtPopupLatLng}
-                                            draggable={true}
-                                            eventHandlers={{
-                                                dragend: async (e: any) => {
-                                                    const latlng = e.target.getLatLng();
-                                                    setDistrictPopupLatLng(latlng);
-                                                    // Simulate a map click at the new location to update reps
-                                                    try {
-                                                        // Map FIPS code to state abbreviation if needed
-                                                        const FIPS_TO_ABBR: Record<string, string> = {
-                                                            '01': 'AL','02': 'AK','04': 'AZ','05': 'AR','06': 'CA','08': 'CO','09': 'CT','10': 'DE','11': 'DC','12': 'FL','13': 'GA','15': 'HI','16': 'ID','17': 'IL','18': 'IN','19': 'IA','20': 'KS','21': 'KY','22': 'LA','23': 'ME','24': 'MD','25': 'MA','26': 'MI','27': 'MN','28': 'MS','29': 'MO','30': 'MT','31': 'NE','32': 'NV','33': 'NH','34': 'NJ','35': 'NM','36': 'NY','37': 'NC','38': 'ND','39': 'OH','40': 'OK','41': 'OR','42': 'PA','44': 'RI','45': 'SC','46': 'SD','47': 'TN','48': 'TX','49': 'UT','50': 'VT','51': 'VA','53': 'WA','54': 'WV','55': 'WI','56': 'WY','72': 'PR'
-                                                        };
-                                                        let state = selectedDistrict?.properties?.state || selectedDistrict?.properties?.STATE || selectedDistrict?.properties?.STATEFP || '';
-                                                        if (!state && selectedDistrict?.properties?.STATEFP) {
-                                                            state = FIPS_TO_ABBR[selectedDistrict.properties.STATEFP] || '';
-                                                        } else if (/^\d{2}$/.test(state)) {
-                                                            state = FIPS_TO_ABBR[state] || '';
-                                                        }
-                                                        const url = `/api/civic?lat=${encodeURIComponent(latlng.lat)}&lng=${encodeURIComponent(latlng.lng)}&state=${encodeURIComponent(state)}`;
-                                                        setDistrictReps([]);
-                                                        const resp = await fetch(url);
-                                                        let reps = [];
-                                                        if (resp.ok) {
-                                                            const data = await resp.json();
-                                                            if (data && data.representatives) {
-                                                                reps = data.representatives;
-                                                            }
-                                                        }
-                                                        setDistrictReps(reps);
-                                                    } catch (e) {
-                                                        setDistrictReps([]);
-                                                    }
+                                {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
+                                    <DistrictMapGL
+                                        geojsonUrl={DISTRICT_GEOJSON_URLS[mapMode]}
+                                        color={DISTRICT_COLORS[mapMode]}
+                                        onDistrictClick={onDistrictClickGL}
+                                        popupMarker={districtPopupLatLng ? {
+                                            lng: districtPopupLatLng.lng,
+                                            lat: districtPopupLatLng.lat,
+                                            iconHtml: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`,
+                                            draggable: true,
+                                            onDragEnd: (lngLat) => {
+                                                setDistrictPopupLatLng(lngLat);
+                                                // Simulate a map click at the new location to update reps
+                                                if (selectedDistrict) {
+                                                    onDistrictClickGL(selectedDistrict, lngLat);
                                                 }
-                                            }}
-                                            icon={L && L.divIcon ? L.divIcon({
-                                                className: 'selected-point-marker',
-                                                html: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`,
-                                                iconSize: [28, 28],
-                                                iconAnchor: [14, 28],
-                                                popupAnchor: [0, -28],
-                                            }) : undefined}
+                                            }
+                                        } : undefined}
+                                    />
+                                ) : (
+                                    <MapContainer
+                                        key="dashboard-map"
+                                        center={DEFAULT_POSITION}
+                                        zoom={DEFAULT_ZOOM}
+                                        style={{height: '100%', width: '100%'}}
+                                        className="z-0"
+                                        ref={mapRef}
+                                    >
+                                        <TileLayer
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         />
-                                    )}
-
-    {!(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') &&
-        Object.entries(stateStats).map(([abbr, state]) => (
-            <Marker
-                key={abbr}
-                position={state.center}
-                eventHandlers={{
-                    click: () => handleStateClick(abbr),
-                }}
-                icon={memoizedIcons[abbr]}
-            >
-                <Popup>
-                    <div className="p-2 min-w-[180px] sm:min-w-[200px]">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-semibold text-sm md:text-lg line-clamp-1">{state.name}</h3>
-                            <div className="flex items-center space-x-1">
-                                <div
-                                    className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
-                                        getActivityLevel(abbr) === 'High Activity' ? 'bg-primary' :
-                                            getActivityLevel(abbr) === 'Medium Activity' ? 'bg-primary/50' :
-                                                getActivityLevel(abbr) === 'Low Activity' ? 'bg-primary/20' :
-                                                    'bg-gray-300'
-                                    }`}
-                                ></div>
-                                <span
-                                    className="text-xs text-muted-foreground hidden sm:inline">
-                                    {getActivityLevel(abbr)}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="space-y-1 md:space-y-2 text-xs md:text-sm">
-                            <div className="flex justify-between">
-                                <span>Bills:</span>
-                                <Badge variant="secondary"
-                                       className="text-xs">{state.legislationCount}</Badge>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Reps:</span>
-                                <Badge variant="secondary"
-                                       className="text-xs">{state.activeRepresentatives}</Badge>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Recent:</span>
-                                <Badge variant="secondary"
-                                       className="text-xs">{state.recentActivity}</Badge>
-                            </div>
-                            <div className="pt-1 md:pt-2">
-                                <div className="text-xs text-muted-foreground mb-1">
-                                    <span className="hidden sm:inline">Key Topics:</span>
-                                    <span className="sm:hidden">Topics:</span>
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                    {[...new Set(state.keyTopics)].slice(0, 3).map((topic, index) => (
-                                        <Badge key={`${topic}-${index}`} variant="secondary"
-                                               className="text-xs">
-                                            {topic}
-                                        </Badge>
-                                    ))}
-                                    {state.keyTopics.length > 3 && (
-                                        <Badge variant="outline" className="text-xs">
-                                            +{state.keyTopics.length - 3}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Popup>
-            </Marker>
-        ))}
-                                </MapContainer>
+                                        {Object.entries(stateStats).map(([abbr, state]) => (
+                                            <Marker
+                                                key={abbr}
+                                                position={state.center}
+                                                eventHandlers={{
+                                                    click: () => handleStateClick(abbr),
+                                                }}
+                                                icon={memoizedIcons[abbr]}
+                                            >
+                                                <Popup>
+                                                    <div className="p-2 min-w-[180px] sm:min-w-[200px]">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <h3 className="font-semibold text-sm md:text-lg line-clamp-1">{state.name}</h3>
+                                                            <div className="flex items-center space-x-1">
+                                                                <div
+                                                                    className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
+                                                                        getActivityLevel(abbr) === 'High Activity' ? 'bg-primary' :
+                                                                            getActivityLevel(abbr) === 'Medium Activity' ? 'bg-primary/50' :
+                                                                                getActivityLevel(abbr) === 'Low Activity' ? 'bg-primary/20' :
+                                                                                    'bg-gray-300'
+                                                                    }`}
+                                                                ></div>
+                                                                <span
+                                                                    className="text-xs text-muted-foreground hidden sm:inline">
+                                                                    {getActivityLevel(abbr)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1 md:space-y-2 text-xs md:text-sm">
+                                                            <div className="flex justify-between">
+                                                                <span>Bills:</span>
+                                                                <Badge variant="secondary"
+                                                                       className="text-xs">{state.legislationCount}</Badge>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span>Reps:</span>
+                                                                <Badge variant="secondary"
+                                                                       className="text-xs">{state.activeRepresentatives}</Badge>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span>Recent:</span>
+                                                                <Badge variant="secondary"
+                                                                       className="text-xs">{state.recentActivity}</Badge>
+                                                            </div>
+                                                            <div className="pt-1 md:pt-2">
+                                                                <div className="text-xs text-muted-foreground mb-1">
+                                                                    <span className="hidden sm:inline">Key Topics:</span>
+                                                                    <span className="sm:hidden">Topics:</span>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {[...new Set(state.keyTopics)].slice(0, 3).map((topic, index) => (
+                                                                        <Badge key={`${topic}-${index}`} variant="secondary"
+                                                                               className="text-xs">
+                                                                            {topic}
+                                                                        </Badge>
+                                                                    ))}
+                                                                    {state.keyTopics.length > 3 && (
+                                                                        <Badge variant="outline" className="text-xs">
+                                                                            +{state.keyTopics.length - 3}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Popup>
+                                            </Marker>
+                                        ))}
+                                    </MapContainer>
+                                )}
                             </div>
 
                             {(loading || districtLoading) && (
