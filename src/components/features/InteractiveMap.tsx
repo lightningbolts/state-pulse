@@ -392,6 +392,7 @@ export function InteractiveMap() {
                                                     onClick={() => handleStateClick(abbr, coords)}
                                                 >
                                                     <div
+                                                        className="transition-transform duration-150 ease-in-out hover:scale-110"
                                                         style={{
                                                             width: size,
                                                             height: size,
@@ -434,7 +435,7 @@ export function InteractiveMap() {
                                                 closeOnClick={false}
                                                 maxWidth="260px"
                                             >
-                                                <div className="p-2 min-w-[180px] sm:min-w-[200px]">
+                                                <div className="p-2 pr-5 min-w-[180px] sm:min-w-[200px]">
                                                     {detailsLoading || !stateDetails ? (
                                                         <div className="flex items-center justify-center min-h-[60px]">
                                                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
