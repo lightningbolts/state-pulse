@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
+import { getCollection } from '@/lib/mongodb';
 import { OpenStatesPerson, Representative, CongressPerson } from "@/types/representative";
 import Fuse from 'fuse.js';
 import { STATE_MAP } from '@/types/geo';
@@ -7,23 +7,6 @@ import { STATE_MAP } from '@/types/geo';
 // US State mapping and validation
 export const validStates = Object.values(STATE_MAP);
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable');
-}
-
-let cachedClient: MongoClient | null = null;
-
-async function connectToDatabase() {
-  if (cachedClient) {
-    return cachedClient;
-  }
-
-  const client = new MongoClient(MONGODB_URI!);
-  await client.connect();
-  cachedClient = client;
-  return client;
-}
 
 // Interface for OpenStates person data
 export async function GET(request: NextRequest) {
@@ -65,10 +48,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Always connect to DB and get collection once
-    const client = await connectToDatabase();
-    const db = client.db('statepulse');
-    const representativesCollection = db.collection<Representative | CongressPerson>('representatives');
+    const representativesCollection = await getCollection('representatives');
 
     // If no state/address provided, fetch all representatives (with pagination, search, sorting)
     if (!stateCode) {
@@ -231,7 +211,7 @@ export async function GET(request: NextRequest) {
           }
           return '';
         };
-        const repsWithNormalized = reps.map(rep => {
+        const repsWithNormalized = reps.map((rep: any) => {
           const name = getSafe(rep, 'name', 'directOrderName');
           const firstName = getSafe(rep, 'firstName', 'first_name');
           const lastName = getSafe(rep, 'lastName', 'last_name');
@@ -264,7 +244,7 @@ export async function GET(request: NextRequest) {
       // Pagination after fuzzy search
       const paginatedReps = reps.slice(skip, skip + pageSize);
       // Normalize results for frontend compatibility
-      const normalizedReps = paginatedReps.map(rep => {
+      const normalizedReps = paginatedReps.map((rep: any) => {
         // CongressPerson normalization
         if ('terms' in rep && Array.isArray(rep.terms)) {
           const latestTerm = rep.terms[rep.terms.length - 1] || {};
@@ -398,7 +378,7 @@ export async function GET(request: NextRequest) {
 
             // console.log(`[API] Returning ${cachedReps.length} cached representatives (first 10)`);
             // Normalize results for frontend compatibility
-            const normalizedCachedReps = cachedReps.map(rep => {
+            const normalizedCachedReps = cachedReps.map((rep: any) => {
               if ('terms' in rep && Array.isArray(rep.terms)) {
                 const latestTerm = rep.terms[rep.terms.length - 1] || {};
                 return {
