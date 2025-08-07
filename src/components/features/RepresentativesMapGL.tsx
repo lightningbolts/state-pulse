@@ -133,23 +133,6 @@ export function RepresentativesMapGL({ center, zoom, representatives, userLocati
             }}/>
           </Marker>
         ))}
-        {/* Popup for representative */}
-        {popup && (
-          <Popup
-            longitude={popup.lon}
-            latitude={popup.lat}
-            anchor="top"
-            onClose={() => setPopup(null)}
-            closeOnClick={false}
-          >
-            <div style={{ minWidth: 200 }}>
-              <strong>{popup.name}</strong><br/>
-              {popup.office && <>{popup.office}<br/></>}
-              {popup.party && <span style={{ color: '#666' }}>{popup.party}</span>}
-              {popup.distance && <><br/><small>{popup.distance.toFixed(1)} miles away</small></>}
-            </div>
-          </Popup>
-        )}
       </Map>
     </Card>
   );
