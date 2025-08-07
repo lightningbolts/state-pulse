@@ -9,6 +9,7 @@ import { StateData } from '@/types/jurisdictions';
 import { MapMode } from "@/types/geo";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useTheme } from 'next-themes';
 import { DistrictMapGL } from './DistrictMapGL';
 const DISTRICT_GEOJSON_URLS: Record<string, string> = {
   'congressional-districts': '/districts/congressional-districts.geojson',
@@ -76,6 +77,7 @@ const mapModes: MapMode[] = [
 ];
 
 export function InteractiveMap() {
+    const { resolvedTheme } = useTheme ? useTheme() : { resolvedTheme: 'light' };
     const [isClient, setIsClient] = useState(false);
     const [selectedState, setSelectedState] = useState<string | null>(null);
     const [selectedStatePopupCoords, setSelectedStatePopupCoords] = useState<[number, number] | null>(null);
@@ -375,7 +377,11 @@ export function InteractiveMap() {
                                         ref={mapRef}
                                         initialViewState={{ longitude: DEFAULT_POSITION[1], latitude: DEFAULT_POSITION[0], zoom: DEFAULT_ZOOM }}
                                         style={{ height: '100%', width: '100%' }}
-                                        mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+                                        mapStyle={
+                                            resolvedTheme === 'dark'
+                                                ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+                                                : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+                                        }
                                     >
                                         {Object.entries(stateStats).map(([abbr, state]) => {
                                             const { color, size } = memoizedMarkers[abbr] || { color: '#e0e0e0', size: 20 };
@@ -435,70 +441,70 @@ export function InteractiveMap() {
                                                 closeOnClick={false}
                                                 maxWidth="260px"
                                             >
-                                                <div className="p-2 pr-5 min-w-[180px] sm:min-w-[200px]">
-                                                    {detailsLoading || !stateDetails ? (
+                                                {detailsLoading || !stateDetails ? (
+                                                    <>
                                                         <div className="flex items-center justify-center min-h-[60px]">
                                                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
                                                             <span className="text-xs text-muted-foreground">Loading details...</span>
                                                         </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <h3 className="font-semibold text-sm md:text-lg line-clamp-1">{stateStats[selectedState].name}</h3>
-                                                                <div className="flex items-center space-x-1">
-                                                                    <div
-                                                                        className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
-                                                                            getActivityLevel(selectedState) === 'High Activity' ? 'bg-primary' :
-                                                                                getActivityLevel(selectedState) === 'Medium Activity' ? 'bg-primary/50' :
-                                                                                    getActivityLevel(selectedState) === 'Low Activity' ? 'bg-primary/20' :
-                                                                                        'bg-gray-300'
-                                                                        }`}
-                                                                    ></div>
-                                                                    <span
-                                                                        className="text-xs text-muted-foreground hidden sm:inline">
-                                                                        {getActivityLevel(selectedState)}
-                                                                    </span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <h3 className="font-semibold text-sm md:text-lg line-clamp-1">{stateStats[selectedState].name}</h3>
+                                                            <div className="flex items-center space-x-1">
+                                                                <div
+                                                                    className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
+                                                                        getActivityLevel(selectedState) === 'High Activity' ? 'bg-primary' :
+                                                                            getActivityLevel(selectedState) === 'Medium Activity' ? 'bg-primary/50' :
+                                                                                getActivityLevel(selectedState) === 'Low Activity' ? 'bg-primary/20' :
+                                                                                    'bg-gray-300'
+                                                                    }`}
+                                                                ></div>
+                                                                <span
+                                                                    className="text-xs text-muted-foreground hidden sm:inline">
+                                                                    {getActivityLevel(selectedState)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1 md:space-y-2 text-xs md:text-sm">
+                                                            <div className="flex justify-between">
+                                                                <span>Bills:</span>
+                                                                <Badge variant="secondary"
+                                                                    className="text-xs">{stateStats[selectedState].legislationCount}</Badge>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span>Reps:</span>
+                                                                <Badge variant="secondary"
+                                                                    className="text-xs">{stateStats[selectedState].activeRepresentatives}</Badge>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span>Recent:</span>
+                                                                <Badge variant="secondary"
+                                                                    className="text-xs">{stateStats[selectedState].recentActivity}</Badge>
+                                                            </div>
+                                                            <div className="pt-1 md:pt-2">
+                                                                <div className="text-xs text-muted-foreground mb-1">
+                                                                    <span className="hidden sm:inline">Key Topics:</span>
+                                                                    <span className="sm:hidden">Topics:</span>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {[...new Set(stateStats[selectedState].keyTopics)].slice(0, 3).map((topic, index) => (
+                                                                        <Badge key={`${topic}-${index}`} variant="secondary"
+                                                                            className="text-xs">
+                                                                            {topic}
+                                                                        </Badge>
+                                                                    ))}
+                                                                    {stateStats[selectedState].keyTopics.length > 3 && (
+                                                                        <Badge variant="outline" className="text-xs">
+                                                                            +{stateStats[selectedState].keyTopics.length - 3}
+                                                                        </Badge>
+                                                                    )}
                                                                 </div>
                                                             </div>
-                                                            <div className="space-y-1 md:space-y-2 text-xs md:text-sm">
-                                                                <div className="flex justify-between">
-                                                                    <span>Bills:</span>
-                                                                    <Badge variant="secondary"
-                                                                        className="text-xs">{stateStats[selectedState].legislationCount}</Badge>
-                                                                </div>
-                                                                <div className="flex justify-between">
-                                                                    <span>Reps:</span>
-                                                                    <Badge variant="secondary"
-                                                                        className="text-xs">{stateStats[selectedState].activeRepresentatives}</Badge>
-                                                                </div>
-                                                                <div className="flex justify-between">
-                                                                    <span>Recent:</span>
-                                                                    <Badge variant="secondary"
-                                                                        className="text-xs">{stateStats[selectedState].recentActivity}</Badge>
-                                                                </div>
-                                                                <div className="pt-1 md:pt-2">
-                                                                    <div className="text-xs text-muted-foreground mb-1">
-                                                                        <span className="hidden sm:inline">Key Topics:</span>
-                                                                        <span className="sm:hidden">Topics:</span>
-                                                                    </div>
-                                                                    <div className="flex flex-wrap gap-1">
-                                                                        {[...new Set(stateStats[selectedState].keyTopics)].slice(0, 3).map((topic, index) => (
-                                                                            <Badge key={`${topic}-${index}`} variant="secondary"
-                                                                                className="text-xs">
-                                                                                {topic}
-                                                                            </Badge>
-                                                                        ))}
-                                                                        {stateStats[selectedState].keyTopics.length > 3 && (
-                                                                            <Badge variant="outline" className="text-xs">
-                                                                                +{stateStats[selectedState].keyTopics.length - 3}
-                                                                            </Badge>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </MapLibrePopup>
                                         )}
                                     </Map>
@@ -522,7 +528,7 @@ export function InteractiveMap() {
                                 </div>
                             )}
                 {selectedDistrict && (
-                  <div className="mt-4">
+                  <div className="mt-4 bg-card text-foreground border border-border rounded-lg shadow-lg p-3 dark:!bg-zinc-900 dark:!text-white dark:!border-zinc-700">
                     <h3 className="font-semibold text-base md:text-lg mb-2">
                       {districtPopupLatLng ? ` (${districtPopupLatLng.lat.toFixed(5)}, ${districtPopupLatLng.lng.toFixed(5)})` : ''}
                       <button

@@ -2,7 +2,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+/* MapLibre GL popup dark mode override */
+.dark .maplibregl-popup-content {
+  background: #18181b !important;
+  color: #fff !important;
+  border: 1px solid #27272a !important;
+}
+/* Optional: style popup tip arrow */
+.dark .maplibregl-popup-tip {
+  border-top-color: #18181b !important;
+  border-bottom-color: #18181b !important;
+}
 @layer base {
   :root {
     --background: 210 14% 95%; /* #F2F4F3 */
