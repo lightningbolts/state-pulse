@@ -237,6 +237,8 @@ We welcome contributions from developers, civic enthusiasts, and anyone passiona
 **Special thanks to the [OpenStates](https://openstates.org/) community** for providing an incredible API for aggregating legislation, representatives, and jurisdictions across all 50 states. Their custom web scrapers and dedication to government transparency make StatePulse possible.
 
 Additional thanks to:
+- MapLibre GL for extremely fast and highly performative map rendering.
+- Fuse for fast and accurate fuzzy search.
 - The open-source community for the amazing tools and libraries
 - Beta testers and early users for valuable feedback
 - Civic engagement organizations for guidance and support
