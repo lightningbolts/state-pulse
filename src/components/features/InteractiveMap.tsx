@@ -359,6 +359,11 @@ export function InteractiveMap() {
                                         geojsonUrl={DISTRICT_GEOJSON_URLS[mapMode]}
                                         color={DISTRICT_COLORS[mapMode]}
                                         onDistrictClick={onDistrictClickGL}
+                                        mapStyle={
+                                            resolvedTheme === 'dark'
+                                                ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+                                                : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+                                        }
                                         popupMarker={districtPopupLatLng ? {
                                             lng: districtPopupLatLng.lng,
                                             lat: districtPopupLatLng.lat,

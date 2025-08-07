@@ -18,6 +18,7 @@ interface DistrictMapGLProps {
     draggable?: boolean;
     onDragEnd?: (lngLat: {lng: number, lat: number}) => void;
   };
+  mapStyle?: string;
 }
 
 
@@ -27,6 +28,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
   onDistrictClick,
   initialViewState = { longitude: -98.5795, latitude: 39.8283, zoom: 4 },
   popupMarker,
+  mapStyle = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
 }) => {
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
@@ -85,7 +87,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
       ref={mapRef}
       initialViewState={initialViewState}
       style={{ width: '100%', height: '100%' }}
-      mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+      mapStyle={mapStyle}
       interactiveLayerIds={['district-fill']}
       onClick={handleClick}
     >
