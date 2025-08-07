@@ -1,7 +1,8 @@
+
 import * as React from 'react';
 import Map, { Source, Layer, MapRef, Marker, Popup } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-
+import { useTheme } from 'next-themes';
 import { Card } from '@/components/ui/card';
 
 
@@ -31,6 +32,7 @@ const typeToColor: Record<string, string> = {
 export function RepresentativesMapGL({ center, zoom, representatives, userLocation, districts }: RepresentativesMapGLProps) {
   const mapRef = React.useRef<MapRef>(null);
   const [popup, setPopup] = React.useState<any>(null);
+  const { resolvedTheme } = useTheme ? useTheme() : { resolvedTheme: 'light' };
 
   // Prepare GeoJSON for districts
   const geojson = React.useMemo(() => {
@@ -78,7 +80,11 @@ export function RepresentativesMapGL({ center, zoom, representatives, userLocati
         ref={mapRef}
         initialViewState={{ longitude: center[1], latitude: center[0], zoom }}
         style={{ width: '100%', height: '100%' }}
-        mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+        mapStyle={
+          resolvedTheme === 'dark'
+            ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+            : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+        }
       >
         {/* District boundaries */}
         {geojson && (
