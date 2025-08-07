@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { MapProps } from '@/types/geo';
 import { RepresentativesMapGL } from './RepresentativesMapGL';
+import { useTheme } from 'next-themes';
 export function RepresentativesMap({ center, zoom, representatives, userLocation, districts }: MapProps & { districts?: any[] }) {
+    const { resolvedTheme } = useTheme ? useTheme() : { resolvedTheme: 'light' };
     const validReps = Array.isArray(representatives)
         ? representatives
             .filter(rep => typeof rep.lat === 'number' && typeof rep.lon === 'number')
@@ -36,17 +38,27 @@ export function RepresentativesMap({ center, zoom, representatives, userLocation
                 districts={districts}
             />
             {/* Map Legend */}
-            <div style={{
-                position: 'absolute',
-                bottom: 12,
-                left: 12,
-                background: 'rgba(255,255,255,0.9)',
-                borderRadius: 8,
-                padding: '8px 14px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                fontSize: 13,
-                zIndex: 10
-            }}>
+            <div
+                style={{
+                    position: 'absolute',
+                    bottom: 12,
+                    left: 12,
+                    background:
+                        resolvedTheme === 'dark'
+                            ? 'rgba(24,24,27,0.95)'
+                            : 'rgba(255,255,255,0.9)',
+                    color: resolvedTheme === 'dark' ? '#fff' : '#222',
+                    borderRadius: 8,
+                    padding: '8px 14px',
+                    boxShadow:
+                        resolvedTheme === 'dark'
+                            ? '0 2px 8px rgba(0,0,0,0.32)'
+                            : '0 2px 8px rgba(0,0,0,0.08)',
+                    fontSize: 13,
+                    zIndex: 10,
+                    border: resolvedTheme === 'dark' ? '1px solid #333' : undefined,
+                }}
+            >
                 {presentTypes.has('congressional') && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                         <span style={{ display: 'inline-block', width: 18, height: 4, background: typeToColor['congressional'], borderRadius: 2, marginRight: 6 }}></span>
