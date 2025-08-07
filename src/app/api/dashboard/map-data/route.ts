@@ -1,35 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 import { STATE_NAMES, STATE_COORDINATES } from "@/types/geo";
-
-interface StateStats {
-  name: string;
-  abbreviation: string;
-  legislationCount: number;
-  activeRepresentatives: number;
-  recentActivity: number;
-  keyTopics: string[];
-  center: [number, number];
-  color: string;
-}
+import { StateData } from '@/types/jurisdictions';
 
 
 export async function GET(request: NextRequest) {
   try {
-    const { db } = await connectToDatabase();
+    const legislationCollection = await getCollection('legislation');
 
-    // Get current date for recent activity calculation (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     console.log('Starting map data aggregation...');
     const startTime = Date.now();
 
-    // Simplified and optimized aggregation pipeline
     const pipeline = [
       {
         // Stage 1: Create a normalized 'effectiveJurisdictionName' field.
-        // This is the most critical step to correctly differentiate federal from state bills.
         $addFields: {
           effectiveJurisdictionName: {
             $cond: {
@@ -39,7 +26,6 @@ export async function GET(request: NextRequest) {
                   // Criteria 1: The jurisdictionName explicitly says it's federal.
                   { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /congress|united states/i } },
                   // Criteria 2: The bill's history involves the President. This is a definitive federal indicator.
-                  // NOTE: We avoid using "House" or "Senate" here as they are ambiguous and exist in state legislatures.
                   { $in: ["President of the United States", { $ifNull: ["$history.actor", []] }] }
                 ]
               },
@@ -53,9 +39,8 @@ export async function GET(request: NextRequest) {
       },
       {
         // Stage 2: Filter out any documents that do not have a valid jurisdiction name after normalization.
-        // This removes junk data and bills that are neither clearly federal nor state-level.
         $match: {
-          effectiveJurisdictionName: { $exists: true, $ne: null, $ne: "" }
+          effectiveJurisdictionName: { $exists: true, $nin: [null, ""] }
         }
       },
       {
@@ -76,9 +61,7 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          // Simplified subject collection - just get first few subjects instead of all
           sampleSubjects: { $push: { $arrayElemAt: ['$subjects', 0] } },
-          // Count unique sponsors more efficiently
           sponsorCount: { $addToSet: { $arrayElemAt: ['$sponsors.name', 0] } }
         }
       },
@@ -106,26 +89,23 @@ export async function GET(request: NextRequest) {
       }
     ];
 
-    const results = await db.collection('legislation').aggregate(pipeline, {
-      maxTimeMS: 10000, // 10 second timeout
-      allowDiskUse: true // Allow using disk for large operations
+    const results = await legislationCollection.aggregate(pipeline, {
+      maxTimeMS: 10000,
+      allowDiskUse: true
     }).toArray();
 
     console.log(`Aggregation completed in ${Date.now() - startTime}ms`);
 
-    // Process results into state data with better error handling
-    const stateStats: Record<string, StateStats> = {};
+    const stateStats: Record<string, StateData> = {};
 
     results.forEach((result: any) => {
       try {
         const jurisdictionName = result._id;
         let stateAbbr = '';
 
-        // More efficient state matching
         if (jurisdictionName.includes('Congress') || jurisdictionName.includes('United States')) {
           stateAbbr = 'US';
         } else {
-          // Try to match by state name
           for (const [abbr, name] of Object.entries(STATE_NAMES)) {
             if (abbr === 'US') continue;
             if (jurisdictionName.toLowerCase().includes(name.toLowerCase())) {
@@ -136,14 +116,12 @@ export async function GET(request: NextRequest) {
         }
 
         if (stateAbbr && STATE_COORDINATES[stateAbbr]) {
-          // Use the simplified subjects
           const topSubjects = (result.topSubjects || [])
             .filter((s: string) => s && s.trim())
             .slice(0, 3);
 
-          // Generate color based on activity level
           const intensity = Math.min(result.totalBills / 1000, 1);
-          const hue = (intensity * 240); // Blue to red scale
+          const hue = (intensity * 240);
           const color = `hsl(${240 - hue}, 70%, 50%)`;
 
           stateStats[stateAbbr] = {
@@ -162,7 +140,6 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Add missing states with zero data more efficiently
     const existingStates = new Set(Object.keys(stateStats));
     Object.entries(STATE_NAMES).forEach(([abbr, name]) => {
       if (!existingStates.has(abbr) && STATE_COORDINATES[abbr]) {

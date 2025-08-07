@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-// POST - Add a reply to a comment
 export async function POST(
   request: NextRequest,
   { params }: { params: { commentId: string } }
@@ -28,12 +27,9 @@ export async function POST(
       );
     }
 
-    const { db } = await connectToDatabase();
+    const postsCollection = await getCollection('posts');
 
-    // Find the post that contains the comment
-    const post = await db.collection('posts').findOne({
-      'comments._id': new ObjectId(commentId)
-    });
+    const post = await postsCollection.findOne({ 'comments._id': new ObjectId(commentId) });
 
     if (!post) {
       return NextResponse.json(
@@ -42,7 +38,6 @@ export async function POST(
       );
     }
 
-    // Get user info from Clerk
     const userResponse = await fetch(`https://api.clerk.dev/v1/users/${userId}`, {
       headers: {
         'Authorization': `Bearer ${process.env.CLERK_SECRET_KEY}`,
@@ -67,20 +62,12 @@ export async function POST(
       createdAt: new Date().toISOString(),
     };
 
-    // Add reply to the specific comment
-    await db.collection('posts').updateOne(
-      {
-        '_id': post._id,
-        'comments._id': new ObjectId(commentId)
-      },
-      {
-        $push: {
-          'comments.$.replies': newReply
-        }
-      } as any
+    await postsCollection.updateOne(
+      { _id: post._id, 'comments._id': new ObjectId(commentId) },
+      { $push: { 'comments.$.replies': newReply } } as any
     );
 
-    const updatedPost = await db.collection('posts').findOne({ _id: post._id });
+    const updatedPost = await postsCollection.findOne({ _id: post._id });
     return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error adding reply:', error);

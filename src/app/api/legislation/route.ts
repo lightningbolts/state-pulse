@@ -1,4 +1,3 @@
-// src/app/api/legislation/route.ts
 import { NextResponse } from 'next/server';
 import {
   addLegislation,
@@ -7,7 +6,6 @@ import {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // TODO: Add validation for the body here (zod or manual)
     const newLegislation = await addLegislation(body);
     return NextResponse.json(newLegislation, { status: 201 });
   } catch (error) {
@@ -16,7 +14,6 @@ export async function POST(request: Request) {
   }
 }
 
-// Handler for GET /api/legislation (Read all)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

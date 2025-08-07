@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { connectToDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { getCollection } from '@/lib/mongodb';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type'); // 'legislation' or 'bug_report'
+    const type = searchParams.get('type');
     const userId = searchParams.get('userId');
 
-    const { db } = await connectToDatabase();
+    const postsCollection = await getCollection('posts');
 
     let filter: any = {};
     if (type) filter.type = type;
     if (userId) filter.userId = userId;
 
-    const posts = await db.collection('posts')
+    const posts = await postsCollection
       .find(filter)
       .sort({ createdAt: -1 })
       .limit(50)
@@ -58,7 +57,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { db } = await connectToDatabase();
+    const postsCollection = await getCollection('posts');
 
     // Get user info from Clerk
     const userResponse = await fetch(`https://api.clerk.dev/v1/users/${userId}`, {
@@ -91,7 +90,7 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    const result = await db.collection('posts').insertOne(newPost);
+    const result = await postsCollection.insertOne(newPost);
 
     return NextResponse.json({
       message: 'Post created successfully',

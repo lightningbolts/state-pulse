@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 
 export async function GET(
   request: NextRequest,
@@ -15,10 +15,8 @@ export async function GET(
       );
     }
 
-    const { db } = await connectToDatabase();
-
-    // Get all comments by the user along with post information
-    const commentsAggregation = await db.collection('posts').aggregate([
+    const postsCollection = await getCollection('posts');
+    const commentsAggregation = await postsCollection.aggregate([
       { $unwind: '$comments' },
       { $match: { 'comments.userId': userId } },
       {

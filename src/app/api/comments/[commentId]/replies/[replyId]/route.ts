@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-// PUT - Edit a specific reply
 export async function PUT(
   request: NextRequest,
   { params }: { params: { commentId: string; replyId: string } }
@@ -28,10 +27,10 @@ export async function PUT(
       );
     }
 
-    const { db } = await connectToDatabase();
+    const postsCollection = await getCollection('posts');
 
     // Check if the user owns the reply
-    const post = await db.collection('posts').findOne({
+    const post = await postsCollection.findOne({
       'comments._id': new ObjectId(commentId),
       'comments.replies._id': new ObjectId(replyId),
       'comments.replies.userId': userId
@@ -45,7 +44,7 @@ export async function PUT(
     }
 
     // Update the reply
-    const result = await db.collection('posts').updateOne(
+    const result = await postsCollection.updateOne(
       {
         'comments._id': new ObjectId(commentId),
         'comments.replies._id': new ObjectId(replyId)
@@ -72,9 +71,9 @@ export async function PUT(
     }
 
     // Find the post id for this comment
-    const postDoc = await db.collection('posts').findOne({ 'comments._id': new ObjectId(commentId) });
+    const postDoc = await postsCollection.findOne({ 'comments._id': new ObjectId(commentId) });
     const postId = postDoc?._id;
-    const updatedPost = postId ? await db.collection('posts').findOne({ _id: postId }) : null;
+    const updatedPost = postId ? await postsCollection.findOne({ _id: postId }) : null;
     return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error updating reply:', error);
@@ -100,10 +99,10 @@ export async function DELETE(
     }
 
     const { commentId, replyId } = await params;
-    const { db } = await connectToDatabase();
+    const postsCollection = await getCollection('posts');
 
     // Check if the user owns the reply
-    const post = await db.collection('posts').findOne({
+    const post = await postsCollection.findOne({
       'comments._id': new ObjectId(commentId),
       'comments.replies._id': new ObjectId(replyId),
       'comments.replies.userId': userId
@@ -117,7 +116,7 @@ export async function DELETE(
     }
 
             // Remove the reply and return updated post
-            const result = await db.collection('posts').updateOne(
+            const result = await postsCollection.updateOne(
                 {
                     'comments._id': new ObjectId(commentId),
                     'comments.replies._id': new ObjectId(replyId),
@@ -143,9 +142,9 @@ export async function DELETE(
             }
 
             // Find the post id for this comment (avoid redeclaration)
-            const postDoc = await db.collection('posts').findOne({ 'comments._id': new ObjectId(commentId) });
+            const postDoc = await postsCollection.findOne({ 'comments._id': new ObjectId(commentId) });
             const postId = postDoc?._id;
-            const updatedPost = postId ? await db.collection('posts').findOne({ _id: postId }) : null;
+            const updatedPost = postId ? await postsCollection.findOne({ _id: postId }) : null;
             return NextResponse.json({ post: updatedPost });
   } catch (error) {
     console.error('Error deleting reply:', error);

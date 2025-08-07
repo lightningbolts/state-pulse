@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserById } from '@/services/usersService';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 
 export async function GET(
   request: NextRequest,
@@ -47,21 +47,19 @@ export async function GET(
     }
 
     // Get user's posts and comments count
-    const { db } = await connectToDatabase();
-
-    const postsCount = await db.collection('posts').countDocuments({ userId });
+    const postsCollection = await getCollection('posts');
+    const postsCount = await postsCollection.countDocuments({ userId });
 
     // Count comments across all posts
-    const commentsAggregation = await db.collection('posts').aggregate([
+    const commentsAggregation = await postsCollection.aggregate([
       { $unwind: '$comments' },
       { $match: { 'comments.userId': userId } },
       { $count: 'totalComments' }
     ]).toArray();
-
     const commentsCount = commentsAggregation[0]?.totalComments || 0;
 
     // Get user's most recent posts
-    const recentPosts = await db.collection('posts')
+    const recentPosts = await postsCollection
       .find({ userId })
       .sort({ createdAt: -1 })
       .limit(10)

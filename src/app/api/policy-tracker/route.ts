@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 import { getAuth } from '@clerk/nextjs/server';
 
-// POST /api/policy-tracker
 export async function POST(req: NextRequest) {
   const auth = getAuth(req);
 
@@ -13,15 +12,13 @@ export async function POST(req: NextRequest) {
   if (!topic) {
     return NextResponse.json({ error: 'Missing topic' }, { status: 400 });
   }
-  const db = await getDb();
-  // Store subscriptions in topic_subscriptions collection
-  const result = await db.collection('topic_subscriptions').updateOne(
+  const collection = await getCollection('topic_subscriptions');
+  const result = await collection.updateOne(
     { userId: auth.userId, topic },
     { $set: { userId: auth.userId, topic, notifyByEmail: !!notifyByEmail }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
   );
 
-  // ...no email logic, handled by toast notifications...
   return NextResponse.json({ success: true });
 }
 
@@ -31,12 +28,10 @@ export async function GET(req: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
   }
-  const db = await getDb();
-  // Find all topics user is subscribed to
-  const subs = await db.collection('topic_subscriptions').find({ userId }).toArray();
+  const collection = await getCollection('topic_subscriptions');
+  const subs = await collection.find({ userId }).toArray();
   const topics = subs.map((s) => s.topic);
-  // Find updates for these topics
-  const updates = await db.collection('topic_subscriptions')
+  const updates = await collection
     .find({ topic: { $in: topics } })
     .sort({ date: -1 })
     .limit(20)
@@ -56,21 +51,17 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Missing topic' }, { status: 400 });
   }
 
-  const db = await getDb();
-  const result = await db
-    .collection('topic_subscriptions')
-    .deleteOne({ userId: auth.userId, topic });
+  const collection = await getCollection('topic_subscriptions');
+  const result = await collection.deleteOne({ userId: auth.userId, topic });
 
   if (result.deletedCount === 0) {
     return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
   }
 
-  // ...no email logic, handled by toast notifications...
 
   return NextResponse.json({ success: true });
 }
 
-// PUT /api/policy-tracker
 export async function PUT(req: NextRequest) {
   console.log('PUT /api/policy-tracker called');
   const auth = getAuth(req);
@@ -86,20 +77,17 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  const db = await getDb();
-  let update: any = {};
-  if (newTopic) update.topic = newTopic;
-  if (typeof notifyByEmail !== 'undefined') update.notifyByEmail = !!notifyByEmail;
-  const result = await db.collection('topic_subscriptions').updateOne(
+  const collection = await getCollection('topic_subscriptions');
+  let updateFields: any = {};
+  if (newTopic) updateFields.topic = newTopic;
+  if (typeof notifyByEmail !== 'undefined') updateFields.notifyByEmail = !!notifyByEmail;
+  const result = await collection.updateOne(
     { userId: auth.userId, topic: oldTopic || newTopic },
-    { $set: update }
+    { $set: updateFields }
   );
 
   if (result.matchedCount === 0) {
     return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
   }
-
-  // ...no email logic, handled by toast notifications...
-
   return NextResponse.json({ success: true });
 }

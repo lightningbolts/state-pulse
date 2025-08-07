@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 import { STATE_NAMES } from '@/types/geo';
 
 export async function GET(
@@ -16,19 +16,15 @@ export async function GET(
       );
     }
 
-    const { db } = await connectToDatabase();
-    const representativesCollection = db.collection('representatives');
+    const representativesCollection = await getCollection('representatives');
 
 
-    // Normalize state parameter - accept both abbreviations and full names
     const stateAbbr = state.toUpperCase();
     const stateFull = STATE_NAMES[stateAbbr] || state;
 
     let baseFilter;
     if (stateAbbr === 'US') {
-      // Special case for US: use robust allocation logic for US House and US Senate (no overlap)
       const currentYear = new Date().getFullYear();
-      // Build a set of the 50 state names (exclude DC and territories)
       const FIFTY_STATE_NAMES = Object.keys(STATE_NAMES)
         .map(abbr => STATE_NAMES[abbr])
         .filter(name => ![
@@ -267,12 +263,10 @@ export async function GET(
         { $sort: { _id: 1 } }
       ]).toArray();
     } else {
-      // ...existing code for non-US states...
       partyMakeup = await representativesCollection.aggregate([
         { $match: baseFilter },
         {
           $addFields: {
-            // ...existing code...
             normalizedChamber: {
               $cond: {
                 if: { $or: [
@@ -296,7 +290,6 @@ export async function GET(
                 }
               }
             },
-            // ...existing code...
             normalizedParty: {
               $cond: {
                 if: { $regexMatch: { input: { $ifNull: ['$party', ''] }, regex: 'democrat', options: 'i' } },

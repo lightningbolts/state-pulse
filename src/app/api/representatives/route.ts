@@ -2,32 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MongoClient } from 'mongodb';
 import { OpenStatesPerson, Representative, CongressPerson } from "@/types/representative";
 import Fuse from 'fuse.js';
+import { STATE_MAP } from '@/types/geo';
 
 // US State mapping and validation
-export const stateMap: Record<string, string> = {
-  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-  'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-};
-
-export const validStates = [
-  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
-  'DC'
-];
+export const validStates = Object.values(STATE_MAP);
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -72,7 +50,7 @@ export async function GET(request: NextRequest) {
     let stateCode = stateAbbr || state;
     if (!stateCode && address) {
       // Check if address contains a full state name (case-insensitive)
-      for (const [fullName, abbrev] of Object.entries(stateMap)) {
+      for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
         if (address.toLowerCase().includes(fullName.toLowerCase())) {
           stateCode = abbrev;
           break;
@@ -199,7 +177,7 @@ export async function GET(request: NextRequest) {
       
       if (filterState && validStates.includes(filterState.toUpperCase())) {
         const abbr = filterState.toUpperCase();
-        const fullName = Object.keys(stateMap).find(name => stateMap[name] === abbr) || abbr;
+        const fullName = Object.keys(STATE_MAP).find(name => STATE_MAP[name] === abbr) || abbr;
         const stateRegex = new RegExp(`\\b(${abbr}|${fullName})\\b`, 'i');
         andFilters.push({ $or: [
           { 'jurisdiction.name': { $regex: fullName, $options: 'i' } }, 
@@ -359,7 +337,7 @@ export async function GET(request: NextRequest) {
         yesterday.setDate(yesterday.getDate() - 1);
 
         // Create a more comprehensive regex that matches both state abbreviation and full name
-        const stateFullName = Object.keys(stateMap).find(name => stateMap[name] === stateCode) || stateCode;
+        const stateFullName = Object.keys(STATE_MAP).find(name => STATE_MAP[name] === stateCode) || stateCode;
         // Use word boundaries to avoid partial matches (e.g., IA in California)
         const stateRegex = new RegExp(`\\b(${stateCode}|${stateFullName.replace(/\s+/g, '\\s+')}|${stateCode}\\s+State)\\b`, 'i');
 

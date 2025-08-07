@@ -1,27 +1,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
+import { getCollection } from '@/lib/mongodb';
 import { OpenStatesPerson, Representative } from "@/types/representative";
+import { STATE_MAP } from '@/types/geo';
+import { validStates } from '@/types/geo';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable');
-}
 
-let cachedClient: MongoClient | null = null;
-
-async function connectToDatabase() {
-  if (cachedClient) {
-    return cachedClient;
-  }
-
-  const client = new MongoClient(MONGODB_URI!);
-  await client.connect();
-  cachedClient = client;
-  return client;
-}
-
-// Interface for OpenStates person data
 let stateAbbr: string | null = null;
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -44,15 +28,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid latitude or longitude' }, { status: 400 });
       }
 
-      let client;
+
+      let boundaries, representatives;
       try {
-        client = await connectToDatabase();
+        boundaries = await getCollection('map_boundaries');
+        representatives = await getCollection('representatives');
       } catch (dbError) {
         return NextResponse.json({ error: 'Database connection failed.' }, { status: 503 });
       }
-      const db = client.db('statepulse');
-      const boundaries = db.collection('map_boundaries');
-      const representatives = db.collection('representatives');
 
       // Find all districts containing the point
 
@@ -114,7 +97,6 @@ export async function GET(request: NextRequest) {
       const atLargeStates = ['AK', 'WY', 'VT', 'ND', 'SD', 'DE', 'MT'];
       const abbr = (stateAbbr || '').toUpperCase();
       if (atLargeStates.includes(abbr)) {
-        // Also match full state name and jurisdiction for at-large reps
         const stateFullNameMap: Record<string, string> = {
           'AK': 'Alaska', 'WY': 'Wyoming', 'VT': 'Vermont', 'ND': 'North Dakota', 'SD': 'South Dakota', 'DE': 'Delaware', 'MT': 'Montana'
         };
@@ -167,32 +149,16 @@ export async function GET(request: NextRequest) {
       }
 
       const senatorOrs = [];
-      const stateMap: Record<string, string> = {
-        'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-        'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-        'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-        'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-        'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-        'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-        'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-        'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-        'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-        'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-        'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-        'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-        'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-      };
       let senatorState = null;
-      if (stateName && stateMap[stateName]) {
-        senatorState = stateMap[stateName];
+      if (stateName && STATE_MAP[stateName]) {
+        senatorState = STATE_MAP[stateName];
       } else if (state && typeof state === 'string' && state.length === 2) {
         senatorState = state.toUpperCase();
       } else if (stateAbbr) {
         senatorState = stateAbbr;
       }
       if (senatorState) {
-        // Also get the full state name for robust matching
-        const fullStateName = Object.keys(stateMap).find(name => stateMap[name] === senatorState.toUpperCase()) || senatorState;
+        const fullStateName = Object.keys(STATE_MAP).find(name => STATE_MAP[name] === senatorState.toUpperCase()) || senatorState;
         senatorOrs.push({
           $and: [
             {
@@ -209,12 +175,10 @@ export async function GET(request: NextRequest) {
                 { 'state': { $regex: new RegExp(`^${fullStateName}$`, 'i') } }
               ]
             }
-            // No district restriction: match all senators for the state
           ]
         });
       }
 
-      // Combine district reps and senators as a single $or array
       const finalOrs: any[] = [...repOrs, ...senatorOrs];
 
       // console.log('[API] Geospatial lookup: repOrs + senatorOrs:', JSON.stringify(finalOrs, null, 2));
@@ -233,7 +197,7 @@ export async function GET(request: NextRequest) {
         } else if (rep.name) {
           key = `${rep.name}|${rep.chamber || rep.role || ''}`;
         } else {
-          return true; // Can't dedupe, keep
+          return true;
         }
         if (seenKeys.has(key)) return false;
         seenKeys.add(key);
@@ -255,35 +219,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Define state mapping at function level so it's available throughout
-    const stateMap: Record<string, string> = {
-      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
-      'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
-      'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
-      'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
-      'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-      'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
-      'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-      'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-      'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
-      'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-      'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
-      'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
-      'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
-    };
-
-    // Extract state from address if not provided separately
     let stateCode = state;
     if (!stateCode && address) {
-      // Check if address contains a full state name (case-insensitive)
-      for (const [fullName, abbrev] of Object.entries(stateMap)) {
+      for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
         if (address.toLowerCase().includes(fullName.toLowerCase())) {
           stateCode = abbrev;
           break;
         }
       }
 
-      // If no full state name found, try to find 2-letter state code
       if (!stateCode) {
         const stateMatch = address.match(/,\s*([A-Z]{2})(?:\s|$)|(?:^|\s)([A-Z]{2})(?:\s*$)/);
         if (stateMatch) {
@@ -297,17 +241,7 @@ export async function GET(request: NextRequest) {
         { error: 'Unable to determine state from address. Please include state abbreviation at the end (e.g., "123 Main St, Columbus, OH").' },
         { status: 400 }
       );
-    }
-
-    // Validate state code
-    const validStates = [
-      'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
-      'DC'
-    ];
+    }  
 
     if (!validStates.includes(stateCode.toUpperCase())) {
       return NextResponse.json(
@@ -319,11 +253,10 @@ export async function GET(request: NextRequest) {
     stateCode = stateCode.toUpperCase();
     // console.log(`[API] Processing request for state: ${stateCode}`);
 
-    // Check MongoDB connection
-    let client;
+
+    let representativesCollection;
     try {
-      client = await connectToDatabase();
-      // console.log(`[API] Database connection established`);
+      representativesCollection = await getCollection('representatives');
     } catch (dbError) {
       console.error(`[API] Database connection failed:`, dbError);
       return NextResponse.json(
@@ -332,14 +265,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = client.db('statepulse');
-    const representativesCollection = db.collection('representatives');
-
-    // Only use cached data, never fetch from OpenStates API
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const stateFullName = Object.keys(stateMap).find(name => stateMap[name] === stateCode) || stateCode;
+    const stateFullName = Object.keys(STATE_MAP).find(name => STATE_MAP[name] === stateCode) || stateCode;
     const stateRegex = new RegExp(`\\b(${stateCode}|${stateFullName.replace(/\\s+/g, '\\s+')}|${stateCode}\\s+State)\\b`, 'i');
 
     const totalCachedReps = await representativesCollection.countDocuments({

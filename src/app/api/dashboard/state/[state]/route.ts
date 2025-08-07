@@ -1,88 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
+import { STATE_NAMES } from '@/types/geo';
+
+
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ state: string }> }
 ) {
   try {
-    const { db } = await connectToDatabase();
     const resolvedParams = await params;
     const stateParam = resolvedParams.state.toUpperCase();
-
-    // Map state abbreviations to jurisdiction patterns
-    const jurisdictionPatterns: Record<string, string[]> = {
-      'AL': ['Alabama'],
-      'AK': ['Alaska'],
-      'AZ': ['Arizona'],
-      'AR': ['Arkansas'],
-      'CA': ['California'],
-      'CO': ['Colorado'],
-      'CT': ['Connecticut'],
-      'DE': ['Delaware'],
-      'DC': ['District of Columbia'],
-      'FL': ['Florida'],
-      'GA': ['Georgia'],
-      'HI': ['Hawaii'],
-      'ID': ['Idaho'],
-      'IL': ['Illinois'],
-      'IN': ['Indiana'],
-      'IA': ['Iowa'],
-      'KS': ['Kansas'],
-      'KY': ['Kentucky'],
-      'LA': ['Louisiana'],
-      'ME': ['Maine'],
-      'MD': ['Maryland'],
-      'MA': ['Massachusetts'],
-      'MI': ['Michigan'],
-      'MN': ['Minnesota'],
-      'MS': ['Mississippi'],
-      'MO': ['Missouri'],
-      'MT': ['Montana'],
-      'NE': ['Nebraska'],
-      'NV': ['Nevada'],
-      'NH': ['New Hampshire'],
-      'NJ': ['New Jersey'],
-      'NM': ['New Mexico'],
-      'NY': ['New York'],
-      'NC': ['North Carolina'],
-      'ND': ['North Dakota'],
-      'OH': ['Ohio'],
-      'OK': ['Oklahoma'],
-      'OR': ['Oregon'],
-      'PA': ['Pennsylvania'],
-      'RI': ['Rhode Island'],
-      'SC': ['South Carolina'],
-      'SD': ['South Dakota'],
-      'TN': ['Tennessee'],
-      'TX': ['Texas'],
-      'UT': ['Utah'],
-      'VT': ['Vermont'],
-      'VA': ['Virginia'],
-      'WA': ['Washington'],
-      'WV': ['West Virginia'],
-      'WI': ['Wisconsin'],
-      'WY': ['Wyoming'],
-      'US': ['United States', 'Congress']
-    };
-
-    const patterns = jurisdictionPatterns[stateParam];
-    if (!patterns) {
+    const stateName = STATE_NAMES[stateParam];
+    if (!stateName) {
       return NextResponse.json(
         { success: false, error: 'Invalid state parameter' },
         { status: 400 }
       );
     }
 
-    // Build regex pattern to match jurisdiction names
-    const jurisdictionRegex = new RegExp(patterns.join('|'), 'i');
-
-    // Get recent legislation (last 30 days)
+    const jurisdictionRegex = new RegExp(stateName, 'i');
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Fetch recent legislation for this state
-    const recentLegislation = await db.collection('legislation')
+    const legislationCollection = await getCollection('legislation');
+
+    const recentLegislation = await legislationCollection
       .find({
         jurisdictionName: { $regex: jurisdictionRegex },
         latestActionAt: { $gte: thirtyDaysAgo }
@@ -100,8 +43,7 @@ export async function GET(
       })
       .toArray();
 
-    // Get trending topics for this state
-    const topicsAggregation = await db.collection('legislation')
+    const topicsAggregation = await legislationCollection
       .aggregate([
         {
           $match: {
@@ -109,9 +51,7 @@ export async function GET(
             subjects: { $exists: true, $ne: [] }
           }
         },
-        {
-          $unwind: '$subjects'
-        },
+        { $unwind: '$subjects' },
         {
           $group: {
             _id: '$subjects',
@@ -127,22 +67,13 @@ export async function GET(
             }
           }
         },
-        {
-          $match: {
-            _id: { $ne: null, $ne: '' }
-          }
-        },
-        {
-          $sort: { recentCount: -1, count: -1 }
-        },
-        {
-          $limit: 10
-        }
+        { $match: { _id: { $nin: [null, ''] } } },
+        { $sort: { recentCount: -1, count: -1 } },
+        { $limit: 10 }
       ])
       .toArray();
 
-    // Get sponsor activity
-    const sponsorActivity = await db.collection('legislation')
+    const sponsorActivity = await legislationCollection
       .aggregate([
         {
           $match: {
@@ -150,9 +81,7 @@ export async function GET(
             sponsors: { $exists: true, $ne: [] }
           }
         },
-        {
-          $unwind: '$sponsors'
-        },
+        { $unwind: '$sponsors' },
         {
           $group: {
             _id: '$sponsors.name',
@@ -168,28 +97,15 @@ export async function GET(
             }
           }
         },
-        {
-          $match: {
-            _id: { $ne: null, $ne: '' }
-          }
-        },
-        {
-          $sort: { recentBills: -1, totalBills: -1 }
-        },
-        {
-          $limit: 10
-        }
+        { $match: { _id: { $nin: [null, ''] } } },
+        { $sort: { recentBills: -1, totalBills: -1 } },
+        { $limit: 10 }
       ])
       .toArray();
 
-    // Get overall statistics
-    const overallStats = await db.collection('legislation')
+    const overallStats = await legislationCollection
       .aggregate([
-        {
-          $match: {
-            jurisdictionName: { $regex: jurisdictionRegex }
-          }
-        },
+        { $match: { jurisdictionName: { $regex: jurisdictionRegex } } },
         {
           $group: {
             _id: null,
@@ -207,7 +123,7 @@ export async function GET(
               $avg: {
                 $divide: [
                   { $subtract: [new Date(), '$createdAt'] },
-                  1000 * 60 * 60 * 24 // Convert to days
+                  1000 * 60 * 60 * 24
                 ]
               }
             }
