@@ -154,7 +154,7 @@ const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   // { ocdId: 'ocd-jurisdiction/country:us/state:or/government', abbr: 'OR' }, // Oregon
   // { ocdId: 'ocd-jurisdiction/country:us/state:ri/government', abbr: 'RI' }, // Rhode Island
   // { ocdId: 'ocd-jurisdiction/country:us/state:sd/government', abbr: 'SD' }, // South Dakota
-  // { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX' }, // Texas
+  { ocdId: 'ocd-jurisdiction/country:us/state:tx/government', abbr: 'TX' }, // Texas (special session in 2025)
   // { ocdId: 'ocd-jurisdiction/country:us/state:ut/government', abbr: 'UT' }, // Utah
   // { ocdId: 'ocd-jurisdiction/country:us/state:wv/government', abbr: 'WV' }, // West Virginia
   // { ocdId: 'ocd-jurisdiction/country:us/state:wy/government', abbr: 'WY' }, // Wyoming
