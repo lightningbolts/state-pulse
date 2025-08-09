@@ -29,9 +29,9 @@ const DISTRICT_COLORS: Record<string, string> = {
 const PARTY_COLORS: Record<string, string> = {
   'Democratic': '#2563eb', // Blue
   'Republican': '#dc2626', // Red
-  'Other': 'hsl(var(--primary))', // StatePulse green
-  'Independent': 'hsl(var(--primary))',
-  'Nonpartisan': 'hsl(var(--primary))',
+  'Other': '#22c55e', // Green (converted from StatePulse primary)
+  'Independent': '#22c55e', // Green
+  'Nonpartisan': '#22c55e', // Green
   'Unknown': '#6b7280' // Gray
 };
 
