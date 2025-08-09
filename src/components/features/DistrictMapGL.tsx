@@ -42,16 +42,20 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
 
   // Create a MapLibre GL expression for dynamic coloring based on district properties
   const fillColorExpression = React.useMemo((): any => {
-    console.log('[DistrictMapGL] fillColorExpression recalculated:', { 
-      showPartyAffiliation, 
-      mappingKeys: Object.keys(districtPartyMapping).slice(0, 10),
-      partyColorsKeys: Object.keys(partyColors) 
-    });
+    // console.log('[DistrictMapGL] fillColorExpression recalculated:', { 
+    //   showPartyAffiliation, 
+    //   mappingKeys: Object.keys(districtPartyMapping).slice(0, 10),
+    //   partyColorsKeys: Object.keys(partyColors) 
+    // });
     
     if (!showPartyAffiliation || Object.keys(districtPartyMapping).length === 0) {
-      console.log('[DistrictMapGL] Using default color:', color);
-      // Convert CSS variables to actual colors for MapLibre
-      const defaultColor = color.includes('var(') ? '#2563eb' : color;
+    //   console.log('[DistrictMapGL] Using default color:', color);
+      // Ensure no CSS variables are used - convert to hardcoded colors
+      let defaultColor = color;
+      if (color.includes('var(')) {
+        console.warn('[DistrictMapGL] CSS variable detected in color, using fallback');
+        defaultColor = '#2563eb'; // Blue fallback
+      }
       return defaultColor;
     }
 
@@ -59,8 +63,8 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     const caseExpression: any[] = ['case'];
     
     Object.entries(districtPartyMapping).forEach(([districtId, party]) => {
-      const partyColor = partyColors[party] || '#6b7280'; // fallback to gray
-      console.log(`[DistrictMapGL] Mapping district ${districtId} -> ${party} -> ${partyColor}`);
+      const partyColor = partyColors[party] || partyColors['Unknown'] || '#6b7280'; // fallback to gray
+    //   console.log(`[DistrictMapGL] Mapping district ${districtId} -> ${party} -> ${partyColor}`);
       
       // Try each property match one at a time
       caseExpression.push(['==', ['get', 'GEOID'], districtId]);
@@ -71,10 +75,14 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     });
     
     // Default fallback color - ensure it's not a CSS variable
-    const fallbackColor = color.includes('var(') ? '#2563eb' : color;
+    let fallbackColor = color;
+    if (color.includes('var(')) {
+      console.warn('[DistrictMapGL] CSS variable detected in fallback color, using hardcoded fallback');
+      fallbackColor = '#2563eb'; // Blue fallback
+    }
     caseExpression.push(fallbackColor);
     
-    console.log('[DistrictMapGL] Case expression:', caseExpression);
+    // console.log('[DistrictMapGL] Case expression built with', (caseExpression.length - 1) / 2, 'conditions');
     return caseExpression;
   }, [showPartyAffiliation, districtPartyMapping, partyColors, color]);
 
@@ -132,10 +140,8 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     const map = mapRef.current?.getMap?.();
     if (!map || !showPartyAffiliation) return;
     
-    console.log('[DistrictMapGL] Party mapping changed, map should update automatically');
+    // console.log('[DistrictMapGL] Party mapping changed, map should update automatically');
     
-    // The Layer component should automatically update when fillColorExpression changes
-    // No need to manually set paint properties
   }, [fillColorExpression, showPartyAffiliation]);
 
   return (
