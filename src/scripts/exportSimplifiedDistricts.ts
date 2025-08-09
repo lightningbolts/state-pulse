@@ -16,12 +16,22 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 function stripProperties(props: any) {
-  // Keep only minimal properties for display
+  // Keep essential properties for display and party matching
   const keep: Record<string, any> = {};
   if (props && props.name) keep.name = props.name;
   if (props && props.state) keep.state = props.state;
   if (props && props.district) keep.district = props.district;
   if (props && props.type) keep.type = props.type;
+  
+  // Keep GEOID and related fields for party affiliation matching
+  if (props && props.GEOID) keep.GEOID = props.GEOID;
+  if (props && props.CD) keep.CD = props.CD;
+  if (props && props.ID) keep.ID = props.ID;
+  if (props && props.DISTRICT) keep.DISTRICT = props.DISTRICT;
+  if (props && props.STATEFP) keep.STATEFP = props.STATEFP;
+  if (props && props.CD116FP) keep.CD116FP = props.CD116FP;
+  if (props && props.GEOIDFQ) keep.GEOIDFQ = props.GEOIDFQ;
+  
   return keep;
 }
 
@@ -38,35 +48,74 @@ function reducePrecision(coords: any, decimals = 5): any {
 async function exportDistricts() {
   const dbCollection = await getCollection('map_boundaries');
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
+  
+  // Process one district type at a time to manage memory
   for (const [outName, dbType] of Object.entries(TYPE_MAP)) {
-    const features = await dbCollection.find({ type: dbType }, { projection: { geometry: 1, properties: 1, _id: 0 } }).toArray();
-    const simplified: Feature<Geometry, GeoJsonProperties>[] = features.map(f => {
-      let geom = f.geometry;
-      const props = stripProperties(f.properties || {});
-      const feature: Feature<Geometry, GeoJsonProperties> = {
-        type: 'Feature',
-        geometry: geom,
-        properties: props,
-      };
-      try {
-        const s = simplify(feature, { tolerance: TOLERANCE, highQuality: false, mutate: false }) as Feature<Geometry, GeoJsonProperties>;
-        geom = s.geometry;
-      } catch {}
-      // Reduce coordinate precision
-      if (geom && geom.coordinates) {
-        geom.coordinates = reducePrecision(geom.coordinates, 5);
+    console.log(`Starting export of ${outName} (${dbType})...`);
+    
+    try {
+      const features = await dbCollection.find({ type: dbType }, { projection: { geometry: 1, properties: 1, _id: 0 } }).toArray();
+      console.log(`Loaded ${features.length} features for ${outName}`);
+      
+      const simplified: Feature<Geometry, GeoJsonProperties>[] = [];
+      
+      // Process features in batches to avoid memory issues
+      const batchSize = 100;
+      for (let i = 0; i < features.length; i += batchSize) {
+        const batch = features.slice(i, i + batchSize);
+        const processedBatch = batch.map(f => {
+          let geom = f.geometry;
+          const props = stripProperties(f.properties || {});
+          const feature: Feature<Geometry, GeoJsonProperties> = {
+            type: 'Feature',
+            geometry: geom,
+            properties: props,
+          };
+          
+          try {
+            const s = simplify(feature, { tolerance: TOLERANCE, highQuality: false, mutate: false }) as Feature<Geometry, GeoJsonProperties>;
+            geom = s.geometry;
+          } catch {
+            // Keep original geometry if simplification fails
+          }
+          
+          // Reduce coordinate precision
+          if (geom && geom.coordinates) {
+            geom.coordinates = reducePrecision(geom.coordinates, 5);
+          }
+          
+          return {
+            type: 'Feature' as const,
+            geometry: geom,
+            properties: props,
+          };
+        });
+        
+        simplified.push(...processedBatch);
+        
+        // Force garbage collection hint
+        if (global.gc) {
+          global.gc();
+        }
+        
+        console.log(`Processed ${i + batch.length}/${features.length} features for ${outName}`);
       }
-      return {
-        type: 'Feature',
-        geometry: geom,
-        properties: props,
-      };
-    });
-    const fc = featureCollection(simplified);
-    const outPath = path.join(OUTPUT_DIR, `${outName}.geojson`);
-    await fs.writeFile(outPath, JSON.stringify(fc));
-    console.log(`Exported ${outName} to ${outPath} (${simplified.length} features)`);
+      
+      const fc = featureCollection(simplified);
+      const outPath = path.join(OUTPUT_DIR, `${outName}.geojson`);
+      await fs.writeFile(outPath, JSON.stringify(fc));
+      console.log(`Exported ${outName} to ${outPath} (${simplified.length} features)`);
+      
+      // Clear memory
+      simplified.length = 0;
+      features.length = 0;
+      
+    } catch (error) {
+      console.error(`Failed to export ${outName}:`, error);
+      // Continue with next district type
+    }
   }
+  
   console.log('All district overlays exported.');
 }
 

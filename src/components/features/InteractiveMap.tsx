@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Calendar, FileText, MapPin, TrendingUp, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { StateData } from '@/types/jurisdictions';
@@ -22,6 +23,23 @@ const DISTRICT_COLORS: Record<string, string> = {
   'congressional-districts': '#2563eb', // blue
   'state-upper-districts': '#a21caf',   // purple
   'state-lower-districts': '#16a34a',   // green
+};
+
+// Party colors - consistent with ChamberMakeup component
+const PARTY_COLORS: Record<string, string> = {
+  'Democratic': '#2563eb', // Blue
+  'Republican': '#dc2626', // Red
+  'Other': 'hsl(var(--primary))', // StatePulse green
+  'Independent': 'hsl(var(--primary))',
+  'Nonpartisan': 'hsl(var(--primary))',
+  'Unknown': '#6b7280' // Gray
+};
+
+// Map district types to API chamber parameters
+const DISTRICT_TO_CHAMBER: Record<string, string> = {
+  'congressional-districts': 'us_house',
+  'state-upper-districts': 'state_upper',
+  'state-lower-districts': 'state_lower',
 };
 import { RepresentativesResults } from "./RepresentativesResults";
 import { ChamberMakeup } from "./ChamberMakeup";
@@ -97,6 +115,13 @@ export function InteractiveMap() {
     const [districtReps, setDistrictReps] = useState<any[]>([]); // Store reps for selected district
     const [districtPopupLatLng, setDistrictPopupLatLng] = useState<any>(null); // Popup position
     const mapRef = useRef<any>(null);
+    
+    // Party affiliation state
+    const [showPartyAffiliation, setShowPartyAffiliation] = useState<boolean>(false);
+    const [districtPartyMapping, setDistrictPartyMapping] = useState<Record<string, string>>({});
+    const [partyDataLoading, setPartyDataLoading] = useState<boolean>(false);
+    const [partyDataError, setPartyDataError] = useState<string | null>(null);
+    
     // No need to fetch districtGeoJson here; handled by DistrictMapGL via URL
 
     useEffect(() => {
@@ -149,6 +174,126 @@ export function InteractiveMap() {
             setDetailsLoading(false);
         }
     };
+
+    const fetchDistrictPartyData = async (chamber: string) => {
+        console.log('fetchDistrictPartyData called with chamber:', chamber);
+        setPartyDataLoading(true);
+        setPartyDataError(null);
+        try {
+            const response = await fetch(`/api/dashboard/representatives/${chamber}`);
+            console.log('API response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch representatives: ${response.status}`);
+            }
+            const result = await response.json();
+            console.log('API result:', { count: result.representatives?.length });
+            if (result.representatives) {
+                // Build district -> party mapping
+                const mapping: Record<string, string> = {};
+                result.representatives.forEach((rep: any) => {
+                    const party = rep.party || 'Unknown';
+                    // Normalize party names
+                    const normalizedParty = party === 'Democrat' ? 'Democratic' : 
+                                          party === 'Republican' ? 'Republican' : 
+                                          party;
+                    
+                    // Use the exact map_boundary.district value (contains FIPS code + district)
+                    // This matches how the civic API works with GEOID
+                    if (rep.map_boundary?.district) {
+                        const districtCode = rep.map_boundary.district;
+                        mapping[districtCode] = normalizedParty;
+                        console.log(`Mapped ${districtCode} -> ${normalizedParty}`);
+                    }
+                    
+                    // Also use the GEOID from map_boundary if available (backup)
+                    if (rep.map_boundary?.geoidfq) {
+                        const geoid = rep.map_boundary.geoidfq;
+                        mapping[geoid] = normalizedParty;
+                        console.log(`Mapped GEOID ${geoid} -> ${normalizedParty}`);
+                    }
+                    
+                    // For backward compatibility with simple district numbers
+                    if (rep.district) {
+                        mapping[rep.district.toString()] = normalizedParty;
+                    }
+                    
+                    // Also check current_role.district or division_id
+                    const altDistrict = rep.current_role?.district || 
+                                      rep.current_role?.division_id?.split(':').pop();
+                    if (altDistrict) {
+                        mapping[altDistrict.toString()] = normalizedParty;
+                    }
+                    
+                    // For congressional districts, create state+district format  
+                    if (rep.state && rep.district) {
+                        mapping[`${rep.state}-${rep.district}`] = normalizedParty;
+                    }
+                    
+                    // Special handling for at-large representatives (district is null)
+                    if (chamber === 'us_house' && rep.state && (rep.district === null || rep.district === undefined)) {
+                        const stateToAtLargeGeoid: Record<string, string> = {
+                            'Alaska': '0200',
+                            'Delaware': '1000',  
+                            'Montana': '3000',
+                            'Vermont': '5000',
+                            'Wyoming': '5600'
+                        };
+                        
+                        const geoid = stateToAtLargeGeoid[rep.state];
+                        if (geoid) {
+                            mapping[geoid] = normalizedParty;
+                            console.log(`Mapped at-large representative ${rep.name} (${rep.state}) -> ${geoid} -> ${normalizedParty}`);
+                        }
+                    }
+                });
+                
+                // Fallback for any at-large districts still not mapped
+                if (chamber === 'us_house') {
+                    const atLargeStates = {
+                        '0200': 'Alaska',
+                        '1000': 'Delaware',  
+                        '3000': 'Montana',
+                        '5000': 'Vermont',
+                        '5600': 'Wyoming'
+                    };
+                    
+                    Object.entries(atLargeStates).forEach(([geoid, stateName]) => {
+                        if (!mapping[geoid]) {
+                            mapping[geoid] = 'Unknown';
+                            console.log(`Added fallback mapping for ${stateName} at-large district ${geoid} -> Unknown`);
+                        }
+                    });
+                }
+
+                console.log('District party mapping created:', Object.keys(mapping).length, 'mappings');
+                console.log('Sample mappings:', Object.entries(mapping).slice(0, 15));
+                setDistrictPartyMapping(mapping);
+            } else {
+                throw new Error('No representatives data returned');
+            }
+        } catch (error) {
+            console.error('Error fetching district party data:', error);
+            setPartyDataError(error instanceof Error ? error.message : 'Unknown error');
+            setDistrictPartyMapping({});
+        } finally {
+            setPartyDataLoading(false);
+        }
+    };    // Effect to fetch party data when district map mode is selected and party affiliation is enabled
+    useEffect(() => {
+        console.log('[DEBUG] useEffect triggered:', { mapMode, showPartyAffiliation });
+        const isDistrictMode = ['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode);
+        console.log('[DEBUG] isDistrictMode:', isDistrictMode);
+        if (isDistrictMode && showPartyAffiliation) {
+            const chamber = DISTRICT_TO_CHAMBER[mapMode];
+            console.log('[DEBUG] Fetching party data for chamber:', chamber);
+            if (chamber) {
+                fetchDistrictPartyData(chamber);
+            }
+        } else {
+            console.log('[DEBUG] Clearing district party mapping');
+            setDistrictPartyMapping({});
+        }
+    }, [mapMode, showPartyAffiliation]);
 
     const handleStateClick = (stateAbbr: string, coords?: [number, number]) => {
         // console.log('[handleStateClick] Clicked:', stateAbbr, coords);
@@ -350,6 +495,65 @@ export function InteractiveMap() {
                             </p>
                         </div>
 
+                        {/* Party Affiliation Toggle - Only show for district modes */}
+                        {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
+                            <div className="space-y-2 md:space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-xs md:text-sm">
+                                            <span className="hidden sm:inline">Party Affiliation</span>
+                                            <span className="sm:hidden">Party Colors</span>
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            <span className="hidden sm:inline">Color districts by representative party affiliation</span>
+                                            <span className="sm:hidden">Color by party</span>
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={showPartyAffiliation}
+                                        onCheckedChange={(checked) => {
+                                            console.log('Switch toggled:', checked, 'current mapMode:', mapMode);
+                                            setShowPartyAffiliation(checked);
+                                        }}
+                                        disabled={partyDataLoading}
+                                    />
+                                </div>
+                                
+                                {/* Party affiliation loading/error state */}
+                                {partyDataLoading && (
+                                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                                        <span>Loading party data...</span>
+                                    </div>
+                                )}
+                                
+                                {partyDataError && (
+                                    <div className="text-xs text-red-500">
+                                        Error loading party data: {partyDataError}
+                                    </div>
+                                )}
+                                
+                                {/* Party legend - only show when party affiliation is enabled and data is loaded */}
+                                {showPartyAffiliation && !partyDataLoading && Object.keys(districtPartyMapping).length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="font-medium text-xs">Party Legend</h5>
+                                        <div className="flex flex-wrap gap-2 text-xs">
+                                            {/* Only show parties that are actually present in the district mapping */}
+                                            {[...new Set(Object.values(districtPartyMapping))].map(party => (
+                                                <div key={party} className="flex items-center space-x-1">
+                                                    <div 
+                                                        className="w-3 h-3 rounded-sm"
+                                                        style={{ backgroundColor: PARTY_COLORS[party] || PARTY_COLORS['Unknown'] }}
+                                                    ></div>
+                                                    <span>{party}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
 
                         {/* Map Container with district overlays */}
                         <div className="relative">
@@ -364,6 +568,9 @@ export function InteractiveMap() {
                                                 ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
                                                 : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
                                         }
+                                        showPartyAffiliation={showPartyAffiliation}
+                                        districtPartyMapping={districtPartyMapping}
+                                        partyColors={PARTY_COLORS}
                                         popupMarker={districtPopupLatLng ? {
                                             lng: districtPopupLatLng.lng,
                                             lat: districtPopupLatLng.lat,
@@ -725,7 +932,7 @@ export function InteractiveMap() {
                                     <Users className="h-4 w-4 md:h-5 md:w-5 text-green-500 flex-shrink-0"/>
                                     <div className="min-w-0">
                                         <p className="text-xs md:text-sm font-medium truncate">
-                                            <span className="hidden sm:inline">Active Representatives</span>
+                                            <span className="hidden sm:inline">Active Sponsors</span>
                                             <span className="sm:hidden">Active Reps</span>
                                         </p>
                                         <p className="text-lg md:text-2xl font-bold">

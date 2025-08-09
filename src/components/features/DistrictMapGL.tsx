@@ -19,6 +19,10 @@ interface DistrictMapGLProps {
     onDragEnd?: (lngLat: {lng: number, lat: number}) => void;
   };
   mapStyle?: string;
+  // Party affiliation coloring
+  showPartyAffiliation?: boolean;
+  districtPartyMapping?: Record<string, string>; // district ID -> party
+  partyColors?: Record<string, string>; // party -> color
 }
 
 
@@ -29,9 +33,50 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
   initialViewState = { longitude: -98.5795, latitude: 39.8283, zoom: 4 },
   popupMarker,
   mapStyle = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  showPartyAffiliation = false,
+  districtPartyMapping = {},
+  partyColors = {},
 }) => {
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
+
+  // Create a MapLibre GL expression for dynamic coloring based on district properties
+  const fillColorExpression = React.useMemo((): any => {
+    console.log('[DistrictMapGL] fillColorExpression recalculated:', { 
+      showPartyAffiliation, 
+      mappingKeys: Object.keys(districtPartyMapping).slice(0, 10),
+      partyColorsKeys: Object.keys(partyColors) 
+    });
+    
+    if (!showPartyAffiliation || Object.keys(districtPartyMapping).length === 0) {
+      console.log('[DistrictMapGL] Using default color:', color);
+      // Convert CSS variables to actual colors for MapLibre
+      const defaultColor = color.includes('var(') ? '#2563eb' : color;
+      return defaultColor;
+    }
+
+    // Build a case expression for MapLibre GL - simplified approach
+    const caseExpression: any[] = ['case'];
+    
+    Object.entries(districtPartyMapping).forEach(([districtId, party]) => {
+      const partyColor = partyColors[party] || '#6b7280'; // fallback to gray
+      console.log(`[DistrictMapGL] Mapping district ${districtId} -> ${party} -> ${partyColor}`);
+      
+      // Try each property match one at a time
+      caseExpression.push(['==', ['get', 'GEOID'], districtId]);
+      caseExpression.push(partyColor);
+      
+      caseExpression.push(['==', ['get', 'GEOIDFQ'], districtId]);
+      caseExpression.push(partyColor);
+    });
+    
+    // Default fallback color - ensure it's not a CSS variable
+    const fallbackColor = color.includes('var(') ? '#2563eb' : color;
+    caseExpression.push(fallbackColor);
+    
+    console.log('[DistrictMapGL] Case expression:', caseExpression);
+    return caseExpression;
+  }, [showPartyAffiliation, districtPartyMapping, partyColors, color]);
 
   const handleClick = React.useCallback((event: any) => {
     const features = event.features || [];
@@ -82,6 +127,17 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     };
   }, [popupMarker]);
 
+  // Force map repaint when party mapping changes
+  React.useEffect(() => {
+    const map = mapRef.current?.getMap?.();
+    if (!map || !showPartyAffiliation) return;
+    
+    console.log('[DistrictMapGL] Party mapping changed, map should update automatically');
+    
+    // The Layer component should automatically update when fillColorExpression changes
+    // No need to manually set paint properties
+  }, [fillColorExpression, showPartyAffiliation]);
+
   return (
     <Map
       ref={mapRef}
@@ -96,16 +152,16 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
           id="district-fill"
           type="fill"
           paint={{
-            'fill-color': color,
-            'fill-opacity': 0.08,
+            'fill-color': fillColorExpression,
+            'fill-opacity': showPartyAffiliation ? 0.3 : 0.08,
           }}
         />
         <Layer
           id="district-outline"
           type="line"
           paint={{
-            'line-color': color,
-            'line-width': 2,
+            'line-color': showPartyAffiliation ? '#333333' : (color.includes('var(') ? '#2563eb' : color),
+            'line-width': showPartyAffiliation ? 1 : 2,
           }}
         />
       </Source>
