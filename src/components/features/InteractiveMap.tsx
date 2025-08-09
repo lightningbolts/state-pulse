@@ -795,32 +795,38 @@ export function InteractiveMap() {
                 )}
                         </div>
 
-                        {/* Legend */}
-                        <div
-                            className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0 text-xs text-muted-foreground">
-                            <div className="flex items-center space-x-2 md:space-x-4 overflow-x-auto">
-                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary"></div>
-                                    <span className="whitespace-nowrap">High Activity</span>
-                                </div>
-                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/50"></div>
-                                    <span className="whitespace-nowrap">
-                    <span className="hidden sm:inline">Medium Activity</span>
-                    <span className="sm:hidden">Medium</span>
-                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/20"></div>
-                                    <span className="whitespace-nowrap">
-                    <span className="hidden sm:inline">Low Activity</span>
-                    <span className="sm:hidden">Low</span>
-                  </span>
-                                </div>
-                            </div>
-                            <div className="text-xs hidden md:block">Click markers for detailed state information</div>
-                            <div className="text-xs md:hidden">Tap markers for details</div>
-                        </div>
+                                                {/* Legend or map instruction */}
+                                                {['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) ? (
+                                                    <div className="text-xs text-muted-foreground text-center w-full py-2">
+                                                        Click anywhere on the map to see legislators representing that location.
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0 text-xs text-muted-foreground">
+                                                        <div className="flex items-center space-x-2 md:space-x-4 overflow-x-auto">
+                                                                <div className="flex items-center space-x-1 flex-shrink-0">
+                                                                        <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary"></div>
+                                                                        <span className="whitespace-nowrap">High Activity</span>
+                                                                </div>
+                                                                <div className="flex items-center space-x-1 flex-shrink-0">
+                                                                        <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/50"></div>
+                                                                        <span className="whitespace-nowrap">
+                                        <span className="hidden sm:inline">Medium Activity</span>
+                                        <span className="sm:hidden">Medium</span>
+                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center space-x-1 flex-shrink-0">
+                                                                        <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/20"></div>
+                                                                        <span className="whitespace-nowrap">
+                                        <span className="hidden sm:inline">Low Activity</span>
+                                        <span className="sm:hidden">Low</span>
+                                    </span>
+                                                                </div>
+                                                        </div>
+                                                        <div className="text-xs hidden md:block">Click markers for detailed state information</div>
+                                                        <div className="text-xs md:hidden">Tap markers for details</div>
+                                                    </div>
+                                                )}
                     </CardContent>
                 </Card>
 
