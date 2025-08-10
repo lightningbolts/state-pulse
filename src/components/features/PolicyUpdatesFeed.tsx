@@ -48,8 +48,14 @@ const CLASSIFICATIONS = [
     {label: "Bill", value: "bill"},
     {label: "Proposed bill", value: "proposed bill"},
     {label: "Resolution", value: "resolution"},
-    {label: "Joint Resolution", value: "concurrent resolution"},
-    {label: "Concurrent Resolution", value: "memorial"},
+    {label: "Joint Resolution", value: "joint resolution"},
+    {label: "Concurrent Resolution", value: "concurrent resolution"},
+    {label: "Amendment", value: "amendment"},
+    {label: "House Bill", value: "hr"},
+    {label: "Senate Bill", value: "sr"},
+    {label: "House Resolution", value: "hres"},
+    {label: "Senate Resolution", value: "sres"},
+    {label: "Memorial", value: "memorial"},
     {label: "Proclamation", value: "proclamation"},
 ];
 
