@@ -825,22 +825,11 @@ Examples:
   return { enableOpenStates, enableCongress, runOnce };
 }
 
+
 async function main() {
-  const { enableOpenStates, enableCongress, runOnce } = parseArguments();
-
-  if (runOnce) {
-    console.log("Running in single-execution mode (--once flag detected)");
-    await runUpdateCycle(enableOpenStates, enableCongress);
-    console.log("Single execution completed. Exiting.");
-    return;
-  }
-
-  // Continuous loop mode
-  while (true) {
-    await runUpdateCycle(enableOpenStates, enableCongress);
-    console.log(`Waiting ${UPDATE_INTERVAL_HOURS} hours before next update cycle...`);
-    await delay(UPDATE_INTERVAL_HOURS * 60 * 60 * 1000);
-  }
+  const { enableOpenStates, enableCongress } = parseArguments();
+  await runUpdateCycle(enableOpenStates, enableCongress);
+  console.log("Execution completed. Exiting.");
 }
 
 main().catch(err => {
