@@ -830,10 +830,12 @@ async function main() {
   const { enableOpenStates, enableCongress } = parseArguments();
   await runUpdateCycle(enableOpenStates, enableCongress);
   console.log("Execution completed. Exiting.");
+  process.exit(0);
 }
 
 main().catch(err => {
   console.error("Unhandled error in main execution:", err);
+  process.exit(1);
 });
 
 /**
