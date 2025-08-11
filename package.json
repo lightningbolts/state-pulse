@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@azure/ai-text-analytics": "^5.1.0",
-    "@clerk/clerk-sdk-node": "^5.1.6",
+    "@clerk/express": "^1.7.17",
     "@clerk/nextjs": "^6.22.0",
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
     "@genkit-ai/googleai": "^1.8.0",
