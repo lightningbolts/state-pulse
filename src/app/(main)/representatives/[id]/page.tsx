@@ -179,7 +179,61 @@ export default function RepresentativeDetailPage() {
                 )}
               </div>
               <div className="text-primary-foreground/80 text-sm mt-2 break-words text-center sm:text-left">
-                {rep.office}
+                {(() => {
+                  // Check if this is a Congress member and format accordingly
+                  const office = rep.office || '';
+                  const jurisdiction = typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name || '';
+                  
+                  // Determine if this is a Congress member
+                  const isCongressMember = jurisdiction === 'US House' || jurisdiction === 'US Senate' || 
+                                          office.toLowerCase().includes('representative') || office.toLowerCase().includes('senator') ||
+                                          ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0);
+
+                  if (isCongressMember) {
+                    // Extract district from terms or rep object
+                    let district = rep.district || (rep as any).district || '';
+                    if (!district && (rep as any).terms) {
+                      let terms = (rep as any).terms;
+                      if (terms.item && Array.isArray(terms.item)) {
+                        terms = terms.item;
+                      }
+                      if (Array.isArray(terms) && terms.length > 0) {
+                        const lastTerm = terms.slice(-1)[0];
+                        if (lastTerm?.district) district = lastTerm.district;
+                      }
+                    }
+                    
+                    // Determine chamber
+                    let chamber = '';
+                    if ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0) {
+                      const lastTerm = (rep as any).terms.slice(-1)[0];
+                      if (lastTerm?.chamber === 'House of Representatives') {
+                        chamber = 'House';
+                      } else if (lastTerm?.chamber === 'Senate') {
+                        chamber = 'Senate';
+                      }
+                    }
+                    
+                    // Fallback to office field or jurisdiction
+                    if (!chamber) {
+                      if (office.toLowerCase().includes('representative') || jurisdiction === 'US House') {
+                        chamber = 'House';
+                      } else if (office.toLowerCase().includes('senator') || jurisdiction === 'US Senate') {
+                        chamber = 'Senate';
+                      }
+                    }
+                    
+                    // Format the display
+                    if (chamber === 'House') {
+                      return district ? `US House - ${district}` : 'US House';
+                    } else if (chamber === 'Senate') {
+                      return 'US Senate';
+                    }
+                  }
+                  
+                  // For non-Congress members, return original office
+                  return office;
+                })()}
               </div>
               <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">
                 {rep.current_role?.org_classification && (

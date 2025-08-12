@@ -51,6 +51,11 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
       if (!district && lastTerm?.district) district = lastTerm.district;
     }
   }
+  
+  // Ensure district is a string for display purposes
+  if (typeof district === 'number') {
+    district = district.toString();
+  }
 
   let chamber = (rep as any).chamber || '';
   if (!chamber && (rep as any).role) chamber = (rep as any).role;
@@ -168,6 +173,60 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     id: rep.id,
   };
 
+  // Determine if this is a Congress member based on jurisdiction, office, terms, or chamber
+  const isCongressMember = jurisdiction === 'US House' || jurisdiction === 'US Senate' || 
+                          office.toLowerCase().includes('representative') || office.toLowerCase().includes('senator') ||
+                          chamber === 'House of Representatives' || chamber === 'Senate' ||
+                          ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0);
+
+  // Format the role/office display for Congress members
+  let roleDisplay = '';
+  if (isCongressMember) {
+    // For Congress members, determine chamber from terms or office
+    let congressChamber = '';
+    
+    // First, try to get chamber from latest term
+    if ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0) {
+      const lastTerm = (rep as any).terms.slice(-1)[0];
+      if (lastTerm?.chamber === 'House of Representatives') {
+        congressChamber = 'House';
+      } else if (lastTerm?.chamber === 'Senate') {
+        congressChamber = 'Senate';
+      }
+    }
+    
+    // Fallback to office field
+    if (!congressChamber) {
+      if (office.toLowerCase().includes('representative')) {
+        congressChamber = 'House';
+      } else if (office.toLowerCase().includes('senator')) {
+        congressChamber = 'Senate';
+      }
+    }
+    
+    // Fallback to chamber field
+    if (!congressChamber) {
+      if (chamber === 'House of Representatives') {
+        congressChamber = 'House';
+      } else if (chamber === 'Senate') {
+        congressChamber = 'Senate';
+      }
+    }
+    
+    // Format the display
+    if (congressChamber === 'House') {
+      roleDisplay = district ? `US House - ${district}` : 'US House';
+    } else if (congressChamber === 'Senate') {
+      roleDisplay = 'US Senate';
+    } else {
+      // Fallback to original logic
+      roleDisplay = office || jurisdiction;
+    }
+  } else {
+    // For state representatives, use the original logic
+    roleDisplay = office || normalized.currentRoleTitle || jurisdiction;
+  }
+
   // Determine background shade based on districtType
   let districtBg = '';
   if (districtType === 'congressional-districts') districtBg = 'bg-blue-50 dark:bg-blue-900/20';
@@ -211,23 +270,10 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                     </Badge>
                   </div>
                   <p className="text-sm font-medium text-primary mb-2">
-                    {normalized.office}
-                    {normalized.currentRoleTitle && (
-                      <>
-                        {normalized.currentRoleTitle}
-                        {normalized.currentRoleDistrict ? ` - ${normalized.currentRoleDistrict}` : ''}
-                      </>
-                    )}
-                    {/* Always show state and district for all reps */}
-                    {!normalized.currentRoleTitle && (
-                      <>
-                        {normalized.state ? `${normalized.state}` : ''}
-                        {normalized.currentRoleDistrict ? ` - ${normalized.currentRoleDistrict}` : ''}
-                      </>
-                    )}
+                    {roleDisplay}
                   </p>
                   <p className="text-xs text-muted-foreground mb-3">
-                    {normalized.jurisdiction}
+                    {normalized.state || normalized.jurisdiction}
                   </p>
                 </div>
               </div>
