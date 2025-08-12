@@ -36,69 +36,32 @@ export async function GET(
           'Northern Mariana Islands'
         ].includes(name));
       baseFilter = {
-        $and: [
-          {
-            $or: [
-              // US House: OpenStates/state reps (no terms array)
-              { $and: [
-                { terms: { $exists: false } },
-                { $or: [
-                  { 'jurisdiction': 'US House' },
-                  { 'jurisdiction.name': 'US House' }
-                ] },
-                { state: { $in: FIFTY_STATE_NAMES } }
-              ] },
-              // US House: CongressPeople (with terms array, latest term is House and is current)
-              { $and: [
-                { 'terms.item': { $exists: true } },
-                { state: { $in: FIFTY_STATE_NAMES } },
-                { $expr: {
-                  $let: {
-                    vars: {
-                      lastTerm: { $arrayElemAt: ["$terms.item", { $subtract: [ { $size: "$terms.item" }, 1 ] } ] }
-                    },
-                    in: {
-                      $and: [
-                        { $regexMatch: { input: "$$lastTerm.chamber", regex: '^House of Representatives$', options: 'i' } },
-                        { $or: [
-                          { $not: [ { $ifNull: ["$$lastTerm.endYear", false] } ] },
-                          { $gte: ["$$lastTerm.endYear", currentYear] }
-                        ] }
-                      ]
-                    }
-                  }
-                } }
-              ] },
-              // US Senate: OpenStates/state reps (no terms array)
-              { $and: [
-                { terms: { $exists: false } },
-                { $or: [
-                  { 'jurisdiction': 'US Senate' },
-                  { 'jurisdiction.name': 'US Senate' }
-                ] }
-              ] },
-              // US Senate: CongressPeople (with terms array, latest term is Senate and is current)
-              { $and: [
-                { 'terms.item': { $exists: true } },
-                { $expr: {
-                  $let: {
-                    vars: {
-                      lastTerm: { $arrayElemAt: ["$terms.item", { $subtract: [ { $size: "$terms.item" }, 1 ] } ] }
-                    },
-                    in: {
-                      $and: [
-                        { $regexMatch: { input: "$$lastTerm.chamber", regex: '^Senate$', options: 'i' } },
-                        { $or: [
-                          { $not: [ { $ifNull: ["$$lastTerm.endYear", false] } ] },
-                          { $gte: ["$$lastTerm.endYear", currentYear] }
-                        ] }
-                      ]
-                    }
-                  }
-                } }
-              ] }
-            ]
-          },
+        $or: [
+          // US House: OpenStates/state reps (no terms array)
+          { $and: [
+            { terms: { $exists: false } },
+            { $or: [
+              { 'jurisdiction': 'US House' },
+              { 'jurisdiction.name': 'US House' }
+            ] },
+            { state: { $in: FIFTY_STATE_NAMES } }
+          ] },
+          // Congress people with terms data (will filter by chamber in aggregation)
+          { $and: [
+            { $or: [
+              { 'terms.item': { $exists: true } },
+              { 'terms': { $exists: true, $ne: null } }
+            ] },
+            { state: { $in: FIFTY_STATE_NAMES } }
+          ] },
+          // US Senate: OpenStates/state reps (no terms array)
+          { $and: [
+            { terms: { $exists: false } },
+            { $or: [
+              { 'jurisdiction': 'US Senate' },
+              { 'jurisdiction.name': 'US Senate' }
+            ] }
+          ] }
         ]
       };
     } else {
@@ -137,9 +100,26 @@ export async function GET(
               $cond: [
                 { $and: [ { $isArray: "$terms.item" }, { $gt: [ { $size: "$terms.item" }, 0 ] } ] },
                 { $arrayElemAt: ["$terms.item", { $subtract: [ { $size: "$terms.item" }, 1 ] } ] },
-                null
+                {
+                  $cond: [
+                    { $and: [ { $isArray: "$terms" }, { $gt: [ { $size: "$terms" }, 0 ] } ] },
+                    { $arrayElemAt: ["$terms", { $subtract: [ { $size: "$terms" }, 1 ] } ] },
+                    null
+                  ]
+                }
               ]
             }
+          }
+        },
+        // Filter to only include records where we can determine chamber from terms or jurisdiction
+        {
+          $match: {
+            $or: [
+              // Has valid lastTerm with chamber info
+              { "lastTerm.chamber": { $exists: true } },
+              // Has jurisdiction for non-Congress reps
+              { jurisdiction: { $exists: true } }
+            ]
           }
         },
         {
@@ -170,34 +150,26 @@ export async function GET(
                     ] },
                     then: 'Senate'
                   },
-                  // OpenStates/state reps: assign by jurisdiction
+                  // OpenStates/state reps: assign by jurisdiction (no terms array)
                   {
-                    case: { $or: [
-                      { $and: [
-                        { $eq: ["$terms", undefined] },
-                        { $or: [
-                          { $eq: ["$jurisdiction", 'US House'] },
-                          { $eq: ["$jurisdiction.name", 'US House'] }
-                        ] }
-                      ] },
-                      { $and: [
-                        { $eq: ["$terms", undefined] },
-                        { $or: [
-                          { $eq: ["$jurisdiction", 'US Senate'] },
-                          { $eq: ["$jurisdiction.name", 'US Senate'] }
-                        ] }
+                    case: { $and: [
+                      { $eq: ["$lastTerm", null] },
+                      { $or: [
+                        { $eq: ["$jurisdiction", 'US House'] },
+                        { $eq: ["$jurisdiction.name", 'US House'] }
                       ] }
                     ] },
-                    then: {
-                      $cond: [
-                        { $or: [
-                          { $eq: ["$jurisdiction", 'US House'] },
-                          { $eq: ["$jurisdiction.name", 'US House'] }
-                        ] },
-                        'House',
-                        'Senate'
-                      ]
-                    }
+                    then: 'House'
+                  },
+                  {
+                    case: { $and: [
+                      { $eq: ["$lastTerm", null] },
+                      { $or: [
+                        { $eq: ["$jurisdiction", 'US Senate'] },
+                        { $eq: ["$jurisdiction.name", 'US Senate'] }
+                      ] }
+                    ] },
+                    then: 'Senate'
                   }
                 ],
                 default: 'Other'
