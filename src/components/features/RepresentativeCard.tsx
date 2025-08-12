@@ -39,10 +39,17 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
 
   let state = (rep as any).state || (rep as any).stateName || '';
   let district = rep.district || (rep as any).district || '';
-  if ((!state || !district) && (rep as any).terms && Array.isArray((rep as any).terms.item)) {
-    const lastTerm = (rep as any).terms.item.slice(-1)[0];
-    if (!state && (lastTerm?.stateName || lastTerm?.stateCode)) state = lastTerm.stateName || lastTerm.stateCode;
-    if (!district && lastTerm?.district) district = lastTerm.district;
+  if ((!state || !district) && (rep as any).terms) {
+    let terms = (rep as any).terms;
+    // Handle both old structure (terms.item) and new structure (direct array)
+    if (terms.item && Array.isArray(terms.item)) {
+      terms = terms.item;
+    }
+    if (Array.isArray(terms) && terms.length > 0) {
+      const lastTerm = terms.slice(-1)[0];
+      if (!state && (lastTerm?.stateName || lastTerm?.stateCode)) state = lastTerm.stateName || lastTerm.stateCode;
+      if (!district && lastTerm?.district) district = lastTerm.district;
+    }
   }
 
   let chamber = (rep as any).chamber || '';
@@ -101,23 +108,37 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
       fax: '',
     }];
   }
-  if ((!addresses || addresses.length === 0) && (rep as any).terms && Array.isArray((rep as any).terms.item)) {
-    const lastTerm = (rep as any).terms.item.slice(-1)[0];
-    if (lastTerm && (lastTerm.officeAddress || lastTerm.phoneNumber)) {
-      addresses = [{
-        type: 'Capitol Office',
-        address: lastTerm.officeAddress || '',
-        phone: lastTerm.phoneNumber || '',
-        fax: '',
-      }];
+  if ((!addresses || addresses.length === 0) && (rep as any).terms) {
+    let terms = (rep as any).terms;
+    // Handle both old structure (terms.item) and new structure (direct array)
+    if (terms.item && Array.isArray(terms.item)) {
+      terms = terms.item;
+    }
+    if (Array.isArray(terms) && terms.length > 0) {
+      const lastTerm = terms.slice(-1)[0];
+      if (lastTerm && (lastTerm.officeAddress || lastTerm.phoneNumber)) {
+        addresses = [{
+          type: 'Capitol Office',
+          address: lastTerm.officeAddress || '',
+          phone: lastTerm.phoneNumber || '',
+          fax: '',
+        }];
+      }
     }
   }
 
   let website = rep.website || (rep as any).officialUrl || (rep as any).url || '';
   if (!website && (rep as any).contactInfo && (rep as any).contactInfo.url) website = (rep as any).contactInfo.url;
-  if (!website && (rep as any).terms && Array.isArray((rep as any).terms.item)) {
-    const lastTerm = (rep as any).terms.item.slice(-1)[0];
-    if (lastTerm?.url) website = lastTerm.url;
+  if (!website && (rep as any).terms) {
+    let terms = (rep as any).terms;
+    // Handle both old structure (terms.item) and new structure (direct array)
+    if (terms.item && Array.isArray(terms.item)) {
+      terms = terms.item;
+    }
+    if (Array.isArray(terms) && terms.length > 0) {
+      const lastTerm = terms.slice(-1)[0];
+      if (lastTerm?.url) website = lastTerm.url;
+    }
   }
 
   let image = rep.image || rep.photo || (rep as any).depiction?.imageUrl || 'https://via.placeholder.com/150';

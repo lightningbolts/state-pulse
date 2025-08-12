@@ -74,63 +74,11 @@ export async function GET(request: NextRequest) {
         const currentYear = new Date().getFullYear();
         if (filterChamber === 'Senate') {
           andFilters.push({
-            $or: [
-              // For OpenStates/state reps, match top-level fields
-              { $and: [
-                { 'terms': { $exists: false } },
-                { jurisdiction: 'US Senate' }
-              ] },
-              // For CongressPeople, only include if latest term is Senate and is current
-              { $and: [
-                { 'terms.item': { $exists: true } },
-                { $expr: {
-                  $let: {
-                    vars: {
-                      lastTerm: { $arrayElemAt: ["$terms.item", { $subtract: [ { $size: "$terms.item" }, 1 ] } ] }
-                    },
-                    in: {
-                      $and: [
-                        { $regexMatch: { input: "$$lastTerm.chamber", regex: '^Senate$', options: 'i' } },
-                        { $or: [
-                          { $not: [ { $ifNull: ["$$lastTerm.endYear", false] } ] },
-                          { $gte: ["$$lastTerm.endYear", currentYear] }
-                        ] }
-                      ]
-                    }
-                  }
-                } }
-              ] }
-            ]
+            jurisdiction: 'US Senate'
           });
         } else if (filterChamber === 'House of Representatives') {
           andFilters.push({
-            $or: [
-              // For OpenStates/state reps, match top-level fields
-              { $and: [
-                { 'terms': { $exists: false } },
-                { jurisdiction: 'US House' }
-              ] },
-              // For CongressPeople, only include if latest term is House and is current
-              { $and: [
-                { 'terms.item': { $exists: true } },
-                { $expr: {
-                  $let: {
-                    vars: {
-                      lastTerm: { $arrayElemAt: ["$terms.item", { $subtract: [ { $size: "$terms.item" }, 1 ] } ] }
-                    },
-                    in: {
-                      $and: [
-                        { $regexMatch: { input: "$$lastTerm.chamber", regex: '^House of Representatives$', options: 'i' } },
-                        { $or: [
-                          { $not: [ { $ifNull: ["$$lastTerm.endYear", false] } ] },
-                          { $gte: ["$$lastTerm.endYear", currentYear] }
-                        ] }
-                      ]
-                    }
-                  }
-                } }
-              ] }
-            ]
+            jurisdiction: 'US House'
           });
         }
       } else if (filterChamber) {
@@ -250,8 +198,10 @@ export async function GET(request: NextRequest) {
           const latestTerm = rep.terms[rep.terms.length - 1] || {};
           // Always set a valid id field
           let id = rep.id || '';
-          // Fallback: try to build a composite id if missing or too short
-          if (!id || id.length < 8) {
+          // Fallback: try to build a composite id if missing or invalid
+          // Don't regenerate valid Congressional bioguide IDs (pattern: letter + 6 digits)
+          const isBioguideId = /^[A-Z]\d{6}$/.test(id);
+          if (!id || (!isBioguideId && id.length < 8)) {
             id = [
               (rep as any).firstName || (rep as any).first_name || '',
               (rep as any).lastName || (rep as any).last_name || '',
@@ -277,7 +227,9 @@ export async function GET(request: NextRequest) {
         const firstName = (rep as any).firstName || (rep as any).first_name || '';
         const lastName = (rep as any).lastName || (rep as any).last_name || '';
         const stateVal = (rep as any).state || '';
-        if ((!id || id.length < 8) && firstName && lastName) {
+        // Don't regenerate valid Congressional bioguide IDs (pattern: letter + 6 digits)
+        const isBioguideId = /^[A-Z]\d{6}$/.test(id);
+        if ((!id || (!isBioguideId && id.length < 8)) && firstName && lastName) {
           id = [firstName, lastName, stateVal].join('-');
         }
         return {

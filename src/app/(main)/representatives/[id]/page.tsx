@@ -19,9 +19,15 @@ const fetchRepresentativeData = async (id: string) => {
 };
 
 const getTimeInOffice = (rep: any) => {
-  // Congress: Use earliest startYear in terms.item
-  if (rep?.terms?.item && Array.isArray(rep.terms.item) && rep.terms.item.length > 0) {
-    const startYears = rep.terms.item
+  // Handle both new structure (terms as direct array) and old structure (terms.item)
+  let terms = rep?.terms;
+  if (terms?.item && Array.isArray(terms.item)) {
+    terms = terms.item;
+  }
+  
+  if (Array.isArray(terms) && terms.length > 0) {
+    // For Congress members: Use earliest startYear in terms
+    const startYears = terms
       .map((term: any) => term.startYear)
       .filter((y: any) => typeof y === 'number' && !isNaN(y));
     if (startYears.length > 0) {
@@ -31,7 +37,8 @@ const getTimeInOffice = (rep: any) => {
       return years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : '<1 year';
     }
   }
-  // State: Prefer current_role.start_date, fallback to rep.created_at
+  
+  // State representatives: Prefer current_role.start_date, fallback to rep.created_at
   const startDate = rep?.current_role?.start_date || rep?.created_at;
   if (!startDate) return 'N/A';
   const start = new Date(startDate);
@@ -185,8 +192,12 @@ export default function RepresentativeDetailPage() {
                 {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) && (
                   <span>{typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name}</span>
                 )}
-                {rep.current_role?.district && (
-                  <span>{((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) ? ' - ' : ''}District {rep.current_role.district}</span>
+                {/* Show district for US House reps or state reps */}
+                {(rep.district || rep.current_role?.district) && (
+                  <span>
+                    {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) ? ' - ' : ''}
+                    District {rep.district || rep.current_role?.district}
+                  </span>
                 )}
               </div>
               <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
@@ -196,50 +207,71 @@ export default function RepresentativeDetailPage() {
         <CardContent className="p-4 md:p-6 space-y-6 bg-background">
           <AnimatedSection>
             <section>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Key Details
+              <h3 className="text-lg font-semibold text-foreground flex items-center mb-3">
+                <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Contact Information
               </h3>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {rep.email && (
-                  <a href={`mailto:${rep.email}`} className="text-primary underline font-medium">
-                    {rep.email}
-                  </a>
+              <div className="space-y-2 text-sm">
+                {rep.phone && (
+                  <div className="flex items-center">
+                    <span className="font-medium text-muted-foreground w-20">Phone:</span>
+                    <a href={`tel:${rep.phone}`} className="text-primary hover:underline">
+                      {rep.phone}
+                    </a>
+                  </div>
                 )}
-                {rep.phone && <Badge variant="secondary">Phone: {rep.phone}</Badge>}
+                {rep.email && (
+                  <div className="flex items-center">
+                    <span className="font-medium text-muted-foreground w-20">Email:</span>
+                    <a href={`mailto:${rep.email}`} className="text-primary hover:underline break-all">
+                      {rep.email}
+                    </a>
+                  </div>
+                )}
+                {((rep as any).address || (rep.addresses && rep.addresses[0]?.address)) && (
+                  <div className="flex items-start">
+                    <span className="font-medium text-muted-foreground w-20 flex-shrink-0">Address:</span>
+                    <span className="text-foreground">
+                      {(rep as any).address || rep.addresses?.[0]?.address}
+                    </span>
+                  </div>
+                )}
                 {rep.website && (
-                  <Link href={rep.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    <Badge variant="secondary">Website</Badge>
-                  </Link>
+                  <div className="flex items-center">
+                    <span className="font-medium text-muted-foreground w-20">Website:</span>
+                    <a href={rep.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center">
+                      Official Website <ExternalLink className="ml-1 h-3 w-3" />
+                    </a>
+                  </div>
                 )}
               </div>
             </section>
           </AnimatedSection>
 
-          {(rep as any).terms && (Array.isArray((rep as any).terms) || (rep as any).terms.item) && (
-            <AnimatedSection>
-              <section>
-                <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                  <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Past Terms
-                </h3>
-                <div className="overflow-x-auto rounded-lg bg-muted/50">
-                  <table className="min-w-full text-sm border">
-                    <thead>
-                      <tr className="bg-muted">
-                        <th className="px-3 py-2 text-left">Chamber</th>
-                        <th className="px-3 py-2 text-left">Congress</th>
-                        <th className="px-3 py-2 text-left">Years</th>
-                        <th className="px-3 py-2 text-left">Party</th>
-                        <th className="px-3 py-2 text-left">State</th>
-                        <th className="px-3 py-2 text-left">District</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(Array.isArray((rep as any).terms)
-                        ? (rep as any).terms
-                        : Array.isArray((rep as any).terms.item)
-                          ? (rep as any).terms.item
-                          : [])
-                        .map((term: any, idx: number) => (
+          {(() => {
+            let terms = (rep as any).terms;
+            if (terms?.item && Array.isArray(terms.item)) {
+              terms = terms.item;
+            }
+            return (Array.isArray(terms) && terms.length > 0) ? (
+              <AnimatedSection>
+                <section>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                    <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Past Terms
+                  </h3>
+                  <div className="overflow-x-auto rounded-lg bg-muted/50">
+                    <table className="min-w-full text-sm border">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="px-3 py-2 text-left">Chamber</th>
+                          <th className="px-3 py-2 text-left">Congress</th>
+                          <th className="px-3 py-2 text-left">Years</th>
+                          <th className="px-3 py-2 text-left">Party</th>
+                          <th className="px-3 py-2 text-left">State</th>
+                          <th className="px-3 py-2 text-left">District</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {terms.map((term: any, idx: number) => (
                           <tr key={idx} className="border-t">
                             <td className="px-3 py-2">{term.chamber || '-'}</td>
                             <td className="px-3 py-2">{term.congress || '-'}</td>
@@ -249,12 +281,13 @@ export default function RepresentativeDetailPage() {
                             <td className="px-3 py-2">{term.district || '-'}</td>
                           </tr>
                         ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            </AnimatedSection>
-          )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </AnimatedSection>
+            ) : null;
+          })()}
 
           {(rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0 && (
             <AnimatedSection>
@@ -345,6 +378,126 @@ export default function RepresentativeDetailPage() {
               )}
             </section>
           </AnimatedSection>
+
+          {(() => {
+            let sponsoredLegislation = (rep as any).sponsoredLegislation;
+            if (sponsoredLegislation?.item && Array.isArray(sponsoredLegislation.item)) {
+              sponsoredLegislation = sponsoredLegislation.item;
+            }
+            return (Array.isArray(sponsoredLegislation) && sponsoredLegislation.length > 0) ? (
+              <AnimatedSection>
+                <section>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                    <FileText className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Sponsored Legislation (Congress API)
+                  </h3>
+                  <div className="space-y-2">
+                    {sponsoredLegislation.slice(0, 5).map((bill: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-muted/50 rounded-lg border">
+                        <h4 className="font-medium text-foreground">{bill.number}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">{bill.title}</p>
+                        {bill.introducedDate && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Introduced: {new Date(bill.introducedDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {sponsoredLegislation.length > 5 && (
+                      <p className="text-sm text-muted-foreground">
+                        ... and {sponsoredLegislation.length - 5} more bills
+                      </p>
+                    )}
+                  </div>
+                </section>
+              </AnimatedSection>
+            ) : null;
+          })()}
+
+          {(() => {
+            let cosponsoredLegislation = (rep as any).cosponsoredLegislation;
+            if (cosponsoredLegislation?.item && Array.isArray(cosponsoredLegislation.item)) {
+              cosponsoredLegislation = cosponsoredLegislation.item;
+            }
+            return (Array.isArray(cosponsoredLegislation) && cosponsoredLegislation.length > 0) ? (
+              <AnimatedSection>
+                <section>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                    <FileText className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Cosponsored Legislation (Congress API)
+                  </h3>
+                  <div className="space-y-2">
+                    {cosponsoredLegislation.slice(0, 5).map((bill: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-muted/50 rounded-lg border">
+                        <h4 className="font-medium text-foreground">{bill.number}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">{bill.title}</p>
+                        {bill.introducedDate && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Introduced: {new Date(bill.introducedDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {cosponsoredLegislation.length > 5 && (
+                      <p className="text-sm text-muted-foreground">
+                        ... and {cosponsoredLegislation.length - 5} more bills
+                      </p>
+                    )}
+                  </div>
+                </section>
+              </AnimatedSection>
+            ) : null;
+          })()}
+
+          {(() => {
+            let partyHistory = (rep as any).partyHistory;
+            if (partyHistory?.item && Array.isArray(partyHistory.item)) {
+              partyHistory = partyHistory.item;
+            }
+            return (Array.isArray(partyHistory) && partyHistory.length > 0) ? (
+              <AnimatedSection>
+                <section>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                    <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Party History
+                  </h3>
+                  <div className="overflow-x-auto rounded-lg bg-muted/50">
+                    <table className="min-w-full text-sm border">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="px-3 py-2 text-left">Party</th>
+                          <th className="px-3 py-2 text-left">Start Date</th>
+                          <th className="px-3 py-2 text-left">End Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {partyHistory.map((party: any, idx: number) => (
+                          <tr key={idx} className="border-t">
+                            <td className="px-3 py-2">{party.partyName || party.party || '-'}</td>
+                            <td className="px-3 py-2">{party.startDate ? new Date(party.startDate).toLocaleDateString() : '-'}</td>
+                            <td className="px-3 py-2">{party.endDate ? new Date(party.endDate).toLocaleDateString() : 'Current'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </AnimatedSection>
+            ) : null;
+          })()}
+
+          {(rep as any).birthYear && (
+            <AnimatedSection>
+              <section>
+                <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
+                  <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Personal Information
+                </h3>
+                <div className="text-sm">
+                  <div className="flex items-center">
+                    <span className="font-medium text-muted-foreground w-20">Birth Year:</span>
+                    <span className="text-foreground">{(rep as any).birthYear}</span>
+                  </div>
+                </div>
+              </section>
+            </AnimatedSection>
+          )}
 
           <AnimatedSection>
             <section>

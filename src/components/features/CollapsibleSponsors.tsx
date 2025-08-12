@@ -4,6 +4,7 @@ import {useState} from 'react';
 import {ChevronDown, ChevronUp, Users} from 'lucide-react';
 import {Legislation} from '@/types/legislation';
 import {AnimatedSection} from '@/components/ui/AnimatedSection';
+import Link from 'next/link';
 
 interface CollapsibleSponsorsProps {
     sponsors: Legislation['sponsors'];
@@ -38,7 +39,21 @@ export function CollapsibleSponsors({sponsors}: CollapsibleSponsorsProps) {
                     {sponsors.map(sponsor => (
                         <AnimatedSection key={sponsor.id || sponsor.name}>
                             <li className="text-sm p-2 bg-muted/50 rounded-md">
-                                {sponsor.name} ({sponsor.primary ? 'Primary' : 'Co-sponsor'}) - {sponsor.entityType}
+                                {sponsor.id ? (
+                                    <Link
+                                        href={`/representatives/${
+                                            sponsor.id.replace('/', '_')
+                                        }`}
+                                        className="text-primary hover:underline font-medium"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        {sponsor.name}
+                                    </Link>
+                                ) : (
+                                    sponsor.name
+                                )} {" "}
+                                ({sponsor.primary ? 'Primary' : 'Co-sponsor'}) - {sponsor.entityType}
                             </li>
                         </AnimatedSection>
                     ))}
