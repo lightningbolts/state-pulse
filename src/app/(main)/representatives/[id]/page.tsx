@@ -109,12 +109,17 @@ export default function RepresentativeDetailPage() {
     return () => { mounted = false; };
   }, [id]);
 
-  useEffect(() => {
-    if (rep) {
-      // eslint-disable-next-line no-console
-      // console.log('DEBUG rep:', rep);
-    }
-  }, [rep]);
+  // useEffect(() => {
+  //   if (rep) {
+  //     console.log('DEBUG ID comparison:', {
+  //       urlId: id,
+  //       repId: rep.id,
+  //       rep_id: (rep as any)._id,
+  //       bioguideId: (rep as any).bioguideId,
+  //       name: rep.name
+  //     });
+  //   }
+  // }, [rep, id]);
 
   if (loading) return <LoadingOverlay text="Loading representative details..." smallText="Please wait..." />;
   if (error) return <div className="py-8 text-center text-red-600">{error}</div>;
@@ -411,8 +416,9 @@ export default function RepresentativeDetailPage() {
                         const h = hash % 360;
                         return `hsl(${h}, ${s}%, ${l}%)`;
                       }
-                      const sponsorLink = rep && rep.id && rep.name
-                        ? `/legislation?sponsorId=${encodeURIComponent(rep.id)}&rep=${encodeURIComponent(rep.name)}`
+                      // Use the URL ID (the one in the current page path) for the sponsor link
+                      const sponsorLink = id && rep.name
+                        ? `/legislation?sponsorId=${encodeURIComponent(id)}&rep=${encodeURIComponent(rep.name)}`
                         : '#';
                       return (
                         <Link
