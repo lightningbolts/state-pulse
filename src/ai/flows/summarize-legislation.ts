@@ -47,7 +47,10 @@ const summarizeLegislationPlainEnglishFlow = ai.defineFlow(
     outputSchema: SummarizeLegislationPlainEnglishOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    // const {output} = await prompt(input);
+    const output = {
+      summary: "This is a plain English summary of the legislation."
+    };
     return output!;
   }
 );

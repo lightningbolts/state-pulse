@@ -40,7 +40,10 @@ const summarizeLegislationTweetLengthFlow = ai.defineFlow(
     outputSchema: SummarizeLegislationTweetLengthOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    // const {output} = await prompt(input);
+    const output = {
+      tweetLengthSummary: "This is a tweet-length summary of the legislation."
+    };
     return output!;
   }
 );

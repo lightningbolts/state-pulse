@@ -42,7 +42,10 @@ const summarizeLegislationLegallyDenseFlow = ai.defineFlow(
     outputSchema: SummarizeLegislationLegallyDenseOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    // const {output} = await prompt(input);
+    const output = {
+      summary: "This is a legally dense summary of the bill."
+    };
     return output!;
   }
 );
