@@ -1,24 +1,24 @@
 "use client";
 
-import {Badge} from "@/components/ui/badge";
-import {LoadingOverlay} from "@/components/ui/LoadingOverlay";
-import {Input} from "@/components/ui/input";
-import {Button} from "@/components/ui/button";
-import {Bookmark, MapPin, Plus, Search, X} from "lucide-react";
-import {BookmarkButton, BookmarksContext} from "@/components/features/BookmarkButton";
-import React, {useCallback, useContext, useEffect, useLayoutEffect, useRef, useState} from "react";
-import {useSearchParams, useRouter} from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Bookmark, MapPin, Plus, Search, X } from "lucide-react";
+import { BookmarkButton, BookmarksContext } from "@/components/features/BookmarkButton";
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import {useUser} from "@clerk/nextjs";
-import {STATE_MAP} from "@/types/geo";
-import {AnimatedSection} from "@/components/ui/AnimatedSection";
+import { useUser } from "@clerk/nextjs";
+import { STATE_MAP } from "@/types/geo";
+import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import PolicyUpdateCard from "@/components/features/PolicyUpdateCard";
 
 interface PolicyUpdate {
@@ -44,19 +44,19 @@ interface PolicyUpdate {
 
 // Classification tags (no descriptions)
 const CLASSIFICATIONS = [
-    {label: "All", value: ""},
-    {label: "Bill", value: "bill"},
-    {label: "Proposed bill", value: "proposed bill"},
-    {label: "Resolution", value: "resolution"},
-    {label: "Joint Resolution", value: "joint resolution"},
-    {label: "Concurrent Resolution", value: "concurrent resolution"},
-    {label: "Amendment", value: "amendment"},
-    {label: "House Bill", value: "hr"},
-    {label: "Senate Bill", value: "sr"},
-    {label: "House Resolution", value: "hres"},
-    {label: "Senate Resolution", value: "sres"},
-    {label: "Memorial", value: "memorial"},
-    {label: "Proclamation", value: "proclamation"},
+    { label: "All", value: "" },
+    { label: "Bill", value: "bill" },
+    { label: "Proposed bill", value: "proposed bill" },
+    { label: "Resolution", value: "resolution" },
+    { label: "Joint Resolution", value: "joint resolution" },
+    { label: "Concurrent Resolution", value: "concurrent resolution" },
+    { label: "Amendment", value: "amendment" },
+    { label: "House Bill", value: "hr" },
+    { label: "Senate Bill", value: "sr" },
+    { label: "House Resolution", value: "hres" },
+    { label: "Senate Resolution", value: "sres" },
+    { label: "Memorial", value: "memorial" },
+    { label: "Proclamation", value: "proclamation" },
 ];
 
 let cardNumber = 20;
@@ -87,7 +87,7 @@ async function fetchUpdatesFeed({
     sponsor?: string;
     sponsorId?: string;
 }) {
-    const params = new URLSearchParams({limit: String(limit), skip: String(skip)});
+    const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
     if (search) params.append("search", search);
     if (subject) params.append("subject", subject);
 
@@ -121,7 +121,7 @@ export function PolicyUpdatesFeed() {
     const [classification, setClassification] = useState("");
     const [jurisdictionName, setJurisdictionName] = useState("");
     const [showCongress, setShowCongress] = useState(false);
-    const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({field: 'createdAt', dir: 'desc'});
+    const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
     const [repFilter, setRepFilter] = useState<string>("");
     const [sponsorId, setSponsorId] = useState<string>("");
     const router = useRouter();
@@ -143,9 +143,21 @@ export function PolicyUpdatesFeed() {
         jurisdictionName: string
     } | null>(null);
 
+    // Add a ref to track if the page was reloaded
+    const wasReloaded = useRef(false);
+
+    // On mount, check navigation type to see if it was a reload
+    // useEffect(() => {
+    //     const navigationEntries = performance.getEntriesByType("navigation");
+    //     if (navigationEntries.length > 0 && (navigationEntries[0] as PerformanceNavigationTiming).type === 'reload') {
+    //         console.log('[FEED] Page was reloaded');
+    //         wasReloaded.current = true;
+    //     }
+    // }, []);
+
     // Access bookmark context
-    const {bookmarks, loading: bookmarksLoading} = useContext(BookmarksContext);
-    const {user} = useUser();
+    const { bookmarks, loading: bookmarksLoading } = useContext(BookmarksContext);
+    const { user } = useUser();
 
     // URL parameter handling for state filtering, congress, and rep filtering
     const searchParams = useSearchParams();
@@ -278,6 +290,16 @@ export function PolicyUpdatesFeed() {
     useLayoutEffect(() => {
         if (didRestore.current) return;
 
+        // If the page was reloaded, clear the session storage to force a fresh fetch
+        if (wasReloaded.current) {
+            sessionStorage.removeItem('policyUpdatesFeedState');
+            sessionStorage.removeItem('policyUpdatesFeedScrollY');
+            sessionStorage.removeItem('policyUpdatesFeedSearch');
+            sessionStorage.removeItem('policyUpdatesFeedCustomTags');
+
+            console.log('[FEED] Cleared session storage due to page reload');
+        }
+
         // Check for URL parameters first - these should take precedence
         const stateParam = searchParams.get('state');
         const stateAbbrParam = searchParams.get('stateAbbr');
@@ -292,7 +314,7 @@ export function PolicyUpdatesFeed() {
                 setClassification(state.classification || "");
                 setJurisdictionName(state.jurisdictionName || "");
                 setShowCongress(state.showCongress || false);
-                setSort(state.sort || {field: 'createdAt', dir: 'desc'});
+                setSort(state.sort || { field: 'createdAt', dir: 'desc' });
                 setSkip(state.skip || 0);
                 skipRef.current = state.skip || 0;
                 setSearchInput(state.searchInput || "");
@@ -326,7 +348,7 @@ export function PolicyUpdatesFeed() {
 
         didRestore.current = true;
         hasRestored.current = true;
-        prevDeps.current = {search, subject, classification, sort, jurisdictionName};
+        prevDeps.current = { search, subject, classification, sort, jurisdictionName };
     }, [searchParams]);
 
     // Block the initial fetch until after restore, and only fetch if updates are empty
@@ -526,75 +548,78 @@ export function PolicyUpdatesFeed() {
         <>
             {/* Unified Filter Indicator */}
             {(repFilter || sponsorId || showCongress || jurisdictionName) && (
-              <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="default" className="bg-primary">
-                      {repFilter
-                        ? `Filtered by Representative: ${repFilter}`
-                        : sponsorId
-                          ? `Filtered by Representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
-                          : showCongress
-                            ? "Filtered by U.S. Congress"
-                            : jurisdictionName
-                              ? `Filtered by State: ${jurisdictionName}`
-                              : ""
-                      }
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">
-                      {repFilter
-                        ? `Showing bills sponsored by ${repFilter}`
-                        : sponsorId
-                          ? `Showing bills sponsored by this representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
-                          : showCongress
-                            ? "Showing federal legislation only"
-                            : jurisdictionName
-                              ? `Showing legislation from ${jurisdictionName} only`
-                              : ""}
-                    </span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Reset all filter-related state to default
-                      setRepFilter("");
-                      setSponsorId("");
-                      setJurisdictionName("");
-                      setShowCongress(false);
-                      setUpdates([]);
-                      setSkip(0);
-                      skipRef.current = 0;
-                      setHasMore(true);
-                      setLoading(true);
-                      setSearch("");
-                      setSubject("");
-                      setClassification("");
-                      setSort({field: 'createdAt', dir: 'desc'});
-                      setShowOnlyBookmarked(false);
-                      // Remove all filter params from URL
-                      const params = new URLSearchParams([...searchParams.entries()]);
-                      params.delete('rep');
-                      params.delete('sponsorId');
-                      params.delete('state');
-                      params.delete('stateAbbr');
-                      params.delete('congress');
-                      router.replace(`/legislation?${params.toString()}`);
-                      // Clear sessionStorage so feed resets after reload
-                      sessionStorage.removeItem('policyUpdatesFeedState');
-                      sessionStorage.removeItem('policyUpdatesFeedScrollY');
-                    }}
-                  >
-                    <X className="h-4 w-4 mr-1"/>
-                    Clear Filter
-                  </Button>
+                <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="default" className="bg-primary">
+                                {repFilter
+                                    ? `Filtered by Representative: ${repFilter}`
+                                    : sponsorId
+                                        ? `Filtered by Representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
+                                        : showCongress
+                                            ? "Filtered by U.S. Congress"
+                                            : jurisdictionName
+                                                ? `Filtered by State: ${jurisdictionName}`
+                                                : ""
+                                }
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                                {repFilter
+                                    ? `Showing bills sponsored by ${repFilter}`
+                                    : sponsorId
+                                        ? `Showing bills sponsored by this representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
+                                        : showCongress
+                                            ? "Showing federal legislation only"
+                                            : jurisdictionName
+                                                ? `Showing legislation from ${jurisdictionName} only`
+                                                : ""}
+                            </span>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                // Reset all filter-related state to default
+                                setRepFilter("");
+                                setSponsorId("");
+                                setJurisdictionName("");
+                                setShowCongress(false);
+                                setUpdates([]);
+                                setSkip(0);
+                                skipRef.current = 0;
+                                setHasMore(true);
+                                setLoading(true);
+                                setSearch("");
+                                setSubject("");
+                                setClassification("");
+                                setSort({ field: 'createdAt', dir: 'desc' });
+                                setShowOnlyBookmarked(false);
+                                // Remove all filter params from URL
+                                const params = new URLSearchParams([...searchParams.entries()]);
+                                params.delete('rep');
+                                params.delete('sponsorId');
+                                params.delete('state');
+                                params.delete('stateAbbr');
+                                params.delete('congress');
+                                router.replace(`/legislation?${params.toString()}`);
+                                // Clear sessionStorage so feed resets after reload
+                                sessionStorage.removeItem('policyUpdatesFeedState');
+                                sessionStorage.removeItem('policyUpdatesFeedScrollY');
+                                sessionStorage.removeItem('policyUpdatesFeedSearch');
+                                sessionStorage.removeItem('policyUpdatesFeedCustomTags');
+                                console.log('[FEED] Cleared all filters and session storage');
+                            }}
+                        >
+                            <X className="h-4 w-4 mr-1" />
+                            Clear Filter
+                        </Button>
+                    </div>
                 </div>
-              </div>
             )}
 
             <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
                 <div className="relative flex-grow w-full sm:w-auto flex">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"/>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                         placeholder="Search updates..."
                         className="pl-10 w-full"
@@ -624,7 +649,7 @@ export function PolicyUpdatesFeed() {
                             value={`${sort.field}:${sort.dir}`}
                             onValueChange={val => {
                                 const [field, dir] = val.split(":");
-                                setSort({field, dir: dir as 'asc' | 'desc'});
+                                setSort({ field, dir: dir as 'asc' | 'desc' });
                                 setUpdates([]);
                                 setSkip(0);
                                 skipRef.current = 0;
@@ -643,7 +668,7 @@ export function PolicyUpdatesFeed() {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full sm:w-auto">
-                            <MapPin className="mr-2 h-4 w-4"/>
+                            <MapPin className="mr-2 h-4 w-4" />
                             {showCongress ? "U.S. Congress" : jurisdictionName || "All States"}
                         </Button>
                     </DropdownMenuTrigger>
@@ -692,7 +717,7 @@ export function PolicyUpdatesFeed() {
                         setLoading(true);
                     }}
                 >
-                    <Bookmark className="mr-2 h-4 w-4"/>
+                    <Bookmark className="mr-2 h-4 w-4" />
                     {showOnlyBookmarked ? "Show All" : `Bookmarked (${bookmarksLoading ? '...' : bookmarks.length})`}
                 </Button>
             </div>
@@ -757,7 +782,7 @@ export function PolicyUpdatesFeed() {
                         onClick={() => setShowCustomTagInput(!showCustomTagInput)}
                         className="flex items-center gap-1"
                     >
-                        <Plus className="h-3 w-3"/>
+                        <Plus className="h-3 w-3" />
                         Add Tag
                     </Button>
                 </div>
@@ -860,24 +885,24 @@ export function PolicyUpdatesFeed() {
             {/* Updates Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                 {updates.map((update, idx) => (
-                  <PolicyUpdateCard
-                    key={update.id || idx}
-                    update={update}
-                    idx={idx}
-                    updates={updates}
-                    classification={classification}
-                    subject={subject}
-                    setClassification={setClassification}
-                    setSubject={setSubject}
-                    setUpdates={setUpdates}
-                    setSkip={setSkip}
-                    skipRef={skipRef}
-                    setHasMore={setHasMore}
-                    setLoading={setLoading}
-                  />
+                    <PolicyUpdateCard
+                        key={update.id || idx}
+                        update={update}
+                        idx={idx}
+                        updates={updates}
+                        classification={classification}
+                        subject={subject}
+                        setClassification={setClassification}
+                        setSubject={setSubject}
+                        setUpdates={setUpdates}
+                        setSkip={setSkip}
+                        skipRef={skipRef}
+                        setHasMore={setHasMore}
+                        setLoading={setLoading}
+                    />
                 ))}
             </div>
-            <div ref={loader}/>
+            <div ref={loader} />
             {showLoadingText && loading && updates.length > 0 && (
                 <LoadingOverlay text="Loading more updates..." smallText="Loading..." />
             )}
