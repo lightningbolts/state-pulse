@@ -29,7 +29,6 @@ type ActiveView =
     | "representatives"
     | "posts"
     | "timeline"
-    | "summaries"
     | "civic";
 
 interface MenuItem {
@@ -46,7 +45,7 @@ const menuItems: MenuItem[] = [
     { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },
     { id: "representatives", path: "/representatives", label: "Representatives", icon: Users },
     { id: "posts", path: "/posts", label: "Community Posts", icon: MessageSquare },
-    { id: "summaries", path: "/summaries", label: "AI Summaries", icon: BrainCircuit },
+    // { id: "summaries", path: "/summaries", label: "AI Summaries", icon: BrainCircuit },
     { id: "civic", path: "/civic", label: "Civic Tools", icon: Wrench },
 ];
 
