@@ -1,7 +1,6 @@
-"use client";
 export const dynamic = 'force-dynamic';
-import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import React from "react";
+import { notFound } from "next/navigation";
 import type { Representative } from '@/types/representative';
 import type { Bill } from '@/types/legislation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -10,12 +9,84 @@ import PolicyUpdateCard from '@/components/features/PolicyUpdateCard';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Info, FileText, Tag } from 'lucide-react';
 import Link from 'next/link';
-import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
+import { getRepresentativeById, getBillsSponsoredByRep } from '@/services/representativesService';
+import { PartyBadge } from './PartyBadge';
+import { generateRepresentativeMetadata } from '@/lib/metadata';
+import type { Metadata } from 'next';
 
 const fetchRepresentativeData = async (id: string) => {
-  const res = await fetch(`/api/representatives/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch representative data');
-  return await res.json();
+  try {
+    // Fetch representative data
+    const rep = await getRepresentativeById(id);
+    if (!rep) {
+      return null;
+    }
+    
+    // --- Normalization logic (copied from API endpoint) ---
+    let normalizedRep = rep;
+    try {
+      if ('terms' in rep && Array.isArray((rep as any).terms)) {
+        const terms = (rep as any).terms;
+        const latestTerm = terms[terms.length - 1] || {};
+        let normId = rep.id || '';
+        if (!normId || normId.length < 8) {
+          normId = [
+            (rep as any).firstName || (rep as any).first_name || '',
+            (rep as any).lastName || (rep as any).last_name || '',
+            (rep as any).state || '',
+            latestTerm.chamber || '',
+            latestTerm.startYear || ''
+          ].filter(Boolean).join('-');
+        }
+        normalizedRep = {
+          ...rep,
+          id: normId,
+          office: latestTerm.memberType || '',
+          district: '',
+          photo: (rep as any).depiction?.imageUrl || '',
+          party: ((rep as any).partyHistory && (rep as any).partyHistory[0] && (rep as any).partyHistory[0].partyName)
+            ? (rep as any).partyHistory[0].partyName
+            : ('party' in rep ? (rep as any).party : ''),
+          jurisdiction: 'state' in rep ? (rep as any).state : (latestTerm.stateName || ''),
+          name:
+            (rep as any).directOrderName ||
+            ('name' in rep ? (rep as any).name : '') ||
+            ((rep as any).firstName ? (rep as any).firstName + ' ' : '') + ((rep as any).lastName || ''),
+        };
+      } else {
+        // State rep normalization
+        let normId = rep.id || '';
+        const firstName = (rep as any).firstName || (rep as any).first_name || '';
+        const lastName = (rep as any).lastName || (rep as any).last_name || '';
+        const stateVal = (rep as any).state || '';
+        if ((!normId || normId.length < 8) && firstName && lastName) {
+          normId = [firstName, lastName, stateVal].join('-');
+        }
+        normalizedRep = {
+          ...rep,
+          id: normId,
+        };
+      }
+    } catch (normError) {
+      console.error('[SSR] Normalization error:', normError, rep);
+      throw new Error('Failed to normalize representative data');
+    }
+    
+    // Fetch bills sponsored by this representative (always use canonical rep.id)
+    let bills: Bill[] = [];
+    try {
+      bills = await getBillsSponsoredByRep(rep.id);
+    } catch (billsError) {
+      console.error('[SSR] Bills fetch error:', billsError, normalizedRep);
+      // Don't throw here, just continue with empty bills
+      bills = [];
+    }
+    
+    return { representative: normalizedRep, bills };
+  } catch (error) {
+    console.error('[SSR] Error fetching representative data:', error);
+    return null;
+  }
 };
 
 const getTimeInOffice = (rep: any) => {
@@ -69,16 +140,24 @@ const getTopTopics = (bills: Bill[], count = 3) => {
     .map(([topic]) => topic);
 };
 
-export default function RepresentativeDetailPage() {
-  const params = useParams<{ id?: string }>() ?? {};
-  const id = typeof params === 'object' && params !== null && 'id' in params ? (params as any).id : undefined;
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [rep, setRep] = useState<Representative | null>(null);
-  const [bills, setBills] = useState<Bill[]>([]);
-  const [showAllBills, setShowAllBills] = useState(false);
-  // Party badge hover state
-  const [partyHover, setPartyHover] = useState(false);
+/** Generate rich metadata for the representative detail page */
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const data = await fetchRepresentativeData(params.id);
+  if (!data) {
+    return { title: 'Representative Not Found - StatePulse', description: 'The requested representative could not be found.' };
+  }
+  const rep = data.representative;
+  const roleTitle = rep.current_role?.title || rep.office || '';
+  const jurisdiction = typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name;
+  return generateRepresentativeMetadata(rep.name, roleTitle, jurisdiction);
+}
+
+export default async function RepresentativeDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
 
   // Guard: check if id is a non-empty string
   const isLikelyRepId = typeof id === 'string' && id.length > 0;
@@ -91,39 +170,13 @@ export default function RepresentativeDetailPage() {
     );
   }
 
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    fetchRepresentativeData(id)
-      .then(data => {
-        if (!mounted) return;
-        setRep(data.representative);
-        setBills(data.bills);
-        setLoading(false);
-      })
-      .catch(err => {
-        if (!mounted) return;
-        setError('Failed to load representative data.');
-        setLoading(false);
-      });
-    return () => { mounted = false; };
-  }, [id]);
+  const data = await fetchRepresentativeData(id);
+  
+  if (!data) {
+    notFound();
+  }
 
-  // useEffect(() => {
-  //   if (rep) {
-  //     console.log('DEBUG ID comparison:', {
-  //       urlId: id,
-  //       repId: rep.id,
-  //       rep_id: (rep as any)._id,
-  //       bioguideId: (rep as any).bioguideId,
-  //       name: rep.name
-  //     });
-  //   }
-  // }, [rep, id]);
-
-  if (loading) return <LoadingOverlay text="Loading representative details..." smallText="Please wait..." />;
-  if (error) return <div className="py-8 text-center text-red-600">{error}</div>;
-  if (!rep) return <div className="py-8 text-center text-red-600">Representative not found.</div>;
+  const { representative: rep, bills } = data;
 
   // Section: Normalize data for display
   const timeInOffice = getTimeInOffice(rep);
@@ -161,27 +214,7 @@ export default function RepresentativeDetailPage() {
             <div className="flex-1 min-w-0">
               <div className="flex flex-col items-center justify-center sm:flex-row sm:items-center sm:justify-between gap-2">
                 <CardTitle className="text-2xl md:text-3xl font-bold tracking-tight break-words text-center sm:text-left">{rep.name}</CardTitle>
-                {rep.party && (
-                  <Badge
-                    className="text-white border-black text-base font-semibold px-4 py-1 mt-2 sm:mt-0 sm:ml-4 whitespace-nowrap mx-auto sm:mx-0"
-                    style={{
-                      minWidth: 64,
-                      textAlign: 'center',
-                      backgroundColor: partyHover
-                        ? rep.party.toLowerCase().includes('republican')
-                          ? '#C81E1E' // Red
-                          : rep.party.toLowerCase().includes('democrat')
-                            ? '#1e96ffff' // Blue
-                            : '#222' // Default dark
-                        : '#000',
-                      borderColor: '#000',
-                    }}
-                    onMouseEnter={() => setPartyHover(true)}
-                    onMouseLeave={() => setPartyHover(false)}
-                  >
-                    {rep.party}
-                  </Badge>
-                )}
+                {rep.party && <PartyBadge party={rep.party} />}
               </div>
               <div className="text-primary-foreground/80 text-sm mt-2 break-words text-center sm:text-left">
                 {(() => {
