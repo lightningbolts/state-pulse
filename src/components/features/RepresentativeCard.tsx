@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Mail, ExternalLink } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import { FollowButton } from "@/components/ui/FollowButton";
 import type { Representative } from "@/types/representative";
 
 
@@ -265,9 +266,17 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                     <div className="flex items-center gap-2 flex-wrap">
                       <h5 className="font-semibold text-lg break-words">{normalized.name}</h5>
                     </div>
-                    <Badge variant="outline" className="w-fit mt-1 md:mt-0">
-                      {normalized.party}
-                    </Badge>
+                    <div className="flex items-center gap-2 mt-1 md:mt-0">
+                      <Badge variant="outline" className="w-fit">
+                        {normalized.party}
+                      </Badge>
+                      <FollowButton
+                        repId={normalized.id}
+                        repName={normalized.name}
+                        size="sm"
+                        variant="outline"
+                      />
+                    </div>
                   </div>
                   <p className="text-sm font-medium text-primary mb-2">
                     {roleDisplay}

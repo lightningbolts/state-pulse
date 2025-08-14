@@ -26,6 +26,8 @@ import {Badge} from "@/components/ui/badge";
 import Link from 'next/link';
 import {RelatedLegislation} from "@/types/legislation";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
+import {useFollowedRepresentatives} from "@/hooks/use-follow-representative";
+import RepresentativeCard from "@/components/features/RepresentativeCard";
 
 export function PolicyTracker() {
     const {user, isLoaded, isSignedIn} = useUser();
@@ -44,6 +46,8 @@ export function PolicyTracker() {
     const [relatedLegislation, setRelatedLegislation] = useState<Record<string, RelatedLegislation[]>>({});
     const [loadingLegislation, setLoadingLegislation] = useState<Set<string>>(new Set());
     const {toast} = useToast();
+    const {followedReps, isLoading: isLoadingRepresentatives} = useFollowedRepresentatives();
+
     // Toggle daily email notification for a topic
     const handleToggleNotification = async (topic: string) => {
         if (!isSignedIn) return;
@@ -551,6 +555,55 @@ export function PolicyTracker() {
                                 </div>
                             </TabsContent>
                         </Tabs>
+                    </CardContent>
+                </Card>
+
+                {/* Followed Representatives Section */}
+                <Card className="shadow-lg">
+                    <CardHeader>
+                        <CardTitle className="font-headline text-2xl flex items-center">
+                            Followed Representatives
+                        </CardTitle>
+                        <CardDescription>
+                            Stay updated on legislation sponsored or supported by your followed representatives.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="overflow-hidden">
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="font-semibold text-lg mb-2">
+                                    Your Followed Representatives
+                                </h3>
+                                <p className="text-sm text-muted-foreground mb-4">
+                                    Manage the representatives you follow and receive updates on their
+                                    sponsored legislation.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                {followedReps.length === 0 && (
+                                    <div className="text-muted-foreground text-sm">
+                                        You are not following any representatives yet.
+                                    </div>
+                                )}
+                                {followedReps.map((rep) => (
+                                    <RepresentativeCard
+                                        key={rep.id}
+                                        rep={rep}
+                                        href={`/representatives/${rep.id}`}
+                                    />
+                                ))}
+                            </div>
+
+                            {/*<div className="flex justify-center">*/}
+                            {/*    <Link*/}
+                            {/*        href="/settings"*/}
+                            {/*        className="text-sm text-primary hover:underline"*/}
+                            {/*    >*/}
+                            {/*        Manage followed representatives*/}
+                            {/*    </Link>*/}
+                            {/*</div>*/}
+                        </div>
                     </CardContent>
                 </Card>
             </div>
