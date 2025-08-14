@@ -283,6 +283,40 @@ export function PolicyUpdatesFeed() {
         setHasMore(true);
     }, [searchInput, search, setUpdates]);
 
+    // Add refresh handler to re-fetch feed
+    const handleRefresh = useCallback(async () => {
+        setUpdates([]);
+        setSkip(0);
+        skipRef.current = 0;
+        setHasMore(true);
+        setLoading(true);
+        try {
+            const newUpdates = await fetchUpdatesFeed({
+                skip: 0,
+                limit: 20,
+                search,
+                subject,
+                sortField: sort.field,
+                sortDir: sort.dir,
+                classification,
+                jurisdictionName,
+                showCongress,
+                sponsorId
+            });
+            const filteredUpdates = showOnlyBookmarked
+                ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
+                : newUpdates;
+            setUpdates(filteredUpdates);
+            skipRef.current = filteredUpdates.length;
+            setSkip(filteredUpdates.length);
+            setHasMore(newUpdates.length === 20 && (!showOnlyBookmarked || filteredUpdates.length === 20));
+        } catch (e) {
+            console.error('[FEED] refresh error', e);
+        } finally {
+            setLoading(false);
+        }
+    }, [search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId]);
+
     // --- Seamless state/scroll restore ---
     // Use a ref to block the initial fetch until state/scroll is restored
     const didRestore = useRef(false);
@@ -617,7 +651,7 @@ export function PolicyUpdatesFeed() {
                 </div>
             )}
 
-            <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
+            <div className="mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-center justify-center md:justify-start">
                 <div className="relative flex-grow w-full sm:w-auto flex">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
@@ -719,6 +753,14 @@ export function PolicyUpdatesFeed() {
                 >
                     <Bookmark className="mr-2 h-4 w-4" />
                     {showOnlyBookmarked ? "Show All" : `Bookmarked (${bookmarksLoading ? '...' : bookmarks.length})`}
+                </Button>
+                {/* Refresh Feed button */}
+                <Button
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={handleRefresh}
+                >
+                    Refresh Feed
                 </Button>
             </div>
 
