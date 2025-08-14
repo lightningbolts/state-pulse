@@ -149,7 +149,29 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const rep = data.representative;
   const roleTitle = rep.current_role?.title || rep.office || '';
   const jurisdiction = typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name;
-  return generateRepresentativeMetadata(rep.name, roleTitle, jurisdiction);
+  // Generate base metadata
+  const meta = generateRepresentativeMetadata(rep.name, roleTitle, jurisdiction);
+  // Override default images with representative's photo
+  const imageUrl = rep.image || rep.photo;
+  if (imageUrl) {
+    // Override Open Graph and Twitter images with representative's image
+    meta.openGraph = {
+      ...meta.openGraph,
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: rep.name,
+        }
+      ],
+    };
+    meta.twitter = {
+      ...meta.twitter,
+      images: [imageUrl],
+    };
+  }
+  return meta;
 }
 
 export default async function RepresentativeDetailPage({
