@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { PostCard } from "./PostCard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LinkPreview } from '@/components/ui/LinkPreview';
 
 export function PostsFeed() {
     const [sortBy, setSortBy] = useState('newest');
@@ -350,6 +351,20 @@ export function PostsFeed() {
                     getSortedPosts().map((post) => (
                         <AnimatedSection key={post._id}>
                             <PostCard post={post} onPostDeleted={fetchPosts} onPostUpdated={handlePostUpdated} />
+                            {/* Rich link previews for all URLs in post content */}
+                            {(() => {
+                                // Regex to find URLs in post content
+                                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                                const urls = post.content.match(urlRegex);
+                                if (!urls) return null;
+                                return (
+                                    <div className="space-y-2 mt-2">
+                                        {urls.map((url, idx) => (
+                                            <LinkPreview key={url + idx} url={url} />
+                                        ))}
+                                    </div>
+                                );
+                            })()}
                         </AnimatedSection>
                     ))
                 )}
