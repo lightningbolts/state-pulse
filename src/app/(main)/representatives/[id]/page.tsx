@@ -24,7 +24,7 @@ const getTimeInOffice = (rep: any) => {
   if (terms?.item && Array.isArray(terms.item)) {
     terms = terms.item;
   }
-  
+
   if (Array.isArray(terms) && terms.length > 0) {
     // For Congress members: Use earliest startYear in terms
     const startYears = terms
@@ -37,7 +37,7 @@ const getTimeInOffice = (rep: any) => {
       return years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : '<1 year';
     }
   }
-  
+
   // State representatives: Prefer current_role.start_date, fallback to rep.created_at
   const startDate = rep?.current_role?.start_date || rep?.created_at;
   if (!startDate) return 'N/A';
@@ -188,9 +188,9 @@ export default function RepresentativeDetailPage() {
                   // Check if this is a Congress member and format accordingly
                   const office = rep.office || '';
                   const jurisdiction = typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name || '';
-                  
+
                   // Determine if this is a Congress member
-                  const isCongressMember = jurisdiction === 'US House' || jurisdiction === 'US Senate' || 
+                  const isCongressMember = jurisdiction === 'US House' || jurisdiction === 'US Senate' ||
                                           office.toLowerCase().includes('representative') || office.toLowerCase().includes('senator') ||
                                           ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0);
 
@@ -207,7 +207,7 @@ export default function RepresentativeDetailPage() {
                         if (lastTerm?.district) district = lastTerm.district;
                       }
                     }
-                    
+
                     // Determine chamber
                     let chamber = '';
                     if ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0) {
@@ -218,7 +218,7 @@ export default function RepresentativeDetailPage() {
                         chamber = 'Senate';
                       }
                     }
-                    
+
                     // Fallback to office field or jurisdiction
                     if (!chamber) {
                       if (office.toLowerCase().includes('representative') || jurisdiction === 'US House') {
@@ -227,7 +227,7 @@ export default function RepresentativeDetailPage() {
                         chamber = 'Senate';
                       }
                     }
-                    
+
                     // Format the display
                     if (chamber === 'House') {
                       return district ? `US House - ${district}` : 'US House';
@@ -235,7 +235,7 @@ export default function RepresentativeDetailPage() {
                       return 'US Senate';
                     }
                   }
-                  
+
                   // For non-Congress members, return original office
                   return office;
                 })()}
@@ -574,7 +574,7 @@ export default function RepresentativeDetailPage() {
                 </div>
               )}
             </section>
-          </AnimatedSection>          
+          </AnimatedSection>
         </CardContent>
       </Card>
     </div>
