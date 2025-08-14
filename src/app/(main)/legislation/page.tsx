@@ -3,6 +3,9 @@ import { Suspense } from "react";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import { pageMetadata } from '@/lib/metadata';
+
+export const metadata = pageMetadata.legislation;
 
 export default function UpdatesPage() {
   return (

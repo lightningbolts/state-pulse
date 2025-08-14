@@ -1,4 +1,7 @@
 import { PostsFeed } from "@/components/features/PostsFeed";
+import { pageMetadata } from '@/lib/metadata';
+
+export const metadata = pageMetadata.posts;
 
 export default function PostsPage() {
   return (

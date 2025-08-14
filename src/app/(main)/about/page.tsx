@@ -1,10 +1,7 @@
-import { Metadata } from "next";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import { pageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: "About - StatePulse",
-  description: "Learn about StatePulse's mission to make state and local legislation accessible to everyone.",
-};
+export const metadata = pageMetadata.about;
 
 export default function AboutPage() {
   return (

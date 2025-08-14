@@ -1,5 +1,8 @@
 import { AISummarizationTool } from "@/components/features/AISummarizationTool";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import { pageMetadata } from '@/lib/metadata';
+
+export const metadata = pageMetadata.summaries;
 
 export default function SummariesPage() {
   return (

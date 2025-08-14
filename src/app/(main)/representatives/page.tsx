@@ -3,6 +3,9 @@ import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import RepresentativesFeed from "@/components/features/RepresentativesFeed";
+import { pageMetadata } from '@/lib/metadata';
+
+export const metadata = pageMetadata.representatives;
 
 export default function RepresentativesPage() {
   return (

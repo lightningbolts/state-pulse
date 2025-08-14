@@ -8,7 +8,33 @@ import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
 import { Legislation } from "@/types/legislation";
+import { generateLegislationMetadata } from '@/lib/metadata';
+import type { Metadata } from 'next';
 
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const { id } = await params;
+
+  try {
+    const legislation = await getLegislationById(id);
+    if (!legislation) {
+      return {
+        title: 'Legislation Not Found | StatePulse',
+        description: 'The requested legislation could not be found.',
+      };
+    }
+
+    return generateLegislationMetadata(
+      legislation.title,
+      legislation.identifier,
+      legislation.geminiSummary || `${legislation.title} - Track this bill's progress and view detailed analysis.`
+    );
+  } catch (error) {
+    return {
+      title: 'Legislation Not Found | StatePulse',
+      description: 'The requested legislation could not be found.',
+    };
+  }
+}
 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;

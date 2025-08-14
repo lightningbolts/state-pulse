@@ -1,4 +1,7 @@
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
+import { pageMetadata } from '@/lib/metadata';
+
+export const metadata = pageMetadata.terms;
 
 export default function TermsOfService() {
   return (

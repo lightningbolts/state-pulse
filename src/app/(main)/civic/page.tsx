@@ -3,6 +3,9 @@ import { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Users } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import { pageMetadata } from '@/lib/metadata';
+
+export const metadata = pageMetadata.civic;
 
 export default function CivicPage() {
   return (
