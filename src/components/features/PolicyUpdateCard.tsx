@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { BookmarkButton } from "@/components/features/BookmarkButton";
+import { LinkPreview } from '@/components/ui/LinkPreview';
 
 export interface PolicyUpdate {
   id: string;
@@ -217,6 +218,21 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Rich link preview for main bill link */}
+      {update.openstatesUrl && (
+        <div className="mt-2">
+          <LinkPreview url={update.openstatesUrl} />
+        </div>
+      )}
+      {/* Rich link previews for all source URLs */}
+      {update.sources && update.sources.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {update.sources.map((src, i) => src.url ? (
+            <LinkPreview key={src.url + i} url={src.url} />
+          ) : null)}
+        </div>
+      )}
     </AnimatedSection>
   );
 };
