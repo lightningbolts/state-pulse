@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import RepresentativeCard from '@/components/features/RepresentativeCard';
+import { useFollowedRepresentatives } from '@/hooks/use-follow-representative';
 import type { Representative } from '@/types/representative';
+
 export default function RepresentativesFeed() {
   const [reps, setReps] = useState<Representative[]>([]);
   const [search, setSearch] = useState("");
@@ -28,6 +30,10 @@ export default function RepresentativesFeed() {
   const [congressChamber, setCongressChamber] = useState<"" | "us-house" | "us-senate">("");
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const loader = useRef<HTMLDivElement | null>(null);
+
+  // Get followed representatives once for the entire feed
+  const { followedReps } = useFollowedRepresentatives();
+  const followedRepIds = new Set(followedReps.map(rep => rep.id));
 
   const fetchReps = useCallback(async (reset = false) => {
     setLoading(true);
@@ -183,6 +189,7 @@ export default function RepresentativesFeed() {
             key={rep.id + idx}
             rep={rep}
             href={`/representatives/${rep.id}`}
+            isFollowed={followedRepIds.has(rep.id)}
           />
         ))}
       </div>

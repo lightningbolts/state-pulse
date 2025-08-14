@@ -16,10 +16,11 @@ type RepresentativeCardProps = {
   href?: string;
   suppressDistance?: boolean;
   districtType?: string;
+  isFollowed?: boolean;
 };
 
 
-const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href, suppressDistance, districtType }) => {
+const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href, suppressDistance, districtType, isFollowed }) => {
 
   // --- Robust normalization for both Congress and state reps ---
   let name = rep.name || '';
@@ -275,6 +276,7 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                         repName={normalized.name}
                         size="sm"
                         variant="outline"
+                        isFollowed={isFollowed}
                       />
                     </div>
                   </div>

@@ -4,15 +4,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
 
-export function useFollowRepresentative(repId: string) {
+export function useFollowRepresentative(repId: string, initialIsFollowed?: boolean) {
   const { isSignedIn } = useUser();
   const { toast } = useToast();
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(initialIsFollowed ?? false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check if representative is followed
+  // Check if representative is followed only if initialIsFollowed is not provided
   const checkFollowStatus = useCallback(async () => {
-    if (!isSignedIn || !repId) return;
+    if (!isSignedIn || !repId || initialIsFollowed !== undefined) return;
 
     try {
       const response = await fetch('/api/representatives/followed');
@@ -24,11 +24,15 @@ export function useFollowRepresentative(repId: string) {
     } catch (error) {
       console.error('Error checking follow status:', error);
     }
-  }, [isSignedIn, repId]);
+  }, [isSignedIn, repId, initialIsFollowed]);
 
   useEffect(() => {
-    checkFollowStatus();
-  }, [checkFollowStatus]);
+    if (initialIsFollowed !== undefined) {
+      setIsFollowing(initialIsFollowed);
+    } else {
+      checkFollowStatus();
+    }
+  }, [checkFollowStatus, initialIsFollowed]);
 
   const toggleFollow = useCallback(async () => {
     if (!isSignedIn) {

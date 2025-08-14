@@ -318,7 +318,7 @@ export async function searchLegislationByTopic(topic: string, daysBack: number =
       .filter(term => term.length > 2 && !locationKeywords.includes(term) && !federalKeywords.includes(term))
       .filter(term => !['in', 'of', 'the', 'and', 'or', 'laws', 'law', 'bill', 'bills'].includes(term));
 
-    console.log('Search debug:', { topic, detectedStates, searchTerms });
+    // console.log('Search debug:', { topic, detectedStates, searchTerms });
 
     let docs = [];
 
@@ -368,7 +368,7 @@ export async function searchLegislationByTopic(topic: string, daysBack: number =
         .limit(10)
         .toArray();
 
-      console.log('Specific search results:', docs.length);
+      // console.log('Specific search results:', docs.length);
     }
 
     // Fallback to location-only search if no results

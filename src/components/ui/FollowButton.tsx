@@ -13,6 +13,7 @@ interface FollowButtonProps {
   size?: 'sm' | 'default' | 'lg';
   className?: string;
   showText?: boolean;
+  isFollowed?: boolean; // Add this prop to override API calls
 }
 
 export function FollowButton({
@@ -21,9 +22,10 @@ export function FollowButton({
   variant = 'outline',
   size = 'default',
   className,
-  showText = true
+  showText = true,
+  isFollowed
 }: FollowButtonProps) {
-  const { isFollowing, isLoading, toggleFollow, isSignedIn } = useFollowRepresentative(repId);
+  const { isFollowing, isLoading, toggleFollow, isSignedIn } = useFollowRepresentative(repId, isFollowed);
 
   if (!isSignedIn) {
     return null;
