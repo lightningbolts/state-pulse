@@ -2,24 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { area } from '@turf/area';
 import { length } from '@turf/length';
 import { polygonToLine } from '@turf/polygon-to-line';
+import { convex } from '@turf/convex';
+import { bbox } from '@turf/bbox';
+import { booleanContains } from '@turf/boolean-contains';
+import { buffer } from '@turf/buffer';
 
 /**
- * Calculate Polsby-Popper compactness score for a district
+ * Enhanced Polsby-Popper calculation that accounts for geographic constraints
+ * Includes adjustments for coastlines, state borders, and natural boundaries
+ */
+
+interface CompactnessResult {
+  polsbyPopper: number;
+  convexHullRatio: number;
+  boundaryContext: {
+    hasCoastline: boolean;
+    hasBorder: boolean;
+    naturalBoundaryPercentage: number;
+  };
+  adjustedScore: number;
+}
+
+/**
+ * Calculate basic Polsby-Popper compactness score
  * Formula: PP(D) = 4π * Area(D) / Perimeter(D)²
- * Score ranges from 0 (highly gerrymandered) to 1 (perfectly compact)
  */
 function calculatePolsbyPopperScore(polygon: any): number {
   try {
-    // Calculate area in square meters
     const polygonArea = area(polygon);
-    
-    // Convert polygon to line to calculate perimeter
     const perimeter = polygonToLine(polygon);
     
-    // Calculate total perimeter length in meters
     let totalPerimeter = 0;
     if (perimeter.type === 'FeatureCollection') {
-      // Handle multiple rings (exterior + holes)
       for (const feature of perimeter.features) {
         totalPerimeter += length(feature, { units: 'meters' });
       }
@@ -27,11 +41,8 @@ function calculatePolsbyPopperScore(polygon: any): number {
       totalPerimeter = length(perimeter, { units: 'meters' });
     }
     
-    // Polsby-Popper formula: 4π * Area / Perimeter²
     if (totalPerimeter === 0) return 0;
     const score = (4 * Math.PI * polygonArea) / Math.pow(totalPerimeter, 2);
-    
-    // Ensure score is between 0 and 1
     return Math.min(Math.max(score, 0), 1);
   } catch (error) {
     console.error('Error calculating Polsby-Popper score:', error);
@@ -40,13 +51,156 @@ function calculatePolsbyPopperScore(polygon: any): number {
 }
 
 /**
- * Calculate gerrymandering index for districts
+ * Calculate convex hull ratio (district area / convex hull area)
+ * More tolerant of irregular shapes caused by natural boundaries
+ */
+function calculateConvexHullRatio(polygon: any): number {
+  try {
+    const polygonArea = area(polygon);
+    const hull = convex(polygon);
+    
+    if (!hull) return 0;
+    const hullArea = area(hull);
+    
+    if (hullArea === 0) return 0;
+    return polygonArea / hullArea;
+  } catch (error) {
+    console.error('Error calculating convex hull ratio:', error);
+    return 0;
+  }
+}
+
+/**
+ * Detect if district likely has coastline or natural boundaries
+ * Uses heuristics based on shape characteristics and geographic context
+ */
+function analyzeGeographicContext(polygon: any, allDistricts: any[]): any {
+  try {
+    const districtBbox = bbox(polygon);
+    const [minX, minY, maxX, maxY] = districtBbox;
+    
+    // Heuristics for coastline detection:
+    // 1. Very elongated districts near water
+    // 2. Districts with highly irregular perimeters
+    // 3. Districts at the edge of the dataset (likely coastal states)
+    
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const aspectRatio = Math.max(width, height) / Math.min(width, height);
+    
+    // Check if district is at dataset boundary (likely coastal)
+    const globalBbox = bbox({
+      type: 'FeatureCollection',
+      features: allDistricts
+    });
+    
+    const [globalMinX, globalMinY, globalMaxX, globalMaxY] = globalBbox;
+    const tolerance = 0.01; // Degree tolerance for edge detection
+    
+    const isAtBoundary = (
+      Math.abs(minX - globalMinX) < tolerance ||
+      Math.abs(maxX - globalMaxX) < tolerance ||
+      Math.abs(minY - globalMinY) < tolerance ||
+      Math.abs(maxY - globalMaxY) < tolerance
+    );
+    
+    // Calculate perimeter complexity (indicator of natural boundaries)
+    const perimeter = polygonToLine(polygon);
+    let totalPerimeter = 0;
+    if (perimeter.type === 'FeatureCollection') {
+      for (const feature of perimeter.features) {
+        totalPerimeter += length(feature, { units: 'meters' });
+      }
+    } else {
+      totalPerimeter = length(perimeter, { units: 'meters' });
+    }
+    
+    const polygonArea = area(polygon);
+    const perimeterToAreaRatio = totalPerimeter / Math.sqrt(polygonArea);
+    
+    // Estimate natural boundary percentage
+    let naturalBoundaryPercentage = 0;
+    if (isAtBoundary) naturalBoundaryPercentage += 0.3;
+    if (aspectRatio > 3) naturalBoundaryPercentage += 0.2;
+    if (perimeterToAreaRatio > 0.1) naturalBoundaryPercentage += 0.2;
+    
+    return {
+      hasCoastline: isAtBoundary && (aspectRatio > 2 || perimeterToAreaRatio > 0.08),
+      hasBorder: isAtBoundary,
+      naturalBoundaryPercentage: Math.min(naturalBoundaryPercentage, 1.0),
+      aspectRatio,
+      perimeterToAreaRatio,
+      isAtBoundary
+    };
+  } catch (error) {
+    console.error('Error analyzing geographic context:', error);
+    return {
+      hasCoastline: false,
+      hasBorder: false,
+      naturalBoundaryPercentage: 0,
+      aspectRatio: 1,
+      perimeterToAreaRatio: 0,
+      isAtBoundary: false
+    };
+  }
+}
+
+/**
+ * Calculate enhanced compactness score with geographic adjustments
+ */
+function calculateEnhancedCompactness(polygon: any, allDistricts: any[]): CompactnessResult {
+  const polsbyPopper = calculatePolsbyPopperScore(polygon);
+  const convexHullRatio = calculateConvexHullRatio(polygon);
+  const context = analyzeGeographicContext(polygon, allDistricts);
+  
+  // Adjust score based on geographic constraints
+  let adjustedScore = polsbyPopper;
+  
+  // Apply adjustments for natural boundaries
+  if (context.hasCoastline) {
+    // Coastal districts get a bonus to account for irregular coastlines
+    adjustedScore = adjustedScore + (0.1 * (1 - adjustedScore));
+  }
+  
+  if (context.hasBorder && !context.hasCoastline) {
+    // Border districts (non-coastal) get a smaller adjustment
+    adjustedScore = adjustedScore + (0.05 * (1 - adjustedScore));
+  }
+  
+  // Use convex hull ratio as additional factor for very irregular shapes
+  if (convexHullRatio > 0 && convexHullRatio < 0.5) {
+    // Very irregular shape might indicate natural boundaries
+    const irregularityBonus = 0.05 * context.naturalBoundaryPercentage;
+    adjustedScore = adjustedScore + (irregularityBonus * (1 - adjustedScore));
+  }
+  
+  // Ensure adjusted score doesn't exceed 1
+  adjustedScore = Math.min(adjustedScore, 1.0);
+  
+  return {
+    polsbyPopper,
+    convexHullRatio,
+    boundaryContext: {
+      hasCoastline: context.hasCoastline,
+      hasBorder: context.hasBorder,
+      naturalBoundaryPercentage: context.naturalBoundaryPercentage
+    },
+    adjustedScore
+  };
+}
+/**
+ * Calculate gerrymandering index for districts with geographic context
  * GET /api/dashboard/gerry-index?type=congressional-districts|state-upper-districts|state-lower-districts
+ * 
+ * Query parameters:
+ * - type: District type (required)
+ * - enhanced: Use enhanced calculation with geographic adjustments (default: true)
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const districtType = searchParams.get('type');
+    const useEnhanced = searchParams.get('enhanced') !== 'false'; // Default to true
     
     if (!districtType) {
       return NextResponse.json({ 
@@ -84,36 +238,67 @@ export async function GET(request: NextRequest) {
       }, { status: 404 });
     }
     
-    // Calculate Polsby-Popper scores for each district
+    // Calculate compactness scores for each district
     const gerryIndex: Record<string, number> = {};
+    const detailedResults: Record<string, CompactnessResult> = {};
+    const allFeatures = geoJsonData.features || [];
     
-    if (geoJsonData.features) {
-      for (const feature of geoJsonData.features) {
+    if (allFeatures.length > 0) {
+      for (const feature of allFeatures) {
         if (feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon') {
-          // Get district identifier (could be GEOID, ID, or other property)
+          // Get district identifier
           const districtId = feature.properties?.GEOID || 
                            feature.properties?.ID || 
                            feature.properties?.DISTRICT || 
                            feature.properties?.CD ||
                            feature.properties?.NAME ||
                            feature.id ||
-                           Math.random().toString(36).substr(2, 9); // fallback
+                           Math.random().toString(36).substr(2, 9);
           
-          const score = calculatePolsbyPopperScore(feature);
-          gerryIndex[districtId] = score;
+          if (useEnhanced) {
+            const result = calculateEnhancedCompactness(feature, allFeatures);
+            gerryIndex[districtId] = result.adjustedScore;
+            detailedResults[districtId] = result;
+          } else {
+            const score = calculatePolsbyPopperScore(feature);
+            gerryIndex[districtId] = score;
+          }
         }
       }
     }
     
-    return NextResponse.json({
+    // Calculate statistics
+    const scores = Object.values(gerryIndex);
+    const statistics = {
+      totalDistricts: scores.length,
+      averageScore: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+      minScore: scores.length > 0 ? Math.min(...scores) : 0,
+      maxScore: scores.length > 0 ? Math.max(...scores) : 0,
+      standardDeviation: scores.length > 1 ? Math.sqrt(scores.map(x => Math.pow(x - (scores.reduce((a, b) => a + b, 0) / scores.length), 2)).reduce((a, b) => a + b, 0) / scores.length) : 0
+    };
+    
+    const response: any = {
       success: true,
       districtType,
+      enhanced: useEnhanced,
       scores: gerryIndex,
-      totalDistricts: Object.keys(gerryIndex).length,
-      averageScore: Object.keys(gerryIndex).length > 0 
-        ? Object.values(gerryIndex).reduce((a, b) => a + b, 0) / Object.keys(gerryIndex).length
-        : 0
-    });
+      statistics
+    };
+    
+    // Include detailed results if enhanced calculation was used
+    if (useEnhanced) {
+      response.detailed = detailedResults;
+      
+      // Add geographic context summary
+      const contexts = Object.values(detailedResults);
+      response.geographicSummary = {
+        coastalDistricts: contexts.filter(c => c.boundaryContext.hasCoastline).length,
+        borderDistricts: contexts.filter(c => c.boundaryContext.hasBorder).length,
+        averageNaturalBoundary: contexts.length > 0 ? contexts.reduce((sum, c) => sum + c.boundaryContext.naturalBoundaryPercentage, 0) / contexts.length : 0
+      };
+    }
+    
+    return NextResponse.json(response);
     
   } catch (error) {
     console.error('Gerrymandering index calculation error:', error);

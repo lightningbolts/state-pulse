@@ -718,7 +718,7 @@ export function InteractiveMap() {
                                             </div>
                                         </div>
                                         <p className="text-xs text-muted-foreground">
-                                            Based on Polsby-Popper compactness test. Green = more compact, Red = less compact.
+                                            Based on enhanced Polsby-Popper compactness analysis with geographic adjustments for coastlines and state borders. Green = more compact, Red = less compact.
                                         </p>
                                     </div>
                                 )}
