@@ -167,14 +167,12 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     };
   }, [popupMarker]);
 
-  // Force map repaint when party mapping changes
+  // Force map repaint when party mapping or gerrymandering changes
   React.useEffect(() => {
     const map = mapRef.current?.getMap?.();
-    if (!map || !showPartyAffiliation) return;
+    if (!map || (!showPartyAffiliation && !showGerrymandering)) return;
     
-    // console.log('[DistrictMapGL] Party mapping changed, map should update automatically');
-    
-  }, [fillColorExpression, showPartyAffiliation]);
+  }, [fillColorExpression, showPartyAffiliation, showGerrymandering]);
 
   return (
     <Map
@@ -191,15 +189,15 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
           type="fill"
           paint={{
             'fill-color': fillColorExpression,
-            'fill-opacity': showPartyAffiliation ? 0.3 : 0.08,
+            'fill-opacity': (showPartyAffiliation || showGerrymandering) ? 0.3 : 0.08,
           }}
         />
         <Layer
           id="district-outline"
           type="line"
           paint={{
-            'line-color': showPartyAffiliation ? '#333333' : (color.includes('var(') ? '#2563eb' : color),
-            'line-width': showPartyAffiliation ? 1 : 2,
+            'line-color': (showPartyAffiliation || showGerrymandering) ? '#333333' : (color.includes('var(') ? '#2563eb' : color),
+            'line-width': (showPartyAffiliation || showGerrymandering) ? 1 : 2,
           }}
         />
       </Source>
