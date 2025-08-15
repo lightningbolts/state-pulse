@@ -223,19 +223,96 @@ export async function GET(request: NextRequest) {
     }
     
     // Load the GeoJSON file from public directory
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    const fullPath = path.join(process.cwd(), 'public', filePath);
-    
+    // Handle both local development and production environments
     let geoJsonData;
-    try {
-      const fileContent = await fs.readFile(fullPath, 'utf-8');
-      geoJsonData = JSON.parse(fileContent);
-    } catch (fileError) {
-      console.error('Error reading GeoJSON file:', fileError);
-      return NextResponse.json({ 
-        error: 'District data file not found' 
-      }, { status: 404 });
+    const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+    
+    if (isVercel) {
+      // Skip filesystem attempt in Vercel - go straight to HTTP fetch
+      console.log('Vercel environment detected, using HTTP fetch for GeoJSON');
+      try {
+        const protocol = request.headers.get('x-forwarded-proto') || 'https';
+        const host = request.headers.get('host') || 'localhost:3000';
+        const baseUrl = `${protocol}://${host}`;
+        
+        const fileUrl = `${baseUrl}${filePath}`;
+        console.log('Fetching GeoJSON from:', fileUrl);
+        
+        const response = await fetch(fileUrl, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'StatePulse-API/1.0'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const fileContent = await response.text();
+        geoJsonData = JSON.parse(fileContent);
+        console.log('Successfully fetched GeoJSON via HTTP');
+      } catch (httpError) {
+        console.error('HTTP fetch failed:', httpError);
+        return NextResponse.json({ 
+          error: 'District data file not found in Vercel deployment.',
+          details: {
+            attemptedPath: filePath,
+            environment: 'vercel',
+            host: request.headers.get('host'),
+            error: httpError instanceof Error ? httpError.message : String(httpError)
+          }
+        }, { status: 404 });
+      }
+    } else {
+      // Local development or other environments - try filesystem first, then HTTP fallback
+      try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const fullPath = path.join(process.cwd(), 'public', filePath);
+        
+        const fileContent = await fs.readFile(fullPath, 'utf-8');
+        geoJsonData = JSON.parse(fileContent);
+      } catch (fileError) {
+        console.error('File system access failed, trying HTTP fetch:', fileError);
+        
+        try {
+          const protocol = request.headers.get('x-forwarded-proto') || 
+                          (request.url.includes('localhost') ? 'http' : 'https');
+          const host = request.headers.get('host') || 'localhost:3000';
+          const baseUrl = `${protocol}://${host}`;
+          
+          const fileUrl = `${baseUrl}${filePath}`;
+          console.log('Attempting to fetch GeoJSON from:', fileUrl);
+          
+          const response = await fetch(fileUrl, {
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'StatePulse-API/1.0'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const fileContent = await response.text();
+          geoJsonData = JSON.parse(fileContent);
+          console.log('Successfully fetched GeoJSON via HTTP');
+        } catch (httpError) {
+          console.error('HTTP fetch also failed:', httpError);
+          return NextResponse.json({ 
+            error: 'District data file not found. GeoJSON files may not be properly deployed.',
+            details: {
+              attemptedPath: filePath,
+              environment: process.env.NODE_ENV,
+              host: request.headers.get('host'),
+              fsError: fileError instanceof Error ? fileError.message : String(fileError),
+              httpError: httpError instanceof Error ? httpError.message : String(httpError)
+            }
+          }, { status: 404 });
+        }
+      }
     }
     
     // Calculate compactness scores for each district
