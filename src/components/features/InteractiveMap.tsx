@@ -33,6 +33,19 @@ const PARTY_COLORS: Record<string, string> = {
   'Unknown': '#6b7280' // Gray
 };
 
+// Gerrymandering color scale: Green (low) to Red (high)
+const getGerrymanderingColor = (score: number): string => {
+  // Score ranges from 0 (highly gerrymandered) to 1 (perfectly compact)
+  // We invert the scale so red = high gerrymandering (low score) and green = low gerrymandering (high score)
+  const invertedScore = 1 - score;
+  
+  if (invertedScore >= 0.8) return '#dc2626'; // High gerrymandering - Red
+  if (invertedScore >= 0.6) return '#ea580c'; // Orange-red
+  if (invertedScore >= 0.4) return '#facc15'; // Yellow-orange
+  if (invertedScore >= 0.2) return '#84cc16'; // Yellow-green
+  return '#22c55e'; // Low gerrymandering - Green
+};
+
 // Party normalization function
 const normalizePartyName = (party: string): string => {
   if (!party) return 'Unknown';
@@ -151,6 +164,12 @@ export function InteractiveMap() {
     const [partyDataLoading, setPartyDataLoading] = useState<boolean>(false);
     const [partyDataError, setPartyDataError] = useState<string | null>(null);
     
+    // Gerrymandering state
+    const [showGerrymandering, setShowGerrymandering] = useState<boolean>(false);
+    const [gerryScores, setGerryScores] = useState<Record<string, number>>({});
+    const [gerryDataLoading, setGerryDataLoading] = useState<boolean>(false);
+    const [gerryDataError, setGerryDataError] = useState<string | null>(null);
+    
 
     useEffect(() => {
         setIsClient(true);
@@ -201,22 +220,65 @@ export function InteractiveMap() {
         }
     };
 
+    const fetchDistrictGerryData = async (districtType: string) => {
+        setGerryDataLoading(true);
+        setGerryDataError(null);
+        try {
+            const response = await fetch(`/api/dashboard/gerry-index?type=${districtType}`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch gerrymandering data: ${response.status}`);
+            }
+            const result = await response.json();
+            if (result.success && result.scores) {
+                setGerryScores(result.scores);
+            } else {
+                throw new Error(result.error || 'No gerrymandering data returned');
+            }
+        } catch (error) {
+            console.error('Error fetching gerrymandering data:', error);
+            setGerryDataError(error instanceof Error ? error.message : 'Unknown error');
+            setGerryScores({});
+        } finally {
+            setGerryDataLoading(false);
+        }
+    };
+
     const fetchDistrictPartyData = async (chamber: string) => {
-        // console.log('fetchDistrictPartyData called with chamber:', chamber);
         setPartyDataLoading(true);
         setPartyDataError(null);
+        
+        // Clear existing mapping to ensure fresh state
+        setDistrictPartyMapping({});
+        
         try {
-            const response = await fetch(`/api/dashboard/representatives/${chamber}`);
-            // console.log('API response status:', response.status);
+            // Add cache busting parameter to ensure fresh data
+            const timestamp = Date.now();
+            const url = `/api/dashboard/representatives/${chamber}?_t=${timestamp}`;
+            const response = await fetch(url, {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
             if (!response.ok) {
                 throw new Error(`Failed to fetch representatives: ${response.status}`);
             }
             const result = await response.json();
-            // console.log('API result:', { count: result.representatives?.length });
             if (result.representatives) {
                 // Build district -> party mapping
                 const mapping: Record<string, string> = {};
-                result.representatives.forEach((rep: any) => {
+                
+                // Filter representatives to ensure we only get the correct chamber
+                const expectedChamber = chamber === 'us_house' ? 'House of Representatives' : 
+                                       chamber === 'state_upper' ? 'State Senate' :
+                                       chamber === 'state_lower' ? 'State House' : '';
+                
+                const filteredReps = result.representatives.filter((rep: any) => 
+                    rep.chamber === expectedChamber
+                );
+                
+                filteredReps.forEach((rep: any) => {
                     const party = rep.party || 'Unknown';
                     // Use our normalization function
                     const normalizedParty = normalizePartyName(party);
@@ -226,14 +288,12 @@ export function InteractiveMap() {
                     if (rep.map_boundary?.district) {
                         const districtCode = rep.map_boundary.district;
                         mapping[districtCode] = normalizedParty;
-                        // console.log(`Mapped ${districtCode} -> ${normalizedParty} (from ${party})`);
                     }
                     
                     // Also use the GEOID from map_boundary if available (backup)
                     if (rep.map_boundary?.geoidfq) {
                         const geoid = rep.map_boundary.geoidfq;
                         mapping[geoid] = normalizedParty;
-                        // console.log(`Mapped GEOID ${geoid} -> ${normalizedParty} (from ${party})`);
                     }
                     
                     // For backward compatibility with simple district numbers
@@ -259,6 +319,8 @@ export function InteractiveMap() {
                             'Alaska': '0200',
                             'Delaware': '1000',  
                             'Montana': '3000',
+                            'North Dakota': '3800',
+                            'South Dakota': '4600',
                             'Vermont': '5000',
                             'Wyoming': '5600'
                         };
@@ -266,7 +328,6 @@ export function InteractiveMap() {
                         const geoid = stateToAtLargeGeoid[rep.state];
                         if (geoid) {
                             mapping[geoid] = normalizedParty;
-                            // console.log(`Mapped at-large representative ${rep.name} (${rep.state}) -> ${geoid} -> ${normalizedParty} (from ${party})`);
                         }
                     }
                 });
@@ -277,6 +338,8 @@ export function InteractiveMap() {
                         '0200': 'Alaska',
                         '1000': 'Delaware',  
                         '3000': 'Montana',
+                        '3800': 'North Dakota',
+                        '4600': 'South Dakota',
                         '5000': 'Vermont',
                         '5600': 'Wyoming'
                     };
@@ -284,13 +347,10 @@ export function InteractiveMap() {
                     Object.entries(atLargeStates).forEach(([geoid, stateName]) => {
                         if (!mapping[geoid]) {
                             mapping[geoid] = 'Unknown';
-                            // console.log(`Added fallback mapping for ${stateName} at-large district ${geoid} -> Unknown`);
                         }
                     });
                 }
 
-                // console.log('District party mapping created:', Object.keys(mapping).length, 'mappings');
-                // console.log('Sample mappings:', Object.entries(mapping).slice(0, 15));
                 setDistrictPartyMapping(mapping);
             } else {
                 throw new Error('No representatives data returned');
@@ -304,20 +364,28 @@ export function InteractiveMap() {
         }
     };    // Effect to fetch party data when district map mode is selected and party affiliation is enabled
     useEffect(() => {
-        // console.log('[DEBUG] useEffect triggered:', { mapMode, showPartyAffiliation });
         const isDistrictMode = ['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode);
-        // console.log('[DEBUG] isDistrictMode:', isDistrictMode);
         if (isDistrictMode && showPartyAffiliation) {
             const chamber = DISTRICT_TO_CHAMBER[mapMode];
-            // console.log('[DEBUG] Fetching party data for chamber:', chamber);
             if (chamber) {
+                // Clear existing mapping first
+                setDistrictPartyMapping({});
                 fetchDistrictPartyData(chamber);
             }
         } else {
-            // console.log('[DEBUG] Clearing district party mapping');
             setDistrictPartyMapping({});
         }
     }, [mapMode, showPartyAffiliation]);
+
+    // Effect to fetch gerrymandering data when district map mode is selected and gerrymandering is enabled
+    useEffect(() => {
+        const isDistrictMode = ['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode);
+        if (isDistrictMode && showGerrymandering) {
+            fetchDistrictGerryData(mapMode);
+        } else {
+            setGerryScores({});
+        }
+    }, [mapMode, showGerrymandering]);
 
     const handleStateClick = (stateAbbr: string, coords?: [number, number]) => {
         // console.log('[handleStateClick] Clicked:', stateAbbr, coords);
@@ -538,6 +606,10 @@ export function InteractiveMap() {
                                         onCheckedChange={(checked) => {
                                             console.log('Switch toggled:', checked, 'current mapMode:', mapMode);
                                             setShowPartyAffiliation(checked);
+                                            // Disable gerrymandering when party affiliation is enabled
+                                            if (checked && showGerrymandering) {
+                                                setShowGerrymandering(false);
+                                            }
                                         }}
                                         disabled={partyDataLoading}
                                     />
@@ -578,6 +650,81 @@ export function InteractiveMap() {
                             </div>
                         )}
 
+                        {/* Gerrymandering Toggle - Only show for district modes */}
+                        {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
+                            <div className="space-y-2 md:space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-xs md:text-sm">
+                                            <span className="hidden sm:inline">Gerrymandering Analysis</span>
+                                            <span className="sm:hidden">Gerrymandering</span>
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            <span className="hidden sm:inline">Color districts by compactness (Polsby-Popper test)</span>
+                                            <span className="sm:hidden">Show district compactness</span>
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={showGerrymandering}
+                                        onCheckedChange={(checked) => {
+                                            setShowGerrymandering(checked);
+                                            // Disable party affiliation when gerrymandering is enabled
+                                            if (checked && showPartyAffiliation) {
+                                                setShowPartyAffiliation(false);
+                                            }
+                                        }}
+                                        disabled={gerryDataLoading}
+                                    />
+                                </div>
+                                
+                                {/* Gerrymandering loading/error state */}
+                                {gerryDataLoading && (
+                                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                                        <span>Calculating compactness scores...</span>
+                                    </div>
+                                )}
+                                
+                                {gerryDataError && (
+                                    <div className="text-xs text-red-500">
+                                        Error loading gerrymandering data: {gerryDataError}
+                                    </div>
+                                )}
+                                
+                                {/* Gerrymandering legend - only show when gerrymandering is enabled and data is loaded */}
+                                {showGerrymandering && !gerryDataLoading && Object.keys(gerryScores).length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="font-medium text-xs">Compactness Scale</h5>
+                                        <div className="flex flex-wrap gap-2 text-xs">
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }}></div>
+                                                <span>Compact</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#84cc16' }}></div>
+                                                <span>Moderate</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#facc15' }}></div>
+                                                <span>Low</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ea580c' }}></div>
+                                                <span>Poor</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#dc2626' }}></div>
+                                                <span>Highly Irregular</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Based on Polsby-Popper compactness test. Green = more compact, Red = less compact.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
 
                         {/* Map Container with district overlays */}
                         <div className="relative">
@@ -595,6 +742,9 @@ export function InteractiveMap() {
                                         showPartyAffiliation={showPartyAffiliation}
                                         districtPartyMapping={districtPartyMapping}
                                         partyColors={PARTY_COLORS}
+                                        showGerrymandering={showGerrymandering}
+                                        gerryScores={gerryScores}
+                                        getGerrymanderingColor={getGerrymanderingColor}
                                         popupMarker={districtPopupLatLng ? {
                                             lng: districtPopupLatLng.lng,
                                             lat: districtPopupLatLng.lat,

@@ -42,12 +42,42 @@ function buildChamberQuery(chamberParam: string) {
   if (chamber === 'us_house') {
     return {
       $or: [
+        // Direct chamber match for congressional representatives
+        { chamber: 'House of Representatives' },
+        { chamber: 'House' },
+        { jurisdiction: 'US House' },
+        
+        // Map boundary type match
+        { 'map_boundary.type': 'congressional' },
+        
         // For OpenStates/state reps, match top-level fields
         { $and: [
           { 'terms': { $exists: false } },
           { jurisdiction: 'US House' }
         ] },
-        // For CongressPeople, only include if latest term is House and is current
+        
+        // For CongressPeople with terms array, check latest term
+        { $and: [
+          { 'terms': { $exists: true, $type: 'array' } },
+          { $expr: {
+            $let: {
+              vars: {
+                lastTerm: { $arrayElemAt: ["$terms", { $subtract: [ { $size: "$terms" }, 1 ] } ] }
+              },
+              in: {
+                $and: [
+                  { $regexMatch: { input: "$$lastTerm.chamber", regex: '^House of Representatives$', options: 'i' } },
+                  { $or: [
+                    { $not: [ { $ifNull: ["$$lastTerm.endYear", false] } ] },
+                    { $gte: ["$$lastTerm.endYear", currentYear] }
+                  ] }
+                ]
+              }
+            }
+          } }
+        ] },
+        
+        // Fallback for terms.item structure (if it exists)
         { $and: [
           { 'terms.item': { $exists: true } },
           { $expr: {
