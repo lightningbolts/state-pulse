@@ -9,7 +9,9 @@ const TARGET_PHRASES = [
   'zoom',
   'general assembly',
   'new bill status inquiry',
-  'unicameral legislature'
+  'unicameral legislature',
+  'Desert Regional Center',
+  'capital improvement program'
 ];
 
 async function removeUnwantedSummaries() {
