@@ -224,7 +224,7 @@ export function InteractiveMap() {
         setGerryDataLoading(true);
         setGerryDataError(null);
         try {
-            const response = await fetch(`/api/dashboard/gerry-index?type=${districtType}`);
+            const response = await fetch(`/api/dashboard/gerry-index-optimized?type=${districtType}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch gerrymandering data: ${response.status}`);
             }
