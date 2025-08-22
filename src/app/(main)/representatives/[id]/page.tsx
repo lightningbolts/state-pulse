@@ -1,3 +1,5 @@
+import {Button} from "@/components/ui/button";
+
 export const dynamic = 'force-dynamic';
 import React from "react";
 import { notFound } from "next/navigation";
@@ -7,12 +9,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import PolicyUpdateCard from '@/components/features/PolicyUpdateCard';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Info, FileText, Tag } from 'lucide-react';
+import {ExternalLink, Info, FileText, Tag, MapPin} from 'lucide-react';
 import Link from 'next/link';
 import { getRepresentativeById, getBillsSponsoredByRep } from '@/services/representativesService';
 import { PartyBadge } from './PartyBadge';
 import { generateRepresentativeMetadata } from '@/lib/metadata';
 import type { Metadata } from 'next';
+import { FollowButton } from '@/components/ui/FollowButton';
 
 const fetchRepresentativeData = async (id: string) => {
   try {
@@ -161,8 +164,9 @@ const getTopTopics = (bills: Bill[], count = 3) => {
 };
 
 /** Generate rich metadata for the representative detail page */
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const data = await fetchRepresentativeData(params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const data = await fetchRepresentativeData(id);
   if (!data) {
     return { title: 'Representative Not Found - StatePulse', description: 'The requested representative could not be found.' };
   }
@@ -378,6 +382,8 @@ export default async function RepresentativeDetailPage({
                   </div>
                 )}
               </div>
+              <br/>
+              <FollowButton repId={rep.id} showText />
             </section>
           </AnimatedSection>
 
@@ -496,16 +502,11 @@ export default async function RepresentativeDetailPage({
                         ? `/legislation?sponsorId=${encodeURIComponent(id)}&rep=${encodeURIComponent(rep.name)}`
                         : '#';
                       return (
-                        <Link
-                          href={sponsorLink}
-                          className="inline-block mt-2 px-4 py-2 rounded-lg font-semibold shadow transition-colors text-center"
-                          style={{
-                            background: '#71A3A1',
-                            color: '#fff'
-                          }}
-                        >
-                          View all bills sponsored
-                        </Link>
+                      <Button asChild variant="outline" className="w-full group mt-4">
+                         <Link href={sponsorLink}>
+                           View all bills sponsored
+                         </Link>
+                      </Button>
                       );
                     })()
                   )}
