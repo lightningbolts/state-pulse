@@ -751,7 +751,7 @@ export function InteractiveMap() {
                                             </div>
                                         </div>
                                         <p className="text-xs text-muted-foreground">
-                                            Based on enhanced Polsby-Popper compactness analysis with geographic adjustments for coastlines and state borders. Blue = more compact, Red/Orange = less compact (colorblind-friendly).
+                                            Based on enhanced Polsby-Popper compactness analysis with geographic adjustments for coastlines and state borders. Blue = more compact, Red/Orange = less compact.
                                         </p>
                                     </div>
                                 )}
