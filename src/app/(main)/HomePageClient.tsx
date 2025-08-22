@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, BarChart3, Landmark, Newspaper } from 'lucide-react';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import StatisticsShowcase from './StatisticsShowcase';
+import ImportanceShowcase from './ImportanceShowcase';
 
 import dynamic from 'next/dynamic';
 import { useUser } from '@clerk/nextjs';
@@ -95,6 +96,9 @@ export default function HomePageClient() {
           </div>
         </div>
       </AnimatedSection>
+
+      {/* Importance Showcase Section */}
+      <ImportanceShowcase />
 
       {/* Statistics Showcase Section */}
       <StatisticsShowcase />
