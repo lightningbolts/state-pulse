@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, BarChart3, Landmark, Newspaper } from 'lucide-react';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
-import CarouselShowcase from './CarouselShowcase';
+import StatisticsShowcase from './StatisticsShowcase';
 
 import dynamic from 'next/dynamic';
 import { useUser } from '@clerk/nextjs';
@@ -96,8 +96,8 @@ export default function HomePageClient() {
         </div>
       </AnimatedSection>
 
-      {/* Carousel Showcase Section */}
-      {/*<CarouselShowcase />*/}
+      {/* Statistics Showcase Section */}
+      <StatisticsShowcase />
 
       {/* Parallax Showcase Section */}
       {/* <ParallaxShowcase /> */}
