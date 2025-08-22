@@ -344,6 +344,11 @@ export default async function RepresentativeDetailPage({
         </CardHeader>
         <CardContent className="p-4 md:p-6 space-y-6 bg-background">
           <AnimatedSection>
+            <div className="h-10"> {/* reserve button height to avoid layout shift */}
+              <FollowButton repId={rep.id} showText />
+            </div>
+          </AnimatedSection>
+          <AnimatedSection>
             <section>
               <h3 className="text-lg font-semibold text-foreground flex items-center mb-3">
                 <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Contact Information
@@ -382,8 +387,6 @@ export default async function RepresentativeDetailPage({
                   </div>
                 )}
               </div>
-              <br/>
-              <FollowButton repId={rep.id} showText />
             </section>
           </AnimatedSection>
 
@@ -502,11 +505,13 @@ export default async function RepresentativeDetailPage({
                         ? `/legislation?sponsorId=${encodeURIComponent(id)}&rep=${encodeURIComponent(rep.name)}`
                         : '#';
                       return (
-                      <Button asChild variant="outline" className="w-full group mt-4">
-                         <Link href={sponsorLink}>
-                           View all bills sponsored
-                         </Link>
-                      </Button>
+                          <AnimatedSection>
+                            <Button asChild variant="outline" className="w-full group mt-4">
+                               <Link href={sponsorLink}>
+                                 View all bills sponsored
+                               </Link>
+                            </Button>
+                          </AnimatedSection>
                       );
                     })()
                   )}
