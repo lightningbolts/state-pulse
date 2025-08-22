@@ -4,6 +4,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
 
+// Memoize followed IDs fetch across hook instances
+let followedRepIdsPromise: Promise<string[]> | null = null;
+const getFollowedRepIds = async (): Promise<string[]> => {
+  if (!followedRepIdsPromise) {
+    followedRepIdsPromise = fetch('/api/representatives/followed')
+      .then(response => response.ok ? response.json() : { representatives: [] })
+      .then(data => data.representatives.map((rep: any) => rep.id))
+      .catch(error => {
+        console.error('Error fetching followed representatives:', error);
+        return [];
+      });
+  }
+  return followedRepIdsPromise;
+};
+
 export function useFollowRepresentative(repId: string, initialIsFollowed?: boolean) {
   const { isSignedIn } = useUser();
   const { toast } = useToast();
@@ -15,12 +30,8 @@ export function useFollowRepresentative(repId: string, initialIsFollowed?: boole
     if (!isSignedIn || !repId || initialIsFollowed !== undefined) return;
 
     try {
-      const response = await fetch('/api/representatives/followed');
-      if (response.ok) {
-        const data = await response.json();
-        const followedRepIds = data.representatives.map((rep: any) => rep.id);
-        setIsFollowing(followedRepIds.includes(repId));
-      }
+      const followedIds = await getFollowedRepIds();
+      setIsFollowing(followedIds.includes(repId));
     } catch (error) {
       console.error('Error checking follow status:', error);
     }
@@ -62,7 +73,13 @@ export function useFollowRepresentative(repId: string, initialIsFollowed?: boole
             : "You are now following this representative.",
         });
       } else {
-        throw new Error('Failed to update follow status');
+        console.error('Failed to update follow status', response);
+        toast({
+          title: "Error",
+          description: "Failed to update follow status. Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
