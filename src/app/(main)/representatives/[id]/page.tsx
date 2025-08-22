@@ -22,6 +22,27 @@ const fetchRepresentativeData = async (id: string) => {
       return null;
     }
     
+    // Helper function to extract party information (consistent with API)
+    const extractPartyInfo = (rep: any): string => {
+      if (rep.party) return rep.party;
+      if (rep.current_role?.party) return rep.current_role.party;
+      if (rep.extras?.party) return rep.extras.party;
+      if (rep.partyHistory && Array.isArray(rep.partyHistory) && rep.partyHistory.length > 0) {
+        return rep.partyHistory[0].partyName;
+      }
+      if (rep.terms && Array.isArray(rep.terms) && rep.terms.length > 0) {
+        const latestTerm = rep.terms[rep.terms.length - 1];
+        if (latestTerm.partyName) return latestTerm.partyName;
+        if (latestTerm.party) return latestTerm.party;
+      }
+      if (rep.terms?.item && Array.isArray(rep.terms.item) && rep.terms.item.length > 0) {
+        const latestTerm = rep.terms.item[rep.terms.item.length - 1];
+        if (latestTerm.partyName) return latestTerm.partyName;
+        if (latestTerm.party) return latestTerm.party;
+      }
+      return 'Unknown';
+    };
+
     // --- Normalization logic (copied from API endpoint) ---
     let normalizedRep = rep;
     try {
@@ -44,9 +65,7 @@ const fetchRepresentativeData = async (id: string) => {
           office: latestTerm.memberType || '',
           district: '',
           photo: (rep as any).depiction?.imageUrl || '',
-          party: ((rep as any).partyHistory && (rep as any).partyHistory[0] && (rep as any).partyHistory[0].partyName)
-            ? (rep as any).partyHistory[0].partyName
-            : ('party' in rep ? (rep as any).party : ''),
+          party: extractPartyInfo(rep),
           jurisdiction: 'state' in rep ? (rep as any).state : (latestTerm.stateName || ''),
           name:
             (rep as any).directOrderName ||
@@ -65,6 +84,7 @@ const fetchRepresentativeData = async (id: string) => {
         normalizedRep = {
           ...rep,
           id: normId,
+          party: extractPartyInfo(rep), // Use consistent party extraction
         };
       }
     } catch (normError) {

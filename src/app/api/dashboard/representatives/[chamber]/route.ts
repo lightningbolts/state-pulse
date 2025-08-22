@@ -143,6 +143,28 @@ function buildChamberQuery(chamberParam: string) {
   };
 }
 
+// Helper function to extract party information from representative data
+function extractPartyInfo(rep: any): string {
+  // Try multiple possible party fields in order of preference
+  if (rep.party) return rep.party;
+  if (rep.current_role?.party) return rep.current_role.party;
+  if (rep.extras?.party) return rep.extras.party;
+  if (rep.partyHistory && Array.isArray(rep.partyHistory) && rep.partyHistory.length > 0) {
+    return rep.partyHistory[0].partyName;
+  }
+  if (rep.terms && Array.isArray(rep.terms) && rep.terms.length > 0) {
+    const latestTerm = rep.terms[rep.terms.length - 1];
+    if (latestTerm.partyName) return latestTerm.partyName;
+    if (latestTerm.party) return latestTerm.party;
+  }
+  if (rep.terms?.item && Array.isArray(rep.terms.item) && rep.terms.item.length > 0) {
+    const latestTerm = rep.terms.item[rep.terms.item.length - 1];
+    if (latestTerm.partyName) return latestTerm.partyName;
+    if (latestTerm.party) return latestTerm.party;
+  }
+  return 'Unknown';
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ chamber: string }> }
@@ -198,7 +220,21 @@ export async function GET(
     }
     
     const reps = await repsCollection.find(query).toArray();
-    return NextResponse.json({ representatives: reps });
+
+    // Process representatives to ensure party information is available
+    const processedReps = reps.map(rep => {
+      const party = extractPartyInfo(rep);
+      return {
+        ...rep,
+        party,
+        // Ensure chamber is properly set for filtering
+        chamber: rep.chamber || (rep.current_role?.org_classification === 'upper' ? 'State Senate' :
+                                rep.current_role?.org_classification === 'lower' ? 'State House' :
+                                rep.chamber)
+      };
+    });
+
+    return NextResponse.json({ representatives: processedReps });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
