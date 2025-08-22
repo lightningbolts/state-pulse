@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic';
 import { useUser } from '@clerk/nextjs';
 const ParallaxShowcase = dynamic(() => import('./ParallaxShowcase'), { ssr: false });
 const MapShowcase = dynamic(() => import('./MapShowcase'), { ssr: false });
+const ExamplesShowcase = dynamic(() => import('./ExamplesShowcase'), { ssr: false });
 
 export default function HomePageClient() {
   const { isSignedIn } = useUser();
@@ -103,6 +104,9 @@ export default function HomePageClient() {
 
       {/* Statistics Showcase Section */}
       <StatisticsShowcase />
+
+      {/* Examples Showcase Section */}
+      <ExamplesShowcase />
 
       {/* Importance Showcase Section */}
       <ImportanceShowcase />

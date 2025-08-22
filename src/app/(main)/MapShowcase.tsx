@@ -105,24 +105,110 @@ export default function MapShowcase() {
 
     if (!isClient) {
         return (
-            <AnimatedSection className="py-20 px-6 md:px-10">
+            <AnimatedSection className="py-20 px-6 md:px-10 bg-muted/30">
                 <div className="container mx-auto">
-                    <Card className="shadow-lg">
-                        <CardHeader className="text-center">
-                            <CardTitle className="text-3xl font-bold mb-4">Legislative Activity Across America</CardTitle>
-                            <CardDescription>
-                                Explore real-time legislative data and trends from all 50 states
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[400px] w-full rounded-md overflow-hidden border flex items-center justify-center bg-muted">
-                                <div className="flex items-center space-x-2">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                                    <span>Loading map...</span>
+                    <div className="text-center mb-12">
+                        <h2 className="text-2xl md:text-4xl font-bold mb-4 tracking-tight">
+                            <span className="hidden sm:inline">Legislative Activity Across America</span>
+                            <span className="sm:hidden">Legislative Activity</span>
+                        </h2>
+                        <p className="text-muted-foreground text-sm md:text-lg mb-8 max-w-2xl mx-auto leading-relaxed">
+                            <span className="hidden sm:inline">Explore real-time legislative data and trends from all 50 states. Click on any state to see detailed information.</span>
+                            <span className="sm:hidden">Explore legislative data from all 50 states. Tap any state for details.</span>
+                        </p>
+                    </div>
+
+                    <Card className="shadow-xl mb-8">
+                        <CardContent className="p-3 md:p-6">
+                            <div className="relative">
+                                <div className="h-[250px] sm:h-[350px] md:h-[400px] w-full rounded-md overflow-hidden border relative">
+                                    {/* Blurred background map image */}
+                                    <div
+                                        className="absolute inset-0 bg-cover bg-center filter blur-sm opacity-30"
+                                        style={{
+                                            backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDgwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNDAwIiBmaWxsPSIjZjhmOWZhIi8+CjxwYXRoIGQ9Ik0xMDAgMTAwIEw3MDAgMTAwIEw3MDAgMzAwIEwxMDAgMzAwIFoiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Q5ZDlkOSIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxjaXJjbGUgY3g9IjIwMCIgY3k9IjE1MCIgcj0iMTAiIGZpbGw9IiM2MzY2ZjEiLz4KPGNpcmNsZSBjeD0iMzAwIiBjeT0iMTgwIiByPSIxNSIgZmlsbD0iIzYzNjZmMSIvPgo8Y2lyY2xlIGN4PSI0MDAiIGN5PSIxNDAiIHI9IjEyIiBmaWxsPSIjNjM2NmYxIi8+CjxjaXJjbGUgY3g9IjUwMCIgY3k9IjE2MCIgcj0iOCIgZmlsbD0iIzYzNjZmMSIvPgo8Y2lyY2xlIGN4PSI2MDAiIGN5PSIyMDAiIHI9IjE4IiBmaWxsPSIjNjM2NmYxIi8+Cjx0ZXh0IHg9IjQwMCIgeT0iNTAiIGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VW5pdGVkIFN0YXRlczwvdGV4dD4KPHN2Zz4K')"
+                                        }}
+                                    ></div>
+
+                                    {/* Loading overlay */}
+                                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                                        <div className="flex flex-col items-center space-y-3">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                            <span className="text-sm text-muted-foreground">Loading legislative data...</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Legend placeholder */}
+                                <div className="mt-3 md:mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 text-xs text-muted-foreground opacity-50">
+                                    <div className="flex items-center space-x-2 sm:space-x-4 overflow-x-auto">
+                                        <div className="flex items-center space-x-1 flex-shrink-0">
+                                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary"></div>
+                                            <span className="whitespace-nowrap">
+                                                <span className="hidden sm:inline">High Activity</span>
+                                                <span className="sm:hidden">High</span>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center space-x-1 flex-shrink-0">
+                                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/50"></div>
+                                            <span className="whitespace-nowrap">
+                                                <span className="hidden sm:inline">Medium Activity</span>
+                                                <span className="sm:hidden">Medium</span>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center space-x-1 flex-shrink-0">
+                                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/20"></div>
+                                            <span className="whitespace-nowrap">
+                                                <span className="hidden sm:inline">Low Activity</span>
+                                                <span className="sm:hidden">Low</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-center sm:text-right">
+                                        <span className="hidden sm:inline">Loading map data...</span>
+                                        <span className="sm:hidden">Loading...</span>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Loading skeleton for Quick Stats */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
+                        <Card className="animate-pulse">
+                            <CardContent className="p-4 md:p-6 text-center">
+                                <div className="flex items-center justify-center mb-2">
+                                    <div className="h-6 w-6 md:h-8 md:w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                </div>
+                                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mx-auto"></div>
+                            </CardContent>
+                        </Card>
+                        <Card className="animate-pulse">
+                            <CardContent className="p-4 md:p-6 text-center">
+                                <div className="flex items-center justify-center mb-2">
+                                    <div className="h-6 w-6 md:h-8 md:w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                </div>
+                                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mx-auto"></div>
+                            </CardContent>
+                        </Card>
+                        <Card className="animate-pulse">
+                            <CardContent className="p-4 md:p-6 text-center">
+                                <div className="flex items-center justify-center mb-2">
+                                    <div className="h-6 w-6 md:h-8 md:w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                                </div>
+                                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mx-auto"></div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Call to Action skeleton */}
+                    <div className="text-center">
+                        <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-lg w-64 mx-auto mb-4 animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-96 max-w-full mx-auto animate-pulse"></div>
+                    </div>
                 </div>
             </AnimatedSection>
         );
@@ -150,14 +236,7 @@ export default function MapShowcase() {
                     <CardContent className="p-3 md:p-6">
                         <div className="relative">
                             <div className="h-[250px] sm:h-[350px] md:h-[400px] w-full rounded-md overflow-hidden border">
-                                {loading ? (
-                                    <div className="flex items-center justify-center h-full bg-muted">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                                            <span>Loading legislative data...</span>
-                                        </div>
-                                    </div>
-                                ) : error ? (
+                                {error ? (
                                     <div className="flex items-center justify-center h-full bg-muted">
                                         <span className="text-red-500">{error}</span>
                                     </div>
@@ -172,6 +251,16 @@ export default function MapShowcase() {
                                         }
                                         interactiveLayerIds={[]}
                                     >
+                                        {/* Loading overlay when data is still loading */}
+                                        {loading && (
+                                            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
+                                                <div className="flex flex-col items-center space-y-3">
+                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                                    <span className="text-sm text-muted-foreground">Loading legislative data...</span>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {Object.entries(stateStats).map(([abbr, state]) => {
                                             const { color, size } = memoizedMarkers[abbr] || { color: '#e0e0e0', size: 15 };
                                             const coords: [number, number] = [
@@ -383,7 +472,7 @@ export default function MapShowcase() {
                         </Link>
                     </Button>
                     <p className="text-xs md:text-sm text-muted-foreground mt-4 px-4">
-                        <span className="hidden sm:inline">Discover congressional districts, party affiliations, gerrymandering analysis, and more</span>
+                        <span className="hidden sm:inline">Discover congressional districts, party affiliations, gerrymandering analysis, and more.</span>
                         <span className="sm:hidden">Discover districts, party data, and more</span>
                     </p>
                 </div>
