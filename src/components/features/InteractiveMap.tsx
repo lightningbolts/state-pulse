@@ -33,17 +33,50 @@ const PARTY_COLORS: Record<string, string> = {
   'Unknown': '#6b7280' // Gray
 };
 
-// Gerrymandering color scale: Green (low) to Red (high)
+// This avoids red-green combinations and uses colors that are distinguishable for all types of color vision
 const getGerrymanderingColor = (score: number): string => {
   // Score ranges from 0 (highly gerrymandered) to 1 (perfectly compact)
-  // We invert the scale so red = high gerrymandering (low score) and green = low gerrymandering (high score)
+  // We invert the scale so orange = high gerrymandering (low score) and blue = low gerrymandering (high score)
+  const invertedScore = 1 - score;
+
+  // Adjusted thresholds for better distribution and contrast
+  // Most districts will fall in the middle ranges, so we spread them out more
+  if (invertedScore >= 0.7) return '#d93706'; // Irregular Shape
+  if (invertedScore >= 0.55) return '#f5ce0b'; // Less Compact
+  if (invertedScore >= 0.4) return '#8cfb24'; // Moderate
+  if (invertedScore >= 0.25) return '#60e8fa'; // Compact
+  return '#3b82f6'; // Very Compact
+};
+
+// Get gerrymandering color with pattern information for enhanced accessibility
+const getGerrymanderingColorWithPattern = (score: number): { color: string; pattern: string; intensity: string } => {
   const invertedScore = 1 - score;
   
-  if (invertedScore >= 0.8) return '#dc2626'; // High gerrymandering - Red
-  if (invertedScore >= 0.6) return '#ea580c'; // Orange-red
-  if (invertedScore >= 0.4) return '#facc15'; // Yellow-orange
-  if (invertedScore >= 0.2) return '#84cc16'; // Yellow-green
-  return '#22c55e'; // Low gerrymandering - Green
+  if (invertedScore >= 0.8) return {
+    color: '#d97706',
+    pattern: 'diagonal-stripes',
+    intensity: 'very-high'
+  };
+  if (invertedScore >= 0.6) return {
+    color: '#f59e0b',
+    pattern: 'dots',
+    intensity: 'high'
+  };
+  if (invertedScore >= 0.4) return {
+    color: '#fbbf24',
+    pattern: 'solid',
+    intensity: 'medium'
+  };
+  if (invertedScore >= 0.2) return {
+    color: '#60a5fa',
+    pattern: 'solid',
+    intensity: 'low'
+  };
+  return {
+    color: '#3b82f6',
+    pattern: 'solid',
+    intensity: 'very-low'
+  };
 };
 
 // Party normalization function
@@ -697,28 +730,28 @@ export function InteractiveMap() {
                                         <h5 className="font-medium text-xs">Compactness Scale</h5>
                                         <div className="flex flex-wrap gap-2 text-xs">
                                             <div className="flex items-center space-x-1">
-                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }}></div>
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }}></div>
+                                                <span>Very Compact</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#60e8fa' }}></div>
                                                 <span>Compact</span>
                                             </div>
                                             <div className="flex items-center space-x-1">
-                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#84cc16' }}></div>
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#8cfb24' }}></div>
                                                 <span>Moderate</span>
                                             </div>
                                             <div className="flex items-center space-x-1">
-                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#facc15' }}></div>
-                                                <span>Low</span>
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f5ce0b' }}></div>
+                                                <span>Less Compact</span>
                                             </div>
                                             <div className="flex items-center space-x-1">
-                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ea580c' }}></div>
-                                                <span>Poor</span>
-                                            </div>
-                                            <div className="flex items-center space-x-1">
-                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#dc2626' }}></div>
-                                                <span>Highly Irregular</span>
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#d93706' }}></div>
+                                                <span>Irregular Shape</span>
                                             </div>
                                         </div>
                                         <p className="text-xs text-muted-foreground">
-                                            Based on enhanced Polsby-Popper compactness analysis with geographic adjustments for coastlines and state borders. Green = more compact, Red = less compact.
+                                            Based on enhanced Polsby-Popper compactness analysis with geographic adjustments for coastlines and state borders. Blue = more compact, Red/Orange = less compact (colorblind-friendly).
                                         </p>
                                     </div>
                                 )}
