@@ -135,7 +135,7 @@ export default function StatisticsShowcase() {
                     {/* Legislation Statistics */}
                     <AnimatedSection>
                         <Card
-                            className="overflow-hidden shadow-xl bg-white dark:bg-slate-800 border-0 hover:shadow-2xl transition-shadow duration-300">
+                            className="overflow-hidden shadow-xl bg-white dark:bg-slate-800 border-0 hover:shadow-2xl hover:-translate-y-1 active:translate-y-0 transition-all duration-300">
                             <CardHeader className="bg-blue-50 dark:bg-blue-950/20 pb-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
@@ -214,7 +214,7 @@ export default function StatisticsShowcase() {
                     {/* Representatives Statistics */}
                     <AnimatedSection>
                         <Card
-                            className="overflow-hidden shadow-xl bg-white dark:bg-slate-800 border-0 hover:shadow-2xl transition-shadow duration-300">
+                            className="overflow-hidden shadow-xl bg-white dark:bg-slate-800 border-0 hover:shadow-2xl hover:-translate-y-1 active:translate-y-0 transition-all duration-300">
                             <CardHeader className="bg-green-50 dark:bg-green-950/20 pb-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
@@ -289,7 +289,7 @@ export default function StatisticsShowcase() {
                 {/* Platform Overview Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                     <AnimatedSection>
-                        <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+                        <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0 transition-all duration-300">
                             <div className="text-2xl font-bold text-primary mb-2">
                                 {formatNumber((stats?.legislation.total || 0) + (stats?.posts.total || 0))}
                             </div>
@@ -298,7 +298,7 @@ export default function StatisticsShowcase() {
                     </AnimatedSection>
 
                     <AnimatedSection>
-                        <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+                        <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0 transition-all duration-300">
                             <div className="text-2xl font-bold text-primary mb-2">
                                 {formatNumber(stats?.jurisdictions || 52)}
                             </div>
@@ -307,7 +307,7 @@ export default function StatisticsShowcase() {
                     </AnimatedSection>
 
                     <AnimatedSection>
-                        <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+                        <div className="text-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0 transition-all duration-300">
                             <div className="text-2xl font-bold text-primary mb-2">
                                 {formatNumber(stats?.legislation.daily || 0)}
                             </div>

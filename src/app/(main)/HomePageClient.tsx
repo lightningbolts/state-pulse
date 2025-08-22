@@ -11,6 +11,7 @@ import ImportanceShowcase from './ImportanceShowcase';
 import dynamic from 'next/dynamic';
 import { useUser } from '@clerk/nextjs';
 const ParallaxShowcase = dynamic(() => import('./ParallaxShowcase'), { ssr: false });
+const MapShowcase = dynamic(() => import('./MapShowcase'), { ssr: false });
 
 export default function HomePageClient() {
   const { isSignedIn } = useUser();
@@ -97,11 +98,14 @@ export default function HomePageClient() {
         </div>
       </AnimatedSection>
 
-      {/* Importance Showcase Section */}
-      <ImportanceShowcase />
+      {/* Map Showcase Section */}
+      <MapShowcase />
 
       {/* Statistics Showcase Section */}
       <StatisticsShowcase />
+
+      {/* Importance Showcase Section */}
+      <ImportanceShowcase />
 
       {/* Parallax Showcase Section */}
       {/* <ParallaxShowcase /> */}
