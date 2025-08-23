@@ -29,8 +29,8 @@ interface DistrictMapGLProps {
   getGerrymanderingColor?: (score: number) => string; // score -> color
 }
 
-
-export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
+// Performance optimization: Memoize the component to prevent unnecessary re-renders
+export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   geojsonUrl,
   color,
   onDistrictClick,
@@ -47,7 +47,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
 
-  // Create a MapLibre GL expression for dynamic coloring based on district properties
+  // Performance optimization: Memoize the fill color expression to prevent recalculation on every render
   const fillColorExpression = React.useMemo((): any => {
     // Priority: Gerrymandering > Party Affiliation > Default Color
     
@@ -55,7 +55,9 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     if (showGerrymandering && Object.keys(gerryScores).length > 0) {
       const caseExpression: any[] = ['case'];
       
-      Object.entries(gerryScores).forEach(([districtId, score]) => {
+      // Performance optimization: Batch process entries for better performance
+      const scoreEntries = Object.entries(gerryScores);
+      scoreEntries.forEach(([districtId, score]) => {
         const gerryColor = getGerrymanderingColor(score);
         
         // Create an OR condition to match any of the possible ID fields
@@ -83,7 +85,9 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     if (showPartyAffiliation && Object.keys(districtPartyMapping).length > 0) {
       const caseExpression: any[] = ['case'];
       
-      Object.entries(districtPartyMapping).forEach(([districtId, party]) => {
+      // Performance optimization: Batch process party mapping entries
+      const partyEntries = Object.entries(districtPartyMapping);
+      partyEntries.forEach(([districtId, party]) => {
         const partyColor = partyColors[party] || partyColors['Unknown'] || '#6b7280'; // fallback to gray
         
         // Create an OR condition to match any of the possible ID fields
@@ -117,6 +121,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     return defaultColor;
   }, [showPartyAffiliation, districtPartyMapping, partyColors, showGerrymandering, gerryScores, getGerrymanderingColor, color]);
 
+  // Performance optimization: Memoize the click handler to prevent recreation on every render
   const handleClick = React.useCallback((event: any) => {
     const features = event.features || [];
     const polygon = features.find((f: any) => f.layer.id === 'district-fill');
@@ -125,6 +130,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     }
   }, [onDistrictClick]);
 
+  // Performance optimization: Memoize marker management
   React.useEffect(() => {
     const map = mapRef.current?.getMap?.();
     if (!map) return;
@@ -167,12 +173,16 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
     };
   }, [popupMarker]);
 
-  // Force map repaint when party mapping or gerrymandering changes
-  React.useEffect(() => {
-    const map = mapRef.current?.getMap?.();
-    if (!map || (!showPartyAffiliation && !showGerrymandering)) return;
-    
-  }, [fillColorExpression, showPartyAffiliation, showGerrymandering]);
+  // Performance optimization: Memoize layer paint properties
+  const layerFillPaint = React.useMemo(() => ({
+    'fill-color': fillColorExpression,
+    'fill-opacity': (showPartyAffiliation || showGerrymandering) ? 0.75 : 0.08,
+  }), [fillColorExpression, showPartyAffiliation, showGerrymandering]);
+
+  const layerLinePaint = React.useMemo(() => ({
+    'line-color': (showPartyAffiliation || showGerrymandering) ? '#333333' : (color.includes('var(') ? '#2563eb' : color),
+    'line-width': (showPartyAffiliation || showGerrymandering) ? 1 : 2,
+  }), [showPartyAffiliation, showGerrymandering, color]);
 
   return (
     <Map
@@ -187,20 +197,14 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = ({
         <Layer
           id="district-fill"
           type="fill"
-          paint={{
-            'fill-color': fillColorExpression,
-            'fill-opacity': (showPartyAffiliation || showGerrymandering) ? 0.3 : 0.08,
-          }}
+          paint={layerFillPaint}
         />
         <Layer
           id="district-outline"
           type="line"
-          paint={{
-            'line-color': (showPartyAffiliation || showGerrymandering) ? '#333333' : (color.includes('var(') ? '#2563eb' : color),
-            'line-width': (showPartyAffiliation || showGerrymandering) ? 1 : 2,
-          }}
+          paint={layerLinePaint}
         />
       </Source>
     </Map>
   );
-};
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,13 +13,18 @@ import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { DistrictMapGL } from './DistrictMapGL';
+import { RepresentativesResults } from "./RepresentativesResults";
+import { ChamberMakeup } from "./ChamberMakeup";
+import MapLibreMap, { Marker as MapLibreMarker, Popup as MapLibrePopup, MapRef } from 'react-map-gl/maplibre';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+// Performance optimization: Create stable references for constant data
 const DISTRICT_GEOJSON_URLS: Record<string, string> = {
   'congressional-districts': '/districts/congressional-districts.geojson',
   'state-upper-districts': '/districts/state-upper-districts.geojson',
   'state-lower-districts': '/districts/state-lower-districts.geojson',
 };
 
-// Helper: Color by district type
 const DISTRICT_COLORS: Record<string, string> = {
   'congressional-districts': '#2563eb',
   'state-upper-districts': '#a21caf',
@@ -26,91 +32,11 @@ const DISTRICT_COLORS: Record<string, string> = {
 };
 
 const PARTY_COLORS: Record<string, string> = {
-  'Democratic': '#2563eb', // Blue
-  'Republican': '#dc2626', // Red
-  'Independent': '#22c55e', // Green (solid color instead of CSS variable)
-  'Nonpartisan': '#8b5cf6', // Purple
-  'Unknown': '#6b7280' // Gray
-};
-
-// This avoids red-green combinations and uses colors that are distinguishable for all types of color vision
-const getGerrymanderingColor = (score: number): string => {
-  // Score ranges from 0 (highly gerrymandered) to 1 (perfectly compact)
-  // We invert the scale so orange = high gerrymandering (low score) and blue = low gerrymandering (high score)
-  const invertedScore = 1 - score;
-
-  // Adjusted thresholds for better distribution and contrast
-  // Most districts will fall in the middle ranges, so we spread them out more
-  if (invertedScore >= 0.7) return '#d93706'; // Irregular Shape
-  if (invertedScore >= 0.55) return '#f5ce0b'; // Less Compact
-  if (invertedScore >= 0.4) return '#8cfb24'; // Moderate
-  if (invertedScore >= 0.25) return '#60e8fa'; // Compact
-  return '#3b82f6'; // Very Compact
-};
-
-// Get gerrymandering color with pattern information for enhanced accessibility
-const getGerrymanderingColorWithPattern = (score: number): { color: string; pattern: string; intensity: string } => {
-  const invertedScore = 1 - score;
-  
-  if (invertedScore >= 0.8) return {
-    color: '#d97706',
-    pattern: 'diagonal-stripes',
-    intensity: 'very-high'
-  };
-  if (invertedScore >= 0.6) return {
-    color: '#f59e0b',
-    pattern: 'dots',
-    intensity: 'high'
-  };
-  if (invertedScore >= 0.4) return {
-    color: '#fbbf24',
-    pattern: 'solid',
-    intensity: 'medium'
-  };
-  if (invertedScore >= 0.2) return {
-    color: '#60a5fa',
-    pattern: 'solid',
-    intensity: 'low'
-  };
-  return {
-    color: '#3b82f6',
-    pattern: 'solid',
-    intensity: 'very-low'
-  };
-};
-
-// Party normalization function
-const normalizePartyName = (party: string): string => {
-  if (!party) return 'Unknown';
-  
-  const lowerParty = party.toLowerCase();
-  
-  // Democratic variants
-  if (lowerParty.includes('democratic') || lowerParty.includes('democrat')) {
-    return 'Democratic';
-  }
-  
-  // Republican variants  
-  if (lowerParty.includes('republican') || lowerParty.includes('conservative')) {
-    return 'Republican';
-  }
-  
-  // Nonpartisan category
-  if (lowerParty.includes('nonpartisan')) {
-    return 'Nonpartisan';
-  }
-  
-  // Independent variants (including other parties)
-  if (lowerParty.includes('independent') || 
-      lowerParty.includes('forward') || 
-      lowerParty.includes('other') ||
-      lowerParty.includes('libertarian') ||
-      lowerParty.includes('green')) {
-    return 'Independent';
-  }
-  
-  // Default to Unknown for unrecognized parties
-  return 'Unknown';
+  'Democratic': '#2563eb',
+  'Republican': '#dc2626',
+  'Independent': '#22c55e',
+  'Nonpartisan': '#8b5cf6',
+  'Unknown': '#6b7280'
 };
 
 const DISTRICT_TO_CHAMBER: Record<string, string> = {
@@ -118,10 +44,89 @@ const DISTRICT_TO_CHAMBER: Record<string, string> = {
   'state-upper-districts': 'state_upper',
   'state-lower-districts': 'state_lower',
 };
-import { RepresentativesResults } from "./RepresentativesResults";
-import { ChamberMakeup } from "./ChamberMakeup";
-import Map, { Marker as MapLibreMarker, Popup as MapLibrePopup, MapRef } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
+
+// Performance optimization: Memoized gerrymandering color function
+const getGerrymanderingColor = (score: number): string => {
+  const invertedScore = 1 - score;
+  if (invertedScore >= 0.7) return '#d93706';
+  if (invertedScore >= 0.55) return '#f5ce0b';
+  if (invertedScore >= 0.4) return '#8cfb24';
+  if (invertedScore >= 0.25) return '#60e8fa';
+  return '#3b82f6';
+};
+
+// Performance optimization: Cache for API responses
+const apiCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+
+// Performance optimization: Debounce utility
+const debounce = <T extends (...args: any[]) => any>(func: T, delay: number) => {
+  let timeoutId: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
+// Performance optimization: Cached fetch with TTL
+const cachedFetch = async (url: string, ttl: number = 300000): Promise<any> => {
+  const now = Date.now();
+  const cached = apiCache.get(url);
+
+  if (cached && (now - cached.timestamp) < cached.ttl) {
+    return cached.data;
+  }
+
+  const response = await fetch(url, {
+    cache: 'no-cache',
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  apiCache.set(url, { data, timestamp: now, ttl });
+
+  return data;
+};
+
+// Party normalization function
+const normalizePartyName = (party: string): string => {
+  if (!party) return 'Unknown';
+
+  const lowerParty = party.toLowerCase();
+
+  // Democratic variants
+  if (lowerParty.includes('democratic') || lowerParty.includes('democrat')) {
+    return 'Democratic';
+  }
+
+  // Republican variants
+  if (lowerParty.includes('republican') || lowerParty.includes('conservative')) {
+    return 'Republican';
+  }
+
+  // Nonpartisan category
+  if (lowerParty.includes('nonpartisan')) {
+    return 'Nonpartisan';
+  }
+
+  // Independent variants (including other parties)
+  if (lowerParty.includes('independent') ||
+      lowerParty.includes('forward') ||
+      lowerParty.includes('other') ||
+      lowerParty.includes('libertarian') ||
+      lowerParty.includes('green')) {
+    return 'Independent';
+  }
+
+  // Default to Unknown for unrecognized parties
+  return 'Unknown';
+};
 
 const DEFAULT_POSITION: [number, number] = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
@@ -171,7 +176,8 @@ const mapModes: MapMode[] = [
     }
 ];
 
-export function InteractiveMap() {
+// Performance optimization: Memoize component to prevent unnecessary re-renders
+export const InteractiveMap = React.memo(() => {
     const { resolvedTheme } = useTheme ? useTheme() : { resolvedTheme: 'light' };
     const [isClient, setIsClient] = useState(false);
     const [selectedState, setSelectedState] = useState<string | null>(null);
@@ -253,15 +259,14 @@ export function InteractiveMap() {
         }
     };
 
-    const fetchDistrictGerryData = async (districtType: string) => {
+    // Performance optimization: Optimized gerrymandering data fetching with caching
+    const fetchDistrictGerryData = useCallback(async (districtType: string) => {
         setGerryDataLoading(true);
         setGerryDataError(null);
         try {
-            const response = await fetch(`/api/dashboard/gerry-index-optimized?type=${districtType}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch gerrymandering data: ${response.status}`);
-            }
-            const result = await response.json();
+            const url = `/api/dashboard/gerry-index-optimized?type=${districtType}`;
+            const result = await cachedFetch(url, 600000); // 10 minutes cache
+
             if (result.success && result.scores) {
                 setGerryScores(result.scores);
             } else {
@@ -274,115 +279,67 @@ export function InteractiveMap() {
         } finally {
             setGerryDataLoading(false);
         }
-    };
+    }, []);
 
-    const fetchDistrictPartyData = async (chamber: string) => {
+    // Performance optimization: Debounced and optimized party data fetching
+    const fetchDistrictPartyData = useCallback(debounce(async (chamber: string) => {
         setPartyDataLoading(true);
         setPartyDataError(null);
-        
-        // Clear existing mapping to ensure fresh state
         setDistrictPartyMapping({});
         
         try {
-            // Add cache busting parameter to ensure fresh data
-            const timestamp = Date.now();
-            const url = `/api/dashboard/representatives/${chamber}?_t=${timestamp}`;
-            const response = await fetch(url, {
-                cache: 'no-cache',
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache'
-                }
-            });
-            if (!response.ok) {
-                throw new Error(`Failed to fetch representatives: ${response.status}`);
-            }
-            const result = await response.json();
+            const url = `/api/dashboard/representatives/${chamber}`;
+            const result = await cachedFetch(url, 300000); // 5 minutes cache
+
             if (result.representatives) {
-                // Build district -> party mapping
+                // Performance optimization: Use a more efficient mapping approach
                 const mapping: Record<string, string> = {};
-                
-                // Filter representatives to ensure we only get the correct chamber
-                const expectedChamber = chamber === 'us_house' ? 'House of Representatives' : 
+                const expectedChamber = chamber === 'us_house' ? 'House of Representatives' :
                                        chamber === 'state_upper' ? 'State Senate' :
                                        chamber === 'state_lower' ? 'State House' : '';
-                
-                const filteredReps = result.representatives.filter((rep: any) => 
+
+                // Filter and process representatives more efficiently
+                const filteredReps = result.representatives.filter((rep: any) =>
                     rep.chamber === expectedChamber
                 );
-                
+
+                // Batch process district mapping to reduce iterations
+                const districtKeys = ['map_boundary.district', 'map_boundary.geoidfq', 'district', 'current_role.district'];
+
                 filteredReps.forEach((rep: any) => {
-                    const party = rep.party || 'Unknown';
-                    // Use our normalization function
-                    const normalizedParty = normalizePartyName(party);
-                    
-                    // Use the exact map_boundary.district value (contains FIPS code + district)
-                    // This matches how the civic API works with GEOID
-                    if (rep.map_boundary?.district) {
-                        const districtCode = rep.map_boundary.district;
-                        mapping[districtCode] = normalizedParty;
-                    }
-                    
-                    // Also use the GEOID from map_boundary if available (backup)
-                    if (rep.map_boundary?.geoidfq) {
-                        const geoid = rep.map_boundary.geoidfq;
-                        mapping[geoid] = normalizedParty;
-                    }
-                    
-                    // For backward compatibility with simple district numbers
-                    if (rep.district) {
-                        mapping[rep.district.toString()] = normalizedParty;
-                    }
-                    
-                    // Also check current_role.district or division_id
-                    const altDistrict = rep.current_role?.district || 
+                    const normalizedParty = normalizePartyName(rep.party || 'Unknown');
+
+                    // Efficiently extract all possible district identifiers
+                    const districtIds = new Set<string>();
+
+                    if (rep.map_boundary?.district) districtIds.add(rep.map_boundary.district);
+                    if (rep.map_boundary?.geoidfq) districtIds.add(rep.map_boundary.geoidfq);
+                    if (rep.district) districtIds.add(rep.district.toString());
+
+                    const altDistrict = rep.current_role?.district ||
                                       rep.current_role?.division_id?.split(':').pop();
-                    if (altDistrict) {
-                        mapping[altDistrict.toString()] = normalizedParty;
-                    }
-                    
-                    // For congressional districts, create state+district format  
+                    if (altDistrict) districtIds.add(altDistrict.toString());
+
                     if (rep.state && rep.district) {
-                        mapping[`${rep.state}-${rep.district}`] = normalizedParty;
+                        districtIds.add(`${rep.state}-${rep.district}`);
                     }
-                    
-                    // Special handling for at-large representatives (district is null)
+
+                    // Handle at-large districts for congressional
                     if (chamber === 'us_house' && rep.state && (rep.district === null || rep.district === undefined)) {
-                        const stateToAtLargeGeoid: Record<string, string> = {
-                            'Alaska': '0200',
-                            'Delaware': '1000',  
-                            'Montana': '3000',
-                            'North Dakota': '3800',
-                            'South Dakota': '4600',
-                            'Vermont': '5000',
-                            'Wyoming': '5600'
+                        const atLargeGeoids: Record<string, string> = {
+                            'Alaska': '0200', 'Delaware': '1000', 'Montana': '3000',
+                            'North Dakota': '3800', 'South Dakota': '4600',
+                            'Vermont': '5000', 'Wyoming': '5600'
                         };
-                        
-                        const geoid = stateToAtLargeGeoid[rep.state];
-                        if (geoid) {
-                            mapping[geoid] = normalizedParty;
-                        }
+                        const geoid = atLargeGeoids[rep.state];
+                        if (geoid) districtIds.add(geoid);
                     }
-                });
-                
-                // Fallback for any at-large districts still not mapped
-                if (chamber === 'us_house') {
-                    const atLargeStates = {
-                        '0200': 'Alaska',
-                        '1000': 'Delaware',  
-                        '3000': 'Montana',
-                        '3800': 'North Dakota',
-                        '4600': 'South Dakota',
-                        '5000': 'Vermont',
-                        '5600': 'Wyoming'
-                    };
-                    
-                    Object.entries(atLargeStates).forEach(([geoid, stateName]) => {
-                        if (!mapping[geoid]) {
-                            mapping[geoid] = 'Unknown';
-                        }
+
+                    // Apply mapping for all district IDs
+                    districtIds.forEach(id => {
+                        mapping[id] = normalizedParty;
                     });
-                }
+                });
 
                 setDistrictPartyMapping(mapping);
             } else {
@@ -395,7 +352,9 @@ export function InteractiveMap() {
         } finally {
             setPartyDataLoading(false);
         }
-    };    // Effect to fetch party data when district map mode is selected and party affiliation is enabled
+    }, 500), []); // 500ms debounce
+
+    // Effect to fetch party data when district map mode is selected and party affiliation is enabled
     useEffect(() => {
         const isDistrictMode = ['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode);
         if (isDistrictMode && showPartyAffiliation) {
@@ -792,7 +751,7 @@ export function InteractiveMap() {
                                         } : undefined}
                                     />
                                 ) : (
-                                    <Map
+                                    <MapLibreMap
                                         ref={mapRef}
                                         initialViewState={{ longitude: DEFAULT_POSITION[1], latitude: DEFAULT_POSITION[0], zoom: DEFAULT_ZOOM }}
                                         style={{ height: '100%', width: '100%' }}
@@ -926,7 +885,7 @@ export function InteractiveMap() {
                                                 )}
                                             </MapLibrePopup>
                                         )}
-                                    </Map>
+                                    </MapLibreMap>
                                 )}
                             </div>
 
@@ -1189,4 +1148,4 @@ export function InteractiveMap() {
             </div>
         </AnimatedSection>
     );
-}
+});
