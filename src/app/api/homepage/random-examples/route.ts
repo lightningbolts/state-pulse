@@ -74,10 +74,55 @@ export async function GET() {
       };
     }
 
-    // Transform representative data
+    // Calculate bills sponsored this year for the representative
+    let billsThisYearCount = 0;
     let formattedRepresentative: Representative | null = null;
+
     if (randomRepresentativeResult.length > 0) {
       const representative = randomRepresentativeResult[0];
+
+      // Calculate start of current year
+      const currentYear = new Date().getFullYear();
+      const startOfYear = new Date(currentYear, 0, 1); // January 1st of current year
+
+      // Count bills sponsored by this representative this year
+      billsThisYearCount = await legislationCollection.countDocuments({
+        $and: [
+          {
+            // Match bills with sponsors
+            sponsors: {
+              $exists: true,
+              $ne: [],
+              $not: { $size: 0 }
+            }
+          },
+          {
+            // Match bills from this year
+            $or: [
+              { firstActionAt: { $gte: startOfYear } },
+              { latestActionAt: { $gte: startOfYear } },
+              { createdAt: { $gte: startOfYear } }
+            ]
+          },
+          {
+            // Match representative by name in various sponsor formats
+            $or: [
+              // Direct string match in sponsors array
+              { "sponsors": { $regex: new RegExp(representative.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
+              // Object format with name field
+              { "sponsors.name": { $regex: new RegExp(representative.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
+              // Object format with person.name field
+              { "sponsors.person.name": { $regex: new RegExp(representative.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
+              // Match by representative ID if available
+              ...(representative.id ? [
+                { "sponsors.id": representative.id },
+                { "sponsors.person.id": representative.id }
+              ] : [])
+            ]
+          }
+        ]
+      });
+
       formattedRepresentative = {
         id: representative.id || representative._id?.toString(),
         name: representative.name,
@@ -120,7 +165,9 @@ export async function GET() {
         lon: representative.lon,
         distance: representative.distance,
         addresses: representative.addresses,
-        lastUpdated: representative.lastUpdated
+        lastUpdated: representative.lastUpdated,
+        // Add the calculated bills this year count
+        recentBillsCount: billsThisYearCount
       };
     }
 

@@ -1,4 +1,3 @@
-
 import { Pagination } from "./index";
 
 // Representative type now matches OpenStatesPerson, plus legacy fields
@@ -69,6 +68,8 @@ export interface Representative {
     fax?: string;
   }>;
   lastUpdated?: Date;
+  // Field for bills sponsored this year count
+  recentBillsCount?: number;
 }
 
 // CongressPerson type matches congress.gov API response example

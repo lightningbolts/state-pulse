@@ -42,24 +42,6 @@ export default function ExamplesShowcase() {
         }
     };
 
-    const getStatusColor = (status: string | null | undefined) => {
-        if (!status) return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
-
-        switch (status.toLowerCase()) {
-            case 'passed':
-            case 'enacted':
-                return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
-            case 'failed':
-            case 'defeated':
-                return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-            case 'pending':
-            case 'introduced':
-                return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
-        }
-    };
-
     const getPartyColor = (party: string | undefined) => {
         if (!party) return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
 
@@ -109,10 +91,13 @@ export default function ExamplesShowcase() {
         return 'Unknown Jurisdiction';
     };
 
-    const getRecentBillsCount = (rep: Representative) => {
-        // This would need to be calculated from actual data or stored in the representative record
-        // For now, return a placeholder
-        return Math.floor(Math.random() * 20) + 1; // Random number between 1-20
+    const getBillsThisYearCount = (rep: Representative) => {
+        // Use the actual count from the backend if available
+        if (rep.recentBillsCount !== undefined) {
+            return rep.recentBillsCount;
+        }
+        // Fallback to 0 if not available
+        return 0;
     };
 
     return (
@@ -312,8 +297,8 @@ export default function ExamplesShowcase() {
                                                 </div>
 
                                                 <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/10 rounded-lg">
-                                                    <span className="text-sm font-medium">Recent Bills Sponsored</span>
-                                                    <Badge variant="secondary">{getRecentBillsCount(representative)}</Badge>
+                                                    <span className="text-sm font-medium">Bills Sponsored This Year</span>
+                                                    <Badge variant="secondary">{getBillsThisYearCount(representative)}</Badge>
                                                 </div>
                                             </div>
                                         </div>
@@ -334,9 +319,8 @@ export default function ExamplesShowcase() {
                 )}
 
                 {/*Refresh for a different set */}
-                <div className="text-center py-6">
-                    <p className="text-muted-foreground mb-4">{error}</p>
-                    <Button onClick={fetchExamples} variant="outline" className="w-full">
+                <div className="text-center mt-8">
+                    <Button onClick={fetchExamples} variant="outline" size="lg">
                         Fetch Again
                     </Button>
                 </div>
