@@ -12,7 +12,7 @@ export default function ImportanceShowcase() {
         <div className="container mx-auto text-center">
           <h2 className="text-4xl font-bold mb-4 tracking-tight">Stay Civically Informed</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              StatePulse is dedicated to democratizing access to state and local legislation. We believe that every citizen deserves to understand the laws that govern their daily lives, from local zoning ordinances to state-wide policy changes. Being aware of civic processes and policy decisions lets you advocate for your community, engage meaningfully in democracy, and help shape the future of the laws that impact your daily life.
+              StatePulse is dedicated to democratizing access to state and local legislation. We believe that every person deserves to understand the laws that govern their daily lives, from local zoning ordinances to state-wide policy changes. Being aware of civic processes and policy decisions lets you advocate for your community, engage meaningfully in democracy, and help shape the future of the laws that impact your daily life.
           </p>
         </div>
       </AnimatedSection>

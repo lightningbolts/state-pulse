@@ -46,7 +46,7 @@ export default function HomePageClient() {
         <div className="container mx-auto text-center">
           <h2 className="text-4xl font-bold mb-4 tracking-tight">Why StatePulse?</h2>
           <p className="text-muted-foreground text-lg mb-16 max-w-2xl mx-auto leading-relaxed">
-            We provide the tools and insights you need to navigate the complex world of state-level policy.
+            We provide the tools and insights you need as an individual to navigate the complex world of state-level policy.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10 min-w-0">
             <Card className="text-left shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 bg-card rounded-lg min-h-[220px] h-auto overflow-visible">
