@@ -56,17 +56,17 @@ export async function removeBookmark(userId: string, legislationId: string): Pro
     try {
         const collection: Collection<BookmarkMongoDbDocument> = await getCollection('bookmarks');
 
-        console.log('removeBookmark - query:', { userId, legislationId });
+        // console.log('removeBookmark - query:', { userId, legislationId });
 
         // First, let's see if the bookmark exists
         const existingBookmark = await collection.findOne({ userId, legislationId });
-        console.log('removeBookmark - existing bookmark found:', existingBookmark);
+        // console.log('removeBookmark - existing bookmark found:', existingBookmark);
 
         const result = await collection.deleteOne({ userId, legislationId });
-        console.log('removeBookmark - delete result:', {
-            deletedCount: result.deletedCount,
-            acknowledged: result.acknowledged
-        });
+        // console.log('removeBookmark - delete result:', {
+        //     deletedCount: result.deletedCount,
+        //     acknowledged: result.acknowledged
+        // });
 
         return result.deletedCount > 0;
     } catch (error) {

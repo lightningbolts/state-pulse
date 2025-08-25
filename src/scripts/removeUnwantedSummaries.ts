@@ -8,7 +8,7 @@ const TARGET_PHRASES = [
   'code of ethics',
   'zoom',
   'general assembly',
-  'new bill status inquiry',
+  'bill status inquiry',
   'unicameral legislature',
   'Desert Regional Center',
   'capital improvement program'

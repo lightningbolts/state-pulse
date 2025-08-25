@@ -196,17 +196,17 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
 
           {/* Bottom buttons section */}
           <div className="mt-auto pt-4 flex justify-between items-center gap-2">
-            <button
-              type="button"
-              className="h-10 px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex-1 transition-colors"
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(stateUrl, '_blank', 'noopener');
-              }}
-            >
-              {update.sources && update.sources.length > 0 ? 'Official Link' : 'OpenStates Link'}
-            </button>
+            {/*<button*/}
+            {/*  type="button"*/}
+            {/*  className="h-10 px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex-1 transition-colors"*/}
+            {/*  onClick={e => {*/}
+            {/*    e.preventDefault();*/}
+            {/*    e.stopPropagation();*/}
+            {/*    window.open(stateUrl, '_blank', 'noopener');*/}
+            {/*  }}*/}
+            {/*>*/}
+            {/*  {update.sources && update.sources.length > 0 ? 'Official Link' : 'OpenStates Link'}*/}
+            {/*</button>*/}
 
             <div onClick={e => e.stopPropagation()}>
               <BookmarkButton
