@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLegislationsByIds } from '@/services/legislationService';
 import { batchGeneratePredictions } from '@/services/votingPredictionService';
+import { checkRateLimit } from '@/services/rateLimitService';
+
+function getClientIdentifier(request: NextRequest): string {
+  // Try to get user ID from auth headers first (if available)
+  const authHeader = request.headers.get('authorization');
+  if (authHeader) {
+    // Extract user ID from auth header if available
+    const userIdMatch = authHeader.match(/user_(.+)/);
+    if (userIdMatch) return `user_${userIdMatch[1]}`;
+  }
+
+  // Fallback to IP address
+  const forwarded = request.headers.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0] : request.headers.get('x-real-ip') || 'unknown';
+  return `ip_${ip}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +35,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Maximum batch size is 50 items' },
         { status: 400 }
+      );
+    }
+
+    // Apply rate limiting for batch requests (more restrictive)
+    const clientId = getClientIdentifier(request);
+    const rateLimitKey = `batch_prediction_${clientId}`;
+    const rateLimit = checkRateLimit(rateLimitKey);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: `Please wait ${rateLimit.timeUntilReset} seconds before generating batch predictions.`,
+          timeUntilReset: rateLimit.timeUntilReset
+        },
+        { status: 429 }
       );
     }
 

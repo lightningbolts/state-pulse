@@ -37,7 +37,9 @@ export function VotingPredictionSection({ legislationId }: VotingPredictionSecti
     isLoading,
     error,
     refetch,
-    generatePrediction
+    generatePrediction,
+    canRefresh,
+    timeUntilCanRefresh
   } = useVotingPrediction({
     legislationId,
     politicalContext: {
@@ -54,10 +56,12 @@ export function VotingPredictionSection({ legislationId }: VotingPredictionSecti
   };
 
   const handleRefresh = () => {
+    if (!canRefresh) return;
     refetch(true);
   };
 
   const handleGenerateWithContext = async () => {
+    if (!canRefresh) return;
     await generatePrediction(politicalContext);
     setIsDialogOpen(false);
   };
@@ -71,15 +75,23 @@ export function VotingPredictionSection({ legislationId }: VotingPredictionSecti
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold text-foreground">Voting Outcome Prediction</h3>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h3 className="text-xl font-semibold text-foreground">Voting Outcome Prediction (Beta)</h3>
         {showPrediction && (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  disabled={!canRefresh || isLoading}
+                >
                   <Settings className="h-4 w-4 mr-2" />
                   Configure
+                  {!canRefresh && (
+                    <span className="ml-2 text-xs">({timeUntilCanRefresh}s)</span>
+                  )}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
@@ -119,8 +131,12 @@ export function VotingPredictionSection({ legislationId }: VotingPredictionSecti
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="submit" onClick={handleGenerateWithContext} disabled={isLoading}>
-                    {isLoading ? 'Generating...' : 'Generate Prediction'}
+                  <Button
+                    type="submit"
+                    onClick={handleGenerateWithContext}
+                    disabled={isLoading || !canRefresh}
+                  >
+                    {isLoading ? 'Generating...' : !canRefresh ? `Wait ${timeUntilCanRefresh}s` : 'Generate Prediction'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -130,14 +146,28 @@ export function VotingPredictionSection({ legislationId }: VotingPredictionSecti
               variant="outline"
               size="sm"
               onClick={handleRefresh}
-              disabled={isLoading}
+              disabled={isLoading || !canRefresh}
+              className="w-full sm:w-auto"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
+              {!canRefresh && (
+                <span className="ml-2 text-xs">({timeUntilCanRefresh}s)</span>
+              )}
             </Button>
           </div>
         )}
       </div>
+
+      {/* Rate limit info alert */}
+      {!canRefresh && showPrediction && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You can generate a new prediction in {timeUntilCanRefresh} seconds. This helps us manage server resources.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {error && (
         <Alert variant="destructive">
