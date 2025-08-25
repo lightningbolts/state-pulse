@@ -157,11 +157,6 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </div>
           </AnimatedSection>
 
-          {/* Voting Prediction Section */}
-          <AnimatedSection>
-            <VotingPredictionSection legislationId={id} />
-          </AnimatedSection>
-
           {openstatesUrl && (
             <AnimatedSection>
               <Link href={openstatesUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center text-sm break-all">
@@ -233,6 +228,10 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
           )}
 
           <AnimatedSection><CollapsibleTimeline historyEvents={history} /></AnimatedSection>
+
+          <AnimatedSection>
+            <VotingPredictionSection legislationId={id} />
+          </AnimatedSection>
         </CardContent>
       </Card>
     </div>

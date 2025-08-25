@@ -11,7 +11,8 @@ const TARGET_PHRASES = [
   'bill status inquiry',
   'unicameral legislature',
   'Desert Regional Center',
-  'capital improvement program'
+  'capital improvement program',
+  '89th legislature'
 ];
 
 async function removeUnwantedSummaries() {

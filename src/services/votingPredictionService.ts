@@ -3,6 +3,7 @@ import { Legislation } from '@/types/legislation';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { fetchPoliticalContextForLegislation, PoliticalContext } from '@/services/politicalContextService';
+import { enhanceSponsorsWithDetails, DetailedSponsor } from '@/services/sponsorService';
 
 export interface VotingPrediction extends PredictVotingOutcomeOutput {
   legislationId: string;
@@ -16,7 +17,7 @@ export interface VotingPredictionDocument extends Omit<VotingPrediction, 'legisl
 }
 
 /**
- * Generate a voting outcome prediction for a piece of legislation with automatic political context
+ * Generate a voting outcome prediction for a piece of legislation with automatic political context and enhanced sponsor data
  */
 export async function generateVotingPrediction(
   legislation: Legislation,
@@ -39,6 +40,41 @@ export async function generateVotingPrediction(
     recentElections: manualPoliticalContext?.recentElections || autoPoliticalContext.recentElections,
   };
 
+  // Enhance sponsors with detailed information
+  const basicSponsors = legislation.sponsors?.map(sponsor => ({
+    id: sponsor.id || sponsor.person?.id,
+    name: sponsor.name || sponsor.person?.name,
+    party: sponsor.party || sponsor.person?.party,
+    classification: sponsor.classification || sponsor.primary
+  })) || [];
+
+  const enhancedSponsors = await enhanceSponsorsWithDetails(basicSponsors);
+
+  // Convert enhanced sponsors to the format expected by the AI
+  const aiSponsors = enhancedSponsors.map(sponsor => ({
+    name: sponsor.name,
+    party: sponsor.party,
+    classification: sponsor.classification,
+    district: sponsor.district,
+    state: sponsor.state,
+    chamber: sponsor.chamber,
+    role: sponsor.role,
+    office: sponsor.office,
+    biography: sponsor.biography,
+    voting_record: sponsor.voting_record ? {
+      liberal_score: sponsor.voting_record.liberal_score,
+      conservative_score: sponsor.voting_record.conservative_score,
+      partisanship_score: sponsor.voting_record.partisanship_score
+    } : undefined,
+    terms: sponsor.terms?.map(term => ({
+      chamber: term.chamber,
+      party: term.party,
+      district: term.district,
+      startYear: term.startYear,
+      endYear: term.endYear
+    }))
+  }));
+
   const input: PredictVotingOutcomeInput = {
     legislationTitle: legislation.title || 'Unknown Bill',
     legislationText: legislation.fullText || undefined,
@@ -46,11 +82,7 @@ export async function generateVotingPrediction(
     subjects: legislation.subjects || [],
     chamber: legislation.chamber || undefined,
     jurisdictionName: legislation.jurisdictionName || undefined,
-    sponsors: legislation.sponsors?.map(sponsor => ({
-      name: sponsor.name || sponsor.person?.name,
-      party: sponsor.party || sponsor.person?.party,
-      classification: sponsor.classification || sponsor.primary
-    })) || [],
+    sponsors: aiSponsors,
     classification: legislation.classification || [],
     statusText: legislation.statusText || undefined,
     history: legislation.history?.map(action => ({
@@ -58,7 +90,8 @@ export async function generateVotingPrediction(
       description: action.description,
       action: action.action
     })) || [],
-    politicalContext
+    politicalContext,
+    currentDate: new Date().toISOString() // Add current date for temporal context
   };
 
   return await predictVotingOutcome(input);

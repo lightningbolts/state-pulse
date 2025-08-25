@@ -432,30 +432,45 @@ export default async function RepresentativeDetailPage({
             ) : null;
           })()}
 
-          {(rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0 && (
+          {(((rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0) ||
+            ((rep as any).extras?.title)) && (
             <AnimatedSection>
               <section className="">
                 <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
                   <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Leadership Roles
                 </h3>
-                <div className="overflow-x-auto rounded-lg bg-muted/50">
-                  <table className="min-w-full text-sm border">
-                    <thead>
-                      <tr className="bg-muted">
-                        <th className="px-3 py-2 text-left">Type</th>
-                        <th className="px-3 py-2 text-left">Congress</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(rep as any).leadership.map((role: any, idx: number) => (
-                        <tr key={idx} className="border-t">
-                          <td className="px-3 py-2">{role.type || '-'}</td>
-                          <td className="px-3 py-2">{role.congress || '-'}</td>
+
+                {/* Federal Leadership Roles (Congress members) */}
+                {(rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0 && (
+                  <div className="overflow-x-auto rounded-lg bg-muted/50 mb-3">
+                    <table className="min-w-full text-sm border">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="px-3 py-2 text-left">Type</th>
+                          <th className="px-3 py-2 text-left">Congress</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {(rep as any).leadership.map((role: any, idx: number) => (
+                          <tr key={idx} className="border-t">
+                            <td className="px-3 py-2">{role.type || '-'}</td>
+                            <td className="px-3 py-2">{role.congress || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* State Leadership Roles (from extras.title) */}
+                {(rep as any).extras?.title && (
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-primary">Current Leadership Position:</span>
+                      <span className="text-foreground">{(rep as any).extras.title}</span>
+                    </div>
+                  </div>
+                )}
               </section>
             </AnimatedSection>
           )}
