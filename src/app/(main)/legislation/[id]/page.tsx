@@ -7,7 +7,7 @@ import { CollapsibleSponsors } from '@/components/features/CollapsibleSponsors';
 import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
-import { Legislation } from "@/types/legislation";
+import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import type { Metadata } from 'next';
 
@@ -24,8 +24,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     }
 
     return generateLegislationMetadata(
-      legislation.title,
-      legislation.identifier,
+      legislation.title || 'Unknown Bill',
+      legislation.identifier || 'Unknown',
       legislation.geminiSummary || `${legislation.title} - Track this bill's progress and view detailed analysis.`
     );
   } catch (error) {
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 export default async function LegislationDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
   // Guard: check if id looks like a valid legislation id (basic check: must contain a dash or be longer than 10 chars)
-  const isLikelyLegislationId = typeof id === 'string' && (id.length > 10 || id.includes('-'));
+  const isLikelyLegislationId = id.length > 10 || id.includes('-');
   if (!isLikelyLegislationId) {
     return (
       <Card className="mt-6 shadow-lg">
@@ -155,6 +155,11 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
                 <p className="text-sm text-muted-foreground">No subjects available.</p>
               )}
             </div>
+          </AnimatedSection>
+
+          {/* Voting Prediction Section */}
+          <AnimatedSection>
+            <VotingPredictionSection legislationId={id} />
           </AnimatedSection>
 
           {openstatesUrl && (

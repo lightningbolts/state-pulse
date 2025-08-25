@@ -200,6 +200,28 @@ export async function getLegislationById(id: string): Promise<Legislation | null
   }
 }
 
+export async function getLegislationsByIds(ids: string[]): Promise<Legislation[]> {
+  if (!ids || ids.length === 0) {
+    console.error('IDs array is required to fetch multiple legislation documents.');
+    return [];
+  }
+  try {
+    const legislationCollection = await getCollection('legislation');
+    const documents = await legislationCollection.find({
+      id: { $in: ids }
+    }).toArray();
+
+    return documents.map(doc => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _id, ...restOfDoc } = doc;
+      return restOfDoc as Legislation;
+    });
+  } catch (error) {
+    console.error(`Error fetching legislation documents with ids ${ids.join(', ')}: `, error);
+    return [];
+  }
+}
+
 export async function getAllLegislation({
   limit = 100,
   skip = 0,
