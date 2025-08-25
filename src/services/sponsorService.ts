@@ -104,10 +104,18 @@ export async function fetchMultipleSponsorDetails(sponsorIds: string[]): Promise
   try {
     const representativesCollection = await getCollection('representatives');
 
-    // Batch fetch all sponsors
+    // Convert sponsor IDs from ocd-person/hash format to ocd-person_hash format
+    const convertedIds = sponsorIds.map(id => id.replace(/\//g, '_'));
+
+    // console.log('Original sponsor IDs:', sponsorIds);
+    // console.log('Converted sponsor IDs:', convertedIds);
+
+    // Try exact ID match with converted IDs
     const sponsors = await representativesCollection.find({
-      id: { $in: sponsorIds }
+      id: { $in: convertedIds }
     }).toArray();
+
+    // console.log(`Found ${sponsors.length} sponsors with converted ID match out of ${sponsorIds.length} requested`);
 
     return sponsors.map(sponsor => mapSponsorData(sponsor));
   } catch (error) {
@@ -204,20 +212,30 @@ export async function enhanceSponsorsWithDetails(basicSponsors: Array<{
   // Fetch detailed information
   const detailedSponsors = await fetchMultipleSponsorDetails(sponsorIds);
 
-  // Create a map for quick lookup
-  const detailsMap = new Map(detailedSponsors.map(sponsor => [sponsor.id, sponsor]));
+  // Create a map for quick lookup using both original slash format and converted underscore format
+  const detailsMap = new Map();
+  detailedSponsors.forEach(sponsor => {
+    if (sponsor.id) {
+      // Map both the underscore format (as stored) and slash format (as used in legislation)
+      detailsMap.set(sponsor.id, sponsor);
+      detailsMap.set(sponsor.id.replace(/_/g, '/'), sponsor);
+    }
+  });
 
   // Merge basic info with detailed info
   return basicSponsors.map(basicSponsor => {
     const detailed = basicSponsor.id ? detailsMap.get(basicSponsor.id) : null;
 
-    return {
-      ...detailed,
-      // Ensure basic info takes precedence if it exists and is more specific
-      id: basicSponsor.id || detailed?.id,
-      name: basicSponsor.name || detailed?.name,
-      party: basicSponsor.party || detailed?.party,
-      classification: basicSponsor.classification || detailed?.classification
-    };
+    if (detailed) {
+      return {
+        ...detailed,
+        // Keep the original classification from basic sponsor
+        classification: basicSponsor.classification || detailed.classification
+      };
+    } else {
+      return {
+        ...basicSponsor
+      };
+    }
   });
 }

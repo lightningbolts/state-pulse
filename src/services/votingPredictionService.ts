@@ -40,19 +40,44 @@ export async function generateVotingPrediction(
     recentElections: manualPoliticalContext?.recentElections || autoPoliticalContext.recentElections,
   };
 
-  // Enhance sponsors with detailed information
-  const basicSponsors = legislation.sponsors?.map(sponsor => ({
-    id: sponsor.id || sponsor.person?.id,
-    name: sponsor.name || sponsor.person?.name,
-    party: sponsor.party || sponsor.person?.party,
-    classification: sponsor.classification || sponsor.primary
-  })) || [];
+  // Enhance sponsors with detailed information - improved extraction logic
+  const basicSponsors = legislation.sponsors?.map(sponsor => {
+    // Handle various sponsor data structures more robustly
+    let sponsorId = sponsor.id || sponsor.person_id || sponsor.personId;
+    let sponsorName = sponsor.name;
+    let sponsorParty = sponsor.party;
+    let sponsorClassification = sponsor.classification || sponsor.primary || sponsor.role;
+
+    // Try to extract from nested person object if available
+    if (sponsor.person) {
+      sponsorId = sponsorId || sponsor.person.id;
+      sponsorName = sponsorName || sponsor.person.name;
+      sponsorParty = sponsorParty || sponsor.person.party;
+    }
+
+    // Try alternative field names commonly used in legislative data
+    sponsorName = sponsorName || sponsor.sponsor_name || sponsor.legislator_name || sponsor.full_name;
+    sponsorParty = sponsorParty || sponsor.party_name || sponsor.political_party;
+
+    return {
+      id: sponsorId,
+      name: sponsorName,
+      party: sponsorParty,
+      classification: sponsorClassification
+    };
+  }).filter(sponsor => sponsor.name || sponsor.id) || []; // Filter out sponsors with no name or ID
+
+  // console.log('Basic sponsors extracted:', basicSponsors); // Debug log to see what we're getting
 
   const enhancedSponsors = await enhanceSponsorsWithDetails(basicSponsors);
+
+  // console.log('Enhanced sponsors:', enhancedSponsors); // Debug log to see enhanced data
 
   // Convert enhanced sponsors to the format expected by the AI
   const aiSponsors = enhancedSponsors.map(sponsor => ({
     name: sponsor.name,
+    given_name: sponsor.given_name,
+    family_name: sponsor.family_name,
     party: sponsor.party,
     classification: sponsor.classification,
     district: sponsor.district,
@@ -60,20 +85,21 @@ export async function generateVotingPrediction(
     chamber: sponsor.chamber,
     role: sponsor.role,
     office: sponsor.office,
-    biography: sponsor.biography,
-    voting_record: sponsor.voting_record ? {
-      liberal_score: sponsor.voting_record.liberal_score,
-      conservative_score: sponsor.voting_record.conservative_score,
-      partisanship_score: sponsor.voting_record.partisanship_score
-    } : undefined,
-    terms: sponsor.terms?.map(term => ({
-      chamber: term.chamber,
-      party: term.party,
-      district: term.district,
-      startYear: term.startYear,
-      endYear: term.endYear
-    }))
+    website: sponsor.website,
+    phone: sponsor.phone,
+    email: sponsor.email,
+    birthYear: sponsor.birthYear,
+    gender: sponsor.gender,
+    leadership: sponsor.leadership,
+    sponsoredLegislation: sponsor.sponsoredLegislation,
+    cosponsoredLegislation: sponsor.cosponsoredLegislation,
+    terms: sponsor.terms,
+    partyHistory: sponsor.partyHistory,
+    extras: sponsor.extras,
+    voting_record: sponsor.voting_record
   }));
+
+  // console.log('AI Sponsors being sent:', JSON.stringify(aiSponsors, null, 2)); // Debug log to see final AI input
 
   const input: PredictVotingOutcomeInput = {
     legislationTitle: legislation.title || 'Unknown Bill',
