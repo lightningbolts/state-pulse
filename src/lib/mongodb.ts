@@ -19,7 +19,7 @@ const client = new MongoClient(MONGODB_URI, {
   }
 });
 
-const clientPromise = client.connect(); // ✅ Define it!
+const clientPromise = client.connect();
 
 
 export async function getDb() {
