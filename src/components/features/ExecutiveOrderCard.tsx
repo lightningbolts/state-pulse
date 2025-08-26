@@ -1,6 +1,5 @@
 import React from 'react';
 import { ExecutiveOrder } from '../../types/executiveOrder';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ExternalLink, Calendar, User, MapPin } from 'lucide-react';
 
@@ -22,12 +21,12 @@ export function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader>
-        <div className="flex justify-between items-start gap-4">
-          <CardTitle className="text-lg leading-tight">
+    <div className="mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full relative">
+      <div className="flex flex-col h-full">
+        <div className="flex justify-between items-start gap-4 mb-3">
+          <h3 className="font-bold text-lg leading-tight">
             {order.title}
-          </CardTitle>
+          </h3>
           <Badge
             variant="secondary"
             className={getSourceBadgeColor(order.source_type)}
@@ -36,7 +35,7 @@ export function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
           </Badge>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
           <div className="flex items-center gap-1">
             <User className="h-4 w-4" />
             <span>{order.governor_or_president}</span>
@@ -58,14 +57,12 @@ export function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
             </Badge>
           )}
         </div>
-      </CardHeader>
 
-      <CardContent>
         {/* AI Summary */}
         {order.geminiSummary && (
           <div className="mb-4">
-            <h4 className="font-medium text-sm text-gray-700 mb-2">AI Summary</h4>
-            <p className="text-sm text-gray-600 leading-relaxed">
+            <h4 className="font-medium text-sm text-muted-foreground mb-2">AI Summary</h4>
+            <p className="text-sm text-foreground leading-relaxed">
               {order.geminiSummary}
             </p>
           </div>
@@ -74,8 +71,8 @@ export function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
         {/* Original Summary (if different from AI) */}
         {order.summary && order.summary !== order.geminiSummary && (
           <div className="mb-4">
-            <h4 className="font-medium text-sm text-gray-700 mb-2">Official Summary</h4>
-            <p className="text-sm text-gray-600 leading-relaxed">
+            <h4 className="font-medium text-sm text-muted-foreground mb-2">Official Summary</h4>
+            <p className="text-sm text-foreground leading-relaxed">
               {order.summary}
             </p>
           </div>
@@ -84,7 +81,7 @@ export function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
         {/* Topics */}
         {order.topics && order.topics.length > 0 && (
           <div className="mb-4">
-            <h4 className="font-medium text-sm text-gray-700 mb-2">Topics</h4>
+            <h4 className="font-medium text-sm text-muted-foreground mb-2">Topics</h4>
             <div className="flex flex-wrap gap-1">
               {order.topics.map((topic, index) => (
                 <Badge key={index} variant="secondary" className="text-xs capitalize">
@@ -101,17 +98,17 @@ export function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
             href={order.full_text_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline transition-colors"
           >
             <ExternalLink className="h-4 w-4" />
             View Full Text
           </a>
 
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-muted-foreground">
             Added {formatDate(order.createdAt)}
           </span>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

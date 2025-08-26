@@ -3,6 +3,7 @@ import { ExecutiveOrdersList } from '../../../components/features/ExecutiveOrder
 import { ExecutiveOrderFilters } from '../../../components/features/ExecutiveOrderFilters';
 import { getRecentExecutiveOrders, getExecutiveOrdersByState } from '../../../services/executiveOrderService';
 import { ExecutiveOrder } from '../../../types/executiveOrder';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 
 interface ExecutiveOrdersPageProps {
   searchParams: {
@@ -74,45 +75,45 @@ export default async function ExecutiveOrdersPage({ searchParams }: ExecutiveOrd
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Executive Orders (Beta)</h1>
-            <p className="text-gray-600 mt-1">
-              Track presidential and governor executive orders with AI-powered summaries
-            </p>
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl">Executive Orders (Beta)</CardTitle>
+          <CardDescription>
+            Track presidential and governor executive orders with AI-powered summaries.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Filters */}
+            <ExecutiveOrderFilters
+              initialState={state}
+              initialDays={days}
+            />
+
+            {/* Results Summary */}
+            <div className="text-sm text-gray-600">
+              Showing executive orders
+              {state !== 'All States' && (
+                <span className="font-medium"> from {state}</span>
+              )}
+              {days && (
+                <span className="font-medium"> from the last {days} days</span>
+              )}
+              {initialOrders.length > 0 && (
+                <span> • {initialOrders.length}+ results found</span>
+              )}
+            </div>
+
+            {/* Executive Orders List */}
+            <ExecutiveOrdersList
+              initialOrders={initialOrders}
+              initialHasMore={initialHasMore}
+              state={state}
+              days={days}
+            />
           </div>
-        </div>
-
-        {/* Filters */}
-        <ExecutiveOrderFilters
-          initialState={state}
-          initialDays={days}
-        />
-
-        {/* Results Summary */}
-        <div className="text-sm text-gray-600">
-          Showing executive orders
-          {state !== 'All States' && (
-            <span className="font-medium"> from {state}</span>
-          )}
-          {days && (
-            <span className="font-medium"> from the last {days} days</span>
-          )}
-          {initialOrders.length > 0 && (
-            <span> • {initialOrders.length}+ results found</span>
-          )}
-        </div>
-
-        {/* Executive Orders List */}
-        <ExecutiveOrdersList
-          initialOrders={initialOrders}
-          initialHasMore={initialHasMore}
-          state={state}
-          days={days}
-        />
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
