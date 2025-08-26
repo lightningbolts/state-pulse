@@ -12,7 +12,8 @@ const TARGET_PHRASES = [
   'unicameral legislature',
   'Desert Regional Center',
   'capital improvement program',
-  '89th legislature'
+  '89th legislature',
+  'Texas Senate'
 ];
 
 async function removeUnwantedSummaries() {
