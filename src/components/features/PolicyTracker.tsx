@@ -9,6 +9,7 @@ import {Button} from "@/components/ui/button";
 import {useToast} from "@/hooks/use-toast";
 import {
     Ban,
+    Bell,
     BellRing,
     Bookmark,
     CalendarDays,
@@ -28,6 +29,7 @@ import {RelatedLegislation} from "@/types/legislation";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import {useFollowedRepresentatives} from "@/hooks/use-follow-representative";
 import RepresentativeCard from "@/components/features/RepresentativeCard";
+import {NotificationPreferences} from "@/components/features/NotificationPreferences";
 
 export function PolicyTracker() {
     const {user, isLoaded, isSignedIn} = useUser();
@@ -595,17 +597,26 @@ export function PolicyTracker() {
                                 ))}
                             </div>
 
-                            {/*<div className="flex justify-center">*/}
-                            {/*    <Link*/}
-                            {/*        href="/settings"*/}
-                            {/*        className="text-sm text-primary hover:underline"*/}
-                            {/*    >*/}
-                            {/*        Manage followed representatives*/}
-                            {/*    </Link>*/}
-                            {/*</div>*/}
+                            {followedReps.length > 0 && (
+                                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Bell className="h-4 w-4 text-blue-600" />
+                                        <p className="text-sm font-medium text-blue-900">
+                                            Email Notifications Available
+                                        </p>
+                                    </div>
+                                    <p className="text-sm text-blue-700">
+                                        You can receive email alerts when your followed representatives sponsor new legislation.
+                                        Configure your notification preferences below.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Email Notification Preferences Section */}
+                <NotificationPreferences />
             </div>
         </AnimatedSection>
     );
