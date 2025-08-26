@@ -1,18 +1,21 @@
 import { config } from 'dotenv';
 import { connectToDatabase } from '../lib/mongodb';
 import { fetchFederalExecutiveOrders } from '../services/federalRegisterService';
-import { scrapeGovernorExecutiveOrders } from '../services/governorScraperService';
+import { fetchWhitehouseExecutiveOrders } from '../services/whitehouseScraperService';
+import { scrapeStatesExecutiveOrders } from '../services/governorScraperService';
 import { processExecutiveOrderSummarization } from '../services/executiveOrderAIService';
 
 // Load environment variables
 config({ path: '../../.env' });
 
 interface FetchOptions {
-  daysBack?: number;
+  cutoffDate?: Date;
   includeFederal?: boolean;
+  includeWhitehouse?: boolean;
   includeGovernors?: boolean;
   processSummaries?: boolean;
   summaryLimit?: number;
+  maxPages?: number;
 }
 
 /**
@@ -20,15 +23,16 @@ interface FetchOptions {
  */
 export async function fetchAllExecutiveOrders(options: FetchOptions = {}) {
   const {
-    daysBack = 7,
-    includeFederal = true,
-    includeGovernors = true,
+    cutoffDate,
+    includeFederal = false, // Disabled Federal Register API
+    includeWhitehouse = true,
+    includeGovernors = true, // Disabled governor scraping
     processSummaries = true,
     summaryLimit = 20
   } = options;
 
   console.log('Starting executive orders fetch pipeline...');
-  console.log(`Options: Federal=${includeFederal}, Governors=${includeGovernors}, Days=${daysBack}, Summaries=${processSummaries}`);
+  console.log(`Options: Federal=${includeFederal}, Whitehouse=${includeWhitehouse}, Governors=${includeGovernors}, CutoffDate=${cutoffDate}, Summaries=${processSummaries}`);
 
   try {
     // Connect to database
@@ -36,25 +40,38 @@ export async function fetchAllExecutiveOrders(options: FetchOptions = {}) {
     console.log('Connected to MongoDB');
 
     let federalCount = 0;
+    let whitehouseCount = 0;
     let governorCount = 0;
 
-    // Fetch federal executive orders
-    if (includeFederal) {
-      console.log('\nFetching federal executive orders...');
-      try {
-        await fetchFederalExecutiveOrders(daysBack);
-        federalCount++;
-        console.log('Federal executive orders fetch completed');
-      } catch (error) {
-        console.error('Error fetching federal executive orders:', error);
-      }
-    }
+    // Fetch federal executive orders (DISABLED - now using only Whitehouse)
+    // if (includeFederal) {
+    //   console.log('\nFetching federal executive orders...');
+    //   try {
+    //     await fetchFederalExecutiveOrders(daysBack);
+    //     federalCount++;
+    //     console.log('Federal executive orders fetch completed');
+    //   } catch (error) {
+    //     console.error('Error fetching federal executive orders:', error);
+    //   }
+    // }
+
+    // Fetch whitehouse executive orders
+    // if (includeWhitehouse) {
+    //   console.log('\nFetching Whitehouse executive orders...');
+    //   try {
+    //     await fetchWhitehouseExecutiveOrders(cutoffDate, options.maxPages || 100);
+    //     whitehouseCount++;
+    //     console.log('Whitehouse executive orders fetch completed');
+    //   } catch (error) {
+    //     console.error('Error fetching Whitehouse executive orders:', error);
+    //   }
+    // }
 
     // Fetch governor executive orders
     if (includeGovernors) {
       console.log('\nScraping governor executive orders...');
       try {
-        await scrapeGovernorExecutiveOrders();
+        await scrapeStatesExecutiveOrders();
         governorCount++;
         console.log('Governor executive orders scraping completed');
       } catch (error) {
@@ -74,7 +91,7 @@ export async function fetchAllExecutiveOrders(options: FetchOptions = {}) {
     }
 
     console.log('\nExecutive orders pipeline completed successfully!');
-    console.log(`Sources processed: Federal=${federalCount}, Governors=${governorCount}`);
+    console.log(`Sources processed: Federal=${federalCount}, Whitehouse=${whitehouseCount}, Governors=${governorCount}`);
 
   } catch (error) {
     console.error('Fatal error in executive orders pipeline:', error);
@@ -92,12 +109,15 @@ async function main() {
   // Parse command line arguments
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
-      case '--days':
-        options.daysBack = parseInt(args[i + 1]);
+      case '--cutoff':
+        options.cutoffDate = new Date(args[i + 1]);
         i++;
         break;
       case '--no-federal':
         options.includeFederal = false;
+        break;
+      case '--no-whitehouse':
+        options.includeWhitehouse = false;
         break;
       case '--no-governors':
         options.includeGovernors = false;
@@ -109,21 +129,27 @@ async function main() {
         options.summaryLimit = parseInt(args[i + 1]);
         i++;
         break;
+      case '--max-pages':
+        options.maxPages = parseInt(args[i + 1]);
+        i++;
+        break;
       case '--help':
         console.log(`
 Usage: node fetchExecutiveOrders.js [options]
 
 Options:
-  --days <number>         Number of days to look back (default: 7)
+  --cutoff <date>        Cutoff date for fetching orders (ISO format)
   --no-federal           Skip federal executive orders
+  --no-whitehouse        Skip Whitehouse executive orders
   --no-governors         Skip governor executive orders
   --no-summaries         Skip AI summarization
   --summary-limit <num>  Limit for AI summarization (default: 20)
+  --max-pages <num>     Maximum number of Whitehouse pages to fetch (default: 11)
   --help                 Show this help message
 
 Examples:
   node fetchExecutiveOrders.js
-  node fetchExecutiveOrders.js --days 30 --no-summaries
+  node fetchExecutiveOrders.js --cutoff 2023-01-01 --no-summaries
   node fetchExecutiveOrders.js --no-federal --summary-limit 10
         `);
         process.exit(0);

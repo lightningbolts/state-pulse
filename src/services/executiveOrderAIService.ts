@@ -161,6 +161,17 @@ export async function processExecutiveOrderSummarization(limit: number = 10): Pr
     try {
       console.log(`Processing summary for: ${order.id} - ${order.title}`);
 
+      // Check if existing summary is adequate (10 or more words)
+      const existingSummary = order.geminiSummary;
+      if (existingSummary) {
+        const wordCount = existingSummary.trim().split(/\s+/).length;
+        if (wordCount >= 10) {
+          console.log(`Skipping ${order.id} - existing summary has ${wordCount} words (>= 10)`);
+          continue;
+        }
+        console.log(`Existing summary has only ${wordCount} words, proceeding with AI summarization`);
+      }
+
       // Get text to summarize (prefer full text, fallback to existing summary)
       const textToSummarize = order.full_text || order.summary || order.title;
 

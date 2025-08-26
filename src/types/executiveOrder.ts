@@ -12,7 +12,7 @@ export interface ExecutiveOrder {
   createdAt: Date;
   updatedAt?: Date;
   full_text?: string | null; // extracted text content
-  source_type: 'federal_register' | 'governor_website'; // source of the data
+  source_type: 'federal_register' | 'governor_website' | 'whitehouse_website'; // source of the data
   raw_data?: Record<string, any>; // store original API/scraper response
 }
 

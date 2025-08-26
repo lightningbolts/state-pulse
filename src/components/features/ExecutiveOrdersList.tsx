@@ -79,7 +79,7 @@ function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
   };
 
   const getSourceBadgeColor = (sourceType: string) => {
-    return sourceType === 'federal_register' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
+    return sourceType === 'federal_register' || sourceType === 'whitehouse_website' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
   };
 
   return (
@@ -93,7 +93,7 @@ function ExecutiveOrderCard({ order }: ExecutiveOrderCardProps) {
             variant="secondary"
             className={getSourceBadgeColor(order.source_type)}
           >
-            {order.source_type === 'federal_register' ? 'Federal' : 'State'}
+            {order.source_type === 'federal_register' || order.source_type === 'whitehouse_website' ? 'Federal' : 'State'}
           </Badge>
         </div>
 
