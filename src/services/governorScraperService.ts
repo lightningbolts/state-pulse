@@ -9,7 +9,7 @@ import { upsertExecutiveOrder } from '../services/executiveOrderService';
  */
 export abstract class BaseGovernorScraper implements GovernorScraper {
   abstract state: string;
-  abstract governorName: string;
+  abstract governorName: string; // Keep for fallback, but try to extract dynamically
 
   abstract scrape(): Promise<GovernorScrapedOrder[]>;
 
@@ -71,6 +71,38 @@ export abstract class BaseGovernorScraper implements GovernorScraper {
         .join('-');
       return `${stateCode}-eo-${dateStr}-${titleSlug}`;
     }
+  }
+
+  /**
+   * Extract governor name from webpage content
+   */
+  protected extractGovernorName(html: string): string {
+    const $ = cheerio.load(html);
+
+    // Try various selectors that might contain the governor's name
+    const selectors = [
+      '.governor-name',
+      '.current-governor',
+      'h1:contains("Governor")',
+      '.site-title',
+      '.page-title',
+      'title'
+    ];
+
+    for (const selector of selectors) {
+      const element = $(selector);
+      if (element.length > 0) {
+        const text = element.text().trim();
+        // Extract name from text like "Governor John Doe" or "Office of Governor Jane Smith"
+        const nameMatch = text.match(/Governor\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/i);
+        if (nameMatch) {
+          return nameMatch[1];
+        }
+      }
+    }
+
+    // Fallback to the hardcoded name
+    return this.governorName;
   }
 }
 

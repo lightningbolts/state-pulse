@@ -67,6 +67,34 @@ export class FederalRegisterClient {
   }
 
   /**
+   * Extract president name from executive order data
+   */
+  private extractPresidentName(doc: FederalRegisterDocument): string {
+    // Try to extract from title first (e.g., "Executive Order 14001 of January 20, 2021")
+    const titleMatch = doc.title.match(/by President (\w+\s+\w+)/i);
+    if (titleMatch) {
+      return titleMatch[1];
+    }
+
+    // Determine by signing date ranges
+    const signingDate = new Date(doc.signing_date || doc.publication_date);
+
+    if (signingDate >= new Date('2025-01-20')) {
+      return 'Donald Trump';
+    } else if (signingDate >= new Date('2021-01-20')) {
+      return 'Joe Biden';
+    } else if (signingDate >= new Date('2017-01-20')) {
+      return 'Donald Trump';
+    } else if (signingDate >= new Date('2009-01-20')) {
+      return 'Barack Obama';
+    } else if (signingDate >= new Date('2001-01-20')) {
+      return 'George W. Bush';
+    } else {
+      return 'Unknown President'; // Fallback
+    }
+  }
+
+  /**
    * Convert Federal Register document to ExecutiveOrder format
    */
   async convertToExecutiveOrder(doc: FederalRegisterDocument): Promise<ExecutiveOrder> {
@@ -102,7 +130,7 @@ export class FederalRegisterClient {
     return {
       id,
       state: 'United States',
-      governor_or_president: this.getCurrentPresident(),
+      governor_or_president: this.extractPresidentName(doc), // Extract from data instead of hardcode
       title: doc.title,
       number,
       date_signed: new Date(doc.signing_date || doc.publication_date),
@@ -114,14 +142,6 @@ export class FederalRegisterClient {
       source_type: 'federal_register',
       raw_data: doc
     };
-  }
-
-  /**
-   * Get current president - you might want to make this dynamic or configurable
-   */
-  private getCurrentPresident(): string {
-    // You can make this configurable or fetch from an API
-    return 'Joe Biden'; // Update as needed
   }
 }
 

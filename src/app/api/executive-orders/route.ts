@@ -3,7 +3,7 @@ import {
   getExecutiveOrdersByState,
   getRecentExecutiveOrders,
   getExecutiveOrderById
-} from '../../../../../services/executiveOrderService';
+} from '../../../services/executiveOrderService';
 
 export async function GET(request: NextRequest) {
   try {
