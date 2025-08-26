@@ -15,7 +15,7 @@ export interface Representative {
     id: string;
     name: string;
     classification: string;
-  };
+  } | string; // Can also be a string for Congress members
   given_name?: string;
   family_name?: string;
   image?: string;
@@ -169,7 +169,7 @@ export interface OpenStatesPerson {
         id: string;
         name: string;
         classification: string;
-    };
+    } | string;
     given_name?: string;
     family_name?: string;
     image?: string;

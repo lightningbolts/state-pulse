@@ -86,8 +86,44 @@ export default function ExamplesShowcase() {
     };
 
     const getRepresentativeJurisdiction = (rep: Representative) => {
-        if (rep.jurisdiction?.name) return rep.jurisdiction.name;
-        if (rep.jurisdictionName) return rep.jurisdictionName;
+        // console.log('Representative jurisdiction data:', {
+        //     name: rep.name,
+        //     jurisdiction: rep.jurisdiction,
+        //     jurisdictionType: typeof rep.jurisdiction,
+        //     jurisdictionName: rep.jurisdictionName,
+        //     chamber: (rep as any).chamber
+        // });
+
+        // Check for object format first (state representatives)
+        if (rep.jurisdiction && typeof rep.jurisdiction === 'object' && rep.jurisdiction.name) {
+            return rep.jurisdiction.name;
+        }
+
+        if (typeof rep.jurisdiction === 'string') {
+            return rep.jurisdiction;
+        }
+
+        // Check for jurisdictionName property
+        if (rep.jurisdictionName) {
+            return rep.jurisdictionName;
+        }
+
+        const chamber = (rep as any).chamber;
+        if (chamber === 'House of Representatives') {
+            return 'US House';
+        }
+        if (chamber === 'Senate') {
+            return 'US Senate';
+        }
+
+        // Try to infer from current_role for Congress members
+        if (rep.current_role?.org_classification === 'upper' && rep.current_role?.division_id?.includes('us')) {
+            return 'US Senate';
+        }
+        if (rep.current_role?.org_classification === 'lower' && rep.current_role?.division_id?.includes('us')) {
+            return 'US House';
+        }
+
         return 'Unknown Jurisdiction';
     };
 
