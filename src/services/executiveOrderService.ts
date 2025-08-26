@@ -1,6 +1,5 @@
 import { getCollection } from '../lib/mongodb';
-import { ExecutiveOrder, ExecutiveOrderMongoDocument } from '../types/executiveOrder';
-import { ObjectId } from 'mongodb';
+import { ExecutiveOrder } from '../types/executiveOrder';
 
 const COLLECTION_NAME = 'executive_orders';
 
@@ -10,7 +9,7 @@ export async function upsertExecutiveOrder(order: Omit<ExecutiveOrder, 'createdA
   const now = new Date();
 
   // Separate the data that should always be updated vs data that should only be set on insert
-  const { createdAt, ...updateData } = { ...order, updatedAt: now };
+  const updateData = { ...order, updatedAt: now };
 
   const result = await collection.updateOne(
     { id: order.id },
@@ -30,41 +29,19 @@ export async function getExecutiveOrderById(id: string): Promise<ExecutiveOrder 
 
   if (!doc) return null;
 
-  return {
-    ...doc,
-    id: doc.id,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt
-  } as ExecutiveOrder;
+  return doc as ExecutiveOrder;
 }
 
-export async function getExecutiveOrdersByState(state: string, limit: number = 100): Promise<ExecutiveOrder[]> {
+export async function getExecutiveOrdersByState(state: string, limit: number = 100, skip: number = 0): Promise<ExecutiveOrder[]> {
   const collection = await getCollection(COLLECTION_NAME);
   const docs = await collection
     .find({ state })
     .sort({ date_signed: -1 })
+    .skip(skip)
     .limit(limit)
     .toArray();
 
-  return docs.map(doc => ({
-    ...doc,
-    id: doc.id,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt
-  } as ExecutiveOrder));
-}
-
-export async function checkExecutiveOrderExists(state: string, number: string, dateSigned: Date): Promise<boolean> {
-  if (!number) return false;
-
-  const collection = await getCollection(COLLECTION_NAME);
-  const doc = await collection.findOne({
-    state,
-    number,
-    date_signed: dateSigned
-  });
-
-  return doc !== null;
+  return docs as ExecutiveOrder[];
 }
 
 export async function getExecutiveOrdersNeedingSummary(limit: number = 10): Promise<ExecutiveOrder[]> {
@@ -79,12 +56,7 @@ export async function getExecutiveOrdersNeedingSummary(limit: number = 10): Prom
     .limit(limit)
     .toArray();
 
-  return docs.map(doc => ({
-    ...doc,
-    id: doc.id,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt
-  } as ExecutiveOrder));
+  return docs as ExecutiveOrder[];
 }
 
 export async function updateExecutiveOrderSummary(id: string, geminiSummary: string, topics: string[] = []): Promise<void> {
@@ -104,7 +76,7 @@ export async function updateExecutiveOrderSummary(id: string, geminiSummary: str
   console.log(`Updated summary for executive order: ${id}`);
 }
 
-export async function getRecentExecutiveOrders(days: number = 30, limit: number = 50): Promise<ExecutiveOrder[]> {
+export async function getRecentExecutiveOrders(days: number = 30, limit: number = 50, skip: number = 0): Promise<ExecutiveOrder[]> {
   const collection = await getCollection(COLLECTION_NAME);
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -112,13 +84,9 @@ export async function getRecentExecutiveOrders(days: number = 30, limit: number 
   const docs = await collection
     .find({ date_signed: { $gte: cutoffDate } })
     .sort({ date_signed: -1 })
+    .skip(skip)
     .limit(limit)
     .toArray();
 
-  return docs.map(doc => ({
-    ...doc,
-    id: doc.id,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt
-  } as ExecutiveOrder));
+  return docs as ExecutiveOrder[];
 }

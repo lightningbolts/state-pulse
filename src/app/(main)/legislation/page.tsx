@@ -11,14 +11,14 @@ export default function UpdatesPage() {
   return (
       <Card className="shadow-lg">
         <CardHeader>
-            <AnimatedSection>
+            {/*<AnimatedSection>*/}
           <CardTitle className="font-headline text-2xl">Policy Updates</CardTitle>
-            </AnimatedSection>
-            <AnimatedSection>
+            {/*</AnimatedSection>*/}
+            {/*<AnimatedSection>*/}
           <CardDescription>
             Stay updated with the latest policy developments. Filter by category or search for specific topics.
           </CardDescription>
-            </AnimatedSection>
+            {/*</AnimatedSection>*/}
         </CardHeader>
         <CardContent>
           <Suspense fallback={<LoadingOverlay text="Loading policy feed..." smallText="Loading..." /> }>

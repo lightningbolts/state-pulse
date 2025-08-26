@@ -651,6 +651,7 @@ export function PolicyUpdatesFeed() {
                 </div>
             )}
 
+            {/*<AnimatedSection>*/}
             <div className="mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-center justify-center md:justify-start">
                 <div className="relative flex-grow w-full sm:w-auto flex">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -763,8 +764,10 @@ export function PolicyUpdatesFeed() {
                     Refresh Feed
                 </Button>
             </div>
+            {/*</AnimatedSection>*/}
 
             {/* Classification badges */}
+            {/*<AnimatedSection>*/}
             <div className="mb-4 flex flex-wrap gap-2">
                 {CLASSIFICATIONS.map(opt => (
                     <Badge
@@ -786,8 +789,10 @@ export function PolicyUpdatesFeed() {
                     </Badge>
                 ))}
             </div>
+            {/*</AnimatedSection>*/}
 
             {/* Predefined Subject Tags */}
+            {/*<AnimatedSection>*/}
             <div className="mb-4">
                 <h3 className="text-sm font-medium mb-2">Subject Tags</h3>
                 <div className="flex flex-wrap gap-2">
@@ -813,8 +818,10 @@ export function PolicyUpdatesFeed() {
                     ))}
                 </div>
             </div>
+            {/*</AnimatedSection>*/}
 
             {/* Custom Tags Section */}
+            {/*<AnimatedSection>*/}
             <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium">Custom Tags</h3>
@@ -902,8 +909,10 @@ export function PolicyUpdatesFeed() {
                         content.</p>
                 )}
             </div>
+            {/*</AnimatedSection>*/}
 
             {/* Bookmark checkbox */}
+            {/*<AnimatedSection>*/}
             <div className="flex items-center mb-4">
                 <input
                     id="show-bookmarked"
@@ -923,6 +932,7 @@ export function PolicyUpdatesFeed() {
                     Show only bookmarked updates
                 </label>
             </div>
+            {/*</AnimatedSection>*/}
 
             {/* Updates Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">

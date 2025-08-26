@@ -62,6 +62,7 @@ export function StatePulseFooter() {
                     { href: "/", label: "Home" },
                     { href: "/dashboard", label: "Dashboard" },
                     { href: "/legislation", label: "Policy Updates" },
+                    { href: "/executive-orders", label: "Executive Orders" },
                     { href: "/tracker", label: "Track Policies" },
                     { href: "/representatives", label: "Representatives" },
                     { href: "/posts", label: "Community Posts" },
@@ -85,6 +86,7 @@ export function StatePulseFooter() {
               <li><Link href="/" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Home</Link></li>
               <li><Link href="/dashboard" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Dashboard</Link></li>
               <li><Link href="/legislation" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Policy Updates</Link></li>
+              <li><Link href="/executive-orders" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Executive Orders</Link></li>
               <li><Link href="/tracker" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Track Policies</Link></li>
               <li><Link href="/representatives" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Representatives</Link></li>
               <li><Link href="/posts" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Community Posts</Link></li>

@@ -23,7 +23,7 @@ interface FetchOptions {
  */
 export async function fetchAllExecutiveOrders(options: FetchOptions = {}) {
   const {
-    cutoffDate,
+    cutoffDate = new Date(new Date().getTime() - 24 * 60 * 60 * 1000), // one day back,
     includeFederal = false, // Disabled Federal Register API
     includeWhitehouse = true,
     includeGovernors = true, // Disabled governor scraping
@@ -56,16 +56,16 @@ export async function fetchAllExecutiveOrders(options: FetchOptions = {}) {
     // }
 
     // Fetch whitehouse executive orders
-    // if (includeWhitehouse) {
-    //   console.log('\nFetching Whitehouse executive orders...');
-    //   try {
-    //     await fetchWhitehouseExecutiveOrders(cutoffDate, options.maxPages || 100);
-    //     whitehouseCount++;
-    //     console.log('Whitehouse executive orders fetch completed');
-    //   } catch (error) {
-    //     console.error('Error fetching Whitehouse executive orders:', error);
-    //   }
-    // }
+    if (includeWhitehouse) {
+      console.log('\nFetching Whitehouse executive orders...');
+      try {
+        await fetchWhitehouseExecutiveOrders(cutoffDate, options.maxPages || 100);
+        whitehouseCount++;
+        console.log('Whitehouse executive orders fetch completed');
+      } catch (error) {
+        console.error('Error fetching Whitehouse executive orders:', error);
+      }
+    }
 
     // Fetch governor executive orders
     if (includeGovernors) {

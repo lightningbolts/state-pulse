@@ -42,6 +42,7 @@ const menuItems: MenuItem[] = [
     { id: "home", path: "/", label: "Home", icon: Gavel },
     { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "updates", path: "/legislation", label: "Policy Updates", icon: Newspaper },
+    { id: "executive-orders", path: "/executive-orders", label: "Executive Orders", icon: Newspaper },
     { id: "tracker", path: "/tracker", label: "Track Policies", icon: Eye },
     { id: "representatives", path: "/representatives", label: "Representatives", icon: Users },
     { id: "posts", path: "/posts", label: "Community Posts", icon: MessageSquare },

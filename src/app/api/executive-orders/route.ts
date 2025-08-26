@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state');
     const days = parseInt(searchParams.get('days') || '30');
     const limit = parseInt(searchParams.get('limit') || '50');
+    const skip = parseInt(searchParams.get('skip') || '0');
     const id = searchParams.get('id');
 
     // Get specific executive order by ID
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Get executive orders by state
     if (state) {
-      const orders = await getExecutiveOrdersByState(state, limit);
+      const orders = await getExecutiveOrdersByState(state, limit, skip);
       return NextResponse.json({
         data: orders,
         count: orders.length,
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get recent executive orders (default)
-    const orders = await getRecentExecutiveOrders(days, limit);
+    const orders = await getRecentExecutiveOrders(days, limit, skip);
     return NextResponse.json({
       data: orders,
       count: orders.length,

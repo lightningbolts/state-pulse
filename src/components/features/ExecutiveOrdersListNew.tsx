@@ -5,7 +5,7 @@ import { ExecutiveOrder } from '../../types/executiveOrder';
 import { Card, CardContent } from '../ui/card';
 import { LoadingOverlay } from '../ui/LoadingOverlay';
 import { ExecutiveOrderCard } from './ExecutiveOrderCard';
-import { AnimatedSection } from '../ui/AnimatedSection';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 interface ExecutiveOrdersListProps {
   initialOrders: ExecutiveOrder[];
@@ -63,6 +63,9 @@ export function ExecutiveOrdersList({
   const skipRef = useRef(skip);
   const loadingRef = useRef(false);
   const scrollPositionKey = `executive-orders-scroll-${state}-${days}`;
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Update skip ref when skip state changes
   useEffect(() => {
@@ -149,60 +152,50 @@ export function ExecutiveOrdersList({
 
   if (orders.length === 0 && !loading) {
     return (
-      <AnimatedSection>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center text-gray-500">
-              <p className="font-medium">No executive orders found</p>
-              <p className="text-sm mt-1">Try adjusting your search criteria</p>
-            </div>
-          </CardContent>
-        </Card>
-      </AnimatedSection>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-gray-500">
+            <p className="font-medium">No executive orders found</p>
+            <p className="text-sm mt-1">Try adjusting your search criteria</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-4">
       {orders.map((order, idx) => (
-        <AnimatedSection key={`${order.id}-${idx}`}>
-          <ExecutiveOrderCard order={order} />
-        </AnimatedSection>
+        <ExecutiveOrderCard key={order.id} order={order} />
       ))}
 
       {loading && (
-        <AnimatedSection>
-          <div className="flex justify-center py-8">
-            <LoadingOverlay text="Loading more executive orders..." />
-          </div>
-        </AnimatedSection>
+        <div className="flex justify-center py-8">
+          <LoadingOverlay />
+        </div>
       )}
 
       {error && (
-        <AnimatedSection>
-          <Card className="border-red-200">
-            <CardContent className="pt-6">
-              <div className="text-red-600 text-center">
-                <p className="font-medium">Error loading executive orders</p>
-                <p className="text-sm mt-1">{error}</p>
-                <button
-                  onClick={loadMore}
-                  className="mt-2 text-sm underline hover:no-underline"
-                >
-                  Try again
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-        </AnimatedSection>
+        <Card className="border-red-200">
+          <CardContent className="pt-6">
+            <div className="text-red-600 text-center">
+              <p className="font-medium">Error loading executive orders</p>
+              <p className="text-sm mt-1">{error}</p>
+              <button
+                onClick={loadMore}
+                className="mt-2 text-sm underline hover:no-underline"
+              >
+                Try again
+              </button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {!hasMore && orders.length > 0 && (
-        <AnimatedSection>
-          <div className="text-center text-gray-500 py-8">
-            <p className="text-sm">No more executive orders to load</p>
-          </div>
-        </AnimatedSection>
+        <div className="text-center text-gray-500 py-8">
+          <p className="text-sm">No more executive orders to load</p>
+        </div>
       )}
     </div>
   );

@@ -11,14 +11,14 @@ export default function RepresentativesPage() {
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <AnimatedSection>
+        {/*<AnimatedSection>*/}
           <CardTitle className="font-headline text-2xl">Representatives</CardTitle>
-        </AnimatedSection>
-        <AnimatedSection>
+        {/*</AnimatedSection>*/}
+        {/*<AnimatedSection>*/}
           <CardDescription>
             Search and filter all state and federal representatives. Use the dropdowns or search bar to find who represents you.
           </CardDescription>
-        </AnimatedSection>
+        {/*</AnimatedSection>*/}
       </CardHeader>
       <CardContent>
         <Suspense fallback={<LoadingOverlay text="Loading representatives..." smallText="Loading..." /> }>
