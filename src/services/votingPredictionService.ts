@@ -74,30 +74,43 @@ export async function generateVotingPrediction(
   // console.log('Enhanced sponsors:', enhancedSponsors); // Debug log to see enhanced data
 
   // Convert enhanced sponsors to the format expected by the AI
-  const aiSponsors = enhancedSponsors.map(sponsor => ({
-    name: sponsor.name,
-    given_name: sponsor.given_name,
-    family_name: sponsor.family_name,
-    party: sponsor.party,
-    classification: sponsor.classification,
-    district: sponsor.district,
-    state: sponsor.state,
-    chamber: sponsor.chamber,
-    role: sponsor.role,
-    office: sponsor.office,
-    website: sponsor.website,
-    phone: sponsor.phone,
-    email: sponsor.email,
-    birthYear: sponsor.birthYear,
-    gender: sponsor.gender,
-    leadership: sponsor.leadership,
-    sponsoredLegislation: sponsor.sponsoredLegislation,
-    cosponsoredLegislation: sponsor.cosponsoredLegislation,
-    terms: sponsor.terms,
-    partyHistory: sponsor.partyHistory,
-    extras: sponsor.extras,
-    voting_record: sponsor.voting_record
-  }));
+  const aiSponsors = enhancedSponsors.map(sponsor => {
+    // Create the sponsor object, filtering out null/undefined values that cause schema validation issues
+    const aiSponsor: any = {
+      name: sponsor.name,
+      party: sponsor.party,
+      classification: sponsor.classification,
+      state: sponsor.state,
+      chamber: sponsor.chamber,
+      role: sponsor.role
+    };
+
+    // Only add fields if they have valid values (not null/undefined)
+    if (sponsor.given_name) aiSponsor.given_name = sponsor.given_name;
+    if (sponsor.family_name) aiSponsor.family_name = sponsor.family_name;
+    if (sponsor.district !== null && sponsor.district !== undefined) {
+      aiSponsor.district = sponsor.district;
+    }
+    if (sponsor.office) aiSponsor.office = sponsor.office;
+    if (sponsor.website) aiSponsor.website = sponsor.website;
+    if (sponsor.phone) aiSponsor.phone = sponsor.phone;
+    if (sponsor.email) aiSponsor.email = sponsor.email;
+    if (sponsor.birthYear !== null && sponsor.birthYear !== undefined) {
+      aiSponsor.birthYear = sponsor.birthYear;
+    }
+    if (sponsor.gender) aiSponsor.gender = sponsor.gender;
+    if (sponsor.leadership && Array.isArray(sponsor.leadership)) {
+      aiSponsor.leadership = sponsor.leadership;
+    }
+    if (sponsor.sponsoredLegislation) aiSponsor.sponsoredLegislation = sponsor.sponsoredLegislation;
+    if (sponsor.cosponsoredLegislation) aiSponsor.cosponsoredLegislation = sponsor.cosponsoredLegislation;
+    if (sponsor.terms && Array.isArray(sponsor.terms)) aiSponsor.terms = sponsor.terms;
+    if (sponsor.partyHistory && Array.isArray(sponsor.partyHistory)) aiSponsor.partyHistory = sponsor.partyHistory;
+    if (sponsor.extras) aiSponsor.extras = sponsor.extras;
+    if (sponsor.voting_record) aiSponsor.voting_record = sponsor.voting_record;
+
+    return aiSponsor;
+  });
 
   // console.log('AI Sponsors being sent:', JSON.stringify(aiSponsors, null, 2)); // Debug log to see final AI input
 
