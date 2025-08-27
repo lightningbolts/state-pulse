@@ -91,10 +91,30 @@ async function main() {
     console.log(`Looking for legislation since: ${cutoffDate.toISOString()}`);
 
     // Get recent legislation with sponsors for sponsorship notifications
-    const recentLegislation = await legislationCollection.find({
+    // Add debugging and optimize the query
+    console.log('Querying for recent legislation with sponsors...');
+    const query = {
       updatedAt: { $gte: cutoffDate },
       sponsors: { $exists: true, $ne: [], $not: { $size: 0 } }
-    }).toArray();
+    };
+
+    // First, check if updatedAt field exists on documents
+    console.log('Checking if updatedAt field exists...');
+    const countWithUpdatedAt = await legislationCollection.countDocuments({ updatedAt: { $exists: true } });
+    console.log(`Documents with updatedAt field: ${countWithUpdatedAt}`);
+
+    // If no documents have updatedAt, fall back to createdAt
+    let actualQuery = query;
+    if (countWithUpdatedAt === 0) {
+      console.log('No documents with updatedAt found, falling back to createdAt');
+      actualQuery = {
+        createdAt: { $gte: cutoffDate },
+        sponsors: { $exists: true, $ne: [], $not: { $size: 0 } }
+      };
+    }
+
+    const recentLegislation = await legislationCollection.find(actualQuery).toArray();
+    console.log(`Found ${recentLegislation.length} recent legislation documents with sponsors`);
 
     // Get sponsorship alerts for users
     const userSponsorshipMap: Record<string, Array<{
