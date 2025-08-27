@@ -92,7 +92,7 @@ async function main() {
 
     // Get recent legislation with sponsors for sponsorship notifications
     const recentLegislation = await legislationCollection.find({
-      createdAt: { $gte: cutoffDate },
+      updatedAt: { $gte: cutoffDate },
       sponsors: { $exists: true, $ne: [], $not: { $size: 0 } }
     }).toArray();
 
@@ -231,7 +231,7 @@ async function main() {
                 </div>
                 ${legislation.geminiSummary ? `<div style='background:#f0f6ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#2563eb;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
                 <div style="margin-top:10px;">
-                  <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #e5e7eb;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#2563eb;text-decoration:none;background:#f9fafb;">View Details</a>
+                  <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #e7eaf3;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#2563eb;text-decoration:none;background:#f9fafb;">View Details</a>
                 </div>
               </div>
             `;
@@ -331,7 +331,8 @@ async function main() {
           }
         }
         if (!email) {
-          const subWithEmail = subsArr.find(s => s.userId === userId && s.email);
+          // Try to find email from topic subscriptions
+          const subWithEmail = await subsCol.findOne({ userId: userId, email: { $exists: true, $ne: null } });
           email = subWithEmail?.email;
           if (email) source = 'topic_subscriptions';
         }
