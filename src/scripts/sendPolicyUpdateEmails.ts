@@ -228,7 +228,7 @@ async function main() {
           `📋 Your Tracked Topics - This Week (${topicCount} updates)` :
           `📋 Your Tracked Topics`;
 
-        message += `<h2 style="margin:1.5em 0 1em 0;font-family:Geist,Arial,sans-serif;font-size:1.3em;color:#2563eb;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">${sectionTitle}</h2>`;
+        message += `<h2 style="margin:1.5em 0 1em 0;font-family:Geist,Arial,sans-serif;font-size:1.3em;color:#71a3a0;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">${sectionTitle}</h2>`;
 
         for (const entry of newLegislation) {
           message += `<h3 style="margin:1.5em 0 0.5em 0;font-family:Geist,Arial,sans-serif;font-size:1.1em;color:#374151;">Topic: ${entry.topic} (${entry.bills.length} ${entry.bills.length === 1 ? 'update' : 'updates'})</h3>`;
@@ -240,18 +240,18 @@ async function main() {
             message += `
               <div style="border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:16px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.03);font-family:Geist,Arial,sans-serif;">
                 <div style="margin-bottom:12px;">
-                  <a href="https://statepulse.me/legislation/${legislation.id}" style="font-size:1.1em;font-weight:600;color:#2563eb;text-decoration:none;">${legislation.identifier}: ${legislation.title}</a>
+                  <a href="https://statepulse.me/legislation/${legislation.id}" style="font-size:1.1em;font-weight:600;color:#71a3a0;text-decoration:none;">${legislation.identifier}: ${legislation.title}</a>
                 </div>
                 <div style="margin-bottom:8px;">
                   ${legislation.statusText ? `<span style='display:inline-block;background:#f3f4f6;color:#374151;border-radius:6px;padding:2px 8px;font-size:0.85em;margin-right:4px;'>${legislation.statusText}</span>` : ''}
-                  ${(legislation.classification||[]).map((type:string) => `<span style='display:inline-block;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;font-size:0.85em;margin-right:4px;'>${type}</span>`).join('')}
+                  ${(legislation.classification || []).map((type: string) => `<span style='display:inline-block;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;font-size:0.85em;margin-right:4px;'>${type}</span>`).join('')}
                 </div>
                 <div style="font-size:0.95em;color:#6b7280;margin-bottom:8px;">
                   ${legislation.session} - ${legislation.jurisdictionName}${legislation.chamber ? ` (${legislation.chamber})` : ''}
                 </div>
-                ${legislation.geminiSummary ? `<div style='background:#f0f6ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#2563eb;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
+                ${legislation.geminiSummary ? `<div style='background:#f0f6ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#71a3a0;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
                 <div style="margin-top:10px;">
-                  <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #e7eaf3;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#2563eb;text-decoration:none;background:#f9fafb;">View Details</a>
+                  <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #e7eaf3;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#71a3a0;text-decoration:none;background:#f9fafb;">View Details</a>
                 </div>
               </div>
             `;
@@ -274,7 +274,7 @@ async function main() {
           `👥 New Legislation from Your Followed Representatives - This Week (${repCount} updates)` :
           `👥 New Legislation from Your Followed Representatives`;
 
-        message += `<h2 style="margin:2em 0 1em 0;font-family:Geist,Arial,sans-serif;font-size:1.3em;color:#16a34a;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">${sectionTitle}</h2>`;
+        message += `<h2 style="margin:2em 0 1em 0;font-family:Geist,Arial,sans-serif;font-size:1.3em;color:#71a3a0;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">${sectionTitle}</h2>`;
 
         for (const alert of sponsorshipAlerts) {
           const rep = alert.representative;
@@ -296,9 +296,9 @@ async function main() {
                   ${legislation.session} - ${legislation.jurisdictionName}${legislation.chamber ? ` (${legislation.chamber})` : ''}
                 </div>
                 <div style="font-size:0.9em;color:#374151;margin-bottom:8px;">
-                  <strong>Date Signed:</strong> ${new Date(legislation.date_signed || legislation.createdAt).toLocaleDateString()}
+                  <strong>Date Introduced:</strong> ${new Date(legislation.date_signed || legislation.createdAt).toLocaleDateString()}
                 </div>
-                ${legislation.geminiSummary ? `<div style='background:#ecfdf5;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#16a34a;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
+                ${legislation.geminiSummary ? `<div style='background:#ecfdf5;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#71a3a0;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
                 <div style="margin-top:10px;">
                   <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #16a34a;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#16a34a;text-decoration:none;background:#f0fdf4;">View Details</a>
                 </div>

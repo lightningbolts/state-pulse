@@ -171,14 +171,14 @@ export function BookmarksList() {
                                 {legislation.firstActionAt && (
                                     <div className="flex items-center text-sm text-muted-foreground">
                                         <CalendarDays className="mr-2 h-4 w-4"/>
-                                        First Action: {new Date(legislation.firstActionAt).toLocaleDateString()}
+                                        First Action: {new Date(legislation.firstActionAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}
                                     </div>
                                 )}
 
                                 {legislation.latestActionAt && (
                                     <div className="flex items-center text-sm text-muted-foreground">
                                         <CalendarDays className="mr-2 h-4 w-4"/>
-                                        Latest Action: {new Date(legislation.latestActionAt).toLocaleDateString()}
+                                        Latest Action: {new Date(legislation.latestActionAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}
                                     </div>
                                 )}
 

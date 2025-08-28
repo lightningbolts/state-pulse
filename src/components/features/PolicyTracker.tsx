@@ -441,7 +441,7 @@ export function PolicyTracker() {
                                                                                                         <CalendarDays
                                                                                                             className="mr-2 h-4 w-4"/>
                                                                                                         First
-                                                                                                        Action: {new Date(legislation.firstActionAt).toLocaleDateString()}
+                                                                                                        Action: {new Date(legislation.firstActionAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}
                                                                                                     </div>
                                                                                                 )}
                                                                                                 {legislation.latestActionAt && (
@@ -450,7 +450,7 @@ export function PolicyTracker() {
                                                                                                         <CalendarDays
                                                                                                             className="mr-2 h-4 w-4"/>
                                                                                                         Latest
-                                                                                                        Action: {new Date(legislation.latestActionAt).toLocaleDateString()}
+                                                                                                        Action: {new Date(legislation.latestActionAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}
                                                                                                     </div>
                                                                                                 )}
                                                                                                 {legislation.sponsors && legislation.sponsors.length > 0 && (
@@ -470,17 +470,13 @@ export function PolicyTracker() {
                                                                                                     </div>
                                                                                                 )}
                                                                                             </div>
-                                                                                            {legislation.subjects && legislation.subjects.length > 0 && (
+                                                                                            {legislation.topicClassification?.broadTopics && legislation.topicClassification.broadTopics.length > 0 && (
                                                                                                 <div className="mb-4">
-                                                                                                    <h4 className="text-sm font-medium mb-2">Subjects:</h4>
-                                                                                                    <div
-                                                                                                        className="flex flex-wrap gap-1">
-                                                                                                        {legislation.subjects.map((subject, idx) => (
-                                                                                                            <Badge
-                                                                                                                key={subject + '-' + idx}
-                                                                                                                variant="default"
-                                                                                                                className="text-xs">
-                                                                                                                {subject}
+                                                                                                    <h4 className="text-sm font-medium mb-2">Topics:</h4>
+                                                                                                    <div className="flex flex-wrap gap-1">
+                                                                                                        {legislation.topicClassification.broadTopics.map((topic, idx) => (
+                                                                                                            <Badge key={topic + '-' + idx} variant="default" className="text-xs">
+                                                                                                                {topic}
                                                                                                             </Badge>
                                                                                                         ))}
                                                                                                     </div>

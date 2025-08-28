@@ -92,6 +92,13 @@ export interface RelatedLegislation {
   abstracts?: { abstract: string }[];
   geminiSummary?: string;
   openstatesUrl?: string;
+  topicClassification?: {
+    broadTopics: string[];
+    narrowTopics: string[];
+    confidence: number;
+    reasoning: string;
+    classifiedAt: Date | null;
+  };
 }
 
 export interface Bill {

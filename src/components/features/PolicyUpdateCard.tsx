@@ -137,16 +137,16 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
                   ))}
                 </div>
               )}
-              {update.subjects && update.subjects.length > 0 && (
+              {update.topicClassification?.broadTopics && update.topicClassification.broadTopics.length > 0 && (
                 <div className="mb-1">
-                  {update.subjects.map((s, i) => (
+                  {update.topicClassification.broadTopics.map((topic, i) => (
                     <Badge
-                      key={s + i}
-                      variant={subject === s ? "default" : "outline"}
+                      key={topic + i}
+                      variant={subject === topic ? "default" : "outline"}
                       onClick={e => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const newSubject = subject === s ? "" : s;
+                        const newSubject = subject === topic ? "" : topic;
                         if (subject !== newSubject) {
                           setSubject(newSubject);
                           setUpdates([]);
@@ -158,7 +158,7 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
                       }}
                       className="mr-1 cursor-pointer"
                     >
-                      #{capitalize(s)}
+                      #{topic}
                     </Badge>
                   ))}
                 </div>
