@@ -9,7 +9,9 @@ import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
 import { generateLegislationMetadata } from '@/lib/metadata';
-import type { Metadata } from 'next';
+
+// Helper for consistent UTC date formatting
+const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const { id } = await params;
@@ -130,13 +132,13 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
               {firstActionAt && (
                 <p className="text-sm text-muted-foreground flex items-start">
                   <CalendarDays className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>First Action: {firstActionAt.toLocaleDateString()}</span>
+                  <span>First Action: {formatDateUTC(firstActionAt)}</span>
                 </p>
               )}
               {latestActionAt && (
                 <p className="text-sm text-muted-foreground flex items-start">
                   <CalendarDays className="mr-2 h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>Latest Action: {latestActionAt.toLocaleDateString()}</span>
+                  <span>Latest Action: {formatDateUTC(latestActionAt)}</span>
                 </p>
               )}
               {latestActionDescription && <p className="text-sm text-muted-foreground break-words">Latest Action Detail: {latestActionDescription}</p>}
@@ -198,7 +200,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
                 {versions.map((version, index) => (
                   <li key={index} className="p-3 border rounded-md bg-muted/50">
                     <p className="font-medium text-foreground break-words">{version.note}</p>
-                    {version.date && <p className="text-xs text-muted-foreground">Date: {version.date.toLocaleDateString()}</p>}
+                    {version.date && <p className="text-xs text-muted-foreground">Date: {formatDateUTC(new Date(version.date))}</p>}
                     {version.links && version.links.map((link: { url: string; media_type?: string | null }) => (
                       <Link key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm block mt-1 break-all">
                         <ExternalLink className="inline-block mr-1 h-3 w-3" /> {link.media_type || 'View Document'}

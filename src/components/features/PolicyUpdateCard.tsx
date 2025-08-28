@@ -48,7 +48,7 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '';
     return typeof window !== 'undefined'
-      ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+      ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
       : date.toISOString().slice(0, 10);
   };
 
@@ -92,7 +92,6 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
   }
   const formattedLastActionDate = lastActionDate && !isNaN(lastActionDate.getTime()) ? getFormattedDate(lastActionDate.toISOString()) : null;
 
-  const stateUrl = update.sources && update.sources.length > 0 ? update.sources[0].url : update.openstatesUrl;
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
   const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
 
