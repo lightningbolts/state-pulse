@@ -10,6 +10,7 @@ import {
   extractBestTextForSummary,
   generateGeminiSummary, summarizeLegislationRichestSource
 } from '../services/aiSummaryUtil';
+import { classifyLegislationForFetch } from '../services/classifyLegislationService';
 
 config({ path: '../../.env' });
 
@@ -587,6 +588,25 @@ async function fetchAndStoreUpdatedBills(
               legislationToStore.geminiSummary = summary;
               legislationToStore.geminiSummarySource = sourceType;
             }
+
+            // Classify the legislation after summary generation
+            try {
+              const classificationResult = classifyLegislationForFetch(legislationToStore);
+              if (classificationResult) {
+                // Merge the existing subjects with classified topics (avoid duplicates)
+                const existingSubjects = legislationToStore.subjects || [];
+                const newSubjects = classificationResult.subjects || [];
+                const combinedSubjects = [...new Set([...existingSubjects, ...newSubjects])];
+
+                legislationToStore.subjects = combinedSubjects;
+                legislationToStore.topicClassification = classificationResult.topicClassification;
+
+                console.log(`  Classified into ${classificationResult.topicClassification.broadTopics.length} broad + ${classificationResult.topicClassification.narrowTopics.length} narrow topics (confidence: ${classificationResult.topicClassification.confidence}%)`);
+              }
+            } catch (classificationError) {
+              console.warn(`  Warning: Failed to classify legislation ${legislationToStore.identifier}: ${classificationError}`);
+            }
+
             // Calculate word count for Gemini summary
             const geminiSummaryWordCount = legislationToStore.geminiSummary ? legislationToStore.geminiSummary.split(/\s+/).filter(Boolean).length : 0;
             // Always upsert the legislation - we want to keep all bills with summaries
@@ -1070,6 +1090,25 @@ async function fetchCongressBills(updatedSince: string) {
               legislationToStore.geminiSummary = summary;
               legislationToStore.geminiSummarySource = sourceType;
             }
+
+            // Classify the legislation after summary generation
+            try {
+              const classificationResult = classifyLegislationForFetch(legislationToStore);
+              if (classificationResult) {
+                // Merge the existing subjects with classified topics (avoid duplicates)
+                const existingSubjects = legislationToStore.subjects || [];
+                const newSubjects = classificationResult.subjects || [];
+                const combinedSubjects = [...new Set([...existingSubjects, ...newSubjects])];
+
+                legislationToStore.subjects = combinedSubjects;
+                legislationToStore.topicClassification = classificationResult.topicClassification;
+
+                console.log(`  Classified into ${classificationResult.topicClassification.broadTopics.length} broad + ${classificationResult.topicClassification.narrowTopics.length} narrow topics (confidence: ${classificationResult.topicClassification.confidence}%)`);
+              }
+            } catch (classificationError) {
+              console.warn(`  Warning: Failed to classify legislation ${legislationToStore.identifier}: ${classificationError}`);
+            }
+
             // Upsert the legislation
             await upsertLegislationSelective(legislationToStore);
             console.log(`Upserted: ${legislationToStore.identifier} (Congress)`);
