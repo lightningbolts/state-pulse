@@ -109,9 +109,9 @@ export const pageMetadata = {
   }),
 
   dashboard: generateMetadata({
-    title: 'Dashboard - Your Personalized Political Feed',
-    description: 'Your personalized dashboard for tracking followed representatives, legislation, and policy updates that matter to you.',
-    keywords: ['dashboard', 'personalized feed', 'political tracking', 'followed representatives'],
+    title: 'Dashboard - Comprehensive Visualization of Policy Trends',
+    description: 'Interactive map powered analysis for political activity, representatives, trending topics, and district boundaries',
+    keywords: ['dashboard', 'political tracking', 'visualization', 'map', 'interactive', 'district boundaries', 'policy trends', 'statepulse'],
     url: '/dashboard',
   }),
 
