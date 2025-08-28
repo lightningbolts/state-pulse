@@ -20,6 +20,7 @@ import { useUser } from "@clerk/nextjs";
 import { STATE_MAP } from "@/types/geo";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import PolicyUpdateCard from "@/components/features/PolicyUpdateCard";
+import { BROAD_TOPIC_KEYWORDS } from "@/types/legislation";
 
 interface PolicyUpdate {
     id: string;
@@ -796,7 +797,7 @@ export function PolicyUpdatesFeed() {
             <div className="mb-4">
                 <h3 className="text-sm font-medium mb-2">Subject Tags</h3>
                 <div className="flex flex-wrap gap-2">
-                    {["Education", "Healthcare", "Policing", "Climate", "Labor", "Tech", "Housing", "Transportation", "Immigration", "Criminal Justice", "Budget", "Taxation", "Energy", "Agriculture", "Veterans", "Civil Rights", "Gun Control", "Privacy", "Ethics", "Environment"].map((cat) => (
+                    {Object.keys(BROAD_TOPIC_KEYWORDS).map((cat) => (
                         <Badge
                             key={cat}
                             variant={subject === cat ? "default" : "secondary"}

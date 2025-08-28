@@ -269,12 +269,12 @@ async function main() {
 
     // Optimized query for unclassified documents
     const query = {
-      $or: [
-        { subjects: { $exists: false } },
-        { subjects: { $size: 0 } },
-        { subjects: null },
-        { topicClassification: { $exists: false } }
-      ],
+      // $or: [
+      //   { subjects: { $exists: false } },
+      //   { subjects: { $size: 0 } },
+      //   { subjects: null },
+      //   { topicClassification: { $exists: false } }
+      // ],
       $and: [
         {
           $or: [
