@@ -13,7 +13,11 @@ const TARGET_PHRASES = [
   'Desert Regional Center',
   'capital improvement program',
   '89th legislature',
-  'Texas Senate'
+  'Texas Senate',
+    'Iowa Senate',
+    'Iowa House of Representatives',
+    'Senate Journal',
+    'House Journal'
 ];
 
 async function removeUnwantedSummaries() {
