@@ -2,8 +2,25 @@ import { getDb } from '../lib/mongodb';
 import { Legislation } from '../types/legislation';
 import {BROAD_TOPIC_KEYWORDS, NARROW_TOPIC_KEYWORDS, ClassificationResult} from "../types/legislation";
 
+// Pre-compile regex patterns for better performance
+const COMPILED_BROAD_PATTERNS: Record<string, RegExp[]> = {};
+const COMPILED_NARROW_PATTERNS: Record<string, RegExp[]> = {};
+
+// Initialize compiled patterns once
+for (const [topic, keywords] of Object.entries(BROAD_TOPIC_KEYWORDS)) {
+  COMPILED_BROAD_PATTERNS[topic] = keywords.map(keyword =>
+    new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
+  );
+}
+
+for (const [topic, keywords] of Object.entries(NARROW_TOPIC_KEYWORDS)) {
+  COMPILED_NARROW_PATTERNS[topic] = keywords.map(keyword =>
+    new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
+  );
+}
+
 /**
- * Custom classifier that uses keyword matching and weighted scoring
+ * OPTIMIZED classifier that uses pre-compiled regex and efficient scoring
  */
 export function classifyLegislationTopics(
     title: string,
@@ -24,24 +41,30 @@ export function classifyLegislationTopics(
         };
     }
 
-    // Score each broad topic
+    const titleLower = title?.toLowerCase() || '';
+    const textLength = textToAnalyze.split(' ').length;
+
+    // Score each broad topic with optimized regex matching
     const broadScores: Record<string, number> = {};
-    for (const [topic, keywords] of Object.entries(BROAD_TOPIC_KEYWORDS)) {
+    for (const [topic, patterns] of Object.entries(COMPILED_BROAD_PATTERNS)) {
         let score = 0;
 
-        for (const keyword of keywords) {
-            const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-            const matches = textToAnalyze.match(regex);
+        for (let i = 0; i < patterns.length; i++) {
+            const pattern = patterns[i];
+            const keyword = BROAD_TOPIC_KEYWORDS[topic][i];
+
+            // Reset regex lastIndex for global patterns
+            pattern.lastIndex = 0;
+            const matches = textToAnalyze.match(pattern);
+
             if (matches) {
-                // Weight keywords based on where they appear and frequency
                 let keywordScore = matches.length;
 
-                // Bonus for title matches
-                if (title && title.toLowerCase().includes(keyword.toLowerCase())) {
+                // Optimized bonus calculations
+                if (titleLower.includes(keyword.toLowerCase())) {
                     keywordScore *= 2;
                 }
 
-                // Bonus for exact phrase matches
                 if (keyword.includes(' ') && textToAnalyze.includes(keyword.toLowerCase())) {
                     keywordScore *= 1.5;
                 }
@@ -55,23 +78,27 @@ export function classifyLegislationTopics(
         }
     }
 
-    // Score each narrow topic
+    // Score each narrow topic with optimized regex matching
     const narrowScores: Record<string, number> = {};
-    for (const [topic, keywords] of Object.entries(NARROW_TOPIC_KEYWORDS)) {
+    for (const [topic, patterns] of Object.entries(COMPILED_NARROW_PATTERNS)) {
         let score = 0;
 
-        for (const keyword of keywords) {
-            const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-            const matches = textToAnalyze.match(regex);
+        for (let i = 0; i < patterns.length; i++) {
+            const pattern = patterns[i];
+            const keyword = NARROW_TOPIC_KEYWORDS[topic][i];
+
+            // Reset regex lastIndex for global patterns
+            pattern.lastIndex = 0;
+            const matches = textToAnalyze.match(pattern);
+
             if (matches) {
                 let keywordScore = matches.length;
 
-                // Bonus for title matches
-                if (title && title.toLowerCase().includes(keyword.toLowerCase())) {
+                // Optimized bonus calculations
+                if (titleLower.includes(keyword.toLowerCase())) {
                     keywordScore *= 2;
                 }
 
-                // Bonus for exact phrase matches
                 if (keyword.includes(' ') && textToAnalyze.includes(keyword.toLowerCase())) {
                     keywordScore *= 1.5;
                 }
@@ -85,40 +112,40 @@ export function classifyLegislationTopics(
         }
     }
 
-    // Select top broad topics (1-3)
+    // Optimized sorting using single pass
     const sortedBroadTopics = Object.entries(broadScores)
         .sort(([,a], [,b]) => b - a)
-        .slice(0, 3);
+        .slice(0, 3)
+        .map(([topic]) => topic);
 
-    // Select top narrow topics (1-5)
     const sortedNarrowTopics = Object.entries(narrowScores)
         .sort(([,a], [,b]) => b - a)
-        .slice(0, 5);
+        .slice(0, 5)
+        .map(([topic]) => topic);
 
-    const selectedBroadTopics = sortedBroadTopics.map(([topic]) => topic);
-    const selectedNarrowTopics = sortedNarrowTopics.map(([topic]) => topic);
-
-    // Calculate confidence based on keyword matches and score distribution
+    // Optimized confidence calculation
     let confidence = 0;
-    if (selectedBroadTopics.length > 0 || selectedNarrowTopics.length > 0) {
-        const totalMatches = Object.values(broadScores).reduce((sum, score) => sum + score, 0) +
-            Object.values(narrowScores).reduce((sum, score) => sum + score, 0);
+    if (sortedBroadTopics.length > 0 || sortedNarrowTopics.length > 0) {
+        const broadSum = Object.values(broadScores).reduce((sum, score) => sum + score, 0);
+        const narrowSum = Object.values(narrowScores).reduce((sum, score) => sum + score, 0);
+        const totalMatches = broadSum + narrowSum;
 
-        // Base confidence on keyword matches and text length
         confidence = Math.min(90, Math.max(20,
             (totalMatches * 10) +
-            (textToAnalyze.split(' ').length > 10 ? 10 : 0) +
-            (selectedBroadTopics.length > 0 ? 15 : 0) +
-            (selectedNarrowTopics.length > 0 ? 10 : 0)
+            (textLength > 10 ? 10 : 0) +
+            (sortedBroadTopics.length > 0 ? 15 : 0) +
+            (sortedNarrowTopics.length > 0 ? 10 : 0)
         ));
     }
 
-    // Generate reasoning
-    const reasoning = `Classified based on keyword matching. Found ${Object.keys(broadScores).length} broad topic matches and ${Object.keys(narrowScores).length} narrow topic matches from analyzing ${textToAnalyze.split(' ').length} words.`;
+    // Simplified reasoning generation
+    const broadMatches = Object.keys(broadScores).length;
+    const narrowMatches = Object.keys(narrowScores).length;
+    const reasoning = `Keyword matching: ${broadMatches} broad, ${narrowMatches} narrow topics from ${textLength} words.`;
 
     return {
-        broadTopics: selectedBroadTopics,
-        narrowTopics: selectedNarrowTopics,
+        broadTopics: sortedBroadTopics,
+        narrowTopics: sortedNarrowTopics,
         confidence: Math.round(confidence),
         reasoning
     };
@@ -216,8 +243,7 @@ export async function processLegislation(legislation: any): Promise<void> {
             console.log('  Database update failed');
         }
 
-        // Small delay to prevent overwhelming the database
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // No delay needed here as we're now using concurrency control in the main script
 
     } catch (error) {
         console.error(`  Error processing legislation: ${error}`);
