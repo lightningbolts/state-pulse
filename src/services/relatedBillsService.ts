@@ -19,32 +19,35 @@ export async function getRelatedBills(
 ): Promise<RelatedBill[]> {
   const collection = await getCollection('legislation');
   
-  // Get all bills except the current one
+  // Get all bills except the current one with random sampling for diversity
   const allBills = await collection
-    .find(
-      { 
-        id: { $ne: currentBill.id },
-        // Only include bills with some content to compare
-        $or: [
-          { subjects: { $exists: true, $ne: [] } },
-          { 
-            $and: [
-              { geminiSummary: { $exists: true } },
-              { geminiSummary: { $ne: null } },
-              { geminiSummary: { $ne: '' } }
-            ]
-          },
-          { 
-            $and: [
-              { title: { $exists: true } },
-              { title: { $ne: null } },
-              { title: { $ne: '' } }
-            ]
-          }
-        ]
-      },
+    .aggregate([
       {
-        projection: {
+        $match: { 
+          id: { $ne: currentBill.id },
+          // Only include bills with some content to compare
+          $or: [
+            { subjects: { $exists: true, $ne: [] } },
+            { 
+              $and: [
+                { geminiSummary: { $exists: true } },
+                { geminiSummary: { $ne: null } },
+                { geminiSummary: { $ne: '' } }
+              ]
+            },
+            { 
+              $and: [
+                { title: { $exists: true } },
+                { title: { $ne: null } },
+                { title: { $ne: '' } }
+              ]
+            }
+          ]
+        }
+      },
+      { $sample: { size: 5000 } }, // Random sample for diversity
+      {
+        $project: {
           id: 1,
           identifier: 1,
           title: 1,
@@ -55,8 +58,7 @@ export async function getRelatedBills(
           subjects: 1
         }
       }
-    )
-    .limit(1000) // Limit initial fetch for performance
+    ])
     .toArray();
 
   const scoredBills = allBills.map(bill => {
@@ -93,9 +95,12 @@ export async function getRelatedBills(
       score += summarySimilarity * 25; // Weight: 25 points max
     }
     
-    // Jurisdiction bonus (same state/federal)
+    // Jurisdiction bonus for diversity
     if (currentBill.jurisdictionName === bill.jurisdictionName) {
-      score += 10; // Weight: 10 points
+      score += 8; // Slight bonus for same jurisdiction
+    } else {
+      // Small bonus for different jurisdictions to encourage diversity
+      score += 3;
     }
     
     // Date proximity bonus (recent bills are more relevant)
@@ -125,11 +130,40 @@ export async function getRelatedBills(
     } as RelatedBill;
   });
   
-  // Sort by score and return top results
-  return scoredBills
+  // Sort by score and ensure strict geographic diversity
+  const sortedBills = scoredBills
     .filter(bill => bill.score > 0) // Only return bills with some similarity
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+
+  // Strict diversity: force one bill per jurisdiction, prioritizing different jurisdictions
+  const currentJurisdiction = currentBill.jurisdictionName;
+  const seenJurisdictions = new Set<string>();
+  const diverseResults: RelatedBill[] = [];
+  
+  // First pass: collect the best bill from each different jurisdiction
+  for (const bill of sortedBills) {
+    if (bill.jurisdictionName !== currentJurisdiction && 
+        !seenJurisdictions.has(bill.jurisdictionName) &&
+        diverseResults.length < limit) {
+      diverseResults.push(bill);
+      seenJurisdictions.add(bill.jurisdictionName);
+    }
+  }
+  
+  // Second pass: if we still have space and the current jurisdiction has good matches, add them
+  if (diverseResults.length < limit) {
+    const sameJurisdictionBills = sortedBills.filter(bill => 
+      bill.jurisdictionName === currentJurisdiction
+    );
+    
+    for (const bill of sameJurisdictionBills) {
+      if (diverseResults.length < limit) {
+        diverseResults.push(bill);
+      }
+    }
+  }
+
+  return diverseResults;
 }
 
 function calculateTextSimilarity(text1: string, text2: string): number {
