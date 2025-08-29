@@ -55,6 +55,46 @@ const getGerrymanderingColor = (score: number): string => {
   return '#3b82f6';
 };
 
+// Performance optimization: Memoized topic heatmap color function with gradual spectrum
+const getTopicHeatmapColor = (score: number): string => {
+  // Create a smooth gradient from light to dark blue
+  // Light means low activity, dark means high activity
+  if (score === 0) return '#f8f9fa'; // Very light gray for no data
+
+  // Ensure score is between 0 and 1
+  const normalizedScore = Math.max(0, Math.min(1, score));
+
+  // Create a more dynamic gradient - use RGB interpolation for smoother transitions
+  const lightBlue = { r: 173, g: 216, b: 230 }; // Light blue
+  const darkBlue = { r: 25, g: 25, b: 112 }; // Dark blue
+
+  const r = Math.round(lightBlue.r + (darkBlue.r - lightBlue.r) * normalizedScore);
+  const g = Math.round(lightBlue.g + (darkBlue.g - lightBlue.g) * normalizedScore);
+  const b = Math.round(lightBlue.b + (darkBlue.b - lightBlue.b) * normalizedScore);
+
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+// Performance optimization: Memoized representative heatmap color function with gradual spectrum
+const getRepHeatmapColor = (score: number): string => {
+  // Create a smooth gradient from light to dark purple
+  // Light means low activity, dark means high activity
+  if (score === 0) return '#f8f9fa'; // Very light gray for no data
+
+  // Ensure score is between 0 and 1
+  const normalizedScore = Math.max(0, Math.min(1, score));
+
+  // Create a more dynamic gradient - use RGB interpolation for smoother transitions
+  const lightPurple = { r: 221, g: 160, b: 221 }; // Light purple/plum
+  const darkPurple = { r: 75, g: 0, b: 130 }; // Dark purple/indigo
+
+  const r = Math.round(lightPurple.r + (darkPurple.r - lightPurple.r) * normalizedScore);
+  const g = Math.round(lightPurple.g + (darkPurple.g - lightPurple.g) * normalizedScore);
+  const b = Math.round(lightPurple.b + (darkPurple.b - lightPurple.b) * normalizedScore);
+
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 // Performance optimization: Cache for API responses
 const apiCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
 
@@ -197,18 +237,35 @@ export const InteractiveMap = React.memo(() => {
     const [districtReps, setDistrictReps] = useState<any[]>([]); // Store reps for selected district
     const [districtPopupLatLng, setDistrictPopupLatLng] = useState<any>(null); // Popup position
     const mapRef = useRef<any>(null);
-    
+
     const [showPartyAffiliation, setShowPartyAffiliation] = useState<boolean>(false);
     const [districtPartyMapping, setDistrictPartyMapping] = useState<Record<string, string>>({});
     const [partyDataLoading, setPartyDataLoading] = useState<boolean>(false);
     const [partyDataError, setPartyDataError] = useState<string | null>(null);
-    
+
     // Gerrymandering state
     const [showGerrymandering, setShowGerrymandering] = useState<boolean>(false);
     const [gerryScores, setGerryScores] = useState<Record<string, number>>({});
     const [gerryDataLoading, setGerryDataLoading] = useState<boolean>(false);
     const [gerryDataError, setGerryDataError] = useState<string | null>(null);
-    
+
+    // Topic heatmap state
+    const [showTopicHeatmap, setShowTopicHeatmap] = useState<boolean>(false);
+    const [topicScores, setTopicScores] = useState<Record<string, number>>({});
+    const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+    const [selectedTopic, setSelectedTopic] = useState<string>('all');
+    const [topicDataLoading, setTopicDataLoading] = useState<boolean>(false);
+    const [topicDataError, setTopicDataError] = useState<string | null>(null);
+
+    // Representative heatmap state
+    const [showRepHeatmap, setShowRepHeatmap] = useState<boolean>(false);
+    const [repScores, setRepScores] = useState<Record<string, number>>({});
+    const [repDetails, setRepDetails] = useState<Record<string, any>>({});
+    const [selectedRepMetric, setSelectedRepMetric] = useState<string>('sponsored_bills');
+    const [repDataLoading, setRepDataLoading] = useState<boolean>(false);
+    const [repDataError, setRepDataError] = useState<string | null>(null);
+    const [availableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity']);
+
 
     useEffect(() => {
         setIsClient(true);
@@ -286,7 +343,7 @@ export const InteractiveMap = React.memo(() => {
         setPartyDataLoading(true);
         setPartyDataError(null);
         setDistrictPartyMapping({});
-        
+
         try {
             const url = `/api/dashboard/representatives/${chamber}`;
             const result = await cachedFetch(url, 300000); // 5 minutes cache
@@ -393,6 +450,86 @@ export const InteractiveMap = React.memo(() => {
         setStateDetails(null);
         fetchStateDetails(stateAbbr);
     };
+
+    const fetchTopicHeatmapData = async (districtType: string, selectedTopic: string) => {
+        setTopicDataLoading(true);
+        setTopicDataError(null);
+        setTopicScores({});
+
+        try {
+            const url = `/api/dashboard/topic-heatmap?type=${districtType}&topic=${selectedTopic}`;
+            const result = await cachedFetch(url, 600000); // 10 minutes cache
+
+            if (result.success && result.scores) {
+                setTopicScores(result.scores);
+                // Set available topics from API response
+                if (result.availableTopics) {
+                    setAvailableTopics(result.availableTopics);
+                }
+            } else {
+                throw new Error(result.error || 'No topic data returned');
+            }
+        } catch (error) {
+            console.error('Error fetching topic heatmap data:', error);
+            setTopicDataError(error instanceof Error ? error.message : 'Unknown error');
+            setTopicScores({});
+        } finally {
+            setTopicDataLoading(false);
+        }
+    };
+
+    const fetchRepresentativeHeatmapData = async (districtType: string, metric: string) => {
+        setRepDataLoading(true);
+        setRepDataError(null);
+        setRepScores({});
+        setRepDetails({});
+
+        try {
+            const url = `/api/dashboard/representative-heatmap?type=${districtType}&metric=${metric}`;
+            const result = await cachedFetch(url, 600000); // 10 minutes cache
+
+            if (result.success && result.scores) {
+                setRepScores(result.scores);
+                // Set details from API response
+                if (result.details) {
+                    setRepDetails(result.details);
+                }
+            } else {
+                throw new Error(result.error || 'No representative data returned');
+            }
+        } catch (error) {
+            console.error('Error fetching representative heatmap data:', error);
+            setRepDataError(error instanceof Error ? error.message : 'Unknown error');
+            setRepScores({});
+        } finally {
+            setRepDataLoading(false);
+        }
+    };
+
+    // Performance optimization: Memoize topic and representative data fetching functions
+    const memoizedFetchTopicHeatmapData = useCallback(debounce(fetchTopicHeatmapData, 500), []);
+    const memoizedFetchRepresentativeHeatmapData = useCallback(debounce(fetchRepresentativeHeatmapData, 500), []);
+
+    // Effect to fetch topic heatmap data when topic heatmap is enabled
+    useEffect(() => {
+        if (showTopicHeatmap) {
+            const districtType = mapMode;
+            memoizedFetchTopicHeatmapData(districtType, selectedTopic);
+        } else {
+            setTopicScores({});
+        }
+    }, [showTopicHeatmap, mapMode, memoizedFetchTopicHeatmapData, selectedTopic]);
+
+    // Effect to fetch representative heatmap data when representative heatmap is enabled
+    useEffect(() => {
+        if (showRepHeatmap) {
+            const districtType = mapMode;
+            const metric = selectedRepMetric;
+            memoizedFetchRepresentativeHeatmapData(districtType, metric);
+        } else {
+            setRepScores({});
+        }
+    }, [showRepHeatmap, mapMode, selectedRepMetric, memoizedFetchRepresentativeHeatmapData]);
 
     const getStateColor = useCallback((stateAbbr: string) => {
         const state = stateStats[stateAbbr];
@@ -606,7 +743,7 @@ export const InteractiveMap = React.memo(() => {
                                         disabled={partyDataLoading}
                                     />
                                 </div>
-                                
+
                                 {/* Party affiliation loading/error state */}
                                 {partyDataLoading && (
                                     <div className="flex items-center space-x-2 text-xs text-muted-foreground">
@@ -614,13 +751,13 @@ export const InteractiveMap = React.memo(() => {
                                         <span>Loading party data...</span>
                                     </div>
                                 )}
-                                
+
                                 {partyDataError && (
                                     <div className="text-xs text-red-500">
                                         Error loading party data: {partyDataError}
                                     </div>
                                 )}
-                                
+
                                 {/* Party legend - only show when party affiliation is enabled and data is loaded */}
                                 {showPartyAffiliation && !partyDataLoading && Object.keys(districtPartyMapping).length > 0 && (
                                     <div className="space-y-2">
@@ -629,7 +766,7 @@ export const InteractiveMap = React.memo(() => {
                                             {/* Always show all party categories */}
                                             {Object.keys(PARTY_COLORS).map(party => (
                                                 <div key={party} className="flex items-center space-x-1">
-                                                    <div 
+                                                    <div
                                                         className="w-3 h-3 rounded-sm"
                                                         style={{ backgroundColor: PARTY_COLORS[party] }}
                                                     ></div>
@@ -668,7 +805,7 @@ export const InteractiveMap = React.memo(() => {
                                         disabled={gerryDataLoading}
                                     />
                                 </div>
-                                
+
                                 {/* Gerrymandering loading/error state */}
                                 {gerryDataLoading && (
                                     <div className="flex items-center space-x-2 text-xs text-muted-foreground">
@@ -676,13 +813,13 @@ export const InteractiveMap = React.memo(() => {
                                         <span>Calculating compactness scores...</span>
                                     </div>
                                 )}
-                                
+
                                 {gerryDataError && (
                                     <div className="text-xs text-red-500">
                                         Error loading gerrymandering data: {gerryDataError}
                                     </div>
                                 )}
-                                
+
                                 {/* Gerrymandering legend - only show when gerrymandering is enabled and data is loaded */}
                                 {showGerrymandering && !gerryDataLoading && Object.keys(gerryScores).length > 0 && (
                                     <div className="space-y-2">
@@ -718,6 +855,199 @@ export const InteractiveMap = React.memo(() => {
                         )}
 
 
+                        {/* Topic Heatmap Toggle - Only show for district modes */}
+                        {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
+                            <div className="space-y-2 md:space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-xs md:text-sm">
+                                            <span className="hidden sm:inline">Topic Heatmap</span>
+                                            <span className="sm:hidden">Topic Heat</span>
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            <span className="hidden sm:inline">Color districts by legislative topic activity</span>
+                                            <span className="sm:hidden">Show topic activity</span>
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={showTopicHeatmap}
+                                        onCheckedChange={(checked) => {
+                                            setShowTopicHeatmap(checked);
+                                            // Disable other heatmaps when topic heatmap is enabled
+                                            if (checked) {
+                                                setShowPartyAffiliation(false);
+                                                setShowGerrymandering(false);
+                                                setShowRepHeatmap(false);
+                                            }
+                                        }}
+                                        disabled={topicDataLoading}
+                                    />
+                                </div>
+
+                                {/* Topic selector - only show when topic heatmap is enabled */}
+                                {showTopicHeatmap && availableTopics.length > 0 && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium">Select Topic:</label>
+                                        <select
+                                            value={selectedTopic}
+                                            onChange={(e) => setSelectedTopic(e.target.value)}
+                                            className="w-full text-xs border rounded px-2 py-1 bg-background"
+                                            disabled={topicDataLoading}
+                                        >
+                                            <option value="all">All Topics</option>
+                                            {availableTopics.map(topic => (
+                                                <option key={topic} value={topic}>{topic}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Topic heatmap loading/error state */}
+                                {topicDataLoading && (
+                                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                                        <span>Loading topic data...</span>
+                                    </div>
+                                )}
+
+                                {topicDataError && (
+                                    <div className="text-xs text-red-500">
+                                        Error loading topic data: {topicDataError}
+                                    </div>
+                                )}
+
+                                {/* Topic legend - only show when topic heatmap is enabled and data is loaded */}
+                                {showTopicHeatmap && !topicDataLoading && Object.keys(topicScores).length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="font-medium text-xs">Activity Scale</h5>
+                                        <div className="flex flex-wrap gap-2 text-xs">
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(25, 25, 112)' }}></div>
+                                                <span>High Activity</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(99, 120, 171)' }}></div>
+                                                <span>Medium Activity</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(173, 216, 230)' }}></div>
+                                                <span>Low Activity</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div>
+                                                <span>No Data</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Blue gradient: light blue = low activity, dark blue = high activity. Based on legislative activity in the selected topic area.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Representative Heatmap Toggle - Only show for district modes */}
+                        {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
+                            <div className="space-y-2 md:space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-xs md:text-sm">
+                                            <span className="hidden sm:inline">Representative Heatmap</span>
+                                            <span className="sm:hidden">Rep Heatmap</span>
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            <span className="hidden sm:inline">Color districts by representative metrics</span>
+                                            <span className="sm:hidden">Show rep metrics</span>
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={showRepHeatmap}
+                                        onCheckedChange={(checked) => {
+                                            setShowRepHeatmap(checked);
+                                            // Disable other heatmaps when rep heatmap is enabled
+                                            if (checked) {
+                                                setShowPartyAffiliation(false);
+                                                setShowGerrymandering(false);
+                                                setShowTopicHeatmap(false);
+                                            }
+                                        }}
+                                        disabled={repDataLoading}
+                                    />
+                                </div>
+
+                                {/* Representative metric selector - only show when rep heatmap is enabled */}
+                                {showRepHeatmap && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium">Select Metric:</label>
+                                        <select
+                                            value={selectedRepMetric}
+                                            onChange={(e) => setSelectedRepMetric(e.target.value)}
+                                            className="w-full text-xs border rounded px-2 py-1 bg-background"
+                                            disabled={repDataLoading}
+                                        >
+                                            {availableRepMetrics.map(metric => (
+                                                <option key={metric} value={metric}>
+                                                    {metric === 'sponsored_bills' ? 'Bills Sponsored' :
+                                                     metric === 'recent_activity' ? 'Recent Activity' : metric}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Representative heatmap loading/error state */}
+                                {repDataLoading && (
+                                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                                        <span>Loading representative data...</span>
+                                    </div>
+                                )}
+
+                                {repDataError && (
+                                    <div className="text-xs text-red-500">
+                                        Error loading representative data: {repDataError}
+                                    </div>
+                                )}
+
+                                {/* Representative legend - only show when rep heatmap is enabled and data is loaded */}
+                                {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="font-medium text-xs">
+                                            {selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' :
+                                             selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Score Scale'}
+                                        </h5>
+                                        <div className="flex flex-wrap gap-2 text-xs">
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(75, 0, 130)' }}></div>
+                                                <span>Highest</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(121, 48, 158)' }}></div>
+                                                <span>High</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(148, 80, 175)' }}></div>
+                                                <span>Medium</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(221, 160, 221)' }}></div>
+                                                <span>Low</span>
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div>
+                                                <span>No Data</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            {selectedRepMetric === 'sponsored_bills' ? 'Purple gradient: light purple = fewer bills sponsored in 2025, dark purple = more bills sponsored in 2025.' :
+                                             selectedRepMetric === 'recent_activity' ? 'Purple gradient: light purple = older data updates, dark purple = more recent data updates.' :
+                                             'Purple gradient based on normalized scores from 0-1.'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Map Container with district overlays */}
                         <div className="relative">
                             <div className="h-[300px] sm:h-[400px] md:h-[500px] w-full rounded-md overflow-hidden border">
@@ -737,6 +1067,13 @@ export const InteractiveMap = React.memo(() => {
                                         showGerrymandering={showGerrymandering}
                                         gerryScores={gerryScores}
                                         getGerrymanderingColor={getGerrymanderingColor}
+                                        showTopicHeatmap={showTopicHeatmap}
+                                        topicScores={topicScores}
+                                        getTopicHeatmapColor={getTopicHeatmapColor}
+                                        showRepHeatmap={showRepHeatmap}
+                                        repScores={repScores}
+                                        repDetails={repDetails}
+                                        getRepHeatmapColor={getRepHeatmapColor}
                                         popupMarker={districtPopupLatLng ? {
                                             lng: districtPopupLatLng.lng,
                                             lat: districtPopupLatLng.lat,
@@ -1149,3 +1486,5 @@ export const InteractiveMap = React.memo(() => {
         </AnimatedSection>
     );
 });
+
+

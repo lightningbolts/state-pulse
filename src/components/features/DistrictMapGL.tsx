@@ -27,6 +27,15 @@ interface DistrictMapGLProps {
   showGerrymandering?: boolean;
   gerryScores?: Record<string, number>; // district ID -> Polsby-Popper score
   getGerrymanderingColor?: (score: number) => string; // score -> color
+  // Representative heatmap coloring
+  showRepHeatmap?: boolean;
+  repScores?: Record<string, number>; // district ID -> score (0-1)
+  repDetails?: Record<string, any>; // district ID -> rep details
+  getRepHeatmapColor?: (score: number) => string; // score -> color
+  // Topic heatmap coloring
+  showTopicHeatmap?: boolean;
+  topicScores?: Record<string, number>; // district ID -> score (0-1)
+  getTopicHeatmapColor?: (score: number) => string; // score -> color
 }
 
 // Performance optimization: Memoize the component to prevent unnecessary re-renders
@@ -43,14 +52,75 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   showGerrymandering = false,
   gerryScores = {},
   getGerrymanderingColor = () => '#e0e0e0',
+  showRepHeatmap = false,
+  repScores = {},
+  repDetails = {},
+  getRepHeatmapColor = () => '#e0e0e0',
+  showTopicHeatmap = false,
+  topicScores = {},
+  getTopicHeatmapColor = () => '#e0e0e0',
 }) => {
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
 
   // Performance optimization: Memoize the fill color expression to prevent recalculation on every render
   const fillColorExpression = React.useMemo((): any => {
-    // Priority: Gerrymandering > Party Affiliation > Default Color
-    
+    // Priority: Topic Heatmap > Representative Heatmap > Gerrymandering > Party Affiliation > Default Color
+
+    const NO_DATA_COLOR = '#f8f9fa';
+
+    // Topic heatmap coloring takes precedence
+    if (showTopicHeatmap && Object.keys(topicScores).length > 0) {
+      const caseExpression: any[] = ['case'];
+
+      // Performance optimization: Batch process entries for better performance
+      const topicEntries = Object.entries(topicScores);
+      topicEntries.forEach(([districtId, score]) => {
+        const topicColor = getTopicHeatmapColor(score);
+
+        // Create an OR condition to match any of the possible ID fields
+        caseExpression.push([
+          'any',
+          ['==', ['get', 'GEOID'], districtId],
+          ['==', ['get', 'GEOIDFQ'], districtId],
+          ['==', ['get', 'ID'], districtId],
+          ['==', ['get', 'DISTRICT'], districtId]
+        ]);
+        caseExpression.push(topicColor);
+      });
+
+      // Default fallback color for unmapped features when heatmap active
+      caseExpression.push(NO_DATA_COLOR);
+
+      return caseExpression;
+    }
+
+    // Representative heatmap coloring
+    if (showRepHeatmap && Object.keys(repScores).length > 0) {
+      const caseExpression: any[] = ['case'];
+
+      // Performance optimization: Batch process entries for better performance
+      const repEntries = Object.entries(repScores);
+      repEntries.forEach(([districtId, score]) => {
+        const repColor = getRepHeatmapColor(score);
+
+        // Create an OR condition to match any of the possible ID fields
+        caseExpression.push([
+          'any',
+          ['==', ['get', 'GEOID'], districtId],
+          ['==', ['get', 'GEOIDFQ'], districtId],
+          ['==', ['get', 'ID'], districtId],
+          ['==', ['get', 'DISTRICT'], districtId]
+        ]);
+        caseExpression.push(repColor);
+      });
+
+      // Default fallback color for unmapped features when heatmap active
+      caseExpression.push(NO_DATA_COLOR);
+
+      return caseExpression;
+    }
+
     // Gerrymandering coloring takes precedence
     if (showGerrymandering && Object.keys(gerryScores).length > 0) {
       const caseExpression: any[] = ['case'];
@@ -71,13 +141,9 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         caseExpression.push(gerryColor);
       });
       
-      // Default fallback color
-      let fallbackColor = color;
-      if (color.includes('var(')) {
-        fallbackColor = '#e0e0e0'; // Gray fallback
-      }
-      caseExpression.push(fallbackColor);
-      
+      // Default fallback color for unmapped features when overlay active
+      caseExpression.push(NO_DATA_COLOR);
+
       return caseExpression;
     }
     
@@ -101,14 +167,9 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         caseExpression.push(partyColor);
       });
       
-      // Default fallback color - ensure it's not a CSS variable
-      let fallbackColor = color;
-      if (color.includes('var(')) {
-        console.warn('[DistrictMapGL] CSS variable detected in fallback color, using hardcoded fallback');
-        fallbackColor = '#2563eb'; // Blue fallback
-      }
-      caseExpression.push(fallbackColor);
-      
+      // Default fallback color for unmapped features when overlay active
+      caseExpression.push(NO_DATA_COLOR);
+
       return caseExpression;
     }
     
@@ -119,7 +180,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
       defaultColor = '#2563eb'; // Blue fallback
     }
     return defaultColor;
-  }, [showPartyAffiliation, districtPartyMapping, partyColors, showGerrymandering, gerryScores, getGerrymanderingColor, color]);
+  }, [showPartyAffiliation, districtPartyMapping, partyColors, showGerrymandering, gerryScores, getGerrymanderingColor, showRepHeatmap, repScores, repDetails, getRepHeatmapColor, showTopicHeatmap, topicScores, getTopicHeatmapColor, color]);
 
   // Performance optimization: Memoize the click handler to prevent recreation on every render
   const handleClick = React.useCallback((event: any) => {
@@ -176,13 +237,13 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   // Performance optimization: Memoize layer paint properties
   const layerFillPaint = React.useMemo(() => ({
     'fill-color': fillColorExpression,
-    'fill-opacity': (showPartyAffiliation || showGerrymandering) ? 0.75 : 0.08,
-  }), [fillColorExpression, showPartyAffiliation, showGerrymandering]);
+    'fill-opacity': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 0.75 : 0.08,
+  }), [fillColorExpression, showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap]);
 
   const layerLinePaint = React.useMemo(() => ({
-    'line-color': (showPartyAffiliation || showGerrymandering) ? '#333333' : (color.includes('var(') ? '#2563eb' : color),
-    'line-width': (showPartyAffiliation || showGerrymandering) ? 1 : 2,
-  }), [showPartyAffiliation, showGerrymandering, color]);
+    'line-color': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? '#000000' : (color.includes('var(') ? '#2563eb' : color),
+    'line-width': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 1 : 2,
+  }), [showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, color]);
 
   return (
     <Map
