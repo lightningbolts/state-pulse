@@ -8,8 +8,9 @@ export async function upsertExecutiveOrder(order: Omit<ExecutiveOrder, 'createdA
 
   const now = new Date();
 
-  // Separate the data that should always be updated vs data that should only be set on insert
-  const updateData = { ...order, updatedAt: now };
+  // Remove any existing createdAt and separate update vs insert data
+  const { createdAt, ...orderData } = order as any;
+  const updateData = { ...orderData, updatedAt: now };
 
   const result = await collection.updateOne(
     { id: order.id },

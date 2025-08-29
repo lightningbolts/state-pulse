@@ -34,9 +34,12 @@ export async function fetchAllExecutiveOrders(options: FetchOptions = {}) {
   console.log('Starting executive orders fetch pipeline...');
   console.log(`Options: Federal=${includeFederal}, Whitehouse=${includeWhitehouse}, Governors=${includeGovernors}, CutoffDate=${cutoffDate}, Summaries=${processSummaries}`);
 
+  let client;
+
   try {
     // Connect to database
-    await connectToDatabase();
+    const dbConn = await connectToDatabase();
+    client = dbConn.client;
     console.log('Connected to MongoDB');
 
     let federalCount = 0;
@@ -96,6 +99,15 @@ export async function fetchAllExecutiveOrders(options: FetchOptions = {}) {
   } catch (error) {
     console.error('Fatal error in executive orders pipeline:', error);
     process.exit(1);
+  } finally {
+    if (client) {
+      try {
+        await client.close();
+        console.log('MongoDB connection closed');
+      } catch (err) {
+        console.error('Error closing MongoDB connection:', err);
+      }
+    }
   }
 }
 
