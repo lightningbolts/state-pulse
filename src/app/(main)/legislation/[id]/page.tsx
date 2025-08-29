@@ -1,5 +1,4 @@
 import { getLegislationById } from '@/services/legislationService';
-import { getRelatedBills } from '@/services/relatedBillsService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CalendarDays, FileText, Tag, Info } from 'lucide-react';
@@ -9,9 +8,11 @@ import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
-import { RelatedBills } from '@/components/features/RelatedBills';
+import { RelatedBillsWrapper } from '@/components/features/RelatedBillsWrapper';
+import { RelatedBillsLoading } from '@/components/features/RelatedBillsLoading';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -64,6 +65,8 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     );
   }
   // console.log(params, "Params in LegislationDetailPage");
+  
+  // Load legislation first, then related bills for better performance
   const legislation = await getLegislationById(id);
 
   if (!legislation) {
@@ -85,8 +88,8 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     );
   }
 
-  // Get related bills
-  const relatedBills = await getRelatedBills(legislation, 3);
+  // Get related bills after we confirm legislation exists
+  // const relatedBills = await getRelatedBills(legislation, 3);
 
   const {
     identifier,
@@ -249,7 +252,9 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
           <AnimatedSection><CollapsibleTimeline historyEvents={history} /></AnimatedSection>
 
           <AnimatedSection>
-            <RelatedBills relatedBills={relatedBills} />
+            <Suspense fallback={<RelatedBillsLoading />}>
+              <RelatedBillsWrapper legislation={legislation} />
+            </Suspense>
           </AnimatedSection>
 
           <AnimatedSection>
