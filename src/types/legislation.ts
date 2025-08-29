@@ -17,6 +17,7 @@ export interface Legislation {
   sources?: any[];
   abstracts?: any[];
   openstatesUrl?: string;
+  congressUrl?: string;
   firstActionAt?: Date | null;
   latestActionAt?: Date | null;
   latestActionDescription?: string | null;
@@ -94,6 +95,7 @@ export interface RelatedLegislation {
   abstracts?: { abstract: string }[];
   geminiSummary?: string;
   openstatesUrl?: string;
+  congressUrl?: string;
   topicClassification?: {
     broadTopics: string[];
     narrowTopics: string[];

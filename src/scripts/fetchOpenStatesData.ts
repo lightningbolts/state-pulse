@@ -1123,7 +1123,7 @@ async function fetchCongressBills(updatedSince: string) {
               }
             }
             // Only summarize if geminiSummary is missing or less than 100 chars
-            if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
+            if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100 || !legislationToStore.longGeminiSummary || legislationToStore.longGeminiSummary.length < 250) {
               const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
               legislationToStore.geminiSummary = summary;
               legislationToStore.geminiSummarySource = sourceType;
