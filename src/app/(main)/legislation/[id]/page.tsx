@@ -1,4 +1,5 @@
 import { getLegislationById } from '@/services/legislationService';
+import { getRelatedBills } from '@/services/relatedBillsService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CalendarDays, FileText, Tag, Info } from 'lucide-react';
@@ -8,6 +9,7 @@ import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
+import { RelatedBills } from '@/components/features/RelatedBills';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
 
@@ -82,6 +84,9 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
       </Card>
     );
   }
+
+  // Get related bills
+  const relatedBills = await getRelatedBills(legislation, 3);
 
   const {
     identifier,
@@ -242,6 +247,10 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
           )}
 
           <AnimatedSection><CollapsibleTimeline historyEvents={history} /></AnimatedSection>
+
+          <AnimatedSection>
+            <RelatedBills relatedBills={relatedBills} />
+          </AnimatedSection>
 
           <AnimatedSection>
             <VotingPredictionSection legislationId={id} />
