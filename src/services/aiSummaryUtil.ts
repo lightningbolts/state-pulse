@@ -4,11 +4,132 @@ import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
 import { Legislation } from '../types/legislation';
 
-export async function generateGeminiSummary(text: string): Promise<string> {
+export async function generateGeminiSummary(text: string, sourceType?: string): Promise<string> {
   // Use Gemini to generate a ~100-word summary
   const prompt = `Summarize the following legislation in 100 words, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.'\n\n${text}`;
   const response = await ai.generate({ prompt });
   return response.text.trim();
+}
+
+/**
+ * Optimized function that determines source type from text characteristics and generates appropriate summaries
+ */
+export async function generateOptimizedGeminiSummary(text: string, detectedSourceType: string): Promise<{ summary: string; longSummary: string | null; sourceType: string }> {
+  // Determine if this is a rich source that warrants detailed summary
+  const isRichSource = ['pdf-extracted', 'pdf', 'full-text', 'ilga-pdf', 'ilga-fulltext'].includes(detectedSourceType);
+  
+  if (!isRichSource || text.length < 500) {
+    // For non-rich sources or short text, just generate regular summary
+    const summary = await generateGeminiSummary(text);
+    return { summary, longSummary: null, sourceType: detectedSourceType };
+  }
+
+  // For rich sources, generate both summaries in one call to save tokens and API calls
+  const prompt = `Please provide TWO summaries of the following legislation:
+
+**SUMMARY 1 - BRIEF (exactly ~100 words):**
+Summarize this legislation in approximately 100 words, focusing on the main points and specific impact. Remove fluff and filler.
+
+**SUMMARY 2 - DETAILED (3-5 paragraphs):**
+Provide a comprehensive, detailed analysis that includes:
+- **Key Provisions**: What the legislation specifically does, changes, or establishes
+- **Impact Analysis**: Who this affects and how (citizens, businesses, government agencies, etc.)  
+- **Implementation Details**: Timeline, funding mechanisms, enforcement procedures
+- **Direct Citations**: Quote specific sections or language from the text when relevant
+
+Format the detailed summary using a mix of paragraphs and bullet points where appropriate. Keep paragraphs to 3-4 sentences for readability.
+
+Please clearly separate the two summaries with "---DETAILED---" between them.
+
+Legislation text:
+${text}`;
+
+  const response = await ai.generate({ prompt });
+  const fullResponse = response.text.trim();
+
+  // Split the response into brief and detailed summaries
+  const parts = fullResponse.split('---DETAILED---');
+
+  if (parts.length >= 2) {
+    const summary = parts[0].trim();
+    const longSummary = parts[1].trim();
+    return { summary, longSummary, sourceType: detectedSourceType };
+  } else {
+    // Fallback if parsing fails - use the whole response as summary
+    console.warn('Failed to parse dual summary response, falling back to single summary');
+    return { summary: fullResponse, longSummary: null, sourceType: detectedSourceType };
+  }
+}
+
+export async function generateGeminiDetailedSummary(text: string): Promise<string> {
+  // @deprecated Use generateOptimizedGeminiSummary instead for better performance
+  // Use Gemini to generate a detailed, longer summary with citations
+  const prompt = `Provide a comprehensive, detailed analysis of this legislation. Your response should be 3-5 paragraphs long and include:
+
+1. **Key Provisions**: What the legislation specifically does, changes, or establishes
+2. **Impact Analysis**: Who this affects and how (citizens, businesses, government agencies, etc.)
+3. **Implementation Details**: Timeline, funding mechanisms, enforcement procedures
+4. **Direct Citations**: Quote specific sections or language from the text when relevant
+
+Format your response using a mix of paragraphs and bullet points where appropriate. Keep paragraphs to 3-4 sentences for readability. Use direct quotes from the source text to support your analysis.
+
+If the text is insufficient for detailed analysis, provide what analysis you can and note the limitations.
+
+Legislation text:
+${text}`;
+
+  const response = await ai.generate({ prompt });
+  return response.text.trim();
+}
+
+/**
+ * Efficiently generates both short and long summaries in a single Gemini call for rich sources
+ */
+export async function generateGeminiDualSummary(text: string, sourceType: string): Promise<{ summary: string; longSummary: string | null }> {
+  // Check if this is a rich source that warrants a detailed summary
+  const isRichSource = ['pdf-extracted', 'pdf', 'full-text', 'ilga-pdf', 'ilga-fulltext'].includes(sourceType);
+
+  if (!isRichSource || text.length < 500) {
+    // For non-rich sources or short text, just generate regular summary
+    const summary = await generateGeminiSummary(text);
+    return { summary, longSummary: null };
+  }
+
+  // For rich sources, generate both summaries in one call
+  const prompt = `Please provide TWO summaries of the following legislation:
+
+**SUMMARY 1 - BRIEF (exactly ~100 words):**
+Summarize this legislation in approximately 100 words, focusing on the main points and specific impact. Remove fluff and filler.
+
+**SUMMARY 2 - DETAILED (3-5 paragraphs):**
+Provide a comprehensive, detailed analysis that includes:
+- **Key Provisions**: What the legislation specifically does, changes, or establishes
+- **Impact Analysis**: Who this affects and how (citizens, businesses, government agencies, etc.)  
+- **Implementation Details**: Timeline, funding mechanisms, enforcement procedures
+- **Direct Citations**: Quote specific sections or language from the text when relevant
+
+Format the detailed summary using a mix of paragraphs and bullet points where appropriate. Keep paragraphs to 3-4 sentences for readability.
+
+Please clearly separate the two summaries with "---DETAILED---" between them.
+
+Legislation text:
+${text}`;
+
+  const response = await ai.generate({ prompt });
+  const fullResponse = response.text.trim();
+
+  // Split the response into brief and detailed summaries
+  const parts = fullResponse.split('---DETAILED---');
+
+  if (parts.length >= 2) {
+    const summary = parts[0].trim();
+    const longSummary = parts[1].trim();
+    return { summary, longSummary };
+  } else {
+    // Fallback if parsing fails - use the whole response as summary
+    console.warn('Failed to parse dual summary response, falling back to single summary');
+    return { summary: fullResponse, longSummary: null };
+  }
 }
 
 export async function summarizeWithAzure(text: string): Promise<string[]> {
@@ -262,11 +383,286 @@ export async function generateOllamaSummary(text: string, model: string): Promis
 }
 
 /**
+ * Optimized function that extracts text from the richest source and generates appropriate summaries in a single pass
+ */
+export async function summarizeLegislationOptimized(bill: Legislation): Promise<{ summary: string; longSummary: string | null; sourceType: string }> {
+  console.log('[Bill Extraction] Starting optimized summarization for bill:', bill.id);
+  console.log('[DEBUG] Bill versions:', bill.versions);
+  console.log('[DEBUG] Bill sources:', bill.sources);
+  console.log('[DEBUG] Bill abstracts:', bill.abstracts);
+  console.log('[DEBUG] Bill title:', bill.title);
+
+  // For the following states, skip all sources, PDFs, and versions; use abstracts (or title)
+  if (bill.jurisdictionName === 'Iowa' || bill.jurisdictionName === 'Nevada' || bill.jurisdictionName === 'Illinois' || bill.jurisdictionName === 'Ohio' || bill.jurisdictionName === 'Minnesota' || bill.jurisdictionName === 'Vermont' || bill.jurisdictionName === 'Arizona' || bill.jurisdictionName === 'Delaware' || bill.jurisdictionName === 'Nebraska' || (bill.jurisdictionName === 'Texas' && bill.chamber === 'upper')) {
+    if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
+      const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
+      if (abstractsText.trim().length > 20) {
+        const summary = await generateGeminiSummary(abstractsText.trim());
+        return { summary, longSummary: null, sourceType: 'abstracts' };
+      }
+    }
+    // Fallback: bill title
+    const title = bill.title || 'No title available.';
+    const summary = await generateGeminiSummary(title.trim());
+    return { summary, longSummary: null, sourceType: 'title' };
+  }
+
+  // 1. Try ALL PDFs and plain-text versions in bill.versions (including links arrays)
+  if (bill.versions && Array.isArray(bill.versions)) {
+    const sortedVersions = bill.versions.slice().sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA;
+    });
+    for (const version of sortedVersions) {
+      // Try top-level url if present
+      if (version.url && (version.url.endsWith('.pdf') || version.url.endsWith('.txt'))) {
+        console.log('[DEBUG] Checking version URL:', version.url);
+        try {
+          const res = await fetch(version.url);
+          if (res.ok) {
+            let billText = '';
+            let sourceType = '';
+            if (version.url.endsWith('.pdf')) {
+              const buffer = await res.arrayBuffer();
+              const pdfText = await pdf(Buffer.from(buffer));
+              billText = pdfText.text;
+              sourceType = 'pdf-extracted';
+              console.log('[DEBUG] PDF text length:', billText.length);
+            } else {
+              billText = await res.text();
+              sourceType = 'full-text';
+              console.log('[DEBUG] Plain text length:', billText.length);
+            }
+            if (billText && billText.trim().length > 100) {
+              console.log('[Bill Extraction] Using version:', version.url);
+              return await generateOptimizedGeminiSummary(billText.trim(), sourceType);
+            } else {
+              console.log('[Bill Extraction] Skipped version (too short):', version.url, 'Length:', billText ? billText.length : 0);
+            }
+          } else {
+            console.log('[Bill Extraction] Fetch failed for version:', version.url, 'Status:', res.status);
+          }
+        } catch (e) {
+          console.log('[Bill Extraction] Error fetching/parsing version:', version.url, e);
+        }
+      }
+      // Try all links in version.links if present
+      if (Array.isArray(version.links)) {
+        for (const linkObj of version.links) {
+          const linkUrl = linkObj.url || linkObj.href || linkObj.link;
+          if (linkUrl && (linkUrl.endsWith('.pdf') || linkUrl.endsWith('.txt'))) {
+            console.log('[DEBUG] Checking version link URL:', linkUrl);
+            try {
+              const res = await fetch(linkUrl);
+              if (res.ok) {
+                let billText = '';
+                let sourceType = '';
+                if (linkUrl.endsWith('.pdf')) {
+                  const buffer = await res.arrayBuffer();
+                  const pdfText = await pdf(Buffer.from(buffer));
+                  billText = pdfText.text;
+                  sourceType = 'pdf-extracted';
+                  console.log('[DEBUG] PDF text length:', billText.length);
+                } else {
+                  billText = await res.text();
+                  sourceType = 'full-text';
+                  console.log('[DEBUG] Plain text length:', billText.length);
+                }
+                if (billText && billText.trim().length > 100) {
+                  console.log('[Bill Extraction] Using version link:', linkUrl);
+                  return await generateOptimizedGeminiSummary(billText.trim(), sourceType);
+                } else {
+                  console.log('[Bill Extraction] Skipped version link (too short):', linkUrl, 'Length:', billText ? billText.length : 0);
+                }
+              } else {
+                console.log('[Bill Extraction] Fetch failed for version link:', linkUrl, 'Status:', res.status);
+              }
+            } catch (e) {
+              console.log('[Bill Extraction] Error fetching/parsing version link:', linkUrl, e);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Try sources for PDF/text content
+  if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
+    let foundPdfInAnySource = false;
+    for (const source of bill.sources) {
+      if (source.url) {
+        // Illinois-specific logic: fetch FullText page, fallback to PDF if no usable text
+        if (bill.jurisdictionName === 'Illinois' && source.url.includes('ilga.gov/Legislation/BillStatus')) {
+          const fullTextUrl = source.url.replace('/BillStatus', '/BillStatus/FullText');
+          console.log('[ILGA] Fetching Illinois FullText page:', fullTextUrl);
+          try {
+            const res = await fetch(fullTextUrl);
+            if (!res.ok) {
+              console.log('[ILGA] FullText fetch failed:', fullTextUrl, 'Status:', res.status);
+              // Try to find PDF link in the FullText page
+            } else {
+              const textHtml = await res.text();
+              // Extract bill text from <pre> tags
+              const match = textHtml.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+              if (match && match[1] && match[1].trim().length > 100) {
+                const billText = match[1].replace(/<[^>]+>/g, '').trim();
+                console.log('[ILGA] Extracted bill text length:', billText.length);
+                return await generateOptimizedGeminiSummary(billText, 'ilga-fulltext');
+              } else {
+                // Try to find PDF link in the FullText page
+                const pdfMatch = textHtml.match(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/i);
+                if (pdfMatch && pdfMatch[1]) {
+                  let pdfUrl = pdfMatch[1];
+                  if (!pdfUrl.startsWith('http')) {
+                    const base = new URL(fullTextUrl);
+                    pdfUrl = new URL(pdfUrl, base).href;
+                  }
+                  console.log('[ILGA] Fallback: Found PDF link in FullText page:', pdfUrl);
+                  try {
+                    const pdfRes = await fetch(pdfUrl);
+                    if (pdfRes.ok) {
+                      const buffer = await pdfRes.arrayBuffer();
+                      const data = await pdf(Buffer.from(buffer));
+                      if (data.text && data.text.trim().length > 100) {
+                        console.log('[ILGA] Fallback: Using PDF text from FullText page:', pdfUrl);
+                        return await generateOptimizedGeminiSummary(data.text.trim(), 'ilga-pdf');
+                      } else {
+                        console.log('[ILGA] Fallback: PDF text too short:', pdfUrl);
+                      }
+                    } else {
+                      console.log('[ILGA] Fallback: PDF fetch failed:', pdfUrl, 'Status:', pdfRes.status);
+                    }
+                  } catch (e) {
+                    console.log('[ILGA] Fallback: Error fetching/parsing PDF:', pdfUrl, e);
+                  }
+                } else {
+                  console.log('[ILGA] No usable <pre> or PDF found in FullText page:', fullTextUrl);
+                }
+              }
+            }
+          } catch (e) {
+            console.log('[ILGA] Error fetching/parsing FullText page:', fullTextUrl, e);
+          }
+          continue; // Skip normal PDF logic for Illinois
+        }
+        console.log('[DEBUG] Checking source URL:', source.url);
+        try {
+          const res = await fetch(source.url);
+          if (!res.ok) {
+            console.log('[Bill Extraction] Source fetch failed:', source.url, 'Status:', res.status);
+            continue;
+          }
+          const html = await res.text();
+          // Find ALL PDF links in the HTML
+          let pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+          // If no PDF links found and this is a congress.gov bill, try the 'Text' subpage
+          if (pdfLinks.length === 0 && source.url.includes('congress.gov/bill/')) {
+            // More robust regex for the Text tab (allow whitespace, case-insensitive, and possible variations)
+            const textTabMatch = html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*Text\s*<\/a>/i)
+              || html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*Bill Text\s*<\/a>/i)
+              || html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*View Text\s*<\/a>/i);
+            if (textTabMatch) {
+              let textTabUrl = textTabMatch[1];
+              if (!textTabUrl.startsWith('http')) {
+                const base = new URL(source.url);
+                textTabUrl = new URL(textTabUrl, base).href;
+              }
+              console.log('[DEBUG] Following Congress.gov Text tab:', textTabUrl);
+              try {
+                const textRes = await fetch(textTabUrl);
+                if (textRes.ok) {
+                  const textHtml = await textRes.text();
+                  console.log('[DEBUG] First 500 chars of Text tab HTML:', textHtml.slice(0, 500));
+                  pdfLinks = Array.from(textHtml.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+                  console.log('[DEBUG] Found PDF links in Text tab:', pdfLinks);
+                }
+              } catch (e) {
+                console.log('[Bill Extraction] Error fetching/parsing Text tab:', textTabUrl, e);
+              }
+            } else {
+              // Log the HTML snippet around the Text tab match attempt for debugging
+              const snippet = html.slice(0, 2000);
+              console.log('[DEBUG] No Text tab found. First 2000 chars of HTML:', snippet);
+              // Fallback: try fetching the /text subpage directly
+              try {
+                let textTabUrl = source.url.replace(/\/$/, '') + '/text';
+                console.log('[DEBUG] Fallback: Trying direct /text subpage:', textTabUrl);
+                const textRes = await fetch(textTabUrl);
+                if (textRes.ok) {
+                  const textHtml = await textRes.text();
+                  console.log('[DEBUG] First 500 chars of direct /text HTML:', textHtml.slice(0, 500));
+                  pdfLinks = Array.from(textHtml.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+                  console.log('[DEBUG] Found PDF links in direct /text:', pdfLinks);
+                }
+              } catch (e) {
+                console.log('[Bill Extraction] Error fetching/parsing direct /text subpage:', e);
+              }
+            }
+          } else {
+            console.log('[DEBUG] Found PDF links:', pdfLinks);
+          }
+          if (pdfLinks.length === 0) {
+            console.log('[Bill Extraction] No PDF links found in source:', source.url);
+          }
+          for (let pdfUrl of pdfLinks) {
+            if (!pdfUrl.startsWith('http')) {
+              const base = new URL(source.url);
+              pdfUrl = new URL(pdfUrl, base).href;
+            }
+            console.log('[DEBUG] Trying PDF URL:', pdfUrl);
+            try {
+              const pdfRes = await fetch(pdfUrl);
+              if (!pdfRes.ok) {
+                console.log('[Bill Extraction] PDF fetch failed:', pdfUrl, 'Status:', pdfRes.status);
+                continue;
+              }
+              const buffer = await pdfRes.arrayBuffer();
+              const data = await pdf(Buffer.from(buffer));
+              console.log('[DEBUG] PDF text length:', data.text ? data.text.length : 0);
+              if (data.text && data.text.trim().length > 100) {
+                console.log('[Bill Extraction] Using PDF from source:', pdfUrl);
+                foundPdfInAnySource = true;
+                return await generateOptimizedGeminiSummary(data.text.trim(), 'pdf-extracted');
+              } else {
+                console.log('[Bill Extraction] Skipped PDF (too short):', pdfUrl, 'Length:', data.text ? data.text.length : 0);
+              }
+            } catch (e) {
+              console.log('[Bill Extraction] Error fetching/parsing PDF:', pdfUrl, e);
+            }
+          }
+        } catch (e) {
+          console.log('[Bill Extraction] Error fetching/parsing source page:', source.url, e);
+        }
+      }
+    }
+    if (!foundPdfInAnySource) {
+      console.log('[Bill Extraction] No PDFs found in any sources for bill:', bill.id);
+    }
+  }
+  
+  // 3. Try abstracts
+  if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
+    const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
+    if (abstractsText.trim().length > 20) {
+      const summary = await generateGeminiSummary(abstractsText.trim());
+      return { summary, longSummary: null, sourceType: 'abstracts' };
+    }
+  }
+  
+  // 4. Fallback: bill title
+  const title = bill.title || 'No title available.';
+  const summary = await generateGeminiSummary(title.trim());
+  return { summary, longSummary: null, sourceType: 'title' };
+}
+
+/**
  * Generates a summary for a bill using the richest available information, in priority order:
  * 1. PDF text from bill versions
  * 2. Text from first sources.url
  * 3. Concatenated abstracts
  * 4. Bill title
+ * @deprecated Use summarizeLegislationOptimized instead for better performance and reduced API calls
  */
 export async function summarizeLegislationRichestSource(bill: Legislation): Promise<{ summary: string, sourceType: string }> {
   console.log('[Bill Extraction] Starting richest source summarization for bill:', bill.id);
@@ -433,7 +829,6 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
           }
           continue; // Skip normal PDF logic for Illinois
         }
-        // ...existing code for other states and Congress.gov...
         console.log('[DEBUG] Checking source URL:', source.url);
         try {
           const res = await fetch(source.url);
@@ -544,4 +939,155 @@ export async function summarizeLegislationRichestSource(bill: Legislation): Prom
   const title = bill.title || 'No title available.';
   const summary = await generateGeminiSummary(title.trim());
   return { summary: String(summary), sourceType: 'title' };
+}
+
+/**
+ * Extracts the richest full text content from a bill for detailed summarization.
+ * Returns the full text content and source type for bills that have PDF or full text sources.
+ * @deprecated This function is now redundant as summarizeLegislationOptimized handles extraction and summarization in one pass
+ */
+export async function extractLegislationFullText(bill: Legislation): Promise<{ fullText: string | null, sourceType: string }> {
+  console.log('[Bill Full Text Extraction] Starting for bill:', bill.id);
+
+  // For the following states, skip all sources, PDFs, and versions; use abstracts (or title)
+  if (bill.jurisdictionName === 'Iowa' || bill.jurisdictionName === 'Nevada' || bill.jurisdictionName === 'Illinois' || bill.jurisdictionName === 'Ohio' || bill.jurisdictionName === 'Minnesota' || bill.jurisdictionName === 'Vermont' || bill.jurisdictionName === 'Arizona' || bill.jurisdictionName === 'Delaware' || bill.jurisdictionName === 'Nebraska' || (bill.jurisdictionName === 'Texas' && bill.chamber === 'upper')) {
+    if (bill.abstracts && Array.isArray(bill.abstracts) && bill.abstracts.length > 0) {
+      const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
+      if (abstractsText.trim().length > 20) {
+        return { fullText: abstractsText.trim(), sourceType: 'abstracts' };
+      }
+    }
+    return { fullText: null, sourceType: 'title' };
+  }
+
+  // 1. Try ALL PDFs and plain-text versions in bill.versions (including links arrays)
+  if (bill.versions && Array.isArray(bill.versions)) {
+    const sortedVersions = bill.versions.slice().sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    for (const version of sortedVersions) {
+      // Try top-level url if present
+      if (version.url && (version.url.endsWith('.pdf') || version.url.endsWith('.txt'))) {
+        try {
+          const res = await fetch(version.url);
+          if (res.ok) {
+            let billText = '';
+            if (version.url.endsWith('.pdf')) {
+              const buffer = await res.arrayBuffer();
+              const pdfText = await pdf(Buffer.from(buffer));
+              billText = pdfText.text;
+            } else {
+              billText = await res.text();
+            }
+            if (billText && billText.trim().length > 100) {
+              console.log('[Bill Full Text] Using version:', version.url);
+              return {
+                fullText: billText.trim(),
+                sourceType: version.url.endsWith('.pdf') ? 'pdf-extracted' : 'full-text'
+              };
+            }
+          }
+        } catch (e) {
+          console.log('[Bill Full Text] Error fetching version:', version.url, e);
+        }
+      }
+
+      // Try all links in version.links if present
+      if (Array.isArray(version.links)) {
+        for (const linkObj of version.links) {
+          const linkUrl = linkObj.url || linkObj.href || linkObj.link;
+          if (linkUrl && (linkUrl.endsWith('.pdf') || linkUrl.endsWith('.txt'))) {
+            try {
+              const res = await fetch(linkUrl);
+              if (res.ok) {
+                let billText = '';
+                if (linkUrl.endsWith('.pdf')) {
+                  const buffer = await res.arrayBuffer();
+                  const pdfText = await pdf(Buffer.from(buffer));
+                  billText = pdfText.text;
+                } else {
+                  billText = await res.text();
+                }
+                if (billText && billText.trim().length > 100) {
+                  console.log('[Bill Full Text] Using version link:', linkUrl);
+                  return {
+                    fullText: billText.trim(),
+                    sourceType: linkUrl.endsWith('.pdf') ? 'pdf-extracted' : 'full-text'
+                  };
+                }
+              }
+            } catch (e) {
+              console.log('[Bill Full Text] Error fetching version link:', linkUrl, e);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Try sources for PDF content
+  if (bill.sources && Array.isArray(bill.sources) && bill.sources.length > 0) {
+    for (const source of bill.sources) {
+      if (source.url) {
+        try {
+          const res = await fetch(source.url);
+          if (!res.ok) continue;
+
+          const html = await res.text();
+          let pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+
+          // Special handling for congress.gov
+          if (pdfLinks.length === 0 && source.url.includes('congress.gov/bill/')) {
+            const textTabMatch = html.match(/<a[^>]+href=["']([^"']+\/text)["'][^>]*>\s*Text\s*<\/a>/i);
+            if (textTabMatch) {
+              let textTabUrl = textTabMatch[1];
+              if (!textTabUrl.startsWith('http')) {
+                const base = new URL(source.url);
+                textTabUrl = new URL(textTabUrl, base).href;
+              }
+              try {
+                const textRes = await fetch(textTabUrl);
+                if (textRes.ok) {
+                  const textHtml = await textRes.text();
+                  pdfLinks = Array.from(textHtml.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
+                }
+              } catch (e) {
+                console.log('[Bill Full Text] Error fetching Text tab:', textTabUrl, e);
+              }
+            }
+          }
+
+          for (let pdfUrl of pdfLinks) {
+            if (!pdfUrl.startsWith('http')) {
+              const base = new URL(source.url);
+              pdfUrl = new URL(pdfUrl, base).href;
+            }
+            try {
+              const pdfRes = await fetch(pdfUrl);
+              if (!pdfRes.ok) continue;
+
+              const buffer = await pdfRes.arrayBuffer();
+              const data = await pdf(Buffer.from(buffer));
+              if (data.text && data.text.trim().length > 100) {
+                console.log('[Bill Full Text] Using PDF from source:', pdfUrl);
+                return {
+                  fullText: data.text.trim(),
+                  sourceType: 'pdf-extracted'
+                };
+              }
+            } catch (e) {
+              console.log('[Bill Full Text] Error fetching/parsing PDF:', pdfUrl, e);
+            }
+          }
+        } catch (e) {
+          console.log('[Bill Full Text] Error fetching/parsing source page:', source.url, e);
+        }
+      }
+    }
+  }
+
+  return { fullText: null, sourceType: 'none' };
 }

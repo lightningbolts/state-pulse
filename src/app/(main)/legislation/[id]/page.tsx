@@ -9,6 +9,7 @@ import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
 import { generateLegislationMetadata } from '@/lib/metadata';
+import { Metadata } from 'next';
 
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -188,6 +189,17 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             <AnimatedSection className="p-4 border border-primary/30 rounded-lg bg-primary/5">
               <h3 className="text-xl font-semibold text-primary mb-3">AI Generated Summary</h3>
               <p className="text-sm text-muted-foreground italic break-words">{geminiSummary}</p>
+            </AnimatedSection>
+          )}
+
+          {legislation.longGeminiSummary && (
+            <AnimatedSection className="p-4 border border-blue-500/30 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+              <h3 className="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-3">Detailed AI Summary</h3>
+              <div className="text-sm text-muted-foreground space-y-2">
+                {legislation.longGeminiSummary.split('\n').map((paragraph, index) => (
+                  <p key={index} className="break-words">{paragraph}</p>
+                ))}
+              </div>
             </AnimatedSection>
           )}
 

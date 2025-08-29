@@ -117,7 +117,7 @@ export async function generateVotingPrediction(
   const input: PredictVotingOutcomeInput = {
     legislationTitle: legislation.title || 'Unknown Bill',
     legislationText: legislation.fullText || undefined,
-    summary: legislation.geminiSummary || legislation.summary || undefined,
+    summary: legislation.longGeminiSummary || legislation.geminiSummary || legislation.summary || undefined,
     subjects: legislation.subjects || [],
     chamber: legislation.chamber || undefined,
     jurisdictionName: legislation.jurisdictionName || undefined,

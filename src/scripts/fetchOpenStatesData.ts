@@ -8,7 +8,10 @@ import {
   generateOllamaSummary,
   fetchPdfTextFromOpenStatesUrl,
   extractBestTextForSummary,
-  generateGeminiSummary, summarizeLegislationRichestSource
+  generateGeminiSummary,
+  summarizeLegislationOptimized,
+  extractLegislationFullText,
+  generateGeminiDetailedSummary
 } from '../services/aiSummaryUtil';
 import { classifyLegislationForFetch } from '../services/classifyLegislationService';
 
@@ -337,14 +340,14 @@ export function transformOpenStatesBillToMongoDB(osBill: any): any {
 
   // Calculate lastActionAt from the most recent action in history
   const lastActionAt = history.length > 0
-    ? history.reduce((latest, action) => {
+    ? history.reduce((latest: any, action: any) => {
         return action.date > latest ? action.date : latest;
       }, history[0].date)
     : null;
 
   // Calculate firstActionAt from the earliest action in history
   const firstActionAt = history.length > 0
-    ? history.reduce((earliest, action) => {
+    ? history.reduce((earliest: any, action: any) => {
         return action.date < earliest ? action.date : earliest;
       }, history[0].date)
     : null;
@@ -584,9 +587,44 @@ async function fetchAndStoreUpdatedBills(
             }
             // Only summarize if geminiSummary is missing or less than 100 chars
             if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
-              const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
+              const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
               legislationToStore.geminiSummary = summary;
               legislationToStore.geminiSummarySource = sourceType;
+              
+              // Set detailed summary if generated
+              if (longSummary) {
+                legislationToStore.longGeminiSummary = longSummary;
+                console.log(`  Generated both summaries for ${legislationToStore.identifier} (source: ${sourceType})`);
+                console.log(`  Brief summary: ${summary.length} chars, Detailed summary: ${longSummary.length} chars`);
+              } else {
+                console.log(`  Generated brief summary only for ${legislationToStore.identifier} (source: ${sourceType})`);
+              }
+            } else {
+              // Check if we need to generate a detailed summary for existing bills
+              const shouldGenerateDetailedSummary = (
+                legislationToStore.geminiSummarySource === 'pdf-extracted' ||
+                legislationToStore.geminiSummarySource === 'pdf' ||
+                legislationToStore.geminiSummarySource === 'full-text' ||
+                legislationToStore.geminiSummarySource === 'ilga-pdf' ||
+                legislationToStore.geminiSummarySource === 'ilga-fulltext'
+              ) && (
+                !legislationToStore.longGeminiSummary ||
+                legislationToStore.longGeminiSummary.length < 1000
+              );
+
+              if (shouldGenerateDetailedSummary) {
+                console.log(`  Generating missing detailed summary for existing bill ${legislationToStore.identifier}`);
+                try {
+                  const { fullText } = await extractLegislationFullText(legislationToStore);
+                  if (fullText && fullText.length > 500) {
+                    const detailedSummary = await generateGeminiDetailedSummary(fullText);
+                    legislationToStore.longGeminiSummary = detailedSummary;
+                    console.log(`  Generated detailed summary: ${detailedSummary.length} characters`);
+                  }
+                } catch (detailError) {
+                  console.warn(`  Warning: Failed to generate detailed summary for ${legislationToStore.identifier}: ${detailError}`);
+                }
+              }
             }
 
             // Classify the legislation after summary generation
@@ -1086,9 +1124,18 @@ async function fetchCongressBills(updatedSince: string) {
             }
             // Only summarize if geminiSummary is missing or less than 100 chars
             if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
-              const { summary, sourceType } = await summarizeLegislationRichestSource(legislationToStore);
+              const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
               legislationToStore.geminiSummary = summary;
               legislationToStore.geminiSummarySource = sourceType;
+              
+              // Set detailed summary if generated
+              if (longSummary) {
+                legislationToStore.longGeminiSummary = longSummary;
+                console.log(`  Generated both summaries for ${legislationToStore.identifier} (source: ${sourceType})`);
+                console.log(`  Brief summary: ${summary.length} chars, Detailed summary: ${longSummary.length} chars`);
+              } else {
+                console.log(`  Generated brief summary only for ${legislationToStore.identifier} (source: ${sourceType})`);
+              }
             }
 
             // Classify the legislation after summary generation
@@ -1135,3 +1182,6 @@ async function fetchCongressBills(updatedSince: string) {
 
   console.log(`Finished fetching Congress bills. Processed ${billsProcessed} bills.`);
 }
+
+
+
