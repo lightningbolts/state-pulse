@@ -266,10 +266,45 @@ export const InteractiveMap = React.memo(() => {
     const [repDataError, setRepDataError] = useState<string | null>(null);
     const [availableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity']);
 
+    // Mobile optimization state
+    const [isMobile, setIsMobile] = useState<boolean>(false);
+    const [mapModeTransitioning, setMapModeTransitioning] = useState<boolean>(false);
+
 
     useEffect(() => {
         setIsClient(true);
         fetchMapData();
+        
+        // Detect mobile device
+        const checkIsMobile = () => {
+            setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+        };
+        
+        checkIsMobile();
+        // Re-check on window resize (for responsive testing)
+        window.addEventListener('resize', checkIsMobile);
+        
+        return () => {
+            window.removeEventListener('resize', checkIsMobile);
+        };
+    }, []);
+
+    // Map mode change handler
+    const handleMapModeChange = useCallback(async (newMode: string) => {
+        try {
+            // Clear existing overlays and data to free memory
+            setSelectedDistrict(null);
+            setDistrictPopupLatLng(null);
+            setDistrictReps([]);
+            setDistrictPartyMapping({});
+            setGerryScores({});
+            setTopicScores({});
+            setRepScores({});
+            
+            setMapMode(newMode);
+        } catch (error) {
+            console.error('[InteractiveMap] Error changing map mode:', error);
+        }
     }, []);
 
     const fetchMapData = async () => {
@@ -630,12 +665,13 @@ export const InteractiveMap = React.memo(() => {
         );
     }
 
-    // Handler for district click (for MapLibre GL)
+    // Handler for district click (for MapLibre GL) with error handling
     const onDistrictClickGL = async (feature: any, lngLat: {lng: number, lat: number}) => {
-        setSelectedDistrict(feature);
-        setDistrictPopupLatLng(lngLat);
-        setDistrictReps([]); // Clear while loading
         try {
+            setSelectedDistrict(feature);
+            setDistrictPopupLatLng(lngLat);
+            setDistrictReps([]); // Clear while loading
+            
             // Map FIPS code to state abbreviation if needed
             const FIPS_TO_ABBR: Record<string, string> = {
                 '01': 'AL','02': 'AK','04': 'AZ','05': 'AR','06': 'CA','08': 'CO','09': 'CT','10': 'DE','11': 'DC','12': 'FL','13': 'GA','15': 'HI','16': 'ID','17': 'IL','18': 'IN','19': 'IA','20': 'KS','21': 'KY','22': 'LA','23': 'ME','24': 'MD','25': 'MA','26': 'MI','27': 'MN','28': 'MS','29': 'MO','30': 'MT','31': 'NE','32': 'NV','33': 'NH','34': 'NJ','35': 'NM','36': 'NY','37': 'NC','38': 'ND','39': 'OH','40': 'OK','41': 'OR','42': 'PA','44': 'RI','45': 'SC','46': 'SD','47': 'TN','48': 'TX','49': 'UT','50': 'VT','51': 'VA','53': 'WA','54': 'WV','55': 'WI','56': 'WY','72': 'PR'
@@ -646,8 +682,12 @@ export const InteractiveMap = React.memo(() => {
             } else if (/^\d{2}$/.test(state)) {
                 state = FIPS_TO_ABBR[state] || '';
             }
+            
             const url = `/api/civic?lat=${encodeURIComponent(lngLat.lat)}&lng=${encodeURIComponent(lngLat.lng)}&state=${encodeURIComponent(state)}`;
-            const resp = await fetch(url);
+            const resp = await fetch(url, {
+                signal: AbortSignal.timeout(10000) // 10 second timeout
+            });
+            
             let reps = [];
             if (resp.ok) {
                 const data = await resp.json();
@@ -656,7 +696,8 @@ export const InteractiveMap = React.memo(() => {
                 }
             }
             setDistrictReps(reps);
-        } catch (e) {
+        } catch (error) {
+            console.error('[InteractiveMap] Error in district click handler:', error);
             setDistrictReps([]);
         }
     };
@@ -689,14 +730,17 @@ export const InteractiveMap = React.memo(() => {
                             <div className="grid grid-cols-2 gap-2 md:grid-cols-2 lg:grid-cols-4 lg:gap-2">
                                 {mapModes.map((mode) => {
                                     const IconComponent = mode.icon;
-                                    // Enable all modes
+                                    const isDisabled = mapModeTransitioning;
+                                    const isLargeDataset = mode.id === 'state-lower-districts';
+                                    
                                     return (
                                         <Button
                                             key={mode.id}
                                             variant={mapMode === mode.id ? "default" : "outline"}
                                             size="sm"
-                                            onClick={() => setMapMode(mode.id)}
-                                            className={`flex flex-col items-center gap-1 lg:flex-row lg:gap-2 h-auto p-2 lg:p-3 min-h-[60px] lg:min-h-[auto]`}
+                                            onClick={() => handleMapModeChange(mode.id)}
+                                            disabled={isDisabled}
+                                            className={`flex flex-col items-center gap-1 lg:flex-row lg:gap-2 h-auto p-2 lg:p-3 min-h-[60px] lg:min-h-[auto] ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             <IconComponent className="h-3 w-3 lg:h-4 lg:w-4 flex-shrink-0"/>
                                             <div className="text-center lg:text-left min-w-0 flex-1">
@@ -735,9 +779,11 @@ export const InteractiveMap = React.memo(() => {
                                         onCheckedChange={(checked) => {
                                             console.log('Switch toggled:', checked, 'current mapMode:', mapMode);
                                             setShowPartyAffiliation(checked);
-                                            // Disable gerrymandering when party affiliation is enabled
-                                            if (checked && showGerrymandering) {
+                                            // Disable all other overlays when party affiliation is enabled
+                                            if (checked) {
                                                 setShowGerrymandering(false);
+                                                setShowTopicHeatmap(false);
+                                                setShowRepHeatmap(false);
                                             }
                                         }}
                                         disabled={partyDataLoading}
@@ -797,9 +843,11 @@ export const InteractiveMap = React.memo(() => {
                                         checked={showGerrymandering}
                                         onCheckedChange={(checked) => {
                                             setShowGerrymandering(checked);
-                                            // Disable party affiliation when gerrymandering is enabled
-                                            if (checked && showPartyAffiliation) {
+                                            // Disable all other overlays when gerrymandering is enabled
+                                            if (checked) {
                                                 setShowPartyAffiliation(false);
+                                                setShowTopicHeatmap(false);
+                                                setShowRepHeatmap(false);
                                             }
                                         }}
                                         disabled={gerryDataLoading}
@@ -883,7 +931,7 @@ export const InteractiveMap = React.memo(() => {
                                         disabled={topicDataLoading}
                                     />
                                 </div>
-
+                                
                                 {/* Topic selector - only show when topic heatmap is enabled */}
                                 {showTopicHeatmap && availableTopics.length > 0 && (
                                     <div className="space-y-2">
@@ -1050,6 +1098,18 @@ export const InteractiveMap = React.memo(() => {
 
                         {/* Map Container with district overlays */}
                         <div className="relative">
+                            {/* Performance warning for large datasets on mobile */}
+                            {mapMode === 'state-lower-districts' && (
+                                <div className="absolute top-2 left-2 right-2 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 text-xs text-amber-800 md:hidden">
+                                    <div className="flex items-center space-x-1">
+                                        <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        <span>Loading {(4879).toLocaleString()} districts. This may take a moment.</span>
+                                    </div>
+                                </div>
+                            )}
+                            
                             <div className="h-[300px] sm:h-[400px] md:h-[500px] w-full rounded-md overflow-hidden border">
                                 {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
                                     <DistrictMapGL

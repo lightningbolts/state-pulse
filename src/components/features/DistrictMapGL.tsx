@@ -62,6 +62,120 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
 }) => {
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [geoJsonData, setGeoJsonData] = React.useState<any>(null);
+
+  // Smart data loading with chunking and optimization
+  React.useEffect(() => {
+    let isCancelled = false;
+    
+    const loadGeoJsonData = async () => {
+      if (!geojsonUrl) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(geojsonUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (isCancelled) return;
+        
+        // Smart loading strategy for large datasets
+        if (data.features && data.features.length > 1000) {
+          console.log(`[DistrictMapGL] Large dataset detected: ${data.features.length} features - using optimized loading`);
+          
+          // For very large datasets (like state-lower-districts), implement chunked loading
+          if (data.features.length > 3000) {
+            console.log(`[DistrictMapGL] Very large dataset - implementing progressive loading`);
+            
+            // Load initial chunk immediately
+            const initialChunkSize = 1000;
+            const initialChunk = {
+              ...data,
+              features: data.features.slice(0, initialChunkSize).map((feature: any) => ({
+                ...feature,
+                properties: { ...feature.properties, _optimized: true }
+              }))
+            };
+            
+            initialChunk._isLargeDataset = true;
+            initialChunk._originalFeatureCount = data.features.length;
+            initialChunk._isPartialLoad = true;
+            
+            setGeoJsonData(initialChunk);
+            
+            // Load remaining features progressively
+            setTimeout(() => {
+              if (!isCancelled) {
+                const fullData = {
+                  ...data,
+                  features: data.features.map((feature: any) => ({
+                    ...feature,
+                    properties: { ...feature.properties, _optimized: true }
+                  }))
+                };
+                fullData._isLargeDataset = true;
+                fullData._originalFeatureCount = data.features.length;
+                setGeoJsonData(fullData);
+                console.log(`[DistrictMapGL] Progressive loading complete - ${data.features.length} features loaded`);
+              }
+            }, 500); // 500ms delay for progressive loading
+            
+          } else {
+            // Standard optimization for moderately large datasets
+            const optimizedData = {
+              ...data,
+              features: data.features.map((feature: any) => ({
+                ...feature,
+                properties: { ...feature.properties, _optimized: true }
+              }))
+            };
+            
+            optimizedData._isLargeDataset = true;
+            optimizedData._originalFeatureCount = data.features.length;
+            setGeoJsonData(optimizedData);
+          }
+        } else {
+          setGeoJsonData(data);
+        }
+        
+      } catch (err) {
+        console.error('[DistrictMapGL] Error loading GeoJSON:', err);
+        if (!isCancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load district data');
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadGeoJsonData();
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [geojsonUrl]);  // Memory management and cleanup
+  React.useEffect(() => {
+    return () => {
+      // Cleanup marker
+      if (markerRef.current) {
+        try {
+          markerRef.current.remove();
+          markerRef.current = null;
+        } catch (err) {
+          console.error('[DistrictMapGL] Error cleaning up marker:', err);
+        }
+      }
+    };
+  }, []);
 
   // Performance optimization: Memoize the fill color expression to prevent recalculation on every render
   const fillColorExpression = React.useMemo((): any => {
@@ -184,66 +298,123 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
 
   // Performance optimization: Memoize the click handler to prevent recreation on every render
   const handleClick = React.useCallback((event: any) => {
-    const features = event.features || [];
-    const polygon = features.find((f: any) => f.layer.id === 'district-fill');
-    if (polygon && onDistrictClick) {
-      onDistrictClick(polygon, event.lngLat);
+    try {
+      const features = event.features || [];
+      const polygon = features.find((f: any) => f.layer.id === 'district-fill');
+      if (polygon && onDistrictClick) {
+        onDistrictClick(polygon, event.lngLat);
+      }
+    } catch (err) {
+      console.error('[DistrictMapGL] Error handling click:', err);
     }
   }, [onDistrictClick]);
 
-  // Performance optimization: Memoize marker management
+  // Performance optimization: Memoize marker management with error handling
   React.useEffect(() => {
     const map = mapRef.current?.getMap?.();
     if (!map) return;
 
-    if (markerRef.current) {
-      markerRef.current.remove();
-      markerRef.current = null;
-    }
-
-    if (popupMarker && typeof window !== 'undefined') {
-      const marker = new (require('maplibre-gl').Marker)({
-        element: (() => {
-          const el = document.createElement('div');
-          el.innerHTML = popupMarker.iconHtml || `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`;
-          el.style.transform = 'translate(-50%, -100%)';
-          el.style.position = 'absolute';
-          el.style.pointerEvents = 'none';
-          return el;
-        })(),
-        draggable: !!popupMarker.draggable,
-      })
-        .setLngLat([popupMarker.lng, popupMarker.lat])
-        .addTo(map);
-      if (popupMarker.draggable && typeof popupMarker.onDragEnd === 'function') {
-        marker.on('dragend', () => {
-          const lngLat = marker.getLngLat();
-          if (popupMarker.onDragEnd) {
-            popupMarker.onDragEnd({ lng: lngLat.lng, lat: lngLat.lat });
-          }
-        });
-      }
-      markerRef.current = marker;
-    }
-
-    return () => {
+    try {
       if (markerRef.current) {
         markerRef.current.remove();
         markerRef.current = null;
       }
+
+      if (popupMarker && typeof window !== 'undefined') {
+        const marker = new (require('maplibre-gl').Marker)({
+          element: (() => {
+            const el = document.createElement('div');
+            el.innerHTML = popupMarker.iconHtml || `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`;
+            el.style.transform = 'translate(-50%, -100%)';
+            el.style.position = 'absolute';
+            el.style.pointerEvents = 'none';
+            return el;
+          })(),
+          draggable: !!popupMarker.draggable,
+        })
+          .setLngLat([popupMarker.lng, popupMarker.lat])
+          .addTo(map);
+        if (popupMarker.draggable && typeof popupMarker.onDragEnd === 'function') {
+          marker.on('dragend', () => {
+            try {
+              const lngLat = marker.getLngLat();
+              if (popupMarker.onDragEnd) {
+                popupMarker.onDragEnd({ lng: lngLat.lng, lat: lngLat.lat });
+              }
+            } catch (err) {
+              console.error('[DistrictMapGL] Error handling marker drag:', err);
+            }
+          });
+        }
+        markerRef.current = marker;
+      }
+    } catch (err) {
+      console.error('[DistrictMapGL] Error managing marker:', err);
+    }
+
+    return () => {
+      try {
+        if (markerRef.current) {
+          markerRef.current.remove();
+          markerRef.current = null;
+        }
+      } catch (err) {
+        console.error('[DistrictMapGL] Error cleaning up marker:', err);
+      }
     };
   }, [popupMarker]);
 
-  // Performance optimization: Memoize layer paint properties
-  const layerFillPaint = React.useMemo(() => ({
-    'fill-color': fillColorExpression,
-    'fill-opacity': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 0.75 : 0.08,
-  }), [fillColorExpression, showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap]);
+  // Optimized layer paint properties - maintain visual quality while optimizing performance
+  const layerFillPaint = React.useMemo(() => {
+    const baseOpacity = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 0.75 : 0.08;
 
-  const layerLinePaint = React.useMemo(() => ({
-    'line-color': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? '#000000' : (color.includes('var(') ? '#2563eb' : color),
-    'line-width': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 1 : 2,
-  }), [showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, color]);
+    return {
+      'fill-color': fillColorExpression,
+      'fill-opacity': baseOpacity,
+    };
+  }, [fillColorExpression, showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap]);
+
+  const layerLinePaint = React.useMemo(() => {
+    const lineWidth = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 1 : 2;
+
+    return {
+      'line-color': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? '#000000' : (color.includes('var(') ? '#2563eb' : color),
+      'line-width': lineWidth,
+    };
+  }, [showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, color, geoJsonData]);
+
+  // Show loading state for large datasets
+  if (loading) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ marginBottom: '8px' }}>Loading district data...</div>
+          <div style={{ fontSize: '12px', color: '#666' }}>This may take a moment on mobile devices</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', color: '#dc2626' }}>
+          <div style={{ marginBottom: '8px' }}>Failed to load district data</div>
+          <div style={{ fontSize: '12px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render map until data is loaded
+  if (!geoJsonData) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div>Preparing map...</div>
+      </div>
+    );
+  }
 
   return (
     <Map
@@ -253,8 +424,22 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
       mapStyle={mapStyle}
       interactiveLayerIds={['district-fill']}
       onClick={handleClick}
+      // Conservative performance optimizations that maintain usability
+      maxZoom={geoJsonData?._isLargeDataset ? 14 : 18} // Allow reasonable zoom levels
+      renderWorldCopies={false} // Disable world copies for better performance
+      attributionControl={false} // Disable attribution for cleaner mobile experience
+      fadeDuration={geoJsonData?._isLargeDataset ? 0 : 300} // Disable fade for large datasets
     >
-      <Source id="districts" type="geojson" data={geojsonUrl}>
+      <Source 
+        id="districts" 
+        type="geojson" 
+        data={geoJsonData}
+        // Conservative performance optimizations that maintain visual quality
+        tolerance={geoJsonData?._isLargeDataset ? 0.5 : 0.375} // Minimal simplification to maintain detail
+        buffer={geoJsonData?._isLargeDataset ? 64 : 128} // Moderate buffer reduction
+        maxzoom={geoJsonData?._isLargeDataset ? 12 : 14} // Conservative zoom limit
+        generateId={true} // Enable feature state for better performance
+      >
         <Layer
           id="district-fill"
           type="fill"
@@ -264,6 +449,11 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
           id="district-outline"
           type="line"
           paint={layerLinePaint}
+          layout={{
+            // Optimize line cap and join for better performance
+            'line-cap': 'round',
+            'line-join': 'round'
+          }}
         />
       </Source>
     </Map>
