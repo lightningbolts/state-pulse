@@ -1,5 +1,4 @@
 import { MongoClient } from 'mongodb';
-import { detectEnactedByPatterns } from '../utils/enacted-legislation';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
@@ -7,9 +6,57 @@ dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.MONGODB_DB_NAME || 'statepulse-data';
 
+// Reuse the enacted detection patterns
+const enactedPatterns = [
+  /signed.*(into|by).*(law|governor)/i,
+  /approved.*by.*governor/i,
+  /became.*law/i,
+  /effective.*date/i,
+  /chapter.*laws/i,
+  /public.*law.*no/i,
+  /acts.*of.*assembly.*chapter/i,
+  /governor.*signed/i,
+  /signed.*into.*law/i
+];
+
+function findEnactedDate(doc: any): Date | null {
+  // Check latest action description first
+  if (doc.latestActionDescription) {
+    for (const pattern of enactedPatterns) {
+      if (pattern.test(doc.latestActionDescription)) {
+        // If latest action indicates enactment, use latestActionAt date
+        return doc.latestActionAt ? new Date(doc.latestActionAt) : null;
+      }
+    }
+  }
+
+  // Check history for enacted actions (search in reverse chronological order)
+  if (doc.history && Array.isArray(doc.history)) {
+    // Sort by date in descending order to find the most recent enacted action
+    const sortedHistory = [...doc.history].sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    for (const historyItem of sortedHistory) {
+      if (historyItem.action) {
+        for (const pattern of enactedPatterns) {
+          if (pattern.test(historyItem.action)) {
+            // Return the date of the enacted action
+            return historyItem.date ? new Date(historyItem.date) : null;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
- * Continuous background job to keep isEnacted field updated
- * This ensures new legislation automatically gets the isEnacted field computed
+ * Continuous background job to keep enactedAt field updated
+ * This ensures new legislation automatically gets the enactedAt field computed
  */
 async function updateEnactedFieldIncrementally() {
   console.log(`Connecting to MongoDB: ${MONGO_URI}`);
@@ -24,41 +71,44 @@ async function updateEnactedFieldIncrementally() {
     const db = client.db(DB_NAME);
     const legislationCollection = db.collection('legislation');
 
-    // Find documents that don't have the isEnacted field or haven't been updated in the last week
+    // Find documents that don't have the enactedAt field or haven't been updated in the last week
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     const documentsToUpdate = await legislationCollection.find({
       $or: [
-        { isEnacted: { $exists: false } },
+        { enactedAt: { $exists: false } },
         { enactedFieldUpdatedAt: { $exists: false } },
         { enactedFieldUpdatedAt: { $lt: oneWeekAgo } },
-        { updatedAt: { $gt: '$enactedFieldUpdatedAt' } } // Document was updated after isEnacted field
+        { updatedAt: { $gt: '$enactedFieldUpdatedAt' } } // Document was updated after enactedAt field
       ]
     }, {
-      projection: { _id: 1, id: 1, latestActionDescription: 1, history: 1, isEnacted: 1 }
+      projection: { _id: 1, id: 1, latestActionDescription: 1, latestActionAt: 1, history: 1, enactedAt: 1 }
     }).limit(1000).toArray(); // Process in batches of 1000
 
     if (documentsToUpdate.length === 0) {
-      console.log('No documents need isEnacted field updates');
+      console.log('No documents need enactedAt field updates');
       return { updated: 0, total: 0 };
     }
 
-    console.log(`Found ${documentsToUpdate.length} documents that need isEnacted field updates`);
+    console.log(`Found ${documentsToUpdate.length} documents that need enactedAt field updates`);
 
     const bulkOps = [];
     let updatedCount = 0;
 
     for (const doc of documentsToUpdate) {
-      const computedEnacted = detectEnactedByPatterns(doc);
+      const computedEnactedAt = findEnactedDate(doc);
 
       // Only update if the value has changed or doesn't exist
-      if (doc.isEnacted !== computedEnacted) {
+      const currentEnactedAt = doc.enactedAt ? new Date(doc.enactedAt).getTime() : null;
+      const newEnactedAt = computedEnactedAt ? computedEnactedAt.getTime() : null;
+
+      if (currentEnactedAt !== newEnactedAt) {
         bulkOps.push({
           updateOne: {
             filter: { _id: doc._id },
             update: {
               $set: {
-                isEnacted: computedEnacted,
+                enactedAt: computedEnactedAt,
                 enactedFieldUpdatedAt: new Date()
               }
             }
@@ -84,7 +134,7 @@ async function updateEnactedFieldIncrementally() {
       await legislationCollection.bulkWrite(bulkOps);
     }
 
-    console.log(`Updated ${updatedCount} documents with new isEnacted values`);
+    console.log(`Updated ${updatedCount} documents with new enactedAt values`);
     console.log(`Processed ${documentsToUpdate.length} total documents`);
 
     return { updated: updatedCount, total: documentsToUpdate.length };

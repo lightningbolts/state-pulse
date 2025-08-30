@@ -9,7 +9,7 @@ function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
   const arrayFields = ['subjects', 'classification', 'sources', 'versions', 'abstracts', 'sponsors', 'history'];
   for (const field of arrayFields) {
     if (cleanData[field] !== undefined && !Array.isArray(cleanData[field])) {
-      (cleanData as Record<string, any>)[field] = Array.isArray(cleanData[field]) ? cleanData[field] : (cleanData[field] ? [cleanData[field]] : []);
+      (cleanData as Record<string, any>)[field] = Array.isArray(cleanData[field] ? cleanData[field] : (cleanData[field] ? [cleanData[field]] : []));
     } else if (cleanData[field] === undefined) {
       (cleanData as Record<string, any>)[field] = [];
     }
@@ -530,9 +530,9 @@ export async function getAllEnactedLegislation({
   try {
     const legislationCollection = await getCollection('legislation');
 
-    // Build optimized filter using pre-computed isEnacted field
+    // Build optimized filter using pre-computed enactedAt field
     const filter: Record<string, any> = {
-      isEnacted: true
+      enactedAt: { $ne: null } // Filter for legislation that has been enacted (has a date)
     };
 
     // Add jurisdiction filter
@@ -540,34 +540,60 @@ export async function getAllEnactedLegislation({
       filter.jurisdictionName = jurisdictionName;
     }
 
-    // Add text search using MongoDB text index
-    if (searchText) {
-      filter.$text = { $search: searchText };
+    // Add text search - use regex search to avoid text/hint conflicts
+    if (searchText && searchText.trim()) {
+      const searchTerm = searchText.trim();
+
+      // Use regex search instead of $text to avoid conflicts with hints
+      const searchRegex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [
+        { title: searchRegex },
+        { identifier: searchRegex },
+        { geminiSummary: searchRegex },
+        { summary: searchRegex },
+        { latestActionDescription: searchRegex },
+        { 'subjects': { $in: [searchRegex] } }
+      ];
     }
 
     // Add subjects filter
     if (subjects && subjects.length > 0) {
-      filter.subjects = { $in: subjects };
+      if (filter.$or) {
+        // If we already have $or from search, combine with $and
+        filter.$and = [
+          { $or: filter.$or },
+          { subjects: { $in: subjects } }
+        ];
+        delete filter.$or;
+      } else {
+        filter.subjects = { $in: subjects };
+      }
     }
 
     console.log('[Service] Fetching enacted legislation with optimized filter:', JSON.stringify(filter, null, 2));
 
-    // Use hint to ensure MongoDB uses the right index
-    const query = legislationCollection.find(filter);
+    // Determine the appropriate sort based on the requested sort
+    let finalSort = sort;
 
-    // Add sort hint for better performance
-    if (filter.isEnacted && filter.jurisdictionName) {
-      query.hint({ isEnacted: 1, jurisdictionName: 1, latestActionAt: -1 });
-    } else if (filter.isEnacted) {
-      query.hint({ isEnacted: 1, latestActionAt: -1 });
+    // If sorting by createdAt, updatedAt, or latestActionAt in descending order,
+    // interpret as "most recent" and sort by enactedAt instead
+    if (sort.createdAt === -1 || sort.updatedAt === -1 || sort.latestActionAt === -1) {
+      finalSort = { enactedAt: -1, latestActionAt: -1 }; // Sort by most recent enactment date first
+      console.log('[Service] Sorting by most recent enactment date (enactedAt desc)');
+    } else if (sort.createdAt === 1 || sort.updatedAt === 1 || sort.latestActionAt === 1) {
+      finalSort = { enactedAt: 1, latestActionAt: 1 }; // Sort by oldest enactment date first
+      console.log('[Service] Sorting by oldest enactment date (enactedAt asc)');
     }
+
+    // Create the query without hints to avoid index errors for now
+    const query = legislationCollection.find(filter);
 
     // Get total count for pagination (with same filter)
     const totalCountPromise = legislationCollection.countDocuments(filter);
 
     // Get the actual results
     const resultsPromise = query
-      .sort(sort)
+      .sort(finalSort)
       .skip(skip)
       .limit(limit)
       .toArray();

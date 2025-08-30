@@ -19,30 +19,75 @@ const enactedPatterns = [
   /signed.*into.*law/i
 ];
 
-function isLegislationEnacted(doc: any): boolean {
-  // Check latest action description
+function findEnactedDate(doc: any): Date | null {
+  // First, if the bill is already marked as enacted (isEnacted: true),
+  // try to find a reasonable enactment date
+  if (doc.isEnacted === true) {
+    // Try to use latestActionAt if it exists and seems reasonable
+    if (doc.latestActionAt) {
+      return new Date(doc.latestActionAt);
+    }
+
+    // Try to find the most recent date from history
+    if (doc.history && Array.isArray(doc.history)) {
+      const sortedHistory = [...doc.history].sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      if (sortedHistory[0] && sortedHistory[0].date) {
+        return new Date(sortedHistory[0].date);
+      }
+    }
+
+    // If no other date is available but it's marked as enacted,
+    // use a reasonable fallback
+    if (doc.latestPassageAt) {
+      return new Date(doc.latestPassageAt);
+    }
+
+    // Last resort: use updatedAt or createdAt
+    if (doc.updatedAt) {
+      return new Date(doc.updatedAt);
+    }
+    if (doc.createdAt) {
+      return new Date(doc.createdAt);
+    }
+  }
+
+  // Check latest action description for enacted patterns
   if (doc.latestActionDescription) {
     for (const pattern of enactedPatterns) {
       if (pattern.test(doc.latestActionDescription)) {
-        return true;
+        // If latest action indicates enactment, use latestActionAt date
+        return doc.latestActionAt ? new Date(doc.latestActionAt) : null;
       }
     }
   }
 
-  // Check history for enacted actions
+  // Check history for enacted actions (search in reverse chronological order)
   if (doc.history && Array.isArray(doc.history)) {
-    for (const historyItem of doc.history) {
+    // Sort by date in descending order to find the most recent enacted action
+    const sortedHistory = [...doc.history].sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    for (const historyItem of sortedHistory) {
       if (historyItem.action) {
         for (const pattern of enactedPatterns) {
           if (pattern.test(historyItem.action)) {
-            return true;
+            // Return the date of the enacted action
+            return historyItem.date ? new Date(historyItem.date) : null;
           }
         }
       }
     }
   }
 
-  return false;
+  return null;
 }
 
 async function addEnactedField() {
@@ -69,7 +114,7 @@ async function addEnactedField() {
     // Process in batches to avoid memory issues
     for (let skip = 0; skip < totalCount; skip += batchSize) {
       const batch = await legislationCollection
-        .find({}, { projection: { _id: 1, id: 1, latestActionDescription: 1, history: 1 } })
+        .find({}, { projection: { _id: 1, id: 1, isEnacted: 1, latestActionDescription: 1, latestActionAt: 1, latestPassageAt: 1, history: 1, updatedAt: 1, createdAt: 1 } })
         .skip(skip)
         .limit(batchSize)
         .toArray();
@@ -77,21 +122,21 @@ async function addEnactedField() {
       const bulkOps = [];
 
       for (const doc of batch) {
-        const isEnacted = isLegislationEnacted(doc);
+        const enactedAt = findEnactedDate(doc);
 
         bulkOps.push({
           updateOne: {
             filter: { _id: doc._id },
             update: {
               $set: {
-                isEnacted,
+                enactedAt,
                 enactedFieldUpdatedAt: new Date()
               }
             }
           }
         });
 
-        if (isEnacted) {
+        if (enactedAt) {
           enactedCount++;
         }
         processed++;
@@ -104,7 +149,7 @@ async function addEnactedField() {
       console.log(`Processed ${processed}/${totalCount} documents (${enactedCount} enacted)`);
     }
 
-    console.log(`\nCompleted! Added isEnacted field to ${processed} documents.`);
+    console.log(`\nCompleted! Added enactedAt field to ${processed} documents.`);
     console.log(`Found ${enactedCount} enacted legislation documents (${((enactedCount / processed) * 100).toFixed(2)}%)`);
 
   } catch (error) {

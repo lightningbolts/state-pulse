@@ -39,8 +39,8 @@ export interface Legislation {
     classifiedAt: Date | null;
   }
   // Performance optimization field
-  isEnacted?: boolean; // Pre-computed field for faster enacted legislation queries
-  enactedFieldUpdatedAt?: Date; // When the isEnacted field was last computed
+  enactedAt?: Date | null; // Date when the legislation was enacted (null if not enacted)
+  enactedFieldUpdatedAt?: Date; // When the enactedAt field was last computed
 }
 
 // Bookmark/SavedLegislation Types

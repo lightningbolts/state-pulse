@@ -17,7 +17,8 @@ const TARGET_PHRASES = [
     'Iowa Senate',
     'Iowa House of Representatives',
     'Senate Journal',
-    'House Journal'
+    'House Journal',
+    'Colorado General Assembly'
 ];
 
 async function removeUnwantedSummaries() {

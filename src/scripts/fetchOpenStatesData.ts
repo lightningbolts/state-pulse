@@ -164,6 +164,46 @@ const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
   { ocdId: 'ocd-jurisdiction/country:us/state:wy/government', abbr: 'WY' }, // Wyoming
 ];
 
+// Helper function to determine the date when a bill was enacted based on its history
+function detectEnactedDate(history: any[]): Date | null {
+  if (!history || history.length === 0) return null;
+
+  // Enhanced regex patterns for enacted legislation detection
+  const enactedPatterns = [
+    /signed.*(into|by).*(law|governor)/i,
+    /approved.*by.*governor/i,
+    /became.*law/i,
+    /effective.*date/i,
+    /chapter.*laws/i,
+    /public.*law.*no/i,
+    /acts.*of.*assembly.*chapter/i,
+    /governor.*signed/i,
+    /signed.*into.*law/i
+  ];
+
+  // Sort history by date in descending order to find the most recent enacted action
+  const sortedHistory = [...history].sort((a, b) => {
+    const dateA = a.date ? new Date(a.date).getTime() : 0;
+    const dateB = b.date ? new Date(b.date).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  // Check if any action in the history matches the enacted patterns
+  for (const action of sortedHistory) {
+    const actionText = (action.action || '').trim();
+    if (!actionText) continue;
+
+    for (const pattern of enactedPatterns) {
+      if (pattern.test(actionText)) {
+        // Return the date of the enacted action
+        return action.date ? new Date(action.date) : null;
+      }
+    }
+  }
+
+  return null;
+}
+
 // Helper function to introduce delays (milliseconds)
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -397,6 +437,9 @@ export function transformOpenStatesBillToMongoDB(osBill: any): any {
 
   const now = new Date();
 
+  // Dynamically detect when the bill was enacted based on history
+  const enactedAt = detectEnactedDate(history);
+
   return {
     id: displayOpenStatesId(osBill.id),
     identifier: osBill.identifier,
@@ -425,6 +468,7 @@ export function transformOpenStatesBillToMongoDB(osBill: any): any {
     updatedAt: toMongoDate(osBill.updated_at) || now,
     summary: summary,
     extras: processedExtras,
+    enactedAt: enactedAt, // Store the enacted date instead of boolean
   };
 }
 
@@ -987,6 +1031,9 @@ export function transformCongressBillToMongoDB(congressBill: any): any {
                  congressBill.originChamber === 'Senate' ? 'upper' :
                  congressBill.originChamber?.toLowerCase();
 
+  // Dynamically detect if the bill is enacted based on history
+  const enactedAt = detectEnactedDate(history);
+
   return {
     id: `congress-bill-${congressBill.congress}-${congressBill.type.toLowerCase()}-${congressBill.number}`,
     identifier: `${congressBill.type} ${congressBill.number}`,
@@ -1018,6 +1065,7 @@ export function transformCongressBillToMongoDB(congressBill: any): any {
       billNumber: congressBill.number,
       constitutionalAuthorityStatementText: congressBill.constitutionalAuthorityStatementText,
     },
+    enactedAt: enactedAt, // Store the enacted date instead of boolean
   };
 }
 
@@ -1182,6 +1230,3 @@ async function fetchCongressBills(updatedSince: string) {
 
   console.log(`Finished fetching Congress bills. Processed ${billsProcessed} bills.`);
 }
-
-
-
