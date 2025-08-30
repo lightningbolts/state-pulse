@@ -1,7 +1,8 @@
 import { getCollection } from '../lib/mongodb';
 import { ObjectId } from 'mongodb';
-import { Legislation } from '../types/legislation';
-import { LegislationMongoDbDocument } from '../types/legislation';
+import type { Legislation } from '../types/legislation';
+import type { LegislationMongoDbDocument } from '../types/legislation';
+import cacheService from '../lib/cache-service';
 
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
   const cleanData = { ...data };
@@ -238,8 +239,6 @@ export async function getAllLegislation({
   try {
     const legislationCollection = await getCollection('legislation');
 
-    const isMostRecentSort = sort.updatedAt === -1 || sort.createdAt === -1;
-
     // If showCongress is true, use robust query to match all Congress bills
     if (showCongress) {
       console.log('[Service] Using robust query for Congress bills');
@@ -275,7 +274,10 @@ export async function getAllLegislation({
         .skip(skip)
         .limit(limit)
         .toArray();
-      return results as Legislation[];
+      return results.map(doc => {
+        const { _id, ...rest } = doc;
+        return rest as Legislation;
+      });
     }
 
     // Default behavior for all other queries (non-congress)
@@ -285,7 +287,10 @@ export async function getAllLegislation({
       .skip(skip)
       .limit(limit)
       .toArray();
-    return results as Legislation[];
+    return results.map(doc => {
+      const { _id, ...rest } = doc;
+      return rest as Legislation;
+    });
   } catch (error) {
     console.error('Error fetching all legislation from service: ', error);
     throw new Error('Failed to fetch legislation.');
@@ -502,5 +507,90 @@ export async function deleteLegislation(id: string): Promise<boolean> {
   } catch (error) {
     console.error(`Error deleting legislation document with id ${id}: `, error);
     throw new Error('Failed to delete legislation.');
+  }
+}
+
+export async function getAllEnactedLegislation({
+  limit = 100,
+  skip = 0,
+  sort = { latestActionAt: -1 },
+  jurisdictionName,
+  searchText,
+  subjects
+}: {
+  limit?: number;
+  skip?: number;
+  sort?: Record<string, 1 | -1>;
+  jurisdictionName?: string;
+  searchText?: string;
+  subjects?: string[];
+}): Promise<{ data: Legislation[]; total: number; duration: number }> {
+  const startTime = Date.now();
+
+  try {
+    const legislationCollection = await getCollection('legislation');
+
+    // Build optimized filter using pre-computed isEnacted field
+    const filter: Record<string, any> = {
+      isEnacted: true
+    };
+
+    // Add jurisdiction filter
+    if (jurisdictionName) {
+      filter.jurisdictionName = jurisdictionName;
+    }
+
+    // Add text search using MongoDB text index
+    if (searchText) {
+      filter.$text = { $search: searchText };
+    }
+
+    // Add subjects filter
+    if (subjects && subjects.length > 0) {
+      filter.subjects = { $in: subjects };
+    }
+
+    console.log('[Service] Fetching enacted legislation with optimized filter:', JSON.stringify(filter, null, 2));
+
+    // Use hint to ensure MongoDB uses the right index
+    const query = legislationCollection.find(filter);
+
+    // Add sort hint for better performance
+    if (filter.isEnacted && filter.jurisdictionName) {
+      query.hint({ isEnacted: 1, jurisdictionName: 1, latestActionAt: -1 });
+    } else if (filter.isEnacted) {
+      query.hint({ isEnacted: 1, latestActionAt: -1 });
+    }
+
+    // Get total count for pagination (with same filter)
+    const totalCountPromise = legislationCollection.countDocuments(filter);
+
+    // Get the actual results
+    const resultsPromise = query
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    // Execute both queries in parallel
+    const [results, total] = await Promise.all([resultsPromise, totalCountPromise]);
+
+    const duration = Date.now() - startTime;
+    console.log(`[Service] Enacted legislation query completed in ${duration}ms, returned ${results.length}/${total} results`);
+
+    const convertedResults = results.map(doc => {
+      const { _id, ...rest } = doc;
+      return rest as Legislation;
+    });
+
+    return {
+      data: convertedResults,
+      total,
+      duration
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Error fetching enacted legislation (${duration}ms):`, error);
+    throw new Error('Failed to fetch enacted legislation.');
   }
 }

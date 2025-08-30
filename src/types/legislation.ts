@@ -38,6 +38,9 @@ export interface Legislation {
     reasoning: string,
     classifiedAt: Date | null;
   }
+  // Performance optimization field
+  isEnacted?: boolean; // Pre-computed field for faster enacted legislation queries
+  enactedFieldUpdatedAt?: Date; // When the isEnacted field was last computed
 }
 
 // Bookmark/SavedLegislation Types

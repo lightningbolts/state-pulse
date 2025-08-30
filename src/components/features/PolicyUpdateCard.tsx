@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { BookmarkButton } from "@/components/features/BookmarkButton";
+import { isLegislationEnacted } from '@/utils/enacted-legislation';
 
 export interface PolicyUpdate {
   id: string;
@@ -23,6 +24,7 @@ export interface PolicyUpdate {
   history?: { date: string; action: string }[];
   firstActionAt?: string | null;
   versions?: { date: string; note?: string; classification?: string | null; links?: any[] }[];
+  topicClassification?: { broadTopics: string[] };
 }
 
 interface PolicyUpdateCardProps {
@@ -51,6 +53,9 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
       ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
       : date.toISOString().slice(0, 10);
   };
+
+  // Use optimized enacted detection
+  const billIsEnacted = isLegislationEnacted(update);
 
   // --- Introduction Date Logic ---
   let introDate: Date | null = null;
@@ -98,8 +103,19 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
   return (
     <AnimatedSection key={uniqueKey}>
       <div
-        className="mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full relative"
+        className={`mb-4 p-4 border rounded-lg bg-background transition hover:bg-accent/50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary h-full relative ${
+          billIsEnacted ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+        }`}
       >
+        {/* Enacted Badge */}
+        {billIsEnacted && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="default" className="bg-green-600 text-white">
+              Enacted
+            </Badge>
+          </div>
+        )}
+
         <div className="flex flex-col h-full">
           {/* Clickable area for navigation */}
           <Link
@@ -108,7 +124,7 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
             style={{ textDecoration: 'none', color: 'inherit' }}
           >
             <div>
-              <div className="font-bold text-lg mb-1 text-left">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
+              <div className="font-bold text-lg mb-1 text-left pr-20">{update.identifier ? `${update.identifier} - ${update.title}` : update.title}</div>
               <div className="text-sm text-muted-foreground mb-1 text-left">
                 {update.jurisdictionName} • {update.session}
               </div>
@@ -169,7 +185,7 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
                 </div>
               )}
               {(lastActionDescription || formattedLastActionDate) && (
-                <div className="text-sm text-muted-foreground mb-1 text-left">
+                <div className={`text-sm mb-1 text-left ${billIsEnacted ? 'text-green-700 dark:text-green-300 font-medium' : 'text-muted-foreground'}`}>
                   <span className="font-semibold">Last Action: </span>{lastActionDescription || 'N/A'}
                   {formattedLastActionDate && (
                     <span className="ml-2">({formattedLastActionDate})</span>

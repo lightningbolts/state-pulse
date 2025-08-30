@@ -10,6 +10,25 @@ interface CollapsibleTimelineProps {
     historyEvents: Legislation['history'];
 }
 
+// Helper function to detect enacted actions (defined outside component to avoid scoping issues)
+const isEnactedAction = (action: string): boolean => {
+    if (!action) return false;
+
+    const enactedPatterns = [
+        /signed.*(into|by).*(law|governor)/i,
+        /approved.*by.*governor/i,
+        /became.*law/i,
+        /effective.*date/i,
+        /chapter.*laws/i,
+        /public.*law.*no/i,
+        /acts.*of.*assembly.*chapter/i,
+        /governor.*signed/i,
+        /signed.*into.*law/i
+    ];
+
+    return enactedPatterns.some(pattern => pattern.test(action));
+};
+
 export function CollapsibleTimeline({historyEvents}: CollapsibleTimelineProps) {
     const [timelineOpen, setTimelineOpen] = useState(false);
 
@@ -60,28 +79,36 @@ export function CollapsibleTimeline({historyEvents}: CollapsibleTimelineProps) {
                             >
                                 {historyEvents.map((event, index) => {
                                     const isLast = index === historyEvents.length - 1;
-                                    const itemVariants = {
-                                        open: {y: 0, opacity: 1, transition: {y: {stiffness: 1000, velocity: -100}}},
-                                        collapsed: {y: 50, opacity: 0, transition: {y: {stiffness: 1000}}}
-                                    };
+                                    const isEnacted = isEnactedAction(event.action);
                                     return (
                                         <AnimatedSection key={index} className="relative pl-8 pb-8">
                                             {/* Vertical Connector Line - now correctly spans the full height */}
                                             {!isLast && (
-                                                <div className="absolute left-[11px] top-3 h-full w-0.5 bg-primary"/>
+                                                <div className={`absolute left-[11px] top-3 h-full w-0.5 ${isEnacted ? 'bg-green-500' : 'bg-primary'}`}/>
                                             )}
-                                            {/* Timeline Dot */}
+                                            {/* Timeline Dot - highlighted for enacted actions */}
                                             <div
-                                                className="absolute left-[6px] top-3 h-3 w-3 rounded-full bg-primary border-2 border-background"/>
+                                                className={`absolute left-[6px] top-3 h-3 w-3 rounded-full border-2 border-background ${
+                                                    isEnacted ? 'bg-green-500' : 'bg-primary'
+                                                }`}/>
                                             <div
-                                                className="bg-card p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                                                className={`bg-card p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow ${
+                                                    isEnacted ? 'border-2 border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+                                                }`}>
                                                 <div
-                                                    className="font-medium text-primary-foreground bg-primary px-3 py-2 rounded-t-md text-sm flex justify-between items-center -m-4 mb-3">
-                                                    <span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}</span>
+                                                    className={`font-medium text-primary-foreground px-3 py-2 rounded-t-md text-sm flex justify-between items-center -m-4 mb-3 ${
+                                                        isEnacted ? 'bg-green-600' : 'bg-primary'
+                                                    }`}>
+                                                    <span className="flex items-center gap-2">
+                                                        {event.date ? new Date(event.date).toLocaleDateString() : 'Date N/A'}
+                                                        {isEnacted && <span className="text-xs">ENACTED</span>}
+                                                    </span>
                                                     <span
                                                         className="text-xs opacity-90">{event.actor || 'Unknown Actor'}</span>
                                                 </div>
-                                                <p className="text-sm text-foreground m-0">{event.action}</p>
+                                                <p className={`text-sm m-0 ${isEnacted ? 'text-green-800 dark:text-green-200 font-semibold' : 'text-foreground'}`}>
+                                                    {event.action}
+                                                </p>
                                                 {event.details &&
                                                     <p className="text-xs text-muted-foreground mt-1 mb-0">Details: {event.details}</p>}
                                             </div>

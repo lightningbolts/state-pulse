@@ -74,7 +74,8 @@ async function fetchUpdatesFeed({
     jurisdictionName = "",
     showCongress = false,
     sponsor = "",
-    sponsorId = ""
+    sponsorId = "",
+    showOnlyEnacted = false
 }: {
     skip?: number;
     limit?: number;
@@ -87,6 +88,7 @@ async function fetchUpdatesFeed({
     showCongress?: boolean;
     sponsor?: string;
     sponsorId?: string;
+    showOnlyEnacted?: boolean;
 }) {
     const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
     if (search) params.append("search", search);
@@ -107,9 +109,27 @@ async function fetchUpdatesFeed({
     if (classification) params.append("classification", classification);
     if (sponsor) params.append("sponsor", sponsor);
     if (sponsorId) params.append("sponsorId", sponsorId);
-    const res = await fetch(`/api/legislation?${params.toString()}`);
+
+    // Use the enacted endpoint if filtering for enacted legislation
+    const endpoint = showOnlyEnacted ? '/api/legislation/enacted' : '/api/legislation';
+    const res = await fetch(`${endpoint}?${params.toString()}`);
     if (!res.ok) throw new Error("Failed to fetch updates");
-    return await res.json();
+
+    const responseData = await res.json();
+
+    // Handle both response formats: direct array (regular API) and object with data property (enacted API)
+    if (Array.isArray(responseData)) {
+        return responseData;
+    } else if (responseData.data && Array.isArray(responseData.data)) {
+        // Log performance metrics if available
+        if (responseData.performance) {
+            console.log(`[FEED] API performance: ${responseData.performance.queryDuration}ms, cache hit: ${responseData.performance.cacheHit}`);
+        }
+        return responseData.data;
+    } else {
+        console.error('[FEED] Unexpected API response format:', responseData);
+        throw new Error("Invalid API response format");
+    }
 }
 
 export function PolicyUpdatesFeed() {
@@ -132,6 +152,7 @@ export function PolicyUpdatesFeed() {
     const [customTags, setCustomTags] = useState<string[]>([]);
     const [newTagInput, setNewTagInput] = useState("");
     const [showCustomTagInput, setShowCustomTagInput] = useState(false);
+    const [showOnlyEnacted, setShowOnlyEnacted] = useState(false);
     const loader = useRef<HTMLDivElement | null>(null);
     const skipRef = useRef(0);
     const loadingRef = useRef(false); // Ref to prevent concurrent loads
@@ -250,7 +271,8 @@ export function PolicyUpdatesFeed() {
                 classification,
                 jurisdictionName,
                 showCongress,
-                sponsorId: sponsorId // Only send sponsorId, not sponsor name
+                sponsorId: sponsorId, // Only send sponsorId, not sponsor name
+                showOnlyEnacted
             });
             const filteredNewUpdates = showOnlyBookmarked
                 ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
@@ -272,7 +294,7 @@ export function PolicyUpdatesFeed() {
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId]);
+    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
@@ -302,7 +324,8 @@ export function PolicyUpdatesFeed() {
                 classification,
                 jurisdictionName,
                 showCongress,
-                sponsorId
+                sponsorId,
+                showOnlyEnacted
             });
             const filteredUpdates = showOnlyBookmarked
                 ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
@@ -316,7 +339,7 @@ export function PolicyUpdatesFeed() {
         } finally {
             setLoading(false);
         }
-    }, [search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId]);
+    }, [search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
 
     // --- Seamless state/scroll restore ---
     // Use a ref to block the initial fetch until state/scroll is restored
@@ -349,6 +372,7 @@ export function PolicyUpdatesFeed() {
                 setClassification(state.classification || "");
                 setJurisdictionName(state.jurisdictionName || "");
                 setShowCongress(state.showCongress || false);
+                setShowOnlyEnacted(state.showOnlyEnacted || false);
                 setSort(state.sort || { field: 'createdAt', dir: 'desc' });
                 setSkip(state.skip || 0);
                 skipRef.current = state.skip || 0;
@@ -405,7 +429,8 @@ export function PolicyUpdatesFeed() {
                     classification,
                     jurisdictionName,
                     showCongress,
-                    sponsorId: sponsorId // Only send sponsorId, not sponsor name
+                    sponsorId: sponsorId, // Only send sponsorId, not sponsor name
+                    showOnlyEnacted
                 });
                 if (!isMounted) return;
 
@@ -430,7 +455,7 @@ export function PolicyUpdatesFeed() {
         return () => {
             isMounted = false;
         };
-    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, didRestore.current]);
+    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, didRestore.current]);
 
 
     // Intersection Observer for infinite scroll
@@ -492,6 +517,7 @@ export function PolicyUpdatesFeed() {
                 hasMore,
                 jurisdictionName,
                 showCongress,
+                showOnlyEnacted,
                 updates
             }));
         } catch (error) {
@@ -500,13 +526,13 @@ export function PolicyUpdatesFeed() {
             try {
                 sessionStorage.removeItem('policyUpdatesFeedState');
                 sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-                    search, subject, classification, sort, showCongress
+                    search, subject, classification, sort, showCongress, showOnlyEnacted
                 }));
             } catch (retryError) {
                 console.error('Failed to save even minimal state:', retryError);
             }
         }
-    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, updates]);
+    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, showOnlyEnacted, updates]);
 
     // Save scroll position
     useEffect(() => {
@@ -582,22 +608,29 @@ export function PolicyUpdatesFeed() {
     return (
         <>
             {/* Unified Filter Indicator */}
-            {(repFilter || sponsorId || showCongress || jurisdictionName) && (
+            {(repFilter || sponsorId || showCongress || jurisdictionName || showOnlyEnacted) && (
                 <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Badge variant="default" className="bg-primary">
-                                {repFilter
-                                    ? `Filtered by Representative: ${repFilter}`
-                                    : sponsorId
-                                        ? `Filtered by Representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
-                                        : showCongress
-                                            ? "Filtered by U.S. Congress"
-                                            : jurisdictionName
-                                                ? `Filtered by State: ${jurisdictionName}`
-                                                : ""
-                                }
-                            </Badge>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {(repFilter || sponsorId || showCongress || jurisdictionName) && (
+                                <Badge variant="default" className="bg-primary">
+                                    {repFilter
+                                        ? `Filtered by Representative: ${repFilter}`
+                                        : sponsorId
+                                            ? `Filtered by Representative${sponsorId ? ` (ID: ${sponsorId})` : ''}`
+                                            : showCongress
+                                                ? "Filtered by U.S. Congress"
+                                                : jurisdictionName
+                                                    ? `Filtered by State: ${jurisdictionName}`
+                                                    : ""
+                                    }
+                                </Badge>
+                            )}
+                            {showOnlyEnacted && (
+                                <Badge variant="default" className="bg-green-600">
+                                    Enacted into Law
+                                </Badge>
+                            )}
                             <span className="text-sm text-muted-foreground">
                                 {repFilter
                                     ? `Showing bills sponsored by ${repFilter}`
@@ -607,7 +640,9 @@ export function PolicyUpdatesFeed() {
                                             ? "Showing federal legislation only"
                                             : jurisdictionName
                                                 ? `Showing legislation from ${jurisdictionName} only`
-                                                : ""}
+                                                : showOnlyEnacted
+                                                    ? "Showing only bills that have been enacted into law"
+                                                    : ""}
                             </span>
                         </div>
                         <Button
@@ -619,6 +654,7 @@ export function PolicyUpdatesFeed() {
                                 setSponsorId("");
                                 setJurisdictionName("");
                                 setShowCongress(false);
+                                setShowOnlyEnacted(false);
                                 setUpdates([]);
                                 setSkip(0);
                                 skipRef.current = 0;
@@ -755,6 +791,21 @@ export function PolicyUpdatesFeed() {
                 >
                     <Bookmark className="mr-2 h-4 w-4" />
                     {showOnlyBookmarked ? "Show All" : `Bookmarked (${bookmarksLoading ? '...' : bookmarks.length})`}
+                </Button>
+                {/* Enacted Legislation Filter */}
+                <Button
+                    variant={showOnlyEnacted ? "default" : "outline"}
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                        setShowOnlyEnacted(!showOnlyEnacted);
+                        setUpdates([]);
+                        setSkip(0);
+                        skipRef.current = 0;
+                        setHasMore(true);
+                        setLoading(true);
+                    }}
+                >
+                    <span className="ml-2">{showOnlyEnacted ? "Show All Bills" : "Enacted into Law"}</span>
                 </Button>
                 {/* Refresh Feed button */}
                 <Button

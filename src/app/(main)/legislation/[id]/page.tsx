@@ -88,6 +88,47 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     );
   }
 
+  // Helper function to detect if this bill is enacted
+  const isEnacted = (): boolean => {
+    const enactedPatterns = [
+      /signed.*(into|by).*(law|governor)/i,
+      /approved.*by.*governor/i,
+      /became.*law/i,
+      /effective.*date/i,
+      /chapter.*laws/i,
+      /public.*law.*no/i,
+      /acts.*of.*assembly.*chapter/i,
+      /governor.*signed/i,
+      /signed.*into.*law/i
+    ];
+
+    // Check latest action description
+    if (legislation.latestActionDescription) {
+      for (const pattern of enactedPatterns) {
+        if (pattern.test(legislation.latestActionDescription)) {
+          return true;
+        }
+      }
+    }
+
+    // Check history for enacted actions
+    if (legislation.history && Array.isArray(legislation.history)) {
+      for (const historyItem of legislation.history) {
+        if (historyItem.action) {
+          for (const pattern of enactedPatterns) {
+            if (pattern.test(historyItem.action)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  const billIsEnacted = isEnacted();
+
   // Get related bills after we confirm legislation exists
   // const relatedBills = await getRelatedBills(legislation, 3);
 
@@ -114,11 +155,35 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
+      {/*/!* Enacted Legislation Banner *!/*/}
+      {/*{billIsEnacted && (*/}
+      {/*  <div className="mb-6 p-4 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg">*/}
+      {/*    <div className="flex items-center gap-3">*/}
+      {/*      <Badge variant="default" className="bg-green-600 text-white text-lg px-3 py-1">*/}
+      {/*        ENACTED INTO LAW*/}
+      {/*      </Badge>*/}
+      {/*      <div>*/}
+      {/*        <h2 className="text-lg font-bold text-green-800 dark:text-green-200">This Bill Has Become Law</h2>*/}
+      {/*        <p className="text-sm text-green-700 dark:text-green-300">*/}
+      {/*          This legislation has successfully completed the legislative process and has been enacted into law.*/}
+      {/*        </p>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*)}*/}
+
       <Card className="w-full max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden">
-        <CardHeader className="bg-gray-700 text-primary-foreground p-6">
+        <CardHeader className={`text-primary-foreground p-6 ${billIsEnacted ? 'bg-green-700' : 'bg-gray-700'}`}>
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-2xl md:text-3xl font-bold tracking-tight break-words">{identifier}: {title}</CardTitle>
+              <div className="flex items-center gap-3 mb-2">
+                <CardTitle className="text-2xl md:text-3xl font-bold tracking-tight break-words">{identifier}: {title}</CardTitle>
+                {/*{billIsEnacted && (*/}
+                {/*  <Badge variant="default" className="bg-white text-green-700 font-semibold">*/}
+                {/*    LAW*/}
+                {/*  </Badge>*/}
+                {/*)}*/}
+              </div>
               <CardDescription className="text-primary-foreground/80 text-sm mt-1 break-words">
                 {session} - {jurisdictionName} {chamber && `(${chamber})`}
               </CardDescription>
@@ -132,6 +197,17 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
               <h3 className="text-lg font-semibold text-foreground flex items-center">
                 <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Key Details
               </h3>
+              {billIsEnacted && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="default" className="bg-green-600 text-white">ENACTED</Badge>
+                    <span className="text-sm font-semibold text-green-800 dark:text-green-200">This Bill is Now Law</span>
+                  </div>
+                  <p className="text-xs text-green-700 dark:text-green-300">
+                    Check the timeline below for enactment details including effective dates and chapter numbers.
+                  </p>
+                </div>
+              )}
               {statusText && <div><Badge variant="secondary" className="text-sm break-words">{statusText}</Badge></div>}
               {classification && classification.length > 0 && (
                 <div className="text-sm text-muted-foreground">
@@ -150,7 +226,11 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
                   <span>Latest Action: {formatDateUTC(latestActionAt)}</span>
                 </p>
               )}
-              {latestActionDescription && <p className="text-sm text-muted-foreground break-words">Latest Action Detail: {latestActionDescription}</p>}
+              {latestActionDescription && (
+                <p className={`text-sm break-words ${billIsEnacted ? 'text-green-700 dark:text-green-300 font-medium' : 'text-muted-foreground'}`}>
+                  Latest Action Detail: {latestActionDescription}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2 min-w-0">
