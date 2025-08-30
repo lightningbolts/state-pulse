@@ -559,6 +559,8 @@ export function PolicyUpdatesFeed() {
                 return "Alphabetical (A-Z)";
             case "title:desc":
                 return "Alphabetical (Z-A)";
+            case "relevance:desc":
+                return "Relevance";
             default:
                 return "Custom";
         }
@@ -734,6 +736,7 @@ export function PolicyUpdatesFeed() {
                             <DropdownMenuRadioItem value="lastActionAt:asc">Earliest Action</DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="title:asc">Alphabetical (A-Z)</DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="title:desc">Alphabetical (Z-A)</DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="relevance:desc">Relevance</DropdownMenuRadioItem>
                         </DropdownMenuRadioGroup>
                     </DropdownMenuContent>
                 </DropdownMenu>
