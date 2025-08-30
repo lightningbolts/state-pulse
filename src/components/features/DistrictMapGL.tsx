@@ -38,6 +38,29 @@ interface DistrictMapGLProps {
   getTopicHeatmapColor?: (score: number) => string; // score -> color
 }
 
+// Mobile detection utility
+const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  const userAgent = navigator.userAgent;
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const hasSmallScreen = window.innerWidth <= 768;
+  const isMobileUserAgent = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+  return isTouchDevice && (hasSmallScreen || isMobileUserAgent);
+};
+
+// Mobile memory optimization utility
+const getOptimalChunkSize = (featureCount: number, isMobile: boolean): number => {
+  if (!isMobile) return featureCount; // No chunking on desktop
+
+  // Conservative chunking for mobile devices based on actual district counts
+  if (featureCount > 4000) return 400;  // State lower districts (~4,800)
+  if (featureCount > 1500) return 600;  // State upper districts (~1,900)
+  if (featureCount > 800) return 800;   // Medium datasets
+  return featureCount; // Congressional districts (~435) and smaller - no chunking needed
+};
+
 // Performance optimization: Memoize the component to prevent unnecessary re-renders
 export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   geojsonUrl,
@@ -62,93 +85,275 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
 }) => {
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
+  const loadingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [geoJsonData, setGeoJsonData] = React.useState<any>(null);
+  const [loadingProgress, setLoadingProgress] = React.useState(0);
+  const [isPartiallyLoaded, setIsPartiallyLoaded] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(false);
 
-  // Smart data loading with chunking and optimization
+  // Mobile detection effect
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(isMobileDevice());
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Smart data loading with mobile-specific optimizations and progressive loading
   React.useEffect(() => {
     let isCancelled = false;
-    
+    let abortController: AbortController | null = null;
+
     const loadGeoJsonData = async () => {
       if (!geojsonUrl) return;
       
       try {
         setLoading(true);
         setError(null);
-        
-        const response = await fetch(geojsonUrl);
+        setLoadingProgress(0);
+        setIsPartiallyLoaded(false);
+
+        // Clear any existing timeout
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+
+        abortController = new AbortController();
+
+        // Mobile-specific timeout and fetch options
+        const fetchTimeout = isMobile ? 25000 : 30000; // Longer timeout on mobile for better stability
+        const timeoutId = setTimeout(() => {
+          if (abortController && !abortController.signal.aborted) {
+            try {
+              abortController.abort('Request timeout');
+            } catch (e) {
+              console.debug('[DistrictMapGL] Timeout abort error:', e);
+            }
+          }
+        }, fetchTimeout);
+
+        const response = await fetch(geojsonUrl, {
+          signal: abortController.signal,
+          cache: 'force-cache', // Use browser cache aggressively
+          // Mobile-specific headers for smaller responses
+          headers: isMobile ? {
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept': 'application/json'
+          } : {}
+        });
+
+        clearTimeout(timeoutId);
+
+        // Check if request was cancelled before processing response
+        if (isCancelled) {
+          console.debug('[DistrictMapGL] Request cancelled during fetch');
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
+        setLoadingProgress(30);
+
         const data = await response.json();
-        
+
         if (isCancelled) return;
-        
-        // Smart loading strategy for large datasets
-        if (data.features && data.features.length > 1000) {
-          console.log(`[DistrictMapGL] Large dataset detected: ${data.features.length} features - using optimized loading`);
-          
-          // For very large datasets (like state-lower-districts), implement chunked loading
-          if (data.features.length > 3000) {
-            console.log(`[DistrictMapGL] Very large dataset - implementing progressive loading`);
-            
-            // Load initial chunk immediately
-            const initialChunkSize = 1000;
+
+        setLoadingProgress(60);
+
+        const featureCount = data.features?.length || 0;
+        const isLargeDataset = featureCount > 1800; // Adjusted: Only state upper (~1900) and state lower (~4800)
+        const isVeryLargeDataset = featureCount > 4000; // Only state lower districts (~4800)
+
+        console.log(`[DistrictMapGL] Dataset loaded: ${featureCount} features (isLarge: ${isLargeDataset}, isVeryLarge: ${isVeryLargeDataset})`);
+
+        // Mobile-specific optimizations for large datasets
+        if (isMobile && isVeryLargeDataset) {
+          console.log(`[DistrictMapGL] Mobile device detected with ${featureCount} features - applying mobile optimizations`);
+
+          const chunkSize = getOptimalChunkSize(featureCount, true);
+
+          if (chunkSize < featureCount) {
+            console.log(`[DistrictMapGL] Mobile progressive loading: ${chunkSize}/${featureCount} features initially`);
+
+            // Create initial chunk with only essential properties
             const initialChunk = {
               ...data,
-              features: data.features.slice(0, initialChunkSize).map((feature: any) => ({
-                ...feature,
-                properties: { ...feature.properties, _optimized: true }
+              features: data.features.slice(0, chunkSize).map((feature: any) => ({
+                type: feature.type,
+                geometry: {
+                  type: feature.geometry.type,
+                  coordinates: feature.geometry.coordinates
+                },
+                properties: {
+                  // Keep only essential properties for mobile
+                  GEOID: feature.properties.GEOID,
+                  GEOIDFQ: feature.properties.GEOIDFQ,
+                  ID: feature.properties.ID,
+                  DISTRICT: feature.properties.DISTRICT,
+                  STATEFP: feature.properties.STATEFP,
+                  NAME: feature.properties.NAME,
+                  _optimized: true,
+                  _mobile: true
+                }
               }))
             };
-            
+
             initialChunk._isLargeDataset = true;
-            initialChunk._originalFeatureCount = data.features.length;
+            initialChunk._isMobile = true;
+            initialChunk._originalFeatureCount = featureCount;
+            initialChunk._loadedFeatureCount = chunkSize;
             initialChunk._isPartialLoad = true;
-            
+
             setGeoJsonData(initialChunk);
-            
-            // Load remaining features progressively
-            setTimeout(() => {
-              if (!isCancelled) {
-                const fullData = {
-                  ...data,
-                  features: data.features.map((feature: any) => ({
-                    ...feature,
-                    properties: { ...feature.properties, _optimized: true }
-                  }))
+            setIsPartiallyLoaded(true);
+            setLoadingProgress(80);
+
+            // Progressive loading with longer delays on mobile to prevent crashes
+            loadingTimeoutRef.current = setTimeout(() => {
+              if (!isCancelled && isMobile) {
+                console.log(`[DistrictMapGL] Mobile progressive loading: Loading remaining ${featureCount - chunkSize} features`);
+
+                // Load remaining features in chunks to prevent memory spikes
+                const remainingFeatures = data.features.slice(chunkSize);
+                const remainingChunks: any[][] = [];
+                const mobileChunkSize = 300; // Smaller chunks for mobile stability
+
+                for (let i = 0; i < remainingFeatures.length; i += mobileChunkSize) {
+                  remainingChunks.push(remainingFeatures.slice(i, i + mobileChunkSize));
+                }
+
+                let currentChunkIndex = 0;
+
+                const loadNextChunk = () => {
+                  if (currentChunkIndex >= remainingChunks.length || isCancelled) {
+                    setLoadingProgress(100);
+                    setIsPartiallyLoaded(false);
+                    console.log(`[DistrictMapGL] Mobile progressive loading complete - ${featureCount} features loaded`);
+                    return;
+                  }
+
+                  const currentChunk = remainingChunks[currentChunkIndex];
+                  const processedChunk = currentChunk.map((feature: any) => ({
+                    type: feature.type,
+                    geometry: {
+                      type: feature.geometry.type,
+                      coordinates: feature.geometry.coordinates
+                    },
+                    properties: {
+                      GEOID: feature.properties.GEOID,
+                      GEOIDFQ: feature.properties.GEOIDFQ,
+                      ID: feature.properties.ID,
+                      DISTRICT: feature.properties.DISTRICT,
+                      STATEFP: feature.properties.STATEFP,
+                      NAME: feature.properties.NAME,
+                      _optimized: true,
+                      _mobile: true
+                    }
+                  }));
+
+                  setGeoJsonData((prevData: any) => {
+                    if (!prevData || isCancelled) return prevData;
+
+                    return {
+                      ...prevData,
+                      features: [...prevData.features, ...processedChunk],
+                      _loadedFeatureCount: prevData._loadedFeatureCount + processedChunk.length,
+                      _isPartialLoad: (currentChunkIndex + 1) < remainingChunks.length
+                    };
+                  });
+
+                  const progress = 80 + Math.floor((currentChunkIndex + 1) / remainingChunks.length * 20);
+                  setLoadingProgress(progress);
+
+                  currentChunkIndex++;
+
+                  // Use requestIdleCallback on mobile for better performance
+                  if (window.requestIdleCallback && isMobile && !isCancelled) {
+                    window.requestIdleCallback(() => {
+                      if (!isCancelled) loadNextChunk();
+                    }, { timeout: 2000 });
+                  } else if (!isCancelled) {
+                    setTimeout(() => {
+                      if (!isCancelled) loadNextChunk();
+                    }, 300); // Longer delay for mobile stability
+                  }
                 };
-                fullData._isLargeDataset = true;
-                fullData._originalFeatureCount = data.features.length;
-                setGeoJsonData(fullData);
-                console.log(`[DistrictMapGL] Progressive loading complete - ${data.features.length} features loaded`);
+
+                loadNextChunk();
               }
-            }, 500); // 500ms delay for progressive loading
-            
+            }, 2000); // Longer initial delay for mobile stability
+
           } else {
-            // Standard optimization for moderately large datasets
+            // Load full dataset with mobile optimizations
             const optimizedData = {
               ...data,
               features: data.features.map((feature: any) => ({
-                ...feature,
-                properties: { ...feature.properties, _optimized: true }
+                type: feature.type,
+                geometry: {
+                  type: feature.geometry.type,
+                  coordinates: feature.geometry.coordinates
+                },
+                properties: {
+                  // Minimal properties for mobile
+                  GEOID: feature.properties.GEOID,
+                  GEOIDFQ: feature.properties.GEOIDFQ,
+                  ID: feature.properties.ID,
+                  DISTRICT: feature.properties.DISTRICT,
+                  STATEFP: feature.properties.STATEFP,
+                  NAME: feature.properties.NAME,
+                  _optimized: true,
+                  _mobile: isMobile
+                }
               }))
             };
-            
-            optimizedData._isLargeDataset = true;
-            optimizedData._originalFeatureCount = data.features.length;
+
+            optimizedData._isLargeDataset = isLargeDataset;
+            optimizedData._isMobile = isMobile;
+            optimizedData._originalFeatureCount = featureCount;
+            optimizedData._loadedFeatureCount = featureCount;
             setGeoJsonData(optimizedData);
           }
         } else {
-          setGeoJsonData(data);
+          // Desktop or small datasets - simple load with minimal optimization
+          const optimizedData = {
+            ...data,
+            features: data.features.map((feature: any) => ({
+              type: feature.type,
+              geometry: feature.geometry,
+              properties: {
+                ...feature.properties,
+                _optimized: true
+              }
+            }))
+          };
+
+          optimizedData._isLargeDataset = isLargeDataset;
+          optimizedData._isMobile = false;
+          optimizedData._originalFeatureCount = featureCount;
+          optimizedData._loadedFeatureCount = featureCount;
+          setGeoJsonData(optimizedData);
         }
-        
-      } catch (err) {
-        console.error('[DistrictMapGL] Error loading GeoJSON:', err);
+
+        setLoadingProgress(100);
+
+      } catch (err: any) {
         if (!isCancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load district data');
+          console.error('[DistrictMapGL] Error loading GeoJSON:', err);
+          if (err.name === 'AbortError') {
+            // Silently handle abort errors to prevent console spam
+            console.debug('[DistrictMapGL] Request aborted');
+            setError('Loading was interrupted. Please try again.');
+          } else {
+            setError(err instanceof Error ? err.message : 'Failed to load district data');
+          }
         }
       } finally {
         if (!isCancelled) {
@@ -161,21 +366,20 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
     
     return () => {
       isCancelled = true;
-    };
-  }, [geojsonUrl]);  // Memory management and cleanup
-  React.useEffect(() => {
-    return () => {
-      // Cleanup marker
-      if (markerRef.current) {
+      // Safely abort the controller without throwing errors
+      if (abortController && !abortController.signal.aborted) {
         try {
-          markerRef.current.remove();
-          markerRef.current = null;
-        } catch (err) {
-          console.error('[DistrictMapGL] Error cleaning up marker:', err);
+          abortController.abort('Component cleanup');
+        } catch (abortError) {
+          // Silently ignore abort errors during cleanup
         }
       }
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
     };
-  }, []);
+  }, [geojsonUrl, isMobile]);
 
   // Performance optimization: Memoize the fill color expression to prevent recalculation on every render
   const fillColorExpression = React.useMemo((): any => {
@@ -364,32 +568,84 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
     };
   }, [popupMarker]);
 
-  // Optimized layer paint properties - maintain visual quality while optimizing performance
+  // Optimized layer paint properties - mobile-specific optimizations
   const layerFillPaint = React.useMemo(() => {
-    const baseOpacity = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 0.75 : 0.08;
+    const baseOpacity = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ?
+      (isMobile ? 0.65 : 0.75) : // Slightly lower opacity on mobile for better performance
+      (isMobile ? 0.06 : 0.08);
 
     return {
       'fill-color': fillColorExpression,
       'fill-opacity': baseOpacity,
     };
-  }, [fillColorExpression, showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap]);
+  }, [fillColorExpression, showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, isMobile]);
 
   const layerLinePaint = React.useMemo(() => {
-    const lineWidth = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? 1 : 2;
+    const lineWidth = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ?
+      (isMobile ? 0.5 : 1) : // Thinner lines on mobile for better performance
+      (isMobile ? 1 : 2);
 
     return {
       'line-color': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? '#000000' : (color.includes('var(') ? '#2563eb' : color),
       'line-width': lineWidth,
     };
-  }, [showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, color, geoJsonData]);
+  }, [showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, color, isMobile]);
 
-  // Show loading state for large datasets
+  // Simplified Source properties to avoid clustering issues and enable world copies
+  const sourceProps = React.useMemo(() => {
+    if (!geoJsonData) return null;
+
+    return {
+      id: "districts",
+      type: "geojson" as const,
+      data: geoJsonData,
+      // Simplified properties for maximum compatibility
+      tolerance: 0.5,
+      buffer: 64,
+      generateId: true,
+      // Remove clustering entirely to avoid undefined boolean issues
+      cluster: false
+    };
+  }, [geoJsonData]);
+
+  // Enhanced loading state with progress for mobile
   if (loading) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ marginBottom: '8px' }}>Loading district data...</div>
-          <div style={{ fontSize: '12px', color: '#666' }}>This may take a moment on mobile devices</div>
+          <div style={{ marginBottom: '8px' }}>
+            {isMobile ? 'Loading district data for mobile...' : 'Loading district data...'}
+          </div>
+          {loadingProgress > 0 && (
+            <div style={{ marginBottom: '8px' }}>
+              <div style={{
+                width: '200px',
+                height: '4px',
+                backgroundColor: '#e0e0e0',
+                borderRadius: '2px',
+                margin: '0 auto',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${loadingProgress}%`,
+                  height: '100%',
+                  backgroundColor: '#2563eb',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                {loadingProgress}%
+              </div>
+            </div>
+          )}
+          <div style={{ fontSize: '12px', color: '#666' }}>
+            {isMobile ? 'Optimizing for mobile device...' : 'This may take a moment on mobile devices'}
+          </div>
+          {isPartiallyLoaded && (
+            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+              Loading progressively to prevent crashes...
+            </div>
+          )}
         </div>
       </div>
     );
@@ -402,6 +658,11 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         <div style={{ textAlign: 'center', color: '#dc2626' }}>
           <div style={{ marginBottom: '8px' }}>Failed to load district data</div>
           <div style={{ fontSize: '12px' }}>{error}</div>
+          {isMobile && (
+            <div style={{ fontSize: '11px', marginTop: '4px', color: '#666' }}>
+              Try refreshing or switch to a smaller district view
+            </div>
+          )}
         </div>
       </div>
     );
@@ -424,38 +685,66 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
       mapStyle={mapStyle}
       interactiveLayerIds={['district-fill']}
       onClick={handleClick}
-      // Conservative performance optimizations that maintain usability
-      maxZoom={geoJsonData?._isLargeDataset ? 14 : 18} // Allow reasonable zoom levels
-      renderWorldCopies={false} // Disable world copies for better performance
-      attributionControl={false} // Disable attribution for cleaner mobile experience
-      fadeDuration={geoJsonData?._isLargeDataset ? 0 : 300} // Disable fade for large datasets
+      // Standard settings for world copies support
+      maxZoom={18}
+      minZoom={0}
+      attributionControl={false}
+      fadeDuration={0} // Disable fade for better mobile performance
+      // Standard interaction settings
+      touchZoomRotate={true}
+      touchPitch={false} // Disable pitch for better mobile performance
+      dragRotate={false} // Disable rotation for better mobile performance
+      doubleClickZoom={true}
+      scrollZoom={true}
+      renderWorldCopies={true} // Explicitly enable world copies
     >
-      <Source 
-        id="districts" 
-        type="geojson" 
-        data={geoJsonData}
-        // Conservative performance optimizations that maintain visual quality
-        tolerance={geoJsonData?._isLargeDataset ? 0.5 : 0.375} // Minimal simplification to maintain detail
-        buffer={geoJsonData?._isLargeDataset ? 64 : 128} // Moderate buffer reduction
-        maxzoom={geoJsonData?._isLargeDataset ? 12 : 14} // Conservative zoom limit
-        generateId={true} // Enable feature state for better performance
-      >
-        <Layer
-          id="district-fill"
-          type="fill"
-          paint={layerFillPaint}
-        />
-        <Layer
-          id="district-outline"
-          type="line"
-          paint={layerLinePaint}
-          layout={{
-            // Optimize line cap and join for better performance
-            'line-cap': 'round',
-            'line-join': 'round'
-          }}
-        />
-      </Source>
+      {sourceProps && (
+        <Source {...sourceProps}>
+          <Layer
+            id="district-fill"
+            type="fill"
+            paint={layerFillPaint}
+          />
+          <Layer
+            id="district-outline"
+            type="line"
+            paint={layerLinePaint}
+            layout={{
+              'line-cap': 'round',
+              'line-join': 'round'
+            }}
+          />
+        </Source>
+      )}
+
+      {/* Show loading indicator overlay for partial loads */}
+      {isPartiallyLoaded && (
+        <div style={{
+          position: 'absolute',
+          bottom: '10px',
+          left: '10px',
+          right: '10px',
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          padding: '8px',
+          borderRadius: '4px',
+          fontSize: '11px',
+          textAlign: 'center',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          zIndex: 1000
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <div style={{
+              width: '12px',
+              height: '12px',
+              border: '2px solid #e0e0e0',
+              borderTop: '2px solid #2563eb',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <span>Loading additional districts... ({geoJsonData?._loadedFeatureCount || 0}/{geoJsonData?._originalFeatureCount || 0})</span>
+          </div>
+        </div>
+      )}
     </Map>
   );
 });

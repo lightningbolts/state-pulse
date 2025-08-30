@@ -2,6 +2,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Loading spinner animation for mobile optimizations */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* MapLibre GL popup dark mode override */
 .dark .maplibregl-popup-content {
   background: #18181b !important;
@@ -13,6 +24,21 @@
   border-top-color: #18181b !important;
   border-bottom-color: #18181b !important;
 }
+
+/* Mobile-specific performance optimizations */
+@media (max-width: 768px) {
+  .maplibregl-canvas {
+    /* Reduce quality on mobile for better performance */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: optimize-contrast;
+  }
+
+  /* Optimize animations on mobile */
+  .maplibregl-map {
+    transition: none !important;
+  }
+}
+
 @layer base {
   :root {
     --background: 210 14% 95%; /* #F2F4F3 */

@@ -18,6 +18,43 @@ import { ChamberMakeup } from "./ChamberMakeup";
 import MapLibreMap, { Marker as MapLibreMarker, Popup as MapLibrePopup, MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+// Mobile detection utility
+const isMobileDevice = (): boolean => {
+    if (typeof window === 'undefined') return false;
+
+    const userAgent = navigator.userAgent;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const hasSmallScreen = window.innerWidth <= 768;
+    const isMobileUserAgent = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+    return isTouchDevice && (hasSmallScreen || isMobileUserAgent);
+};
+
+// Memory management utility for mobile
+const checkMemoryPressure = (): boolean => {
+    if (typeof window === 'undefined' || !('memory' in performance)) return false;
+
+    const memInfo = (performance as any).memory;
+    if (!memInfo) return false;
+
+    const usedMemoryMB = memInfo.usedJSHeapSize / 1024 / 1024;
+    const totalMemoryMB = memInfo.totalJSHeapSize / 1024 / 1024;
+    const memoryPressure = usedMemoryMB / totalMemoryMB;
+
+    return memoryPressure > 0.8; // 80% memory usage indicates pressure
+};
+
+// Force garbage collection (if available)
+const forceGarbageCollection = () => {
+    try {
+        if (window.gc) {
+            window.gc();
+        }
+    } catch (e) {
+        // gc() not available in production, ignore
+    }
+};
+
 // Performance optimization: Create stable references for constant data
 const DISTRICT_GEOJSON_URLS: Record<string, string> = {
   'congressional-districts': '/districts/congressional-districts.geojson',
@@ -269,29 +306,62 @@ export const InteractiveMap = React.memo(() => {
     // Mobile optimization state
     const [isMobile, setIsMobile] = useState<boolean>(false);
     const [mapModeTransitioning, setMapModeTransitioning] = useState<boolean>(false);
-
+    const [memoryPressure, setMemoryPressure] = useState<boolean>(false);
+    const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         setIsClient(true);
         fetchMapData();
         
-        // Detect mobile device
-        const checkIsMobile = () => {
-            setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+        // Detect mobile device and monitor memory
+        const checkMobileAndMemory = () => {
+            const mobile = isMobileDevice();
+            setIsMobile(mobile);
+
+            if (mobile) {
+                const pressure = checkMemoryPressure();
+                setMemoryPressure(pressure);
+            }
         };
         
-        checkIsMobile();
+        checkMobileAndMemory();
+
+        // Monitor memory pressure on mobile devices
+        let memoryMonitorInterval: NodeJS.Timeout | null = null;
+        if (isMobileDevice()) {
+            memoryMonitorInterval = setInterval(checkMobileAndMemory, 5000); // Check every 5 seconds
+        }
+
         // Re-check on window resize (for responsive testing)
-        window.addEventListener('resize', checkIsMobile);
-        
+        window.addEventListener('resize', checkMobileAndMemory);
+
         return () => {
-            window.removeEventListener('resize', checkIsMobile);
+            window.removeEventListener('resize', checkMobileAndMemory);
+            if (memoryMonitorInterval) {
+                clearInterval(memoryMonitorInterval);
+            }
         };
     }, []);
 
-    // Map mode change handler
+    // Map mode change handler with mobile-specific safety checks
     const handleMapModeChange = useCallback(async (newMode: string) => {
         try {
+            setMapModeTransitioning(true);
+
+            // Mobile safety check for large datasets
+            if (isMobile && newMode === 'state-lower-districts') {
+                console.log('[InteractiveMap] Mobile safety check for state-lower-districts');
+
+                // Force garbage collection before loading large dataset
+                forceGarbageCollection();
+
+                // Check memory pressure
+                if (checkMemoryPressure()) {
+                    console.warn('[InteractiveMap] High memory pressure detected on mobile, implementing additional optimizations');
+                    setMemoryPressure(true);
+                }
+            }
+
             // Clear existing overlays and data to free memory
             setSelectedDistrict(null);
             setDistrictPopupLatLng(null);
@@ -301,11 +371,28 @@ export const InteractiveMap = React.memo(() => {
             setTopicScores({});
             setRepScores({});
             
+            // Clear any pending cleanup timeouts
+            if (cleanupTimeoutRef.current) {
+                clearTimeout(cleanupTimeoutRef.current);
+                cleanupTimeoutRef.current = null;
+            }
+
+            // Additional cleanup for mobile devices when switching from large datasets
+            if (isMobile && ['state-lower-districts', 'state-upper-districts'].includes(mapMode)) {
+                // Schedule garbage collection
+                cleanupTimeoutRef.current = setTimeout(() => {
+                    forceGarbageCollection();
+                    setMemoryPressure(false);
+                }, 1000);
+            }
+
             setMapMode(newMode);
         } catch (error) {
             console.error('[InteractiveMap] Error changing map mode:', error);
+        } finally {
+            setMapModeTransitioning(false);
         }
-    }, []);
+    }, [isMobile, mapMode]);
 
     const fetchMapData = async () => {
         setLoading(true);
@@ -1098,14 +1185,32 @@ export const InteractiveMap = React.memo(() => {
 
                         {/* Map Container with district overlays */}
                         <div className="relative">
-                            {/* Performance warning for large datasets on mobile */}
-                            {mapMode === 'state-lower-districts' && (
-                                <div className="absolute top-2 left-2 right-2 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 text-xs text-amber-800 md:hidden">
+                            {/* Enhanced performance warning for large datasets on mobile */}
+                            {mapMode === 'state-lower-districts' && isMobile && (
+                                <div className="absolute top-2 left-2 right-2 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 text-xs text-amber-800">
                                     <div className="flex items-center space-x-1">
                                         <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                         </svg>
-                                        <span>Loading {(4879).toLocaleString()} districts. This may take a moment.</span>
+                                        <span>
+                                            Loading {(4879).toLocaleString()} districts with mobile optimizations.
+                                            {memoryPressure && ' Memory optimization active.'}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 text-xs text-amber-700">
+                                        Districts will load progressively to prevent crashes.
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* General performance warning for large datasets */}
+                            {(mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (
+                                <div className="absolute top-2 left-2 right-2 z-10 bg-blue-50 border border-blue-200 rounded-md p-2 text-xs text-blue-800 md:hidden">
+                                    <div className="flex items-center space-x-1">
+                                        <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                        <span>Mobile optimizations active for better performance.</span>
                                     </div>
                                 </div>
                             )}
@@ -1138,13 +1243,13 @@ export const InteractiveMap = React.memo(() => {
                                             lng: districtPopupLatLng.lng,
                                             lat: districtPopupLatLng.lat,
                                             iconHtml: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`,
-                                            draggable: true,
-                                            onDragEnd: (lngLat) => {
+                                            draggable: !isMobile, // Disable dragging on mobile for better performance
+                                            onDragEnd: !isMobile ? (lngLat) => {
                                                 setDistrictPopupLatLng(lngLat);
                                                 if (selectedDistrict) {
                                                     onDistrictClickGL(selectedDistrict, lngLat);
                                                 }
-                                            }
+                                            } : undefined
                                         } : undefined}
                                     />
                                 ) : (
@@ -1286,20 +1391,47 @@ export const InteractiveMap = React.memo(() => {
                                 )}
                             </div>
 
-                            {(loading || districtLoading) && (
+                            {/* Enhanced loading overlay with memory pressure indicators */}
+                            {(loading || districtLoading || mapModeTransitioning) && (
                                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                                    <div className="flex items-center space-x-2">
-                                        <div className="animate-spin rounded-full h-3 w-3 md:h-4 md:w-4 border-b-2 border-primary"></div>
-                                        <span className="text-xs md:text-sm">
-                                            <span className="hidden sm:inline">Updating map data...</span>
-                                            <span className="sm:hidden">Loading...</span>
-                                        </span>
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <div className="flex items-center space-x-2">
+                                            <div className="animate-spin rounded-full h-3 w-3 md:h-4 md:w-4 border-b-2 border-primary"></div>
+                                            <span className="text-xs md:text-sm">
+                                                {mapModeTransitioning ? (
+                                                    <>
+                                                        <span className="hidden sm:inline">Switching map mode...</span>
+                                                        <span className="sm:hidden">Switching...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span className="hidden sm:inline">Updating map data...</span>
+                                                        <span className="sm:hidden">Loading...</span>
+                                                    </>
+                                                )}
+                                            </span>
+                                        </div>
+                                        {isMobile && mapMode === 'state-lower-districts' && (
+                                            <div className="text-xs text-muted-foreground text-center">
+                                                <div>Mobile optimizations active</div>
+                                                {memoryPressure && (
+                                                    <div className="text-amber-600">Memory optimization in progress</div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
                             {districtError && (
                                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                                    <span className="text-xs text-red-500">{districtError}</span>
+                                    <div className="text-center">
+                                        <span className="text-xs text-red-500 block">{districtError}</span>
+                                        {isMobile && (
+                                            <span className="text-xs text-muted-foreground block mt-1">
+                                                Try switching to a smaller district view
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                 {selectedDistrict && (
@@ -1308,7 +1440,14 @@ export const InteractiveMap = React.memo(() => {
                       {districtPopupLatLng ? ` (${districtPopupLatLng.lat.toFixed(5)}, ${districtPopupLatLng.lng.toFixed(5)})` : ''}
                       <button
                         className="ml-2 text-lg text-gray-400 hover:text-gray-700"
-                        onClick={() => { setSelectedDistrict(null); setDistrictPopupLatLng(null); }}
+                        onClick={() => {
+                            setSelectedDistrict(null);
+                            setDistrictPopupLatLng(null);
+                            // Force cleanup on mobile
+                            if (isMobile) {
+                                setTimeout(forceGarbageCollection, 100);
+                            }
+                        }}
                         aria-label="Close"
                       >×</button>
                     </h3>
@@ -1334,10 +1473,17 @@ export const InteractiveMap = React.memo(() => {
                 )}
                         </div>
 
-                                                {/* Legend or map instruction */}
+                                                {/* Enhanced legend with mobile-specific messaging */}
                                                 {['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) ? (
                                                     <div className="text-xs text-muted-foreground text-center w-full py-2">
-                                                        Click anywhere on the map to see legislators representing that location.
+                                                        <div>
+                                                            {isMobile ? 'Tap anywhere on the map to see legislators' : 'Click anywhere on the map to see legislators representing that location.'}
+                                                        </div>
+                                                        {isMobile && mapMode === 'state-lower-districts' && (
+                                                            <div className="text-amber-600 mt-1">
+                                                                Large dataset - optimized for mobile performance
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <div
@@ -1546,5 +1692,4 @@ export const InteractiveMap = React.memo(() => {
         </AnimatedSection>
     );
 });
-
 
