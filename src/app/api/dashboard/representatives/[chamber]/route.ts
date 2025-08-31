@@ -165,6 +165,16 @@ function extractPartyInfo(rep: any): string {
   return 'Unknown';
 }
 
+// Helper function to check if a state has a unicameral legislature
+function isUnicameralState(rep: any): boolean {
+  // Nebraska is the only state with a unicameral legislature
+  const isNebraska = rep.jurisdiction?.name === 'Nebraska' ||
+                    rep.current_role?.division_id?.includes('/state:ne/') ||
+                    rep.state === 'Nebraska' ||
+                    rep.state === 'NE';
+  return isNebraska;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ chamber: string }> }
@@ -182,14 +192,45 @@ export async function GET(
         query = {
           $and: [
             baseQuery,
-            { 'map_boundary.type': 'state_leg_upper' }
+            {
+              $or: [
+                { 'map_boundary.type': 'state_leg_upper' },
+                // Special case for Nebraska's unicameral legislature
+                {
+                  $and: [
+                    {
+                      $or: [
+                        { 'jurisdiction.name': 'Nebraska' },
+                        { 'current_role.division_id': { $regex: '/state:ne/' } },
+                        { 'state': { $in: ['Nebraska', 'NE'] } }
+                      ]
+                    },
+                    {
+                      $or: [
+                        { 'current_role.title': 'Senator' },
+                        { 'map_boundary.type': 'state_leg' },
+                        { 'current_role.org_classification': 'legislature' }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
           ]
         };
       } else if (chamber === 'state_lower') {
         query = {
           $and: [
             baseQuery,
-            { 'map_boundary.type': 'state_leg_lower' }
+            { 'map_boundary.type': 'state_leg_lower' },
+            // Exclude Nebraska from state_lower since it's unicameral
+            {
+              $nor: [
+                { 'jurisdiction.name': 'Nebraska' },
+                { 'current_role.division_id': { $regex: '/state:ne/' } },
+                { 'state': { $in: ['Nebraska', 'NE'] } }
+              ]
+            }
           ]
         };
       } else if (chamber === 'us_house') {
@@ -224,13 +265,27 @@ export async function GET(
     // Process representatives to ensure party information is available
     const processedReps = reps.map(rep => {
       const party = extractPartyInfo(rep);
+
+      // Determine chamber based on the request and special cases
+      let chamberName = rep.chamber;
+
+      if (!chamberName) {
+        if (isUnicameralState(rep)) {
+          // Nebraska's unicameral legislature - treat as upper chamber for mapping purposes
+          chamberName = 'State Senate';
+        } else if (rep.current_role?.org_classification === 'upper') {
+          chamberName = 'State Senate';
+        } else if (rep.current_role?.org_classification === 'lower') {
+          chamberName = 'State House';
+        } else {
+          chamberName = rep.chamber;
+        }
+      }
+
       return {
         ...rep,
         party,
-        // Ensure chamber is properly set for filtering
-        chamber: rep.chamber || (rep.current_role?.org_classification === 'upper' ? 'State Senate' :
-                                rep.current_role?.org_classification === 'lower' ? 'State House' :
-                                rep.chamber)
+        chamber: chamberName
       };
     });
 

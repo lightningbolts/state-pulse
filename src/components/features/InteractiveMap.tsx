@@ -518,6 +518,39 @@ export const InteractiveMap = React.memo(() => {
                     districtIds.forEach(id => {
                         mapping[id] = normalizedParty;
                     });
+
+                    // Special handling for Nebraska - add additional district ID patterns
+                    const isNebraska = rep.jurisdiction?.name === 'Nebraska' ||
+                                      rep.current_role?.division_id?.includes('/state:ne/') ||
+                                      rep.state === 'Nebraska' ||
+                                      rep.state === 'NE';
+
+                    if (isNebraska && chamber === 'state_upper') {
+                        // Nebraska uses 'ne/sldu:XX' format in division_id
+                        if (rep.current_role?.division_id) {
+                            const divisionMatch = rep.current_role.division_id.match(/\/state:ne\/sldu:(\d+)/);
+                            if (divisionMatch) {
+                                const districtNum = divisionMatch[1];
+                                // Add various possible Nebraska district ID formats
+                                const nebraskaIds = [
+                                    districtNum,
+                                    `31${districtNum.padStart(3, '0')}`, // FIPS format: 31 + 3-digit district
+                                    `3100${districtNum.padStart(2, '0')}`, // Alternative FIPS format
+                                    `NE-${districtNum}`, // State-district format
+                                    `Nebraska-${districtNum}`, // Full state name format
+                                    `31${districtNum}`, // FIPS + district
+                                    `ne${districtNum}`, // state abbrev + district
+                                ];
+
+                                // Apply all Nebraska-specific mappings
+                                nebraskaIds.forEach(id => {
+                                    mapping[id] = normalizedParty;
+                                });
+
+                                console.log(`[Nebraska] Mapped district ${districtNum} (${normalizedParty}) to IDs:`, nebraskaIds);
+                            }
+                        }
+                    }
                 });
 
                 setDistrictPartyMapping(mapping);

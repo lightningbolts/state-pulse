@@ -3,7 +3,6 @@ import { getCollection } from '@/lib/mongodb';
 import { STATE_NAMES, STATE_COORDINATES } from "@/types/geo";
 import { StateData } from '@/types/jurisdictions';
 
-
 export async function GET(request: NextRequest) {
   try {
     const legislationCollection = await getCollection('legislation');
@@ -16,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const pipeline = [
       {
-        // Stage 1: Create a normalized 'effectiveJurisdictionName' field.
+        // Stage 1: Create a normalized 'effectiveJurisdictionName' field with improved state matching.
         $addFields: {
           effectiveJurisdictionName: {
             $cond: {
@@ -31,8 +30,29 @@ export async function GET(request: NextRequest) {
               },
               // If it's federal, label it "United States".
               then: "United States",
-              // Otherwise, use its existing jurisdictionName.
-              else: "$jurisdictionName"
+              // Otherwise, normalize the jurisdiction name for better state matching
+              else: {
+                $switch: {
+                  branches: [
+                    // Handle common state jurisdiction name patterns with exact matches
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^west virginia$/i } }, then: "West Virginia" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^west virginia legislature$/i } }, then: "West Virginia" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^west virginia general assembly$/i } }, then: "West Virginia" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^wv$/i } }, then: "West Virginia" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^new york$/i } }, then: "New York" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^new jersey$/i } }, then: "New Jersey" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^new hampshire$/i } }, then: "New Hampshire" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^new mexico$/i } }, then: "New Mexico" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^north carolina$/i } }, then: "North Carolina" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^north dakota$/i } }, then: "North Dakota" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^south carolina$/i } }, then: "South Carolina" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^south dakota$/i } }, then: "South Dakota" },
+                    { case: { $regexMatch: { input: { $ifNull: ["$jurisdictionName", ""] }, regex: /^rhode island$/i } }, then: "Rhode Island" }
+                  ],
+                  // Default: use the original jurisdiction name
+                  default: "$jurisdictionName"
+                }
+              }
             }
           }
         }
@@ -106,12 +126,42 @@ export async function GET(request: NextRequest) {
         if (jurisdictionName.includes('Congress') || jurisdictionName.includes('United States')) {
           stateAbbr = 'US';
         } else {
+          // Improved state matching with exact name matching first, then partial matching
           for (const [abbr, name] of Object.entries(STATE_NAMES)) {
             if (abbr === 'US') continue;
-            if (jurisdictionName.toLowerCase().includes(name.toLowerCase())) {
+
+            // Exact match first (case insensitive)
+            if (jurisdictionName.toLowerCase() === name.toLowerCase()) {
               stateAbbr = abbr;
               break;
             }
+          }
+
+          // If no exact match, try partial matching
+          if (!stateAbbr) {
+            for (const [abbr, name] of Object.entries(STATE_NAMES)) {
+              if (abbr === 'US') continue;
+
+              // Partial match for compound state names and variations
+              if (jurisdictionName.toLowerCase().includes(name.toLowerCase()) ||
+                  name.toLowerCase().includes(jurisdictionName.toLowerCase())) {
+                stateAbbr = abbr;
+                break;
+              }
+            }
+          }
+
+          // Special cases for known variations
+          if (!stateAbbr) {
+            const variations: Record<string, string> = {
+              'wv': 'WV',
+              'west va': 'WV',
+              'w virginia': 'WV',
+              'w va': 'WV'
+            };
+
+            const lowerJurisdiction = jurisdictionName.toLowerCase().trim();
+            stateAbbr = variations[lowerJurisdiction] || '';
           }
         }
 
@@ -134,6 +184,8 @@ export async function GET(request: NextRequest) {
             center: STATE_COORDINATES[stateAbbr],
             color: color
           };
+        } else {
+          console.warn(`Could not map jurisdiction "${jurisdictionName}" to a known state`);
         }
       } catch (error) {
         console.error('Error processing result:', result, error);

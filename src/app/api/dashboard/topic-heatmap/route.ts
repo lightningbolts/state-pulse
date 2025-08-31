@@ -85,6 +85,11 @@ function getDistrictIdentifiers(rep: any): string[] {
     return null;
   };
 
+  // Check if this is a Nebraska representative (unicameral legislature)
+  const isNebraska = rep.current_role?.division_id?.includes('/state:ne/') ||
+                    rep.state === 'Nebraska' || rep.state === 'NE' ||
+                    rep.current_role?.state === 'NE';
+
   const divisionId: string | undefined = rep.current_role?.division_id;
 
   // Try multiple sources for state information
@@ -96,6 +101,24 @@ function getDistrictIdentifiers(rep: any): string[] {
                getStateFipsFromState(stateFromTerms) ||
                getStateFipsFromState(stateFromCurrentRole) ||
                getStateFipsFromState(stateFromField);
+
+  // Special handling for Nebraska's unicameral legislature
+  if (isNebraska && divisionId) {
+    const divisionMatch = divisionId.match(/\/state:ne\/sldu:(\d+)/);
+    if (divisionMatch) {
+      const districtNum = divisionMatch[1];
+      // Add various possible Nebraska district ID formats
+      return [
+        districtNum,
+        `31${districtNum.padStart(3, '0')}`, // FIPS format: 31 + 3-digit district
+        `3100${districtNum.padStart(2, '0')}`, // Alternative FIPS format
+        `NE-${districtNum}`, // State-district format
+        `Nebraska-${districtNum}`, // Full state name format
+        `31${districtNum}`, // FIPS + district
+        `ne${districtNum}`, // state abbrev + district
+      ];
+    }
+  }
 
   // 1) If map_boundary.geoid looks like canonical GEOID, use it
   const mb = rep.map_boundary || {};
@@ -238,13 +261,36 @@ export async function GET(request: NextRequest) {
       chamberQuery = { $or: [
         { chamber: 'State Senate' }, { chamber: 'Senate' },
         { 'current_role.chamber': 'upper' }, { 'current_role.chamber': 'senate' },
-        { 'map_boundary.type': 'state_leg_upper' }
+        { 'map_boundary.type': 'state_leg_upper' },
+        // Special case for Nebraska's unicameral legislature
+        {
+          $and: [
+            {
+              $or: [
+                { 'current_role.division_id': { $regex: '/state:ne/' } },
+                { 'state': { $in: ['Nebraska', 'NE'] } }
+              ]
+            },
+            {
+              $or: [
+                { 'current_role.title': 'Senator' },
+                { 'map_boundary.type': 'state_leg' },
+                { 'current_role.org_classification': 'legislature' }
+              ]
+            }
+          ]
+        }
       ]};
     } else if (chamber === 'state_lower') {
       chamberQuery = { $or: [
         { chamber: 'State House' }, { chamber: 'House' }, { chamber: 'Assembly' }, { chamber: 'General Assembly' },
         { 'current_role.chamber': 'lower' }, { 'current_role.chamber': 'house' },
         { 'map_boundary.type': 'state_leg_lower' }
+      ],
+      // Exclude Nebraska from state_lower since it's unicameral
+      $nor: [
+        { 'current_role.division_id': { $regex: '/state:ne/' } },
+        { 'state': { $in: ['Nebraska', 'NE'] } }
       ]};
     }
 

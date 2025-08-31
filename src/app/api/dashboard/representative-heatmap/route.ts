@@ -81,6 +81,11 @@ function getDistrictIdentifiers(rep: any): string[] {
     return null;
   };
 
+  // Check if this is a Nebraska representative (unicameral legislature)
+  const isNebraska = rep.current_role?.division_id?.includes('/state:ne/') ||
+                    rep.state === 'Nebraska' || rep.state === 'NE' ||
+                    rep.current_role?.state === 'NE';
+
   const divisionId: string | undefined = rep.current_role?.division_id;
 
   // Try multiple sources for state information
@@ -92,6 +97,24 @@ function getDistrictIdentifiers(rep: any): string[] {
                getStateFipsFromState(stateFromTerms) ||
                getStateFipsFromState(stateFromCurrentRole) ||
                getStateFipsFromState(stateFromField);
+
+  // Special handling for Nebraska's unicameral legislature
+  if (isNebraska && divisionId) {
+    const divisionMatch = divisionId.match(/\/state:ne\/sldu:(\d+)/);
+    if (divisionMatch) {
+      const districtNum = divisionMatch[1];
+      // Add various possible Nebraska district ID formats
+      return [
+        districtNum,
+        `31${districtNum.padStart(3, '0')}`, // FIPS format: 31 + 3-digit district
+        `3100${districtNum.padStart(2, '0')}`, // Alternative FIPS format
+        `NE-${districtNum}`, // State-district format
+        `Nebraska-${districtNum}`, // Full state name format
+        `31${districtNum}`, // FIPS + district
+        `ne${districtNum}`, // state abbrev + district
+      ];
+    }
+  }
 
   const mb = rep.map_boundary || {};
 
@@ -257,9 +280,21 @@ async function getBulkRecentActivityScores(representatives: any[]): Promise<Reco
     representatives.forEach(rep => {
       const repKey = rep.id;
       if (!repKey) return;
-      const ids = normalizeIds(rep.id, rep._id?.toString(), rep.person_id, rep.name);
+      // Enhanced ID normalization for Nebraska and other edge cases
+      const ids = normalizeIds(
+        rep.id,
+        rep._id?.toString(),
+        rep.person_id,
+        rep.name,
+        // Add Nebraska-specific ID patterns
+        rep.current_role?.person_id,
+        rep.current_role?.id,
+        // OpenStates ID patterns
+        rep.openstates_url?.split('/').pop()?.replace('-', '_')
+      );
       ids.forEach(id => repIdToRepKey.set(id, repKey));
     });
+
     const allRepIds = Array.from(repIdToRepKey.keys());
     if (allRepIds.length === 0) return {};
 
@@ -271,23 +306,71 @@ async function getBulkRecentActivityScores(representatives: any[]): Promise<Reco
 
     const pipeline = [
       { $match: { sponsors: { $exists: true, $ne: [] } } },
-      { $project: { sponsors: 1, actionDate: { $ifNull: ['$latestActionAt', { $ifNull: ['$firstActionAt', '$createdAt'] }] } } },
+      { $project: {
+        sponsors: 1,
+        actionDate: { $ifNull: ['$latestActionAt', { $ifNull: ['$firstActionAt', '$createdAt'] }] }
+      } },
       { $unwind: '$sponsors' },
-      { $project: { sponsorId: { $ifNull: ['$sponsors.person_id', { $ifNull: ['$sponsors.id', '$sponsors.name'] }] }, actionDate: 1 } },
-      { $match: { sponsorId: { $in: allRepIds } } },
-      { $group: { _id: '$sponsorId', latestAction: { $max: '$actionDate' }, last30: { $sum: { $cond: [{ $gte: ['$actionDate', d30] }, 1, 0] } }, last90: { $sum: { $cond: [{ $gte: ['$actionDate', d90] }, 1, 0] } }, last180: { $sum: { $cond: [{ $gte: ['$actionDate', d180] }, 1, 0] } }, last365: { $sum: { $cond: [{ $gte: ['$actionDate', d365] }, 1, 0] } }, total: { $sum: 1 } } }
+      { $project: {
+        sponsorId: { $ifNull: ['$sponsors.person_id', { $ifNull: ['$sponsors.id', '$sponsors.name'] }] },
+        sponsorName: '$sponsors.name',
+        actionDate: 1
+      } },
+      { $match: {
+        $or: [
+          { sponsorId: { $in: allRepIds } },
+          { sponsorName: { $in: allRepIds } }
+        ]
+      } },
+      { $group: {
+        _id: { $ifNull: ['$sponsorId', '$sponsorName'] },
+        latestAction: { $max: '$actionDate' },
+        last30: { $sum: { $cond: [{ $gte: ['$actionDate', d30] }, 1, 0] } },
+        last90: { $sum: { $cond: [{ $gte: ['$actionDate', d90] }, 1, 0] } },
+        last180: { $sum: { $cond: [{ $gte: ['$actionDate', d180] }, 1, 0] } },
+        last365: { $sum: { $cond: [{ $gte: ['$actionDate', d365] }, 1, 0] } },
+        total: { $sum: 1 }
+      } }
     ];
 
     const results = await legislationCollection.aggregate(pipeline).toArray();
 
     const scores: Record<string, number> = {};
     results.forEach((row: any) => {
+      // Enhanced ID matching for Nebraska and other edge cases
       let repKey = repIdToRepKey.get(row._id);
+
       if (!repKey) {
+        // Try all normalized variants
         const variants = normalizeIds(row._id);
-        for (const v of variants) { repKey = repIdToRepKey.get(v); if (repKey) break; }
+        for (const v of variants) {
+          repKey = repIdToRepKey.get(v);
+          if (repKey) break;
+        }
       }
+
+      // If still no match, try fuzzy matching for Nebraska names
+      if (!repKey) {
+        const rowIdStr = String(row._id || '').toLowerCase();
+        for (const [mappedId, mappedKey] of repIdToRepKey.entries()) {
+          const mappedIdStr = String(mappedId).toLowerCase();
+          // Check for partial name matches (useful for Nebraska where names might vary slightly)
+          if (rowIdStr.includes(' ') && mappedIdStr.includes(' ')) {
+            const rowParts = rowIdStr.split(' ');
+            const mappedParts = mappedIdStr.split(' ');
+            if (rowParts.length >= 2 && mappedParts.length >= 2) {
+              // Match first and last name
+              if (rowParts[0] === mappedParts[0] && rowParts[rowParts.length - 1] === mappedParts[mappedParts.length - 1]) {
+                repKey = mappedKey;
+                break;
+              }
+            }
+          }
+        }
+      }
+
       if (!repKey) return;
+
       let base = 0;
       const latest = row.latestAction ? new Date(row.latestAction) : null;
       if (latest) {
@@ -340,13 +423,36 @@ export async function GET(request: NextRequest) {
       chamberQuery = { $or: [
         { chamber: 'State Senate' }, { chamber: 'Senate' },
         { 'current_role.chamber': 'upper' }, { 'current_role.chamber': 'senate' },
-        { 'map_boundary.type': 'state_leg_upper' }
+        { 'map_boundary.type': 'state_leg_upper' },
+        // Special case for Nebraska's unicameral legislature
+        {
+          $and: [
+            {
+              $or: [
+                { 'current_role.division_id': { $regex: '/state:ne/' } },
+                { 'state': { $in: ['Nebraska', 'NE'] } }
+              ]
+            },
+            {
+              $or: [
+                { 'current_role.title': 'Senator' },
+                { 'map_boundary.type': 'state_leg' },
+                { 'current_role.org_classification': 'legislature' }
+              ]
+            }
+          ]
+        }
       ] };
     } else if (chamber === 'state_lower') {
       chamberQuery = { $or: [
         { chamber: 'State House' }, { chamber: 'House' }, { chamber: 'Assembly' }, { chamber: 'General Assembly' },
         { 'current_role.chamber': 'lower' }, { 'current_role.chamber': 'house' },
         { 'map_boundary.type': 'state_leg_lower' }
+      ],
+      // Exclude Nebraska from state_lower since it's unicameral
+      $nor: [
+        { 'current_role.division_id': { $regex: '/state:ne/' } },
+        { 'state': { $in: ['Nebraska', 'NE'] } }
       ] };
     }
 
