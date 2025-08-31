@@ -108,6 +108,15 @@ async function main() {
       if (districtProp === 'SLDLST' || districtProp === 'SLDUST') {
         if (/^\d+$/.test(districtNum)) {
           paddedDistrict = districtNum.padStart(3, '0');
+        } else if (/^\d+[A-Za-z]$/.test(districtNum)) {
+          // Handle multi-member districts with letter suffixes (e.g., "1A", "13B")
+          // Extract the numeric part and pad it, keeping the letter
+          const match = districtNum.match(/^(\d+)([A-Za-z])$/);
+          if (match) {
+            const numPart = match[1].padStart(3, '0');
+            paddedDistrict = numPart; // Use just the numeric part for boundary lookup
+            console.log(`[MULTI-MEMBER] Detected multi-member district ${districtNum}, using numeric part ${numPart} for boundary lookup`);
+          }
         }
       } else if (districtProp === 'CD119FP') {
         if (/^\d+$/.test(districtNum)) {
@@ -135,12 +144,39 @@ async function main() {
       // Fallback: If not found and districtNum is not numeric, try by NAMELSAD (case-insensitive, regex, and prefix)
       if (!boundary && isNaN(Number(districtNum)) && districtProp) {
         console.log(`[FALLBACK] Trying NAMELSAD regex match for rep: ${rep.name}, district: ${districtNum}`);
-        // Try raw districtNum
+
+        // Get all available boundaries for this state and type for better matching
+        const available = await boundaries.find({
+          'properties.STATEFP': stateFips,
+          type
+        }, { projection: { 'properties.NAMELSAD': 1 } }).toArray();
+        const availableNames = available.map(b => b.properties?.NAMELSAD).filter(Boolean);
+
+        // Try exact match first
         boundary = await boundaries.findOne({
           'properties.STATEFP': stateFips,
-          'properties.NAMELSAD': { $regex: new RegExp(districtNum, 'i') },
+          'properties.NAMELSAD': districtNum,
           type
         });
+
+        // Try case-insensitive regex match
+        if (!boundary) {
+          boundary = await boundaries.findOne({
+            'properties.STATEFP': stateFips,
+            'properties.NAMELSAD': { $regex: new RegExp(`^${districtNum}$`, 'i') },
+            type
+          });
+        }
+
+        // Try raw districtNum as substring
+        if (!boundary) {
+          boundary = await boundaries.findOne({
+            'properties.STATEFP': stateFips,
+            'properties.NAMELSAD': { $regex: new RegExp(districtNum, 'i') },
+            type
+          });
+        }
+
         // Try with 'District ' prefix if not found
         if (!boundary) {
           boundary = await boundaries.findOne({
@@ -149,7 +185,119 @@ async function main() {
             type
           });
         }
-        // If still not found, try parent district (strip trailing letter)
+
+        // Special handling for multi-county districts (e.g., "Norfolk, Worcester and Middlesex")
+        if (!boundary && districtNum.includes(',')) {
+          // Split on commas and "and", then try to match patterns
+          const counties = districtNum.split(/,| and | & /).map((c: string) => c.trim());
+
+          // Try different permutations and formats
+          const permutations = [
+            counties.join(' and '), // "Norfolk and Worcester and Middlesex"
+            counties.join(', '), // "Norfolk, Worcester, Middlesex"
+            counties.join('-'), // "Norfolk-Worcester-Middlesex"
+            counties.reverse().join(' and '), // Reverse order
+            counties.join(' '),  // Just spaces
+            // Massachusetts-specific patterns
+            `${counties[0]} and ${counties.slice(1).join(' and ')} District`,
+            `${counties.join('-')} District`,
+            `${counties.join(' and ')} District`
+          ];
+
+          for (const perm of permutations) {
+            if (!boundary) {
+              boundary = await boundaries.findOne({
+                'properties.STATEFP': stateFips,
+                'properties.NAMELSAD': { $regex: new RegExp(perm, 'i') },
+                type
+              });
+              if (boundary) {
+                console.log(`[NAME-MATCH] Found multi-county boundary with permutation "${perm}" for rep: ${rep.name}`);
+                break;
+              }
+            }
+          }
+
+          // Try partial matches - any NAMELSAD that contains all county names
+          if (!boundary) {
+            const foundByPartial = availableNames.find(name => {
+              const nameLower = name.toLowerCase();
+              return counties.every((county: string) => nameLower.includes(county.toLowerCase()));
+            });
+            if (foundByPartial) {
+              boundary = await boundaries.findOne({
+                'properties.STATEFP': stateFips,
+                'properties.NAMELSAD': foundByPartial,
+                type
+              });
+              if (boundary) {
+                console.log(`[NAME-MATCH] Found multi-county boundary by partial match for rep: ${rep.name}, NAMELSAD: ${boundary.properties.NAMELSAD}`);
+              }
+            }
+          }
+
+          // Try word reordering for Massachusetts districts
+          if (!boundary && statePostal === 'MA') {
+            // Massachusetts often uses different word orders, try all combinations
+            for (let i = 0; i < counties.length; i++) {
+              for (let j = i + 1; j < counties.length; j++) {
+                for (let k = j + 1; k < counties.length; k++) {
+                  const permOrder = [counties[i], counties[j], counties[k]].filter(Boolean);
+                  if (permOrder.length >= 2) {
+                    const patterns = [
+                      `${permOrder.join(' and ')} District`,
+                      `${permOrder.join('-')} District`,
+                      `${permOrder.join(' ')} District`
+                    ];
+
+                    for (const pattern of patterns) {
+                      if (!boundary) {
+                        boundary = await boundaries.findOne({
+                          'properties.STATEFP': stateFips,
+                          'properties.NAMELSAD': { $regex: new RegExp(pattern, 'i') },
+                          type
+                        });
+                        if (boundary) {
+                          console.log(`[NAME-MATCH] Found MA multi-county boundary with reordered pattern "${pattern}" for rep: ${rep.name}`);
+                          break;
+                        }
+                      }
+                    }
+                    if (boundary) break;
+                  }
+                }
+                if (boundary) break;
+              }
+              if (boundary) break;
+            }
+          }
+        }
+
+        // Special handling for tribal districts
+        if (!boundary && (districtNum.toLowerCase().includes('tribe') || districtNum.toLowerCase().includes('tribal'))) {
+          // Try matching any boundary that contains the tribe name
+          const tribeName = districtNum.replace(/\s+(tribe|tribal).*$/i, '').trim();
+          boundary = await boundaries.findOne({
+            'properties.STATEFP': stateFips,
+            'properties.NAMELSAD': { $regex: new RegExp(tribeName, 'i') },
+            type
+          });
+
+          if (!boundary) {
+            // For tribal districts, try looking for special district types or at-large districts
+            boundary = await boundaries.findOne({
+              'properties.STATEFP': stateFips,
+              'properties.NAMELSAD': { $regex: new RegExp('(tribal|at.large|special)', 'i') },
+              type
+            });
+          }
+
+          if (boundary) {
+            console.log(`[NAME-MATCH] Found tribal/special boundary for rep: ${rep.name}, NAMELSAD: ${boundary.properties.NAMELSAD}`);
+          }
+        }
+
+        // If still not found and districtNum is not numeric, try parent district (strip trailing letter)
         if (!boundary && /^(\d+)[A-Za-z]$/.test(districtNum)) {
           const parentDistrict = districtNum.match(/^(\d+)[A-Za-z]$/)[1];
           // Try parent district as raw
@@ -170,6 +318,7 @@ async function main() {
             console.log(`[NAME-MATCH] Found parent boundary for subdistrict rep: ${rep.name}, parent: ${parentDistrict}, NAMELSAD: ${boundary.properties.NAMELSAD}`);
           }
         }
+
         // If still not found, try matching 'CountyName N' style districts (e.g., 'Carroll 1')
         if (!boundary && /^([A-Za-z ]+) (\d+)$/.test(districtNum)) {
           const match = districtNum.match(/^([A-Za-z ]+) (\d+)$/);
@@ -193,17 +342,13 @@ async function main() {
           }
           // Try loose match: ignore spaces and leading zeros
           if (!boundary) {
-            const available = await boundaries.find({
-              'properties.STATEFP': stateFips,
-              type
-            }, { projection: { 'properties.NAMELSAD': 1 } }).toArray();
             const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '').replace(/^0+/, '');
             const matchNorm = norm(`${county}${num}`);
-            const found = available.find(b => b.properties && norm(b.properties.NAMELSAD).includes(matchNorm));
+            const found = availableNames.find(name => norm(name).includes(matchNorm));
             if (found) {
               boundary = await boundaries.findOne({
                 'properties.STATEFP': stateFips,
-                'properties.NAMELSAD': found.properties.NAMELSAD,
+                'properties.NAMELSAD': found,
                 type
               });
               if (boundary) {
@@ -215,6 +360,7 @@ async function main() {
             console.log(`[NAME-MATCH] Found county/number boundary for rep: ${rep.name}, NAMELSAD: ${boundary.properties.NAMELSAD}`);
           }
         }
+
         // If still not found, try matching 'Senatorial District' style (e.g., 'Chittenden Southeast')
         if (!boundary && /[A-Za-z]/.test(districtNum)) {
           // Try replacing 'Southeast' with 'South East' and add 'Senatorial District' suffix
@@ -236,17 +382,13 @@ async function main() {
           }
           // Try loose match: ignore spaces and case
           if (!boundary) {
-            const available = await boundaries.find({
-              'properties.STATEFP': stateFips,
-              type
-            }, { projection: { 'properties.NAMELSAD': 1 } }).toArray();
             const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '');
             const matchNorm = norm(districtNum);
-            const found = available.find(b => b.properties && norm(b.properties.NAMELSAD).includes(matchNorm));
+            const found = availableNames.find(name => norm(name).includes(matchNorm));
             if (found) {
               boundary = await boundaries.findOne({
                 'properties.STATEFP': stateFips,
-                'properties.NAMELSAD': found.properties.NAMELSAD,
+                'properties.NAMELSAD': found,
                 type
               });
               if (boundary) {
@@ -258,16 +400,12 @@ async function main() {
             console.log(`[NAME-MATCH] Found senatorial boundary for rep: ${rep.name}, NAMELSAD: ${boundary.properties.NAMELSAD}`);
           }
         }
+
         if (boundary) {
           console.log(`[NAME-MATCH] Found boundary by NAMELSAD regex for rep: ${rep.name}, NAMELSAD: ${boundary.properties.NAMELSAD}`);
         } else {
           // Log available NAMELSADs for debugging
-          const available = await boundaries.find({
-            'properties.STATEFP': stateFips,
-            type
-          }, { projection: { 'properties.NAMELSAD': 1 } }).toArray();
-          const names = available.map(b => b.properties?.NAMELSAD).filter(Boolean);
-          console.log(`[DEBUG] No NAMELSAD match for rep: ${rep.name}, district: ${districtNum}. Available NAMELSADs:`, names);
+          console.log(`[DEBUG] No NAMELSAD match for rep: ${rep.name}, district: ${districtNum}. Available NAMELSADs:`, availableNames);
         }
       }
       if (!boundary) {
@@ -338,7 +476,6 @@ async function main() {
         paddedDistrict = districtNum.padStart(2, '0');
       }
       const type = 'congressional';
-      const districtProp = 'CD119FP';
       console.log(`[MATCH] [HOUSE] Looking for congressional boundary: STATEFP=${stateFips}, CD119FP=${paddedDistrict}, type=${type} for rep: ${rep.name}`);
       let boundary = await boundaries.findOne({
         'properties.STATEFP': stateFips,
