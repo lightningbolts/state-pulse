@@ -93,6 +93,7 @@ function getDistrictIdentifiers(rep: any): string[] {
   const stateFromCurrentRole = rep.current_role?.state;
   const stateFromField = rep.state;
 
+  // @ts-ignore
   const fips = getStateFipsFromDivision(divisionId) ||
                getStateFipsFromState(stateFromTerms) ||
                getStateFipsFromState(stateFromCurrentRole) ||
@@ -194,7 +195,7 @@ function getDistrictIdentifiers(rep: any): string[] {
   return [];
 }
 
-async function getBulkBillsSponsoredCount(representatives: any[]): Promise<Record<string, number>> {
+async function getBulkBillsSponsoredCount(representatives: any[], enactedOnly: boolean = false): Promise<Record<string, number>> {
   try {
     const legislationCollection = await getCollection('legislation');
 
@@ -214,12 +215,23 @@ async function getBulkBillsSponsoredCount(representatives: any[]): Promise<Recor
     const allRepIds = Array.from(repIdToRepKey.keys());
     if (allRepIds.length === 0) return {};
 
-    const pipeline = [
-      { $match: { sponsors: { $exists: true, $ne: [] }, $or: [
+    // Base match criteria
+    let matchCriteria: any = {
+      sponsors: { $exists: true, $ne: [] },
+      $or: [
         { firstActionAt: { $gte: yearStart, $lt: yearEnd } },
         { latestActionAt: { $gte: yearStart, $lt: yearEnd } },
         { createdAt: { $gte: yearStart, $lt: yearEnd } }
-      ] } },
+      ]
+    };
+
+    // Add enacted filter if requested
+    if (enactedOnly) {
+      matchCriteria.enactedAt = { $exists: true, $ne: null };
+    }
+
+    const pipeline = [
+      { $match: matchCriteria },
       { $unwind: '$sponsors' },
       { $project: { sponsor_id: { $ifNull: ['$sponsors.person_id', '$sponsors.id'] }, sponsor_name: '$sponsors.name' } },
       { $match: { $or: [
@@ -272,7 +284,7 @@ function calculateRecentActivityScore(rep: any): number {
   return score;
 }
 
-async function getBulkRecentActivityScores(representatives: any[]): Promise<Record<string, number>> {
+async function getBulkRecentActivityScores(representatives: any[], enactedOnly: boolean = false): Promise<Record<string, number>> {
   try {
     const legislationCollection = await getCollection('legislation');
 
@@ -304,11 +316,21 @@ async function getBulkRecentActivityScores(representatives: any[]): Promise<Reco
     const d180 = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
     const d365 = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
 
+    // Base match criteria
+    let matchCriteria: any = { sponsors: { $exists: true, $ne: [] } };
+
+    // Add enacted filter if requested
+    if (enactedOnly) {
+      matchCriteria.enactedAt = { $exists: true, $ne: null };
+    }
+
     const pipeline = [
-      { $match: { sponsors: { $exists: true, $ne: [] } } },
+      { $match: matchCriteria },
       { $project: {
         sponsors: 1,
-        actionDate: { $ifNull: ['$latestActionAt', { $ifNull: ['$firstActionAt', '$createdAt'] }] }
+        actionDate: enactedOnly ?
+          '$enactedAt' : // Use enactedAt for enacted legislation
+          { $ifNull: ['$latestActionAt', { $ifNull: ['$firstActionAt', '$createdAt'] }] }
       } },
       { $unwind: '$sponsors' },
       { $project: {
@@ -467,13 +489,19 @@ export async function GET(request: NextRequest) {
 
     const districtDetails: Record<string, any> = {};
 
-    const sponsorshipCounts = metric === 'sponsored_bills' ? await getBulkBillsSponsoredCount(representatives) : {};
-    const recentActivityScores = metric === 'recent_activity' ? await getBulkRecentActivityScores(representatives) : {};
+    // Check if enacted filter is requested
+    const enactedOnly = metric === 'enacted_bills' || metric === 'enacted_recent_activity';
+    const baseMetric = enactedOnly ?
+      (metric === 'enacted_bills' ? 'sponsored_bills' : 'recent_activity') :
+      metric;
 
-    if (metric === 'sponsored_bills' && Object.keys(sponsorshipCounts).length > 0) {
+    const sponsorshipCounts = (baseMetric === 'sponsored_bills') ? await getBulkBillsSponsoredCount(representatives, enactedOnly) : {};
+    const recentActivityScores = (baseMetric === 'recent_activity') ? await getBulkRecentActivityScores(representatives, enactedOnly) : {};
+
+    if (baseMetric === 'sponsored_bills' && Object.keys(sponsorshipCounts).length > 0) {
       // console.log(`Sponsorship counts found for ${Object.keys(sponsorshipCounts).length} representatives`);
     }
-    if (metric === 'recent_activity' && Object.keys(recentActivityScores).length > 0) {
+    if (baseMetric === 'recent_activity' && Object.keys(recentActivityScores).length > 0) {
       // console.log(`Recent activity scores found for ${Object.keys(recentActivityScores).length} representatives`);
     }
 
@@ -486,8 +514,8 @@ export async function GET(request: NextRequest) {
       const repRecentScore = recentActivityScores[rep.id] || calculateRecentActivityScore(rep);
 
       let score = 0;
-      if (metric === 'sponsored_bills') score = repSponsorshipCount;
-      else if (metric === 'recent_activity') score = repRecentScore;
+      if (baseMetric === 'sponsored_bills') score = repSponsorshipCount;
+      else if (baseMetric === 'recent_activity') score = repRecentScore;
 
       for (const id of identifiers) {
         districtScores[id] = (districtScores[id] || 0) + score;
@@ -590,9 +618,10 @@ export async function GET(request: NextRequest) {
         avgScore: Math.round(avgScore * 100) / 100,
         minScore: Math.round(minScore * 100) / 100,
         maxScoreRaw: maxScore,
-        maxScoreP90: (metric === 'sponsored_bills' && isStateLeg) ? Math.max(...values.filter(v => v > 0).sort((a,b)=>a-b).slice(0, Math.ceil(values.filter(v=>v>0).length*0.9))) || 0 : undefined,
+        maxScoreP90: (baseMetric === 'sponsored_bills' && isStateLeg) ? Math.max(...values.filter(v => v > 0).sort((a,b)=>a-b).slice(0, Math.ceil(values.filter(v=>v>0).length*0.9))) || 0 : undefined,
         maxScoreNormalized: Math.round(maxNormalizedScore * 100) / 100,
-        availableMetrics: ['sponsored_bills', 'recent_activity']
+        availableMetrics: ['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity'],
+        enactedOnly
       }
     });
 

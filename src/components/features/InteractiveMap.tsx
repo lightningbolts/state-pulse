@@ -301,7 +301,13 @@ export const InteractiveMap = React.memo(() => {
     const [selectedRepMetric, setSelectedRepMetric] = useState<string>('sponsored_bills');
     const [repDataLoading, setRepDataLoading] = useState<boolean>(false);
     const [repDataError, setRepDataError] = useState<string | null>(null);
-    const [availableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity']);
+    const [availableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity']);
+
+    // Enacted legislation filtering state
+    const [showEnactedOnly, setShowEnactedOnly] = useState<boolean>(false);
+
+    // District border visibility state
+    const [showDistrictBorders, setShowDistrictBorders] = useState<boolean>(true);
 
     // Mobile optimization state
     const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -606,13 +612,13 @@ export const InteractiveMap = React.memo(() => {
         fetchStateDetails(stateAbbr);
     };
 
-    const fetchTopicHeatmapData = async (districtType: string, selectedTopic: string) => {
+    const fetchTopicHeatmapData = async (districtType: string, selectedTopic: string, enactedOnly: boolean = false) => {
         setTopicDataLoading(true);
         setTopicDataError(null);
         setTopicScores({});
 
         try {
-            const url = `/api/dashboard/topic-heatmap?type=${districtType}&topic=${selectedTopic}`;
+            const url = `/api/dashboard/topic-heatmap?type=${districtType}&topic=${selectedTopic}&enacted=${enactedOnly}`;
             const result = await cachedFetch(url, 600000); // 10 minutes cache
 
             if (result.success && result.scores) {
@@ -669,11 +675,11 @@ export const InteractiveMap = React.memo(() => {
     useEffect(() => {
         if (showTopicHeatmap) {
             const districtType = mapMode;
-            memoizedFetchTopicHeatmapData(districtType, selectedTopic);
+            memoizedFetchTopicHeatmapData(districtType, selectedTopic, showEnactedOnly);
         } else {
             setTopicScores({});
         }
-    }, [showTopicHeatmap, mapMode, memoizedFetchTopicHeatmapData, selectedTopic]);
+    }, [showTopicHeatmap, mapMode, memoizedFetchTopicHeatmapData, selectedTopic, showEnactedOnly]);
 
     // Effect to fetch representative heatmap data when representative heatmap is enabled
     useEffect(() => {
@@ -1156,7 +1162,10 @@ export const InteractiveMap = React.memo(() => {
                                             {availableRepMetrics.map(metric => (
                                                 <option key={metric} value={metric}>
                                                     {metric === 'sponsored_bills' ? 'Bills Sponsored' :
-                                                     metric === 'recent_activity' ? 'Recent Activity' : metric}
+                                                     metric === 'recent_activity' ? 'Recent Activity' :
+                                                     metric === 'enacted_bills' ? 'Enacted Bills Sponsored' :
+                                                     metric === 'enacted_recent_activity' ? 'Enacted Bills - Recent Activity' :
+                                                     metric}
                                                 </option>
                                             ))}
                                         </select>
@@ -1216,6 +1225,29 @@ export const InteractiveMap = React.memo(() => {
                             </div>
                         )}
 
+                        {/* District Borders Toggle - Only show for district modes when any overlay is active */}
+                        {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') &&
+                         (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) && (
+                            <div className="space-y-2 md:space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-xs md:text-sm">
+                                            <span className="hidden sm:inline">District Borders</span>
+                                            <span className="sm:hidden">Borders</span>
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            <span className="hidden sm:inline">Show or hide district boundary lines</span>
+                                            <span className="sm:hidden">Show boundary lines</span>
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={showDistrictBorders}
+                                        onCheckedChange={setShowDistrictBorders}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Map Container with district overlays */}
                         <div className="relative">
                             {/* Enhanced performance warning for large datasets on mobile */}
@@ -1241,7 +1273,7 @@ export const InteractiveMap = React.memo(() => {
                                 <div className="absolute top-2 left-2 right-2 z-10 bg-blue-50 border border-blue-200 rounded-md p-2 text-xs text-blue-800 md:hidden">
                                     <div className="flex items-center space-x-1">
                                         <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-4 4a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                         </svg>
                                         <span>Mobile optimizations active for better performance.</span>
                                     </div>
@@ -1272,6 +1304,7 @@ export const InteractiveMap = React.memo(() => {
                                         repScores={repScores}
                                         repDetails={repDetails}
                                         getRepHeatmapColor={getRepHeatmapColor}
+                                        showDistrictBorders={showDistrictBorders}
                                         popupMarker={districtPopupLatLng ? {
                                             lng: districtPopupLatLng.lng,
                                             lat: districtPopupLatLng.lat,
@@ -1600,7 +1633,7 @@ export const InteractiveMap = React.memo(() => {
                                     <div className="flex items-center space-x-2">
                                         <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-orange-500 flex-shrink-0"/>
                                         <span className="font-medium text-sm md:text-base">Recent Activity</span>
-                                    </div>
+                                                                       </div>
                                     <p className="text-xl md:text-2xl font-bold">{stateStats[selectedState].recentActivity}</p>
                                     <p className="text-xs text-muted-foreground">
                                         <span className="hidden sm:inline">Actions in the last 30 days</span>

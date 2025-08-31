@@ -97,6 +97,7 @@ function getDistrictIdentifiers(rep: any): string[] {
   const stateFromCurrentRole = rep.current_role?.state;
   const stateFromField = rep.state;
 
+  // @ts-ignore
   const fips = getStateFipsFromDivision(divisionId) ||
                getStateFipsFromState(stateFromTerms) ||
                getStateFipsFromState(stateFromCurrentRole) ||
@@ -222,8 +223,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const districtType = searchParams.get('type') || 'congressional-districts';
     const selectedTopic = searchParams.get('topic') || 'all';
+    const enactedOnly = searchParams.get('enacted') === 'true'; // New parameter for enacted legislation
 
-    // console.log(`Topic heatmap request: ${districtType}, topic: ${selectedTopic}`);
+    // console.log(`Topic heatmap request: ${districtType}, topic: ${selectedTopic}, enacted: ${enactedOnly}`);
 
     const chamberMap: Record<string, string> = {
       'congressional-districts': 'us_house',
@@ -335,6 +337,11 @@ export async function GET(request: NextRequest) {
       ]
     };
 
+    // Add enacted filter if requested
+    if (enactedOnly) {
+      matchStage.enactedAt = { $exists: true, $ne: null };
+    }
+
     if (selectedTopic !== 'all') {
       matchStage['topicClassification.broadTopics'] = { $regex: selectedTopic, $options: 'i' };
     }
@@ -431,7 +438,21 @@ export async function GET(request: NextRequest) {
 
     // console.log(`Returning ${Object.keys(normalizedScores).length} scored districts with ${availableTopics.length} available topics`);
 
-    return NextResponse.json({ success: true, scores: normalizedScores, availableTopics, selectedTopic, districtType, metadata: { totalDistricts: Object.keys(normalizedScores).length, totalRepresentatives: representatives.length, maxScore, uniqueTopics: allBroadTopics.size, processedResults: results.length } });
+    return NextResponse.json({
+      success: true,
+      scores: normalizedScores,
+      availableTopics,
+      selectedTopic,
+      districtType,
+      enactedOnly,
+      metadata: {
+        totalDistricts: Object.keys(normalizedScores).length,
+        totalRepresentatives: representatives.length,
+        maxScore,
+        uniqueTopics: allBroadTopics.size,
+        processedResults: results.length
+      }
+    });
 
   } catch (error: any) {
     console.error('Topic heatmap error:', error);

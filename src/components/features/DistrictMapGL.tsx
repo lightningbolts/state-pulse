@@ -36,6 +36,8 @@ interface DistrictMapGLProps {
   showTopicHeatmap?: boolean;
   topicScores?: Record<string, number>; // district ID -> score (0-1)
   getTopicHeatmapColor?: (score: number) => string; // score -> color
+  // District border visibility
+  showDistrictBorders?: boolean;
 }
 
 // Mobile detection utility
@@ -82,6 +84,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   showTopicHeatmap = false,
   topicScores = {},
   getTopicHeatmapColor = () => '#e0e0e0',
+  showDistrictBorders = true,
 }) => {
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
@@ -581,6 +584,15 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   }, [fillColorExpression, showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, isMobile]);
 
   const layerLinePaint = React.useMemo(() => {
+    // If borders are disabled, make the line completely transparent
+    if (!showDistrictBorders) {
+      return {
+        'line-color': 'transparent',
+        'line-width': 0,
+        'line-opacity': 0
+      };
+    }
+
     const lineWidth = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ?
       (isMobile ? 0.5 : 1) : // Thinner lines on mobile for better performance
       (isMobile ? 1 : 2);
@@ -589,7 +601,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
       'line-color': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? '#000000' : (color.includes('var(') ? '#2563eb' : color),
       'line-width': lineWidth,
     };
-  }, [showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, color, isMobile]);
+  }, [showPartyAffiliation, showGerrymandering, showTopicHeatmap, showRepHeatmap, color, isMobile, showDistrictBorders]);
 
   // Simplified Source properties to avoid clustering issues and enable world copies
   const sourceProps = React.useMemo(() => {
