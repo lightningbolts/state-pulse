@@ -18,8 +18,12 @@ export function isEnactedAction(action: string): boolean {
  */
 export function isLegislationEnacted(legislation: Legislation | any): boolean {
   // If we have the pre-computed field, use it for maximum performance
-  if (typeof legislation.isEnacted === 'boolean') {
-    return legislation.isEnacted;
+  // if (typeof legislation.isEnacted === 'boolean') {
+  //   return legislation.isEnacted;
+  // }
+
+  if (legislation?.enactedAt) {
+    return true;
   }
 
   // Fallback to pattern matching for backward compatibility

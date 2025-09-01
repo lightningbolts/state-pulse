@@ -75,26 +75,25 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
   const formattedIntroDate = introDate && !isNaN(introDate.getTime()) ? getFormattedDate(introDate.toISOString()) : '';
 
   // --- Last Action Date & Description Logic ---
-  let lastActionDate: Date | null = update.lastActionAt ? new Date(update.lastActionAt) : null;
-  let lastActionDescription = update.latestActionDescription;
+  let lastActionDate: Date | null = null;
+  let lastActionDescription: string | undefined = undefined;
 
   if (Array.isArray(update.history) && update.history.length > 0) {
+    // Always prioritize the most recent history item
     const sortedHistory = [...update.history]
       .filter(h => h.date && h.action)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    if (sortedHistory.length > 0) {
-      const latestHistoryAction = sortedHistory[0];
-      const latestHistoryDate = new Date(latestHistoryAction.date);
-
-      if (latestHistoryDate && !isNaN(latestHistoryDate.getTime())) {
-        if (!lastActionDate || isNaN(lastActionDate.getTime()) || latestHistoryDate > lastActionDate) {
-          lastActionDate = latestHistoryDate;
-          lastActionDescription = latestHistoryAction.action;
-        }
-      }
+    const latestHistoryAction = sortedHistory[0];
+    if (latestHistoryAction && latestHistoryAction.date) {
+      lastActionDate = new Date(latestHistoryAction.date);
+      lastActionDescription = latestHistoryAction.action;
     }
+  } else {
+    // Fallback to lastActionAt/latestActionDescription if no history
+    lastActionDate = update.lastActionAt ? new Date(update.lastActionAt) : null;
+    lastActionDescription = update.latestActionDescription;
   }
+
   const formattedLastActionDate = lastActionDate && !isNaN(lastActionDate.getTime()) ? getFormattedDate(lastActionDate.toISOString()) : null;
 
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
