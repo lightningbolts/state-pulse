@@ -20,6 +20,7 @@ export default function DashboardPageClient() {
     const stateParam = searchParams.get("state");
     const stateAbbrParam = searchParams.get("stateAbbr");
     const congressParam = searchParams.get("congress"); // Add congress parameter
+    const mapParam = searchParams.get("map");
 
     useEffect(() => {
         // console.log('Dashboard useEffect triggered with params:', {

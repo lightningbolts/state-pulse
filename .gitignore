@@ -48,3 +48,7 @@ src/data/legislation2.json
 
 # python
 .venv
+.junie
+.vscode
+.idx
+.idea

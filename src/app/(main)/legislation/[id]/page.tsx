@@ -7,6 +7,7 @@ import { CollapsibleSponsors } from '@/components/features/CollapsibleSponsors';
 import { CollapsibleTimeline } from '@/components/features/CollapsibleTimeline';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 import { BookmarkButton } from '@/components/features/BookmarkButton';
+import { ShareButton } from '@/components/ui/ShareButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
 import { RelatedBillsWrapper } from '@/components/features/RelatedBillsWrapper';
 import { RelatedBillsLoading } from '@/components/features/RelatedBillsLoading';
@@ -65,7 +66,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     );
   }
   // console.log(params, "Params in LegislationDetailPage");
-  
+
   // Load legislation first, then related bills for better performance
   const legislation = await getLegislationById(id);
 
@@ -188,7 +189,10 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
                 {session} - {jurisdictionName} {chamber && `(${chamber})`}
               </CardDescription>
             </div>
-            <BookmarkButton legislationId={id} className="flex-shrink-0 self-start" />
+            <div className="flex gap-2 flex-shrink-0 self-start">
+              <BookmarkButton legislationId={id} />
+              <ShareButton type="bill" id={id} title={title} />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6 space-y-6 bg-background">

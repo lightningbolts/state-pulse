@@ -16,6 +16,7 @@ import { PartyBadge } from './PartyBadge';
 import { generateRepresentativeMetadata } from '@/lib/metadata';
 import type { Metadata } from 'next';
 import { FollowButton } from '@/components/ui/FollowButton';
+import { ShareButton } from '@/components/ui/ShareButton';
 
 const fetchRepresentativeData = async (id: string) => {
   try {
@@ -24,7 +25,7 @@ const fetchRepresentativeData = async (id: string) => {
     if (!rep) {
       return null;
     }
-    
+
     // Helper function to extract party information (consistent with API)
     const extractPartyInfo = (rep: any): string => {
       if (rep.party) return rep.party;
@@ -94,7 +95,7 @@ const fetchRepresentativeData = async (id: string) => {
       console.error('[SSR] Normalization error:', normError, rep);
       throw new Error('Failed to normalize representative data');
     }
-    
+
     // Fetch bills sponsored by this representative (always use canonical rep.id)
     let bills: Bill[] = [];
     try {
@@ -104,7 +105,7 @@ const fetchRepresentativeData = async (id: string) => {
       // Don't throw here, just continue with empty bills
       bills = [];
     }
-    
+
     return { representative: normalizedRep, bills };
   } catch (error) {
     console.error('[SSR] Error fetching representative data:', error);
@@ -217,7 +218,7 @@ export default async function RepresentativeDetailPage({
   }
 
   const data = await fetchRepresentativeData(id);
-  
+
   if (!data) {
     notFound();
   }
@@ -344,8 +345,9 @@ export default async function RepresentativeDetailPage({
         </CardHeader>
         <CardContent className="p-4 md:p-6 space-y-6 bg-background">
           <AnimatedSection>
-            <div className="h-10"> {/* reserve button height to avoid layout shift */}
+            <div className="flex gap-2 items-center h-10"> {/* reserve button height to avoid layout shift */}
               <FollowButton repId={rep.id} showText />
+              <ShareButton type="rep" id={rep.id} title={rep.name} />
             </div>
           </AnimatedSection>
           <AnimatedSection>
