@@ -178,7 +178,11 @@ function detectEnactedDate(history: any[]): Date | null {
     /public.*law.*no/i,
     /acts.*of.*assembly.*chapter/i,
     /governor.*signed/i,
-    /signed.*into.*law/i
+    /signed.*into.*law/i,
+    /notification.*is.*now.*act/i,
+    /approved.*p.*l.*c/i,
+    /signed.*chap/i,
+    /signed.*by.*gov/i
   ];
 
   // Sort history by date in descending order to find the most recent enacted action

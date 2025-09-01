@@ -16,7 +16,11 @@ const enactedPatterns = [
   /public.*law.*no/i,
   /acts.*of.*assembly.*chapter/i,
   /governor.*signed/i,
-  /signed.*into.*law/i
+  /signed.*into.*law/i,
+    /notification.*is.*now.*act/i,
+    /approved.*p.*l.*c/i,
+    /signed.*chap/i,
+    /signed.*by.*gov/i
 ];
 
 function findEnactedDate(doc: any): Date | null {
@@ -24,9 +28,9 @@ function findEnactedDate(doc: any): Date | null {
   // try to find a reasonable enactment date
   if (doc.isEnacted === true) {
     // Try to use latestActionAt if it exists and seems reasonable
-    if (doc.latestActionAt) {
-      return new Date(doc.latestActionAt);
-    }
+    // if (doc.latestActionAt) {
+    //   return new Date(doc.latestActionAt);
+    // }
 
     // Try to find the most recent date from history
     if (doc.history && Array.isArray(doc.history)) {
