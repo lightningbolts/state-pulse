@@ -1,17 +1,6 @@
-import type { Legislation } from '../types/legislation';
+import type { Legislation } from '@/types/legislation';
+import { enactedPatterns } from "@/types/legislation";
 
-// Centralized enacted detection patterns
-const enactedPatterns = [
-  /signed.*(into|by).*(law|governor)/i,
-  /approved.*by.*governor/i,
-  /became.*law/i,
-  /effective.*date/i,
-  /chapter.*laws/i,
-  /public.*law.*no/i,
-  /acts.*of.*assembly.*chapter/i,
-  /governor.*signed/i,
-  /signed.*into.*law/i
-];
 
 /**
  * Check if a single action string indicates enacted status

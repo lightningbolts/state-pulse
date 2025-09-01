@@ -1,27 +1,12 @@
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
+import {enactedPatterns} from "@/types/legislation";
 
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.MONGODB_DB_NAME || 'statepulse-data';
 
-// Reuse the enacted detection patterns from the existing codebase
-const enactedPatterns = [
-  /signed.*(into|by).*(law|governor)/i,
-  /approved.*by.*governor/i,
-  /became.*law/i,
-  /effective.*date/i,
-  /chapter.*laws/i,
-  /public.*law.*no/i,
-  /acts.*of.*assembly.*chapter/i,
-  /governor.*signed/i,
-  /signed.*into.*law/i,
-    /notification.*is.*now.*act/i,
-    /approved.*p.*l.*c/i,
-    /signed.*chap/i,
-    /signed.*by.*gov/i
-];
 
 function findEnactedDate(doc: any): Date | null {
   // First, if the bill is already marked as enacted (isEnacted: true),

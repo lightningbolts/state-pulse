@@ -14,6 +14,7 @@ import { RelatedBillsLoading } from '@/components/features/RelatedBillsLoading';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
 import { Suspense } from 'react';
+import { enactedPatterns } from "@/types/legislation";
 
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -91,18 +92,6 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
 
   // Helper function to detect if this bill is enacted
   const isEnacted = (): boolean => {
-    const enactedPatterns = [
-      /signed.*(into|by).*(law|governor)/i,
-      /approved.*by.*governor/i,
-      /became.*law/i,
-      /effective.*date/i,
-      /chapter.*laws/i,
-      /public.*law.*no/i,
-      /acts.*of.*assembly.*chapter/i,
-      /governor.*signed/i,
-      /signed.*into.*law/i
-    ];
-
     // Check latest action description
     if (legislation.latestActionDescription) {
       for (const pattern of enactedPatterns) {

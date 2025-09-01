@@ -5,6 +5,7 @@ import {AnimatePresence, motion} from 'framer-motion';
 import {ChevronDown, ListChecks} from 'lucide-react';
 import {Legislation} from '@/types/legislation';
 import {AnimatedSection} from '@/components/ui/AnimatedSection';
+import { enactedPatterns } from "@/types/legislation";
 
 interface CollapsibleTimelineProps {
     historyEvents: Legislation['history'];
@@ -13,19 +14,6 @@ interface CollapsibleTimelineProps {
 // Helper function to detect enacted actions (defined outside component to avoid scoping issues)
 const isEnactedAction = (action: string): boolean => {
     if (!action) return false;
-
-    const enactedPatterns = [
-        /signed.*(into|by).*(law|governor)/i,
-        /approved.*by.*governor/i,
-        /became.*law/i,
-        /effective.*date/i,
-        /chapter.*laws/i,
-        /public.*law.*no/i,
-        /acts.*of.*assembly.*chapter/i,
-        /governor.*signed/i,
-        /signed.*into.*law/i
-    ];
-
     return enactedPatterns.some(pattern => pattern.test(action));
 };
 

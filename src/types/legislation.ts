@@ -132,6 +132,22 @@ export interface BillSearchProps {
   className?: string;
 }
 
+export const enactedPatterns = [
+  /signed.*(into|by).*(law|governor)/i,
+  /approved.*by.*governor/i,
+  /became.*law/i,
+  /effective.*date/i,
+  /chapter.*laws/i,
+  /public.*law.*no/i,
+  /acts.*of.*assembly.*chapter/i,
+  /governor.*signed/i,
+  /signed.*into.*law/i,
+  /notification.*is.*now.*act/i,
+  /approved.*p.*l.*c/i,
+  /signed.*chap/i,
+  /signed.*by.*gov/i
+];
+
 export const BROAD_TOPIC_KEYWORDS: Record<string, string[]> = {
   'Agriculture and Food': [
     'agriculture', 'agricultural', 'farm', 'farming', 'farmer', 'crop', 'crops', 'livestock', 'cattle', 'beef', 'pork', 'poultry', 'chicken', 'dairy', 'milk', 'food', 'nutrition', 'organic', 'pesticide', 'fertilizer', 'irrigation', 'harvest', 'grain', 'wheat', 'corn', 'soybean', 'vegetable', 'fruit', 'meat', 'fish', 'seafood', 'aquaculture', 'horticulture', 'forestry', 'ranch', 'pasture', 'rural development'

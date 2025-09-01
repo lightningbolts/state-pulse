@@ -10,10 +10,10 @@ import {
   extractBestTextForSummary,
   generateGeminiSummary,
   summarizeLegislationOptimized,
-  extractLegislationFullText,
   generateGeminiDetailedSummary
 } from '../services/aiSummaryUtil';
 import { classifyLegislationForFetch } from '../services/classifyLegislationService';
+import { enactedPatterns } from "@/types/legislation";
 
 config({ path: '../../.env' });
 
@@ -167,23 +167,6 @@ const STATE_OCD_IDS: { ocdId: string, abbr: string }[] = [
 // Helper function to determine the date when a bill was enacted based on its history
 function detectEnactedDate(history: any[]): Date | null {
   if (!history || history.length === 0) return null;
-
-  // Enhanced regex patterns for enacted legislation detection
-  const enactedPatterns = [
-    /signed.*(into|by).*(law|governor)/i,
-    /approved.*by.*governor/i,
-    /became.*law/i,
-    /effective.*date/i,
-    /chapter.*laws/i,
-    /public.*law.*no/i,
-    /acts.*of.*assembly.*chapter/i,
-    /governor.*signed/i,
-    /signed.*into.*law/i,
-    /notification.*is.*now.*act/i,
-    /approved.*p.*l.*c/i,
-    /signed.*chap/i,
-    /signed.*by.*gov/i
-  ];
 
   // Sort history by date in descending order to find the most recent enacted action
   const sortedHistory = [...history].sort((a, b) => {
@@ -494,6 +477,7 @@ async function fetchSessionsForJurisdiction(ocdId: string): Promise<OpenStatesSe
       return [];
     }
     const data = await response.json();
+    // @ts-ignore
     return (data.legislative_sessions || []).sort((a: OpenStatesSession, b: OpenStatesSession) => {
         const dateA = a.end_date || a.start_date || '0';
         const dateB = b.end_date || b.start_date || '0';
@@ -537,7 +521,9 @@ async function fetchAndStoreUpdatedBills(
       const testResponse = await fetch(testUrl);
       if (testResponse.ok) {
         const testData = await testResponse.json();
+        // @ts-ignore
         const maxPage = testData.pagination?.max_page || testData.pagination?.total_pages || 1;
+        // @ts-ignore
         const totalItems = testData.pagination?.total_items || 0;
 
         console.log(`Current pagination: max_page=${maxPage}, total_items=${totalItems}, requested_start_page=${startPage}`);
@@ -663,12 +649,12 @@ async function fetchAndStoreUpdatedBills(
               if (shouldGenerateDetailedSummary) {
                 console.log(`  Generating missing detailed summary for existing bill ${legislationToStore.identifier}`);
                 try {
-                  const { fullText } = await extractLegislationFullText(legislationToStore);
-                  if (fullText && fullText.length > 500) {
-                    const detailedSummary = await generateGeminiDetailedSummary(fullText);
-                    legislationToStore.longGeminiSummary = detailedSummary;
-                    console.log(`  Generated detailed summary: ${detailedSummary.length} characters`);
-                  }
+                  const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
+                  legislationToStore.geminiSummary = summary;
+                  legislationToStore.geminiSummarySource = sourceType;
+                  legislationToStore.longGeminiSummary = longSummary;
+                  console.log(`  Generated detailed summary for ${legislationToStore.identifier} (source: ${sourceType})`);
+                  console.log(`  Brief summary: ${summary.length} chars, Detailed summary: ${longSummary?.length} chars`);
                 } catch (detailError) {
                   console.warn(`  Warning: Failed to generate detailed summary for ${legislationToStore.identifier}: ${detailError}`);
                 }

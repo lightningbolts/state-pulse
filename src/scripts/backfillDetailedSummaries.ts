@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 import { getCollection } from '../lib/mongodb';
-import { extractLegislationFullText, generateGeminiDetailedSummary } from '../services/aiSummaryUtil';
+import { generateGeminiDetailedSummary } from '../services/aiSummaryUtil';
 import { Legislation } from '../types/legislation';
 
 config({ path: '../../.env' });
@@ -101,6 +101,7 @@ async function backfillDetailedSummaries() {
 
   for await (const doc of cursor) {
     processed++;
+    // @ts-ignore
     const legislation = doc as Legislation;
 
     console.log(`\n[${processed}/${totalCount}] Processing ${legislation.identifier} (${legislation.jurisdictionName})`);

@@ -1,23 +1,13 @@
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
+import { enactedPatterns } from "@/types/legislation";
+
 
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.MONGODB_DB_NAME || 'statepulse-data';
 
-// Reuse the enacted detection patterns
-const enactedPatterns = [
-  /signed.*(into|by).*(law|governor)/i,
-  /approved.*by.*governor/i,
-  /became.*law/i,
-  /effective.*date/i,
-  /chapter.*laws/i,
-  /public.*law.*no/i,
-  /acts.*of.*assembly.*chapter/i,
-  /governor.*signed/i,
-  /signed.*into.*law/i
-];
 
 function findEnactedDate(doc: any): Date | null {
   // Check latest action description first
