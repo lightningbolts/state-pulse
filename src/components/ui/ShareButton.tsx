@@ -114,7 +114,7 @@ export function ShareButton({ type, id, title, identifier, jurisdiction, classNa
     switch (type) {
       case 'bill':
         return title 
-          ? `${jurisdiction} - ${identifier}: ${title} on StatePulse`
+          ? `${jurisdiction} - ${identifier}: ${title}`
           : `Track this legislation on StatePulse`;
       case 'rep':
         return title 
