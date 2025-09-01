@@ -7,6 +7,8 @@ import { MapPin, Phone, Mail, ExternalLink } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { FollowButton } from "@/components/ui/FollowButton";
 import type { Representative } from "@/types/representative";
+import {BookmarkButton} from "@/components/features/BookmarkButton";
+import {ShareButton} from "@/components/ui/ShareButton";
 
 
 type RepresentativeCardProps = {
@@ -271,13 +273,30 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                       <Badge variant="outline" className="w-fit">
                         {normalized.party}
                       </Badge>
-                      <FollowButton
-                        repId={normalized.id}
-                        repName={normalized.name}
-                        size="sm"
-                        variant="outline"
-                        isFollowed={isFollowed}
-                      />
+                      {/*<FollowButton*/}
+                      {/*  repId={normalized.id}*/}
+                      {/*  repName={normalized.name}*/}
+                      {/*  size="sm"*/}
+                      {/*  variant="outline"*/}
+                      {/*  isFollowed={isFollowed}*/}
+                      {/*/>*/}
+                      <div onClick={e => e.stopPropagation()} className="flex items-center gap-2">
+                        <FollowButton
+                            repId={normalized.id}
+                            repName={normalized.name}
+                            size="sm"
+                            variant="outline"
+                            isFollowed={isFollowed}
+                        />
+                        <ShareButton
+                            type={'rep'}
+                            id={normalized.id}
+                            title={normalized.name}
+                            identifier={''}
+                            jurisdiction={''}
+                            size="sm"
+                        />
+                      </div>
                     </div>
                   </div>
                   <p className="text-sm font-medium text-primary mb-2">

@@ -185,11 +185,11 @@ export function BookmarkButton({legislationId, className = ''}: BookmarkButtonPr
             )}
         >
             {isBookmarked ? (
-                <BookmarkCheck className="h-4 w-4 mr-1"/>
+                <BookmarkCheck className="h-4 w-4"/>
             ) : (
-                <Bookmark className="h-4 w-4 mr-1"/>
+                <Bookmark className="h-4 w-4"/>
             )}
-            {isBookmarked ? 'Bookmarked' : 'Bookmark'}
+            {/*{isBookmarked ? 'Bookmarked' : 'Bookmark'}*/}
         </Button>
     );
 }

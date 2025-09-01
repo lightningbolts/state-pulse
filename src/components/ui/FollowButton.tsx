@@ -54,11 +54,11 @@ export function FollowButton({
       ) : (
         <Icon className="h-4 w-4" />
       )}
-      {showText && (
-        <span className="ml-2">
-          {buttonText}
-        </span>
-      )}
+      {/*{showText && (*/}
+      {/*  <span className="ml-2">*/}
+      {/*    {buttonText}*/}
+      {/*  </span>*/}
+      {/*)}*/}
     </Button>
   );
 }

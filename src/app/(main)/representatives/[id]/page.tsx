@@ -347,7 +347,7 @@ export default async function RepresentativeDetailPage({
           <AnimatedSection>
             <div className="flex gap-2 items-center h-10"> {/* reserve button height to avoid layout shift */}
               <FollowButton repId={rep.id} showText />
-              <ShareButton type="rep" id={rep.id} title={rep.name} />
+              <ShareButton type="rep" id={rep.id} title={rep.name} className={`h-10 w-10`} />
             </div>
           </AnimatedSection>
           <AnimatedSection>

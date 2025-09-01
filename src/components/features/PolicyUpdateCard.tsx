@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { BookmarkButton } from "@/components/features/BookmarkButton";
 import { isLegislationEnacted } from '@/utils/enacted-legislation';
+import {ShareButton} from "@/components/ui/ShareButton";
+import {STATE_MAP} from "@/types/geo";
 
 export interface PolicyUpdate {
   id: string;
@@ -98,6 +100,14 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
 
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
   const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
+
+  let jurisdictionAb = ''
+  if (update.jurisdictionName === "United States Congress") {
+    jurisdictionAb = "US"
+  } else {
+    // @ts-ignore
+    jurisdictionAb = STATE_MAP[update.jurisdictionName]
+  }
 
   return (
     <AnimatedSection key={uniqueKey}>
@@ -222,10 +232,19 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
             {/*  {update.sources && update.sources.length > 0 ? 'Official Link' : 'OpenStates Link'}*/}
             {/*</button>*/}
 
-            <div onClick={e => e.stopPropagation()}>
+            <div onClick={e => e.stopPropagation()} className="flex items-center gap-2">
               <BookmarkButton
                 legislationId={update.id}
                 className="h-10 px-3 rounded-md"
+              />
+              <ShareButton
+                  type={'bill'}
+                  id={update.id}
+                  title={update.title}
+                  identifier={update.identifier}
+                  jurisdiction={jurisdictionAb}
+                  className="h-10 px-3 rounded-md"
+                  size="sm"
               />
             </div>
           </div>

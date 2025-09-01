@@ -175,11 +175,11 @@ export function generateRepresentativeMetadata(name: string, title: string, stat
   });
 }
 
-export function generateLegislationMetadata(billTitle: string, billNumber?: string, summary?: string) {
+export function generateLegislationMetadata(billTitle: string, billNumber?: string, jurisdiction?: string, summary?: string) {
   return generateMetadata({
-    title: `${billNumber ? `${billNumber}: ` : ''}${billTitle}`,
+    title: `${billNumber ? `${jurisdiction} - ${billNumber} ` : ''}${billTitle}`,
     description: summary || `Details and analysis of ${billTitle}. Track the progress, view voting records, and understand the impact of this legislation.`,
-    keywords: ['legislation', 'bill', billNumber, billTitle.toLowerCase(), 'policy'].filter(Boolean),
+    keywords: ['legislation', 'bill', billNumber, billTitle.toLowerCase(), 'policy', jurisdiction].filter(Boolean),
     type: 'article',
   });
 }

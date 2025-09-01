@@ -15,6 +15,7 @@ import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { enactedPatterns } from "@/types/legislation";
+import {STATE_MAP} from "@/types/geo";
 
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -31,9 +32,18 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       };
     }
 
+    let jurisdictionAb = '';
+    if (legislation.jurisdictionName === "United States Congress") {
+      jurisdictionAb = "US";
+    } else {
+      // @ts-ignore
+      jurisdictionAb = STATE_MAP[legislation.jurisdictionName];
+    }
+
     return generateLegislationMetadata(
       legislation.title || 'Unknown Bill',
       legislation.identifier || 'Unknown',
+      jurisdictionAb || 'Unknown Jurisdiction',
       legislation.geminiSummary || `${legislation.title} - Track this bill's progress and view detailed analysis.`
     );
   } catch (error) {
@@ -143,6 +153,14 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     geminiSummary,
   } = legislation;
 
+  let jurisdictionAb = '';
+  if (jurisdictionName === "United States Congress") {
+    jurisdictionAb = "US";
+  } else {
+    // @ts-ignore
+    jurisdictionAb = STATE_MAP[jurisdictionName];
+  }
+
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
       {/*/!* Enacted Legislation Banner *!/*/}
@@ -180,7 +198,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </div>
             <div className="flex gap-2 flex-shrink-0 self-start">
               <BookmarkButton legislationId={id} />
-              <ShareButton type="bill" id={id} title={title} />
+              <ShareButton type="bill" id={id} title={title} jurisdiction={jurisdictionAb} identifier={identifier} />
             </div>
           </div>
         </CardHeader>
