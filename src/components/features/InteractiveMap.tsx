@@ -57,9 +57,9 @@ const forceGarbageCollection = () => {
 
 // Performance optimization: Create stable references for constant data
 const DISTRICT_GEOJSON_URLS: Record<string, string> = {
-  'congressional-districts': '/districts/congressional-districts.geojson',
-  'state-upper-districts': '/districts/state-upper-districts.geojson',
-  'state-lower-districts': '/districts/state-lower-districts.geojson',
+  'congressional-districts': '/districts/congressional-districts.topojson',
+  'state-upper-districts': '/districts/state-upper-districts.topojson',
+  'state-lower-districts': '/districts/state-lower-districts.topojson',
 };
 
 const DISTRICT_COLORS: Record<string, string> = {

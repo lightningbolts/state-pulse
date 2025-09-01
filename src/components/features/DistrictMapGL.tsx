@@ -1,6 +1,7 @@
 import * as React from 'react';
 import Map, { Source, Layer, MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { feature } from 'topojson-client'; // ADDED: TopoJSON parsing function
 
 interface DistrictMapGLProps {
   geojsonUrl: string;
@@ -65,27 +66,27 @@ const getOptimalChunkSize = (featureCount: number, isMobile: boolean): number =>
 
 // Performance optimization: Memoize the component to prevent unnecessary re-renders
 export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
-  geojsonUrl,
-  color,
-  onDistrictClick,
-  initialViewState = { longitude: -98.5795, latitude: 39.8283, zoom: 4 },
-  popupMarker,
-  mapStyle = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-  showPartyAffiliation = false,
-  districtPartyMapping = {},
-  partyColors = {},
-  showGerrymandering = false,
-  gerryScores = {},
-  getGerrymanderingColor = () => '#e0e0e0',
-  showRepHeatmap = false,
-  repScores = {},
-  repDetails = {},
-  getRepHeatmapColor = () => '#e0e0e0',
-  showTopicHeatmap = false,
-  topicScores = {},
-  getTopicHeatmapColor = () => '#e0e0e0',
-  showDistrictBorders = true,
-}) => {
+                                                                         geojsonUrl,
+                                                                         color,
+                                                                         onDistrictClick,
+                                                                         initialViewState = { longitude: -98.5795, latitude: 39.8283, zoom: 4 },
+                                                                         popupMarker,
+                                                                         mapStyle = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                                                                         showPartyAffiliation = false,
+                                                                         districtPartyMapping = {},
+                                                                         partyColors = {},
+                                                                         showGerrymandering = false,
+                                                                         gerryScores = {},
+                                                                         getGerrymanderingColor = () => '#e0e0e0',
+                                                                         showRepHeatmap = false,
+                                                                         repScores = {},
+                                                                         repDetails = {},
+                                                                         getRepHeatmapColor = () => '#e0e0e0',
+                                                                         showTopicHeatmap = false,
+                                                                         topicScores = {},
+                                                                         getTopicHeatmapColor = () => '#e0e0e0',
+                                                                         showDistrictBorders = true,
+                                                                       }) => {
   const mapRef = React.useRef<MapRef>(null);
   const markerRef = React.useRef<any>(null);
   const loadingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -114,7 +115,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
 
     const loadGeoJsonData = async () => {
       if (!geojsonUrl) return;
-      
+
       try {
         setLoading(true);
         setError(null);
@@ -165,9 +166,20 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
 
         setLoadingProgress(30);
 
-        const data = await response.json();
+        // --- START OF TOPOJSON MODIFICATION ---
+        const topojsonData = await response.json(); // Data is now TopoJSON
 
         if (isCancelled) return;
+
+        // Dynamically find the key for the main object within the TopoJSON file
+        const objectKey = topojsonData.objects && Object.keys(topojsonData.objects)[0];
+        if (!objectKey) {
+          throw new Error('Invalid TopoJSON file: No objects found.');
+        }
+
+        // Convert the TopoJSON object back into a GeoJSON FeatureCollection
+        const data = feature(topojsonData, topojsonData.objects[objectKey]) as any;
+        // --- END OF TOPOJSON MODIFICATION ---
 
         setLoadingProgress(60);
 
@@ -364,9 +376,9 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         }
       }
     };
-    
+
     loadGeoJsonData();
-    
+
     return () => {
       isCancelled = true;
       // Safely abort the controller without throwing errors
@@ -445,12 +457,12 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
     // Gerrymandering coloring takes precedence
     if (showGerrymandering && Object.keys(gerryScores).length > 0) {
       const caseExpression: any[] = ['case'];
-      
+
       // Performance optimization: Batch process entries for better performance
       const scoreEntries = Object.entries(gerryScores);
       scoreEntries.forEach(([districtId, score]) => {
         const gerryColor = getGerrymanderingColor(score);
-        
+
         // Create an OR condition to match any of the possible ID fields
         caseExpression.push([
           'any',
@@ -461,22 +473,22 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         ]);
         caseExpression.push(gerryColor);
       });
-      
+
       // Default fallback color for unmapped features when overlay active
       caseExpression.push(NO_DATA_COLOR);
 
       return caseExpression;
     }
-    
+
     // Party affiliation coloring (if gerrymandering is not active)
     if (showPartyAffiliation && Object.keys(districtPartyMapping).length > 0) {
       const caseExpression: any[] = ['case'];
-      
+
       // Performance optimization: Batch process party mapping entries
       const partyEntries = Object.entries(districtPartyMapping);
       partyEntries.forEach(([districtId, party]) => {
         const partyColor = partyColors[party] || partyColors['Unknown'] || '#6b7280'; // fallback to gray
-        
+
         // Create an OR condition to match any of the possible ID fields
         caseExpression.push([
           'any',
@@ -487,13 +499,13 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         ]);
         caseExpression.push(partyColor);
       });
-      
+
       // Default fallback color for unmapped features when overlay active
       caseExpression.push(NO_DATA_COLOR);
 
       return caseExpression;
     }
-    
+
     // Default color (no special coloring active)
     let defaultColor = color;
     if (color.includes('var(')) {
@@ -539,8 +551,8 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
           })(),
           draggable: !!popupMarker.draggable,
         })
-          .setLngLat([popupMarker.lng, popupMarker.lat])
-          .addTo(map);
+            .setLngLat([popupMarker.lng, popupMarker.lat])
+            .addTo(map);
         if (popupMarker.draggable && typeof popupMarker.onDragEnd === 'function') {
           marker.on('dragend', () => {
             try {
@@ -574,8 +586,8 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   // Optimized layer paint properties - mobile-specific optimizations
   const layerFillPaint = React.useMemo(() => {
     const baseOpacity = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ?
-      (isMobile ? 0.65 : 0.75) : // Slightly lower opacity on mobile for better performance
-      (isMobile ? 0.06 : 0.08);
+        (isMobile ? 0.65 : 0.75) : // Slightly lower opacity on mobile for better performance
+        (isMobile ? 0.06 : 0.08);
 
     return {
       'fill-color': fillColorExpression,
@@ -594,8 +606,8 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
     }
 
     const lineWidth = (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ?
-      (isMobile ? 0.5 : 1) : // Thinner lines on mobile for better performance
-      (isMobile ? 1 : 2);
+        (isMobile ? 0.5 : 1) : // Thinner lines on mobile for better performance
+        (isMobile ? 1 : 2);
 
     return {
       'line-color': (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) ? '#000000' : (color.includes('var(') ? '#2563eb' : color),
@@ -623,140 +635,140 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
   // Enhanced loading state with progress for mobile
   if (loading) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ marginBottom: '8px' }}>
-            {isMobile ? 'Loading district data for mobile...' : 'Loading district data...'}
-          </div>
-          {loadingProgress > 0 && (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
             <div style={{ marginBottom: '8px' }}>
-              <div style={{
-                width: '200px',
-                height: '4px',
-                backgroundColor: '#e0e0e0',
-                borderRadius: '2px',
-                margin: '0 auto',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  width: `${loadingProgress}%`,
-                  height: '100%',
-                  backgroundColor: '#2563eb',
-                  transition: 'width 0.3s ease'
-                }} />
-              </div>
-              <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                {loadingProgress}%
-              </div>
+              {isMobile ? 'Loading district data for mobile...' : 'Loading district data...'}
             </div>
-          )}
-          <div style={{ fontSize: '12px', color: '#666' }}>
-            {isMobile ? 'Optimizing for mobile device...' : 'This may take a moment on mobile devices'}
+            {loadingProgress > 0 && (
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{
+                    width: '200px',
+                    height: '4px',
+                    backgroundColor: '#e0e0e0',
+                    borderRadius: '2px',
+                    margin: '0 auto',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${loadingProgress}%`,
+                      height: '100%',
+                      backgroundColor: '#2563eb',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                    {loadingProgress}%
+                  </div>
+                </div>
+            )}
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {isMobile ? 'Optimizing for mobile device...' : 'This may take a moment on mobile devices'}
+            </div>
+            {isPartiallyLoaded && (
+                <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                  Loading progressively to prevent crashes...
+                </div>
+            )}
           </div>
-          {isPartiallyLoaded && (
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-              Loading progressively to prevent crashes...
-            </div>
-          )}
         </div>
-      </div>
     );
   }
 
   // Show error state
   if (error) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', color: '#dc2626' }}>
-          <div style={{ marginBottom: '8px' }}>Failed to load district data</div>
-          <div style={{ fontSize: '12px' }}>{error}</div>
-          {isMobile && (
-            <div style={{ fontSize: '11px', marginTop: '4px', color: '#666' }}>
-              Try refreshing or switch to a smaller district view
-            </div>
-          )}
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: '#dc2626' }}>
+            <div style={{ marginBottom: '8px' }}>Failed to load district data</div>
+            <div style={{ fontSize: '12px' }}>{error}</div>
+            {isMobile && (
+                <div style={{ fontSize: '11px', marginTop: '4px', color: '#666' }}>
+                  Try refreshing or switch to a smaller district view
+                </div>
+            )}
+          </div>
         </div>
-      </div>
     );
   }
 
   // Don't render map until data is loaded
   if (!geoJsonData) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div>Preparing map...</div>
-      </div>
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div>Preparing map...</div>
+        </div>
     );
   }
 
   return (
-    <Map
-      ref={mapRef}
-      initialViewState={initialViewState}
-      style={{ width: '100%', height: '100%' }}
-      mapStyle={mapStyle}
-      interactiveLayerIds={['district-fill']}
-      onClick={handleClick}
-      // Standard settings for world copies support
-      maxZoom={18}
-      minZoom={0}
-      attributionControl={false}
-      fadeDuration={0} // Disable fade for better mobile performance
-      // Standard interaction settings
-      touchZoomRotate={true}
-      touchPitch={false} // Disable pitch for better mobile performance
-      dragRotate={false} // Disable rotation for better mobile performance
-      doubleClickZoom={true}
-      scrollZoom={true}
-      renderWorldCopies={true} // Explicitly enable world copies
-    >
-      {sourceProps && (
-        <Source {...sourceProps}>
-          <Layer
-            id="district-fill"
-            type="fill"
-            paint={layerFillPaint}
-          />
-          <Layer
-            id="district-outline"
-            type="line"
-            paint={layerLinePaint}
-            layout={{
-              'line-cap': 'round',
-              'line-join': 'round'
-            }}
-          />
-        </Source>
-      )}
+      <Map
+          ref={mapRef}
+          initialViewState={initialViewState}
+          style={{ width: '100%', height: '100%' }}
+          mapStyle={mapStyle}
+          interactiveLayerIds={['district-fill']}
+          onClick={handleClick}
+          // Standard settings for world copies support
+          maxZoom={18}
+          minZoom={0}
+          attributionControl={false}
+          fadeDuration={0} // Disable fade for better mobile performance
+          // Standard interaction settings
+          touchZoomRotate={true}
+          touchPitch={false} // Disable pitch for better mobile performance
+          dragRotate={false} // Disable rotation for better mobile performance
+          doubleClickZoom={true}
+          scrollZoom={true}
+          renderWorldCopies={true} // Explicitly enable world copies
+      >
+        {sourceProps && (
+            <Source {...sourceProps}>
+              <Layer
+                  id="district-fill"
+                  type="fill"
+                  paint={layerFillPaint}
+              />
+              <Layer
+                  id="district-outline"
+                  type="line"
+                  paint={layerLinePaint}
+                  layout={{
+                    'line-cap': 'round',
+                    'line-join': 'round'
+                  }}
+              />
+            </Source>
+        )}
 
-      {/* Show loading indicator overlay for partial loads */}
-      {isPartiallyLoaded && (
-        <div style={{
-          position: 'absolute',
-          bottom: '10px',
-          left: '10px',
-          right: '10px',
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          padding: '8px',
-          borderRadius: '4px',
-          fontSize: '11px',
-          textAlign: 'center',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          zIndex: 1000
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+        {/* Show loading indicator overlay for partial loads */}
+        {isPartiallyLoaded && (
             <div style={{
-              width: '12px',
-              height: '12px',
-              border: '2px solid #e0e0e0',
-              borderTop: '2px solid #2563eb',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }} />
-            <span>Loading additional districts... ({geoJsonData?._loadedFeatureCount || 0}/{geoJsonData?._originalFeatureCount || 0})</span>
-          </div>
-        </div>
-      )}
-    </Map>
+              position: 'absolute',
+              bottom: '10px',
+              left: '10px',
+              right: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              padding: '8px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              textAlign: 'center',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              zIndex: 1000
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid #e0e0e0',
+                  borderTop: '2px solid #2563eb',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                <span>Loading additional districts... ({geoJsonData?._loadedFeatureCount || 0}/{geoJsonData?._originalFeatureCount || 0})</span>
+              </div>
+            </div>
+        )}
+      </Map>
   );
 });

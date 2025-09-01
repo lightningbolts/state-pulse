@@ -3,15 +3,15 @@ import { area } from '@turf/area';
 import { length } from '@turf/length';
 import { polygonToLine } from '@turf/polygon-to-line';
 import { bbox } from '@turf/bbox';
+import { feature } from 'topojson-client';
 
 /**
  * OPTIMIZED Gerrymandering Analysis API
- * 
- * Performance improvements:
+ * * Performance improvements:
  * 1. Custom convex hull implementation (no RBush dependency)
  * 2. In-memory caching with TTL
  * 3. Batch processing with Worker threads simulation
- * 4. Compressed data storage
+ * 4. Compressed data storage (now using TopoJSON)
  * 5. Progressive loading for large datasets
  */
 
@@ -91,13 +91,13 @@ class FastConvexHull {
  */
 function extractCoordinates(geometry: any): Point[] {
   const coords: Point[] = [];
-  
+
   if (geometry.type === 'Polygon') {
     // Only use exterior ring for performance
     const ring = geometry.coordinates[0];
     // Sample points for very large polygons to improve performance
     const sampleRate = ring.length > 1000 ? Math.ceil(ring.length / 500) : 1;
-    
+
     for (let i = 0; i < ring.length; i += sampleRate) {
       coords.push({ x: ring[i][0], y: ring[i][1] });
     }
@@ -109,13 +109,13 @@ function extractCoordinates(geometry: any): Point[] {
         largestRing = polygon[0];
       }
     }
-    
+
     const sampleRate = largestRing.length > 1000 ? Math.ceil(largestRing.length / 500) : 1;
     for (let i = 0; i < largestRing.length; i += sampleRate) {
       coords.push({ x: largestRing[i][0], y: largestRing[i][1] });
     }
   }
-  
+
   return coords;
 }
 
@@ -124,10 +124,10 @@ function extractCoordinates(geometry: any): Point[] {
  */
 function hullToGeoJSON(hullPoints: Point[]): any {
   if (hullPoints.length < 3) return null;
-  
+
   const coordinates = hullPoints.map(p => [p.x, p.y]);
   coordinates.push(coordinates[0]); // Close polygon
-  
+
   return {
     type: 'Feature',
     geometry: {
@@ -144,10 +144,10 @@ function calculatePolsbyPopperScore(polygon: any): number {
   try {
     const polygonArea = area(polygon);
     if (polygonArea === 0) return 0;
-    
+
     const perimeter = polygonToLine(polygon);
     let totalPerimeter = 0;
-    
+
     if (perimeter.type === 'FeatureCollection') {
       for (const feature of perimeter.features) {
         totalPerimeter += length(feature, { units: 'meters' });
@@ -155,7 +155,7 @@ function calculatePolsbyPopperScore(polygon: any): number {
     } else {
       totalPerimeter = length(perimeter, { units: 'meters' });
     }
-    
+
     if (totalPerimeter === 0) return 0;
     const score = (4 * Math.PI * polygonArea) / Math.pow(totalPerimeter, 2);
     return Math.min(Math.max(score, 0), 1);
@@ -172,16 +172,16 @@ function calculateConvexHullRatio(polygon: any): number {
   try {
     const polygonArea = area(polygon);
     if (polygonArea === 0) return 0;
-    
+
     const coordinates = extractCoordinates(polygon.geometry);
     if (coordinates.length < 3) return 0;
-    
+
     const hullPoints = FastConvexHull.calculate(coordinates);
     if (hullPoints.length < 3) return 0;
-    
+
     const hullGeoJSON = hullToGeoJSON(hullPoints);
     if (!hullGeoJSON) return 0;
-    
+
     const hullArea = area(hullGeoJSON);
     return hullArea === 0 ? 0 : polygonArea / hullArea;
   } catch (error) {
@@ -198,29 +198,29 @@ function analyzeGeographicContext(polygon: any, globalBbox: number[]): any {
     const districtBbox = bbox(polygon);
     const [minX, minY, maxX, maxY] = districtBbox;
     const [globalMinX, globalMinY, globalMaxX, globalMaxY] = globalBbox;
-    
+
     const width = maxX - minX;
     const height = maxY - minY;
     const aspectRatio = Math.max(width, height) / Math.min(width, height);
-    
+
     const tolerance = 0.01;
     const isAtBoundary = (
-      Math.abs(minX - globalMinX) < tolerance ||
-      Math.abs(maxX - globalMaxX) < tolerance ||
-      Math.abs(minY - globalMinY) < tolerance ||
-      Math.abs(maxY - globalMaxY) < tolerance
+        Math.abs(minX - globalMinX) < tolerance ||
+        Math.abs(maxX - globalMaxX) < tolerance ||
+        Math.abs(minY - globalMinY) < tolerance ||
+        Math.abs(maxY - globalMaxY) < tolerance
     );
-    
+
     // Simplified perimeter calculation for performance
     const polygonArea = area(polygon);
     const estimatedPerimeter = 2 * Math.sqrt(Math.PI * polygonArea); // Rough estimate
     const perimeterToAreaRatio = estimatedPerimeter / Math.sqrt(polygonArea);
-    
+
     let naturalBoundaryPercentage = 0;
     if (isAtBoundary) naturalBoundaryPercentage += 0.3;
     if (aspectRatio > 3) naturalBoundaryPercentage += 0.2;
     if (perimeterToAreaRatio > 0.1) naturalBoundaryPercentage += 0.2;
-    
+
     return {
       hasCoastline: isAtBoundary && (aspectRatio > 2 || perimeterToAreaRatio > 0.08),
       hasBorder: isAtBoundary,
@@ -248,24 +248,24 @@ function calculateEnhancedCompactness(polygon: any, globalBbox: number[]): Compa
   const polsbyPopper = calculatePolsbyPopperScore(polygon);
   const convexHullRatio = calculateConvexHullRatio(polygon);
   const context = analyzeGeographicContext(polygon, globalBbox);
-  
+
   let adjustedScore = polsbyPopper;
-  
+
   if (context.hasCoastline) {
     adjustedScore = adjustedScore + (0.1 * (1 - adjustedScore));
   }
-  
+
   if (context.hasBorder && !context.hasCoastline) {
     adjustedScore = adjustedScore + (0.05 * (1 - adjustedScore));
   }
-  
+
   if (convexHullRatio > 0 && convexHullRatio < 0.5) {
     const irregularityBonus = 0.05 * context.naturalBoundaryPercentage;
     adjustedScore = adjustedScore + (irregularityBonus * (1 - adjustedScore));
   }
-  
+
   adjustedScore = Math.min(adjustedScore, 1.0);
-  
+
   return {
     polsbyPopper,
     convexHullRatio,
@@ -284,12 +284,12 @@ function calculateEnhancedCompactness(polygon: any, globalBbox: number[]): Compa
 function getCached(key: string): any | null {
   const entry = cache.get(key);
   if (!entry) return null;
-  
+
   if (Date.now() - entry.timestamp > entry.ttl) {
     cache.delete(key);
     return null;
   }
-  
+
   return entry.data;
 }
 
@@ -302,62 +302,69 @@ function setCache(key: string, data: any, ttl: number = CACHE_TTL): void {
 }
 
 /**
- * Optimized file loading with caching
+ * Optimized file loading with caching and TopoJSON parsing
  */
 async function loadGeoJSONOptimized(filePath: string, request: NextRequest): Promise<any> {
-  const cacheKey = `geojson:${filePath}`;
+  const cacheKey = `geojson:${filePath}`; // Keep cache key same to serve parsed geojson
   const cached = getCached(cacheKey);
   if (cached) {
-    console.log('Cache hit for GeoJSON:', filePath);
+    console.log('Cache hit for parsed GeoJSON:', filePath);
     return cached;
   }
-  
-  console.log('Cache miss, loading GeoJSON:', filePath);
-  
+
+  console.log('Cache miss, loading and parsing TopoJSON:', filePath);
+
   const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
-  let geoJsonData;
-  
+  let topojsonData;
+
   if (isVercel) {
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
     const host = request.headers.get('host') || 'localhost:3000';
     const fileUrl = `${protocol}://${host}${filePath}`;
-    
+
     const response = await fetch(fileUrl, {
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'StatePulse-API/1.0'
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
-    geoJsonData = await response.json(); // Use json() instead of text() + parse
+
+    topojsonData = await response.json();
   } else {
     try {
       const fs = await import('fs/promises');
       const path = await import('path');
       const fullPath = path.join(process.cwd(), 'public', filePath);
-      
+
       const fileContent = await fs.readFile(fullPath, 'utf-8');
-      geoJsonData = JSON.parse(fileContent);
+      topojsonData = JSON.parse(fileContent);
     } catch (fileError) {
       // Fallback to HTTP
       const protocol = request.headers.get('x-forwarded-proto') || 'http';
       const host = request.headers.get('host') || 'localhost:3000';
       const fileUrl = `${protocol}://${host}${filePath}`;
-      
+
       const response = await fetch(fileUrl);
       if (!response.ok) {
         throw new Error(`File not found: ${filePath}`);
       }
-      
-      geoJsonData = await response.json();
+
+      topojsonData = await response.json();
     }
   }
-  
-  // Cache the loaded data
+
+  // MODIFICATION: Parse TopoJSON into GeoJSON
+  const objectKey = topojsonData.objects && Object.keys(topojsonData.objects)[0];
+  if (!objectKey) {
+    throw new Error('Invalid TopoJSON file: No objects found.');
+  }
+  const geoJsonData = feature(topojsonData, topojsonData.objects[objectKey]) as any;
+
+  // Cache the PARSED GeoJSON data
   setCache(cacheKey, geoJsonData);
   return geoJsonData;
 }
@@ -371,21 +378,21 @@ async function processBatch(features: any[], globalBbox: number[], useEnhanced: 
 }> {
   const gerryIndex: Record<string, number> = {};
   const detailedResults: Record<string, CompactnessResult> = {};
-  
+
   // Process in batches to avoid blocking the event loop
   for (let i = 0; i < features.length; i += batchSize) {
     const batch = features.slice(i, i + batchSize);
-    
+
     for (const feature of batch) {
       if (feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon') {
-        const districtId = feature.properties?.GEOID || 
-                          feature.properties?.ID || 
-                          feature.properties?.DISTRICT || 
-                          feature.properties?.CD ||
-                          feature.properties?.NAME ||
-                          feature.id ||
-                          `district_${i}`;
-        
+        const districtId = feature.properties?.GEOID ||
+            feature.properties?.ID ||
+            feature.properties?.DISTRICT ||
+            feature.properties?.CD ||
+            feature.properties?.NAME ||
+            feature.id ||
+            `district_${i}`;
+
         if (useEnhanced) {
           const result = calculateEnhancedCompactness(feature, globalBbox);
           gerryIndex[districtId] = result.adjustedScore;
@@ -396,13 +403,13 @@ async function processBatch(features: any[], globalBbox: number[], useEnhanced: 
         }
       }
     }
-    
+
     // Yield control back to event loop between batches
     if (i + batchSize < features.length) {
       await new Promise(resolve => setImmediate(resolve));
     }
   }
-  
+
   return { gerryIndex, detailedResults };
 }
 
@@ -411,19 +418,19 @@ async function processBatch(features: any[], globalBbox: number[], useEnhanced: 
  */
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
-  
+
   try {
     const { searchParams } = new URL(request.url);
     const districtType = searchParams.get('type');
     const useEnhanced = searchParams.get('enhanced') !== 'false';
     const skipCache = searchParams.get('skipCache') === 'true';
-    
+
     if (!districtType) {
-      return NextResponse.json({ 
-        error: 'District type parameter is required' 
+      return NextResponse.json({
+        error: 'District type parameter is required'
       }, { status: 400 });
     }
-    
+
     // Check cache first
     const cacheKey = `gerry:${districtType}:${useEnhanced}`;
     if (!skipCache) {
@@ -437,41 +444,42 @@ export async function GET(request: NextRequest) {
         });
       }
     }
-    
+
+    // MODIFIED: Point to .topojson files
     const districtFiles: Record<string, string> = {
-      'congressional-districts': '/districts/congressional-districts.geojson',
-      'state-upper-districts': '/districts/state-upper-districts.geojson',
-      'state-lower-districts': '/districts/state-lower-districts.geojson',
+      'congressional-districts': '/districts/congressional-districts.topojson',
+      'state-upper-districts': '/districts/state-upper-districts.topojson',
+      'state-lower-districts': '/districts/state-lower-districts.topojson',
     };
-    
+
     const filePath = districtFiles[districtType];
     if (!filePath) {
-      return NextResponse.json({ 
-        error: 'Invalid district type' 
+      return NextResponse.json({
+        error: 'Invalid district type'
       }, { status: 400 });
     }
-    
-    // Load GeoJSON with caching
+
+    // Load and parse TopoJSON/GeoJSON with caching
     const geoJsonData = await loadGeoJSONOptimized(filePath, request);
     const allFeatures = geoJsonData.features || [];
-    
+
     if (allFeatures.length === 0) {
-      return NextResponse.json({ 
-        error: 'No features found in district data' 
+      return NextResponse.json({
+        error: 'No features found in district data'
       }, { status: 404 });
     }
-    
+
     // Calculate global bbox once for all districts
     const globalBbox = bbox({
       type: 'FeatureCollection',
       features: allFeatures
     });
-    
+
     console.log(`Processing ${allFeatures.length} districts for ${districtType}`);
-    
+
     // Process in batches for better performance
     const { gerryIndex, detailedResults } = await processBatch(allFeatures, globalBbox, useEnhanced);
-    
+
     // Calculate statistics
     const scores = Object.values(gerryIndex);
     const statistics = {
@@ -481,7 +489,7 @@ export async function GET(request: NextRequest) {
       maxScore: scores.length > 0 ? Math.max(...scores) : 0,
       standardDeviation: scores.length > 1 ? Math.sqrt(scores.map(x => Math.pow(x - (scores.reduce((a, b) => a + b, 0) / scores.length), 2)).reduce((a, b) => a + b, 0) / scores.length) : 0
     };
-    
+
     const response: any = {
       success: true,
       districtType,
@@ -491,10 +499,10 @@ export async function GET(request: NextRequest) {
       processingTime: Date.now() - startTime,
       cached: false
     };
-    
+
     if (useEnhanced) {
       response.detailed = detailedResults;
-      
+
       const contexts = Object.values(detailedResults);
       response.geographicSummary = {
         coastalDistricts: contexts.filter(c => c.boundaryContext.hasCoastline).length,
@@ -502,16 +510,16 @@ export async function GET(request: NextRequest) {
         averageNaturalBoundary: contexts.length > 0 ? contexts.reduce((sum, c) => sum + c.boundaryContext.naturalBoundaryPercentage, 0) / contexts.length : 0
       };
     }
-    
+
     // Cache the result
     setCache(cacheKey, response);
-    
+
     console.log(`Gerrymandering analysis completed in ${Date.now() - startTime}ms`);
     return NextResponse.json(response);
-    
+
   } catch (error) {
     console.error('Gerrymandering index calculation error:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Internal server error',
       processingTime: Date.now() - startTime
     }, { status: 500 });
