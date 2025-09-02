@@ -184,7 +184,11 @@ export function ShareButton({ type, id, title, identifier, jurisdiction, classNa
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant={variant} size={size} className={className}>
+        <Button
+          variant={variant}
+          size={size}
+          className={`border-gray-400 text-gray-800 dark:border-gray-600 dark:text-gray-100 ${className || ''}`}
+        >
           <Share2 className="h-4 w-4" />
           {/*<span className="ml-2 hidden sm:inline">Share</span>*/}
         </Button>
