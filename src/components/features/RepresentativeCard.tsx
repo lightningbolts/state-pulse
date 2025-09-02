@@ -388,7 +388,7 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
             </div>
           ) : (
             <div className="flex flex-col md:flex-row md:items-start gap-4">
-              {/* ...existing code for non-link card... */}
+              {/* ...blah blah blah... */}
             </div>
           )}
         </CardContent>

@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar, FileText, MapPin, TrendingUp, Users, Maximize, Minimize } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { StateData } from '@/types/jurisdictions';
-import { MapMode } from "@/types/geo";
+import {FIPS_TO_ABBR, MapMode} from "@/types/geo";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useTheme } from 'next-themes';
@@ -56,10 +56,18 @@ const forceGarbageCollection = () => {
 };
 
 // Performance optimization: Create stable references for constant data
-const DISTRICT_GEOJSON_URLS: Record<string, string> = {
-  'congressional-districts': '/districts/congressional-districts.topojson',
-  'state-upper-districts': '/districts/state-upper-districts.topojson',
-  'state-lower-districts': '/districts/state-lower-districts.topojson',
+const getDistrictGeoJsonUrl = (mapMode: string, isMobile: boolean): string => {
+  if (mapMode === 'state-lower-districts') {
+    return isMobile
+      ? '/districts/state-lower-districts-simplified.topojson'
+      : '/districts/state-lower-districts.topojson';
+  }
+  const DISTRICT_GEOJSON_URLS: Record<string, string> = {
+    'congressional-districts': '/districts/congressional-districts.topojson',
+    'state-upper-districts': '/districts/state-upper-districts.topojson',
+    // 'state-lower-districts' handled above
+  };
+  return DISTRICT_GEOJSON_URLS[mapMode] || '';
 };
 
 const DISTRICT_COLORS: Record<string, string> = {
@@ -811,10 +819,6 @@ export const InteractiveMap = React.memo(() => {
             setDistrictPopupLatLng(lngLat);
             setDistrictReps([]); // Clear while loading
             
-            // Map FIPS code to state abbreviation if needed
-            const FIPS_TO_ABBR: Record<string, string> = {
-                '01': 'AL','02': 'AK','04': 'AZ','05': 'AR','06': 'CA','08': 'CO','09': 'CT','10': 'DE','11': 'DC','12': 'FL','13': 'GA','15': 'HI','16': 'ID','17': 'IL','18': 'IN','19': 'IA','20': 'KS','21': 'KY','22': 'LA','23': 'ME','24': 'MD','25': 'MA','26': 'MI','27': 'MN','28': 'MS','29': 'MO','30': 'MT','31': 'NE','32': 'NV','33': 'NH','34': 'NJ','35': 'NM','36': 'NY','37': 'NC','38': 'ND','39': 'OH','40': 'OK','41': 'OR','42': 'PA','44': 'RI','45': 'SC','46': 'SD','47': 'TN','48': 'TX','49': 'UT','50': 'VT','51': 'VA','53': 'WA','54': 'WV','55': 'WI','56': 'WY','72': 'PR'
-            };
             let state = feature.properties.state || feature.properties.STATE || feature.properties.STATEFP || '';
             if (!state && feature.properties.STATEFP) {
                 state = FIPS_TO_ABBR[feature.properties.STATEFP] || '';
@@ -979,7 +983,7 @@ export const InteractiveMap = React.memo(() => {
                         <div className="h-full w-full">
                             {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
                                 <DistrictMapGL
-                                    geojsonUrl={DISTRICT_GEOJSON_URLS[mapMode]}
+                                    geojsonUrl={getDistrictGeoJsonUrl(mapMode, isMobile)}
                                     color={DISTRICT_COLORS[mapMode]}
                                     onDistrictClick={onDistrictClickGL}
                                     mapStyle={
@@ -1871,7 +1875,7 @@ export const InteractiveMap = React.memo(() => {
                             <div className="h-[300px] sm:h-[400px] md:h-[500px] w-full rounded-md overflow-hidden border">
                                 {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
                                     <DistrictMapGL
-                                        geojsonUrl={DISTRICT_GEOJSON_URLS[mapMode]}
+                                        geojsonUrl={getDistrictGeoJsonUrl(mapMode, isMobile)}
                                         color={DISTRICT_COLORS[mapMode]}
                                         onDistrictClick={onDistrictClickGL}
                                         mapStyle={
@@ -1897,7 +1901,7 @@ export const InteractiveMap = React.memo(() => {
                                             lng: districtPopupLatLng.lng,
                                             lat: districtPopupLatLng.lat,
                                             iconHtml: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`,
-                                            draggable: !isMobile, // Disable dragging on mobile for better performance
+                                            draggable: !isMobile,
                                             onDragEnd: !isMobile ? (lngLat) => {
                                                 setDistrictPopupLatLng(lngLat);
                                                 if (selectedDistrict) {

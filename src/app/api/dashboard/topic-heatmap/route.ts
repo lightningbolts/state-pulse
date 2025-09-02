@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
+import {ABR_TO_FIPS, STATE_MAP} from "@/types/geo";
 
 function normalizeIds(...ids: (string | undefined | null)[]): string[] {
   const out = new Set<string>();
@@ -23,43 +24,12 @@ function getDistrictIdentifiers(rep: any): string[] {
     const m = divisionId.match(/state:([a-z]{2})/i);
     if (!m) return null;
     const abbr = m[1].toUpperCase();
-    const ABR_TO_FIPS: Record<string, string> = {
-      AL: '01', AK: '02', AZ: '04', AR: '05', CA: '06', CO: '08', CT: '09', DE: '10', DC: '11',
-      FL: '12', GA: '13', HI: '15', ID: '16', IL: '17', IN: '18', IA: '19', KS: '20', KY: '21',
-      LA: '22', ME: '23', MD: '24', MA: '25', MI: '26', MN: '27', MS: '28', MO: '29', MT: '30',
-      NE: '31', NV: '32', NH: '33', NJ: '34', NM: '35', NY: '36', NC: '37', ND: '38', OH: '39',
-      OK: '40', OR: '41', PA: '42', RI: '44', SC: '45', SD: '46', TN: '47', TX: '48', UT: '49',
-      VT: '50', VA: '51', WA: '53', WV: '54', WI: '55', WY: '56', PR: '72'
-    };
     return ABR_TO_FIPS[abbr] || null;
   };
 
   // Helper function to get state FIPS from state field (handles both abbreviations and full names)
   const getStateFipsFromState = (state?: string): string | null => {
     if (!state) return null;
-
-    const ABR_TO_FIPS: Record<string, string> = {
-      AL: '01', AK: '02', AZ: '04', AR: '05', CA: '06', CO: '08', CT: '09', DE: '10', DC: '11',
-      FL: '12', GA: '13', HI: '15', ID: '16', IL: '17', IN: '18', IA: '19', KS: '20', KY: '21',
-      LA: '22', ME: '23', MD: '24', MA: '25', MI: '26', MN: '27', MS: '28', MO: '29', MT: '30',
-      NE: '31', NV: '32', NH: '33', NJ: '34', NM: '35', NY: '36', NC: '37', ND: '38', OH: '39',
-      OK: '40', OR: '41', PA: '42', RI: '44', SC: '45', SD: '46', TN: '47', TX: '48', UT: '49',
-      VT: '50', VA: '51', WA: '53', WV: '54', WI: '55', WY: '56', PR: '72'
-    };
-
-    const NAME_TO_ABR: Record<string, string> = {
-      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
-      'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'District of Columbia': 'DC',
-      'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL',
-      'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA',
-      'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN',
-      'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-      'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-      'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR',
-      'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD',
-      'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA',
-      'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY', 'Puerto Rico': 'PR'
-    };
 
     // First try as abbreviation
     const stateUpper = state.toUpperCase();
@@ -68,7 +38,7 @@ function getDistrictIdentifiers(rep: any): string[] {
     }
 
     // Then try as full state name
-    const abbr = NAME_TO_ABR[state];
+    const abbr = STATE_MAP[state];
     if (abbr && ABR_TO_FIPS[abbr]) {
       return ABR_TO_FIPS[abbr];
     }
@@ -98,8 +68,9 @@ function getDistrictIdentifiers(rep: any): string[] {
   const stateFromField = rep.state;
 
   // @ts-ignore
+  // @ts-ignore
   const fips = getStateFipsFromDivision(divisionId) ||
-               getStateFipsFromState(stateFromTerms) ||
+               // getStateFipsFromState(stateFromTerms) ||
                getStateFipsFromState(stateFromCurrentRole) ||
                getStateFipsFromState(stateFromField);
 
@@ -158,23 +129,8 @@ function getDistrictIdentifiers(rep: any): string[] {
   } else if (stateFromField && stateFromField.length === 2) {
     repState = stateFromField.toUpperCase();
   } else {
-    // Convert full state name to abbreviation
-    const NAME_TO_ABR: Record<string, string> = {
-      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
-      'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'District of Columbia': 'DC',
-      'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL',
-      'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA',
-      'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN',
-      'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
-      'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
-      'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR',
-      'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD',
-      'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA',
-      'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY', 'Puerto Rico': 'PR'
-    };
-
     const stateName = stateFromTerms || stateFromCurrentRole || stateFromField || '';
-    repState = NAME_TO_ABR[stateName] || stateName.toUpperCase();
+    repState = STATE_MAP[stateName] || stateName.toUpperCase();
   }
 
   const isAtLargeState = isCongress && atLargeStates.includes(repState);
