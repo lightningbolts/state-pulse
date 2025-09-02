@@ -742,20 +742,24 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         )}
 
         {/* Show loading indicator overlay for partial loads */}
-        {isPartiallyLoaded && (
-            <div style={{
-              position: 'absolute',
-              bottom: '10px',
-              left: '10px',
-              right: '10px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              padding: '8px',
-              borderRadius: '4px',
-              fontSize: '11px',
-              textAlign: 'center',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              zIndex: 1000
-            }}>
+        {isPartiallyLoaded && (geoJsonData?._originalFeatureCount > 0) && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '10px',
+                right: '10px',
+                backgroundColor: 'var(--district-loading-bg, rgba(255,255,255,0.92))',
+                padding: '8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                textAlign: 'center',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                zIndex: 1000,
+                color: 'var(--district-loading-text, #222)'
+              }}
+              className={typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'district-loading-dark' : ''}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 <div style={{
                   width: '12px',
@@ -767,8 +771,19 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
                 }} />
                 <span>Loading additional districts... ({geoJsonData?._loadedFeatureCount || 0}/{geoJsonData?._originalFeatureCount || 0})</span>
               </div>
+              <style>{`
+                .district-loading-dark {
+                  --district-loading-bg: rgba(30, 32, 36, 0.92);
+                  --district-loading-text: #f3f4f6;
+                }
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
             </div>
         )}
       </Map>
   );
 });
+

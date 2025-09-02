@@ -961,20 +961,21 @@ export const InteractiveMap = React.memo(() => {
                         </div>
                     </div>
 
-                    {/* Full Screen Map Container */}
-                    {/* Full Screen Map Container - with top padding for header and left margin for navbar */}
                     <div className="absolute top-0 left-0 w-full h-full">
                         {/* Performance warnings in full screen */}
-                        {mapMode === 'state-lower-districts' && isMobile && (
+                        {(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (
                             <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 xl:left-72 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 sm:p-3 text-xs text-amber-800">
                                 <div className="flex items-center space-x-2">
                                     <svg className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                     </svg>
                                     <span className="text-xs">
-                                        Loading {(4879).toLocaleString()} districts with mobile optimizations.
+                                        Loading districts with mobile optimizations.
                                         {memoryPressure && ' Memory optimization active.'}
                                     </span>
+                                </div>
+                                <div className="mt-1 text-xs text-amber-700">
+                                    Districts will load progressively to prevent crashes.
                                 </div>
                             </div>
                         )}
@@ -1165,7 +1166,7 @@ export const InteractiveMap = React.memo(() => {
                                             {mapModeTransitioning ? 'Switching map mode...' : 'Loading map data...'}
                                         </span>
                                     </div>
-                                    {isMobile && mapMode === 'state-lower-districts' && (
+                                    {isMobile && (mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && (
                                         <div className="text-xs sm:text-sm text-muted-foreground text-center">
                                             <div>Mobile optimizations active</div>
                                             {memoryPressure && (
@@ -1843,31 +1844,19 @@ export const InteractiveMap = React.memo(() => {
                         {/* Map Container with district overlays */}
                         <div className="relative">
                             {/* Enhanced performance warning for large datasets on mobile */}
-                            {mapMode === 'state-lower-districts' && isMobile && (
+                            {(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (
                                 <div className="absolute top-2 left-2 right-2 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 text-xs text-amber-800">
                                     <div className="flex items-center space-x-1">
                                         <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                         </svg>
                                         <span>
-                                            Loading {(4879).toLocaleString()} districts with mobile optimizations.
+                                            Loading districts with mobile optimizations.
                                             {memoryPressure && ' Memory optimization active.'}
                                         </span>
                                     </div>
                                     <div className="mt-1 text-xs text-amber-700">
                                         Districts will load progressively to prevent crashes.
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* General performance warning for large datasets */}
-                            {(mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (
-                                <div className="absolute top-2 left-2 right-2 z-10 bg-blue-50 border border-blue-200 rounded-md p-2 text-xs text-blue-800 md:hidden">
-                                    <div className="flex items-center space-x-1">
-                                        <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-4 4a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                        </svg>
-                                        <span>Mobile optimizations active for better performance.</span>
                                     </div>
                                 </div>
                             )}
@@ -2048,7 +2037,7 @@ export const InteractiveMap = React.memo(() => {
                                 )}
                             </div>
 
-                            {/* Enhanced loading overlay with memory pressure indicators */}
+                            {/* Loading overlay for map container */}
                             {(loading || districtLoading || mapModeTransitioning) && (
                                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
                                     <div className="flex flex-col items-center space-y-2">
@@ -2068,7 +2057,7 @@ export const InteractiveMap = React.memo(() => {
                                                 )}
                                             </span>
                                         </div>
-                                        {isMobile && mapMode === 'state-lower-districts' && (
+                                        {(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (
                                             <div className="text-xs text-muted-foreground text-center">
                                                 <div>Mobile optimizations active</div>
                                                 {memoryPressure && (
