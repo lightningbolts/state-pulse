@@ -35,6 +35,8 @@ interface PolicyUpdateCardProps {
   updates: PolicyUpdate[];
   classification: string;
   subject: string;
+  selectedClassifications?: string[];
+  selectedSubjects?: string[];
   setClassification: (c: string) => void;
   setSubject: (s: string) => void;
   setUpdates: (u: PolicyUpdate[]) => void;
@@ -42,10 +44,12 @@ interface PolicyUpdateCardProps {
   skipRef: React.MutableRefObject<number>;
   setHasMore: (b: boolean) => void;
   setLoading: (b: boolean) => void;
+  onToggleClassification?: (classification: string) => void;
+  onToggleSubject?: (subject: string) => void;
 }
 
 const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
-  update, idx, updates, classification, subject, setClassification, setSubject, setUpdates, setSkip, skipRef, setHasMore, setLoading
+  update, idx, updates, classification, subject, selectedClassifications = [], selectedSubjects = [], setClassification, setSubject, setUpdates, setSkip, skipRef, setHasMore, setLoading, onToggleClassification, onToggleSubject
 }) => {
   const getFormattedDate = (dateString: string | null | undefined) => {
     if (!dateString) return '';
@@ -139,53 +143,75 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
               </div>
               {update.classification && update.classification.length > 0 && (
                 <div className="mb-1">
-                  {update.classification.map((c, i) => (
-                    <Badge
-                      key={c + i}
-                      variant={classification === c.toLowerCase() ? "default" : "secondary"}
-                      onClick={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (classification !== c.toLowerCase()) {
-                          setClassification(c.toLowerCase());
-                          setUpdates([]);
-                          setSkip(0);
-                          skipRef.current = 0;
-                          setHasMore(true);
-                          setLoading(true);
-                        }
-                      }}
-                      className="mr-1 cursor-pointer"
-                    >
-                      {capitalize(c)}
-                    </Badge>
-                  ))}
+                  {update.classification.map((c, i) => {
+                    const isSelected = selectedClassifications.includes(c.toLowerCase());
+                    return (
+                      <Badge
+                        key={c + i}
+                        variant={isSelected ? "default" : "secondary"}
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (onToggleClassification) {
+                            onToggleClassification(c.toLowerCase());
+                          } else if (classification !== c.toLowerCase()) {
+                            setClassification(c.toLowerCase());
+                            setUpdates([]);
+                            setSkip(0);
+                            skipRef.current = 0;
+                            setHasMore(true);
+                            setLoading(true);
+                          }
+                        }}
+                        className={`mr-1 cursor-pointer`}
+                        style={isSelected ? { 
+                          backgroundColor: '#73A3A1', 
+                          color: 'white',
+                          borderColor: '#73A3A1'
+                        } : {}}
+                      >
+                        {capitalize(c)}
+                      </Badge>
+                    );
+                  })}
                 </div>
               )}
               {update.topicClassification?.broadTopics && update.topicClassification.broadTopics.length > 0 && (
                 <div className="mb-1">
-                  {update.topicClassification.broadTopics.map((topic, i) => (
-                    <Badge
-                      key={topic + i}
-                      variant={subject === topic ? "default" : "outline"}
-                      onClick={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const newSubject = subject === topic ? "" : topic;
-                        if (subject !== newSubject) {
-                          setSubject(newSubject);
-                          setUpdates([]);
-                          setSkip(0);
-                          skipRef.current = 0;
-                          setHasMore(true);
-                          setLoading(true);
-                        }
-                      }}
-                      className="mr-1 cursor-pointer"
-                    >
-                      #{topic}
-                    </Badge>
-                  ))}
+                  {update.topicClassification.broadTopics.map((topic, i) => {
+                    const isSelected = selectedSubjects.includes(topic.toLowerCase());
+                    return (
+                      <Badge
+                        key={topic + i}
+                        variant={isSelected ? "default" : "outline"}
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (onToggleSubject) {
+                            onToggleSubject(topic.toLowerCase());
+                          } else {
+                            const newSubject = subject === topic ? "" : topic;
+                            if (subject !== newSubject) {
+                              setSubject(newSubject);
+                              setUpdates([]);
+                              setSkip(0);
+                              skipRef.current = 0;
+                              setHasMore(true);
+                              setLoading(true);
+                            }
+                          }
+                        }}
+                        className={`mr-1 cursor-pointer`}
+                        style={isSelected ? { 
+                          backgroundColor: '#73A3A1', 
+                          color: 'white',
+                          borderColor: '#73A3A1'
+                        } : {}}
+                      >
+                        #{topic}
+                      </Badge>
+                    );
+                  })}
                 </div>
               )}
               {formattedIntroDate && (

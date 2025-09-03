@@ -91,8 +91,14 @@ export async function GET(request: Request) {
       const jurisdictionNameParam = searchParams.get('jurisdictionName');
       otherFilters.jurisdictionName = jurisdictionNameParam;
     }
-    if (searchParams.get('subject')) {
-      otherFilters.subjects = searchParams.get('subject');
+    const subjectParams = searchParams.getAll('subject');
+    if (subjectParams.length > 0) {
+      otherFilters.subjects = { $in: subjectParams };
+    }
+
+    const classificationParams = searchParams.getAll('classification');
+    if (classificationParams.length > 0) {
+      otherFilters.classification = { $in: classificationParams };
     }
     if (searchParams.get('chamber')) {
       otherFilters.chamber = searchParams.get('chamber');

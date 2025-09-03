@@ -67,10 +67,10 @@ async function fetchUpdatesFeed({
     skip = 0,
     limit = cardNumber,
     search = "",
-    subject = "",
+    selectedSubjects = [],
+    selectedClassifications = [],
     sortField = "createdAt",
     sortDir = "desc",
-    classification = "",
     jurisdictionName = "",
     showCongress = false,
     sponsor = "",
@@ -80,10 +80,10 @@ async function fetchUpdatesFeed({
     skip?: number;
     limit?: number;
     search?: string;
-    subject?: string;
+    selectedSubjects?: string[];
+    selectedClassifications?: string[];
     sortField?: string;
     sortDir?: string;
-    classification?: string;
     jurisdictionName?: string;
     showCongress?: boolean;
     sponsor?: string;
@@ -92,7 +92,16 @@ async function fetchUpdatesFeed({
 }) {
     const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
     if (search) params.append("search", search);
-    if (subject) params.append("subject", subject);
+    
+    // Append multiple subjects
+    selectedSubjects.forEach(subject => {
+        if (subject) params.append("subject", subject);
+    });
+    
+    // Append multiple classifications
+    selectedClassifications.forEach(classification => {
+        if (classification) params.append("classification", classification);
+    });
 
     // Handle Congress vs State filtering - they are mutually exclusive
     if (showCongress) {
@@ -106,11 +115,8 @@ async function fetchUpdatesFeed({
     const apiSortField = sortField === "lastAction" ? "lastActionAt" : sortField;
     if (apiSortField) params.append("sortBy", apiSortField);
     if (sortDir) params.append("sortDir", sortDir);
-    if (classification) params.append("classification", classification);
     if (sponsor) params.append("sponsor", sponsor);
     if (sponsorId) params.append("sponsorId", sponsorId);
-
-    // Always use the main endpoint and pass showOnlyEnacted as a param
     if (showOnlyEnacted) {
         params.append('showOnlyEnacted', 'true');
     }
@@ -140,8 +146,8 @@ export function PolicyUpdatesFeed() {
     const [hasMore, setHasMore] = useState(true);
     const [skip, setSkip] = useState(0);
     const [search, setSearch] = useState("");
-    const [subject, setSubject] = useState("");
-    const [classification, setClassification] = useState("");
+    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+    const [selectedClassifications, setSelectedClassifications] = useState<string[]>([]);
     const [jurisdictionName, setJurisdictionName] = useState("");
     const [showCongress, setShowCongress] = useState(false);
     const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'createdAt', dir: 'desc' });
@@ -161,8 +167,8 @@ export function PolicyUpdatesFeed() {
     const hasRestored = useRef(false);
     const prevDeps = useRef<{
         search: string,
-        subject: string,
-        classification: string,
+        selectedSubjects: string[],
+        selectedClassifications: string[],
         sort: any,
         jurisdictionName: string
     } | null>(null);
@@ -267,10 +273,10 @@ export function PolicyUpdatesFeed() {
                 skip: currentSkip,
                 limit: 20,
                 search,
-                subject,
+                selectedSubjects,
+                selectedClassifications,
                 sortField: sort.field,
                 sortDir: sort.dir,
-                classification,
                 jurisdictionName,
                 showCongress,
                 sponsorId: sponsorId, // Only send sponsorId, not sponsor name
@@ -296,7 +302,7 @@ export function PolicyUpdatesFeed() {
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
+    }, [hasMore, search, selectedSubjects, selectedClassifications, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
@@ -320,10 +326,10 @@ export function PolicyUpdatesFeed() {
                 skip: 0,
                 limit: 20,
                 search,
-                subject,
+                selectedSubjects,
+                selectedClassifications,
                 sortField: sort.field,
                 sortDir: sort.dir,
-                classification,
                 jurisdictionName,
                 showCongress,
                 sponsorId,
@@ -341,7 +347,7 @@ export function PolicyUpdatesFeed() {
         } finally {
             setLoading(false);
         }
-    }, [search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
+    }, [search, selectedSubjects, selectedClassifications, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
 
     // --- Seamless state/scroll restore ---
     // Use a ref to block the initial fetch until state/scroll is restored
@@ -370,8 +376,8 @@ export function PolicyUpdatesFeed() {
             try {
                 const state = JSON.parse(saved);
                 setSearch(state.search || "");
-                setSubject(state.subject || "");
-                setClassification(state.classification || "");
+                setSelectedSubjects(state.selectedSubjects || []);
+                setSelectedClassifications(state.selectedClassifications || []);
                 setJurisdictionName(state.jurisdictionName || "");
                 setShowCongress(state.showCongress || false);
                 setShowOnlyEnacted(state.showOnlyEnacted || false);
@@ -409,7 +415,7 @@ export function PolicyUpdatesFeed() {
 
         didRestore.current = true;
         hasRestored.current = true;
-        prevDeps.current = { search, subject, classification, sort, jurisdictionName };
+        prevDeps.current = { search, selectedSubjects, selectedClassifications, sort, jurisdictionName };
     }, [searchParams]);
 
     // Block the initial fetch until after restore, and only fetch if updates are empty
@@ -425,10 +431,10 @@ export function PolicyUpdatesFeed() {
                     skip: 0,
                     limit: 20,
                     search,
-                    subject,
+                    selectedSubjects,
+                    selectedClassifications,
                     sortField: sort.field,
                     sortDir: sort.dir,
-                    classification,
                     jurisdictionName,
                     showCongress,
                     sponsorId: sponsorId, // Only send sponsorId, not sponsor name
@@ -457,7 +463,7 @@ export function PolicyUpdatesFeed() {
         return () => {
             isMounted = false;
         };
-    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, didRestore.current]);
+    }, [search, selectedSubjects, selectedClassifications, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, didRestore.current]);
 
 
     // Intersection Observer for infinite scroll
@@ -511,8 +517,8 @@ export function PolicyUpdatesFeed() {
         try {
             sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
                 search,
-                subject,
-                classification,
+                selectedSubjects,
+                selectedClassifications,
                 sort,
                 skip,
                 searchInput,
@@ -528,13 +534,13 @@ export function PolicyUpdatesFeed() {
             try {
                 sessionStorage.removeItem('policyUpdatesFeedState');
                 sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-                    search, subject, classification, sort, showCongress, showOnlyEnacted
+                    search, selectedSubjects, selectedClassifications, sort, showCongress, showOnlyEnacted
                 }));
             } catch (retryError) {
                 console.error('Failed to save even minimal state:', retryError);
             }
         }
-    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, showOnlyEnacted, updates]);
+    }, [search, selectedSubjects, selectedClassifications, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, showOnlyEnacted, updates]);
 
     // Save scroll position
     useEffect(() => {
@@ -598,15 +604,13 @@ export function PolicyUpdatesFeed() {
     // Remove custom tag
     const removeCustomTag = (tagToRemove: string) => {
         setCustomTags(prev => prev.filter(tag => tag !== tagToRemove));
-        // If the removed tag was active, clear the subject filter
-        if (subject === tagToRemove) {
-            setSubject("");
-            setUpdates([]);
-            setSkip(0);
-            skipRef.current = 0;
-            setHasMore(true);
-            setLoading(true);
-        }
+        // If the removed tag was active, remove it from selected subjects
+        setSelectedSubjects(prev => prev.filter(tag => tag !== tagToRemove));
+        setUpdates([]);
+        setSkip(0);
+        skipRef.current = 0;
+        setHasMore(true);
+        setLoading(true);
     };
 
     return (
@@ -665,8 +669,8 @@ export function PolicyUpdatesFeed() {
                                 setHasMore(true);
                                 setLoading(true);
                                 setSearch("");
-                                setSubject("");
-                                setClassification("");
+                                setSelectedSubjects([]);
+                                setSelectedClassifications([]);
                                 setSort({ field: 'createdAt', dir: 'desc' });
                                 setShowOnlyBookmarked(false);
                                 // Remove all filter params from URL
@@ -686,7 +690,7 @@ export function PolicyUpdatesFeed() {
                             }}
                         >
                             <X className="h-4 w-4 mr-1" />
-                            Clear Filter
+                            Clear All Filters
                         </Button>
                     </div>
                 </div>
@@ -823,22 +827,71 @@ export function PolicyUpdatesFeed() {
             </div>
             {/*</AnimatedSection>*/}
 
+            {/* Active Filters Summary */}
+            {(selectedSubjects.length > 0 || selectedClassifications.length > 0) && (
+                <div className="mb-4 p-3 bg-secondary/10 border border-secondary/20 rounded-lg">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {selectedSubjects.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                    <span className="text-sm text-muted-foreground">Topics:</span>
+                                    {selectedSubjects.map((subject) => (
+                                        <Badge key={subject} variant="default" className="bg-blue-600">
+                                            #{subject}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            )}
+                            {selectedClassifications.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                    <span className="text-sm text-muted-foreground">Types:</span>
+                                    {selectedClassifications.map((classification) => (
+                                        <Badge key={classification} variant="default" className="bg-purple-600">
+                                            {CLASSIFICATIONS.find(c => c.value === classification)?.label || classification}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setSelectedSubjects([]);
+                                setSelectedClassifications([]);
+                                setUpdates([]);
+                                setSkip(0);
+                                skipRef.current = 0;
+                                setHasMore(true);
+                                setLoading(true);
+                            }}
+                        >
+                            <X className="h-4 w-4 mr-1" />
+                            Clear Filters
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* Classification badges */}
             {/*<AnimatedSection>*/}
             <div className="mb-4 flex flex-wrap gap-2">
                 {CLASSIFICATIONS.map(opt => (
                     <Badge
                         key={opt.value}
-                        variant={classification === opt.value ? "default" : "secondary"}
+                        variant={selectedClassifications.includes(opt.value) ? "default" : "secondary"}
                         onClick={() => {
-                            if (classification !== opt.value) {
-                                setClassification(opt.value);
+                            setSelectedClassifications(prev => {
+                                const newSelected = prev.includes(opt.value)
+                                    ? prev.filter(v => v !== opt.value)
+                                    : [...prev, opt.value];
                                 setUpdates([]);
                                 setSkip(0);
                                 skipRef.current = 0;
                                 setHasMore(true);
                                 setLoading(true);
-                            }
+                                return newSelected;
+                            });
                         }}
                         className="cursor-pointer"
                     >
@@ -856,17 +909,19 @@ export function PolicyUpdatesFeed() {
                     {Object.keys(BROAD_TOPIC_KEYWORDS).map((cat) => (
                         <Badge
                             key={cat}
-                            variant={subject === cat ? "default" : "secondary"}
+                            variant={selectedSubjects.includes(cat) ? "default" : "secondary"}
                             onClick={() => {
-                                const newSubject = subject === cat ? "" : cat;
-                                if (subject !== newSubject) {
-                                    setSubject(newSubject);
+                                setSelectedSubjects(prev => {
+                                    const newSelected = prev.includes(cat)
+                                        ? prev.filter(s => s !== cat)
+                                        : [...prev, cat];
                                     setUpdates([]);
                                     setSkip(0);
                                     skipRef.current = 0;
                                     setHasMore(true);
                                     setLoading(true);
-                                }
+                                    return newSelected;
+                                });
                             }}
                             className="cursor-pointer"
                         >
@@ -934,17 +989,19 @@ export function PolicyUpdatesFeed() {
                         {customTags.map((tag) => (
                             <Badge
                                 key={tag}
-                                variant={subject === tag ? "default" : "outline"}
+                                variant={selectedSubjects.includes(tag) ? "default" : "outline"}
                                 onClick={() => {
-                                    const newSubject = subject === tag ? "" : tag;
-                                    if (subject !== newSubject) {
-                                        setSubject(newSubject);
+                                    setSelectedSubjects(prev => {
+                                        const newSelected = prev.includes(tag)
+                                            ? prev.filter(s => s !== tag)
+                                            : [...prev, tag];
                                         setUpdates([]);
                                         setSkip(0);
                                         skipRef.current = 0;
                                         setHasMore(true);
                                         setLoading(true);
-                                    }
+                                        return newSelected;
+                                    });
                                 }}
                                 className="cursor-pointer flex items-center gap-1"
                             >
@@ -999,15 +1056,45 @@ export function PolicyUpdatesFeed() {
                         update={update}
                         idx={idx}
                         updates={updates}
-                        classification={classification}
-                        subject={subject}
-                        setClassification={setClassification}
-                        setSubject={setSubject}
+                        classification=""
+                        subject=""
+                        selectedClassifications={selectedClassifications}
+                        selectedSubjects={selectedSubjects}
+                        setClassification={() => {}}
+                        setSubject={() => {}}
                         setUpdates={setUpdates}
                         setSkip={setSkip}
                         skipRef={skipRef}
                         setHasMore={setHasMore}
                         setLoading={setLoading}
+                        onToggleClassification={(classification) => {
+                            setSelectedClassifications(prev => {
+                                const isSelected = prev.includes(classification);
+                                const newSelection = isSelected 
+                                    ? prev.filter(c => c !== classification)
+                                    : [...prev, classification];
+                                return newSelection;
+                            });
+                            setUpdates([]);
+                            setSkip(0);
+                            skipRef.current = 0;
+                            setHasMore(true);
+                            setLoading(true);
+                        }}
+                        onToggleSubject={(subject) => {
+                            setSelectedSubjects(prev => {
+                                const isSelected = prev.includes(subject);
+                                const newSelection = isSelected 
+                                    ? prev.filter(s => s !== subject)
+                                    : [...prev, subject];
+                                return newSelection;
+                            });
+                            setUpdates([]);
+                            setSkip(0);
+                            skipRef.current = 0;
+                            setHasMore(true);
+                            setLoading(true);
+                        }}
                     />
                 ))}
             </div>
