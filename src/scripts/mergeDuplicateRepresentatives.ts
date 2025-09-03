@@ -23,7 +23,7 @@ function mergeObjects(a: any, b: any) {
       merged[key] = mergeObjects(aVal, bVal);
     } else if (typeof bVal === 'string' && bVal.length > (aVal?.length || 0)) {
       merged[key] = bVal;
-    } else if (typeof bVal === 'number' && (aVal == null || isNaN(aVal))) {
+    } else if (typeof bVal === 'number' && isNaN(aVal)) {
       merged[key] = bVal;
     } else if (bVal instanceof Date && (!aVal || (aVal instanceof Date && bVal > aVal))) {
       merged[key] = bVal;

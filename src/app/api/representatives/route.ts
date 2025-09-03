@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
-import { OpenStatesPerson, Representative, CongressPerson } from "@/types/representative";
+import { OpenStatesPerson, Representative } from "@/types/representative";
 import Fuse from 'fuse.js';
 import { STATE_MAP } from '@/types/geo';
 
@@ -555,8 +555,8 @@ export async function GET(request: NextRequest) {
           const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction'];
           const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
           filteredReps = filteredReps.sort((a, b) => {
-            let aVal = '';
-            let bVal = '';
+            let aVal: string;
+            let bVal: string;
             switch (sortField) {
               case 'name':
                 aVal = a.name || '';
@@ -916,8 +916,8 @@ export async function GET(request: NextRequest) {
     const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
     // Type-safe sort mapping
     filteredReps = filteredReps.sort((a, b) => {
-      let aVal = '';
-      let bVal = '';
+      let aVal: string;
+      let bVal: string;
       switch (sortField) {
         case 'name':
           aVal = a.name || '';

@@ -1,6 +1,5 @@
-import { getDb } from '../lib/mongodb';
-import { Legislation } from '../types/legislation';
-import {BROAD_TOPIC_KEYWORDS, NARROW_TOPIC_KEYWORDS, ClassificationResult} from "../types/legislation";
+import { getDb } from '@/lib/mongodb';
+import {BROAD_TOPIC_KEYWORDS, NARROW_TOPIC_KEYWORDS, ClassificationResult} from "@/types/legislation";
 
 // Pre-compile regex patterns for better performance
 const COMPILED_BROAD_PATTERNS: Record<string, RegExp[]> = {};

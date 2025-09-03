@@ -1,5 +1,5 @@
 "use client"
-import { Gavel, LayoutDashboard, Newspaper, Eye, Users, MessageSquare, BrainCircuit, Wrench } from "lucide-react";
+import { Gavel, LayoutDashboard, Newspaper, Eye, Users, MessageSquare, Wrench } from "lucide-react";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';

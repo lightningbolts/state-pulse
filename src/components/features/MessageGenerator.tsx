@@ -193,7 +193,7 @@ Sincerely,
             });
 
             if (!response.ok) {
-                throw new Error('Failed to generate message with AI');
+                console.error('Failed to generate message with AI');
             }
 
             const data = await response.json();
@@ -233,7 +233,7 @@ Sincerely,
             }
 
             // Add reason based on position
-            let reason = '';
+            let reason: string;
             if (position === 'support') {
                 reason = 'it will benefit our community and align with my values';
             } else if (position === 'oppose') {

@@ -3,13 +3,11 @@ import {Button} from "@/components/ui/button";
 export const dynamic = 'force-dynamic';
 import React from "react";
 import { notFound } from "next/navigation";
-import type { Representative } from '@/types/representative';
 import type { Bill } from '@/types/legislation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
-import PolicyUpdateCard from '@/components/features/PolicyUpdateCard';
 import { Badge } from '@/components/ui/badge';
-import {ExternalLink, Info, FileText, Tag, MapPin} from 'lucide-react';
+import {ExternalLink, Info, FileText, Tag} from 'lucide-react';
 import Link from 'next/link';
 import { getRepresentativeById, getBillsSponsoredByRep } from '@/services/representativesService';
 import { PartyBadge } from './PartyBadge';
@@ -93,11 +91,11 @@ const fetchRepresentativeData = async (id: string) => {
       }
     } catch (normError) {
       console.error('[SSR] Normalization error:', normError, rep);
-      throw new Error('Failed to normalize representative data');
+      console.error('Failed to normalize representative data');
     }
 
     // Fetch bills sponsored by this representative (always use canonical rep.id)
-    let bills: Bill[] = [];
+    let bills: Bill[];
     try {
       bills = await getBillsSponsoredByRep(rep.id);
     } catch (billsError) {
@@ -207,7 +205,7 @@ export default async function RepresentativeDetailPage({
   const { id } = await params;
 
   // Guard: check if id is a non-empty string
-  const isLikelyRepId = typeof id === 'string' && id.length > 0;
+  const isLikelyRepId = id.length > 0;
   if (!isLikelyRepId) {
     return (
       <div className="py-8 text-center text-red-600">
@@ -239,11 +237,8 @@ export default async function RepresentativeDetailPage({
     office.includes('u.s. representative') ||
     office.includes('us representative')
   ) {
-    filterJurisdiction = 'United States Congress';
   } else if (typeof rep.jurisdiction === 'string') {
-    filterJurisdiction = rep.jurisdiction;
-  } else if (rep.jurisdiction && typeof rep.jurisdiction.name === 'string') {
-    filterJurisdiction = rep.jurisdiction.name;
+  } else if (rep.jurisdiction) {
   }
 
   return (

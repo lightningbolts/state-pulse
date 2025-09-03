@@ -1,11 +1,9 @@
 import { upsertLegislation } from '@/services/legislationService';
 import { config } from 'dotenv';
-import { ai } from '../ai/genkit';
+import { ai } from '@/ai/genkit';
 import fetch from 'node-fetch';
-import pdf from 'pdf-parse';
-import * as cheerio from 'cheerio';
-import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '../services/aiSummaryUtil';
-import { getCollection } from '../lib/mongodb';
+import { generateGeminiSummary, fetchPdfTextFromOpenStatesUrl, extractBestTextForSummary } from '@/services/aiSummaryUtil';
+import { getCollection } from '@/lib/mongodb';
 
 config();
 

@@ -1,9 +1,9 @@
 import { config } from 'dotenv';
 import fs from 'fs/promises';
 import path from 'path';
-import { getCollection, connectToDatabase } from '../lib/mongodb';
-import { Legislation } from '../types/legislation';
-import { generateOllamaSummary } from '../services/aiSummaryUtil';
+import { getCollection, connectToDatabase } from '@/lib/mongodb';
+import { Legislation } from '@/types/legislation';
+import { generateOllamaSummary } from '@/services/aiSummaryUtil';
 import fetch from 'node-fetch';
 
 config({ path: path.resolve(__dirname, '../../.env') });

@@ -1,4 +1,3 @@
-import { AISummarizationTool } from "@/components/features/AISummarizationTool";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { pageMetadata } from '@/lib/metadata';
 

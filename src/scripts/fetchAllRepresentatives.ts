@@ -1,6 +1,6 @@
 declare global {
   // eslint-disable-next-line no-var
-  var openStatesRate: {
+  let openStatesRate: {
     count: number;
     dayCount: number;
     lastMinute: number;
@@ -8,7 +8,7 @@ declare global {
   } | undefined;
 }
 import { MongoClient } from 'mongodb';
-import { Representative, CongressPerson } from '../types/representative';
+import { Representative, CongressPerson } from '@/types/representative';
 import * as dotenv from 'dotenv';
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 import fetch from 'node-fetch';
@@ -106,11 +106,7 @@ const MONGODB_URI = process.env.MONGODB_URI || '';
 const DB_NAME = process.env.MONGODB_DB_NAME || 'statepulse';
 const COLLECTION_NAME = 'representatives';
 const OPENSTATES_API_KEY = process.env.OPENSTATES_API_KEY || '';
-
-
-const STATES = validStates
-
-const JURISDICTIONS = [...STATES];
+const JURISDICTIONS = [...validStates];
 
 async function fetchRepresentativesForState(state: string): Promise<Representative[]> {
   if (!globalThis.openStatesRate) {

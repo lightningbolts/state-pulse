@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { connectToDatabase } from '../lib/mongodb';
+import { connectToDatabase } from '@/lib/mongodb';
 
 // Load environment variables
 config({ path: '../../.env' });

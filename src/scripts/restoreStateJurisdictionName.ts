@@ -1,4 +1,4 @@
-import { getCollection } from '../lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 
 const states = [
   { abbr: "AL", name: "Alabama", source: "alison.legislature.state.al.us/bill-search" },

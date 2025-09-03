@@ -15,6 +15,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { BillSearch } from "./BillSearch";
+import { UserAvatar } from "./UserAvatar";
 
 
 
@@ -64,7 +65,6 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
         setEditSelectedBills(post.linkedBills || []);
     }, [post._id]);
 
-    // Helper: refresh post data from API (for comments/likes)
     const refreshPost = async () => {
         try {
             const response = await fetch(`/api/posts/${postState._id}`);
@@ -330,20 +330,7 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
             <CardHeader className="pb-3 sm:pb-4">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                        {postState.userImage && (
-                            <img
-                                src={postState.userImage}
-                                alt={postState.username}
-                                className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex-shrink-0 cursor-default select-none pointer-events-none"
-                                draggable={false}
-                                onContextMenu={e => e.preventDefault()}
-                                onMouseDown={e => e.preventDefault()}
-                                onDragStart={e => e.preventDefault()}
-                                onCopy={e => e.preventDefault()}
-                                onPaste={e => e.preventDefault()}
-                                onCut={e => e.preventDefault()}
-                            />
-                        )}
+                        <UserAvatar src={postState.userImage} alt={postState.username} size="post" />
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span
@@ -555,21 +542,7 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                         <div className="space-y-2 sm:space-y-3">
                             {(postState.comments || []).map((comment: Comment) => (
                                 <div key={comment._id} className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
-                                    {comment.userImage && (
-                                        <img
-                                            src={comment.userImage}
-                                            alt={comment.username}
-                                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 mt-0.5 cursor-default select-none pointer-events-none"
-                                            draggable={false}
-                                            // ...removed userDrag property...
-                                            onContextMenu={e => e.preventDefault()}
-                                            onMouseDown={e => e.preventDefault()}
-                                            onDragStart={e => e.preventDefault()}
-                                            onCopy={e => e.preventDefault()}
-                                            onPaste={e => e.preventDefault()}
-                                            onCut={e => e.preventDefault()}
-                                        />
-                                    )}
+                                    <UserAvatar src={comment.userImage} alt={comment.username} size="comment" />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -649,21 +622,7 @@ export function PostCard({ post, onPostDeleted, onPostUpdated }: PostCardProps) 
                                             <div className="mt-3 ml-4 space-y-2 border-l-2 border-muted pl-4">
                                                 {comment.replies.map((reply: Reply) => (
                                                     <div key={reply._id} className="flex gap-2 sm:gap-3 p-2 sm:p-3 bg-background rounded-lg border">
-                                                        {reply.userImage && (
-                                                            <img
-                                                                src={reply.userImage}
-                                                                alt={reply.username}
-                                                                className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 mt-0.5 cursor-default select-none pointer-events-none"
-                                                                draggable={false}
-                                                                // ...removed userDrag property...
-                                                                onContextMenu={e => e.preventDefault()}
-                                                                onMouseDown={e => e.preventDefault()}
-                                                                onDragStart={e => e.preventDefault()}
-                                                                onCopy={e => e.preventDefault()}
-                                                                onPaste={e => e.preventDefault()}
-                                                                onCut={e => e.preventDefault()}
-                                                            />
-                                                        )}
+                                                        <UserAvatar src={reply.userImage} alt={reply.username} size="reply" />
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-start justify-between gap-2">
                                                             <div className="flex items-center gap-2 mb-1 flex-wrap">

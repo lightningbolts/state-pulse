@@ -32,7 +32,7 @@ export function BookmarksList() {
             // Fetch the user's bookmarks from the new API
             const bookmarksResponse = await fetch('/api/bookmarks');
             if (!bookmarksResponse.ok) {
-                throw new Error('Failed to fetch bookmarks');
+                console.error('Failed to fetch bookmarks');
             }
 
             const bookmarksData = await bookmarksResponse.json();

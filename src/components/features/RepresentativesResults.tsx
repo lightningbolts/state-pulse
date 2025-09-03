@@ -3,7 +3,6 @@
 import {AlertCircle, Database, MapPin} from "lucide-react";
 import {RepresentativesResultsProps} from "@/types/representative";
 
-import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import RepresentativeCard from "@/components/features/RepresentativeCard";
 
 export function RepresentativesResults({

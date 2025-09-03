@@ -1,9 +1,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
-import { OpenStatesPerson, Representative } from "@/types/representative";
 import {FIPS_TO_ABBR, STATE_MAP} from '@/types/geo';
 import { validStates } from '@/types/geo';
+import { getStateAbbrFromString } from "@/lib/locationUtils";
 
 
 let stateAbbr: string | null = null;
@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
       let senatorState = null;
       if (stateName && STATE_MAP[stateName]) {
         senatorState = STATE_MAP[stateName];
-      } else if (state && typeof state === 'string' && state.length === 2) {
+      } else if (state && true && state.length === 2) {
         senatorState = state.toUpperCase();
       } else if (stateAbbr) {
         senatorState = stateAbbr;
@@ -213,19 +213,7 @@ export async function GET(request: NextRequest) {
 
     let stateCode = state;
     if (!stateCode && address) {
-      for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
-        if (address.toLowerCase().includes(fullName.toLowerCase())) {
-          stateCode = abbrev;
-          break;
-        }
-      }
-
-      if (!stateCode) {
-        const stateMatch = address.match(/,\s*([A-Z]{2})(?:\s|$)|(?:^|\s)([A-Z]{2})(?:\s*$)/);
-        if (stateMatch) {
-          stateCode = stateMatch[1] || stateMatch[2];
-        }
-      }
+      stateCode = getStateAbbrFromString(address);
     }
 
     if (!stateCode) {

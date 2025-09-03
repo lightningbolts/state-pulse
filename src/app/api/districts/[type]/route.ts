@@ -38,13 +38,13 @@ export async function GET(
     // Simplify each geometry (tolerance can be tuned for your needs)
     const simplifiedFeatures = features.map(f => {
       let simplifiedGeom = f.geometry;
-      const feature: Feature<Geometry, GeoJsonProperties> = {
+      const feature: Feature = {
         type: 'Feature',
         geometry: f.geometry,
         properties: f.properties || {},
       };
       try {
-        const simplified = simplify(feature, { tolerance: 0.01, highQuality: false, mutate: false }) as Feature<Geometry, GeoJsonProperties>;
+        const simplified = simplify(feature, { tolerance: 0.01, highQuality: false, mutate: false }) as Feature;
         simplifiedGeom = simplified.geometry;
       } catch (e) {
         // Fallback to original geometry if simplification fails

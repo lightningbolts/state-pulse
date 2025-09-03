@@ -7,73 +7,49 @@ dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.MONGODB_DB_NAME || 'statepulse-data';
 
-
 function findEnactedDate(doc: any): Date | null {
-  // First, if the bill is already marked as enacted (isEnacted: true),
-  // try to find a reasonable enactment date
-  if (doc.isEnacted === true) {
-    // Try to use latestActionAt if it exists and seems reasonable
-    // if (doc.latestActionAt) {
-    //   return new Date(doc.latestActionAt);
-    // }
+  const toDate = (dateStr: string | Date | undefined): Date | null => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
 
-    // Try to find the most recent date from history
-    if (doc.history && Array.isArray(doc.history)) {
-      const sortedHistory = [...doc.history].sort((a, b) => {
-        const dateA = a.date ? new Date(a.date).getTime() : 0;
-        const dateB = b.date ? new Date(b.date).getTime() : 0;
-        return dateB - dateA;
-      });
-
-      if (sortedHistory[0] && sortedHistory[0].date) {
-        return new Date(sortedHistory[0].date);
-      }
-    }
-
-    // If no other date is available but it's marked as enacted,
-    // use a reasonable fallback
-    if (doc.latestPassageAt) {
-      return new Date(doc.latestPassageAt);
-    }
-
-    // Last resort: use updatedAt or createdAt
-    if (doc.updatedAt) {
-      return new Date(doc.updatedAt);
-    }
-    if (doc.createdAt) {
-      return new Date(doc.createdAt);
-    }
-  }
-
-  // Check latest action description for enacted patterns
-  if (doc.latestActionDescription) {
+  const checkPatterns = (text: string | undefined): boolean => {
+    if (!text) return false;
     for (const pattern of enactedPatterns) {
-      if (pattern.test(doc.latestActionDescription)) {
-        // If latest action indicates enactment, use latestActionAt date
-        return doc.latestActionAt ? new Date(doc.latestActionAt) : null;
+      if (pattern.test(text)) {
+        return true;
       }
     }
+    return false;
+  };
+
+  const sortedHistory = (doc.history && Array.isArray(doc.history))
+    ? [...doc.history].sort((a, b) => {
+      const dateA = toDate(a.date)?.getTime() ?? 0;
+      const dateB = toDate(b.date)?.getTime() ?? 0;
+      return dateB - dateA;
+    })
+    : [];
+
+  // 1. If isEnacted is explicitly true, find the best possible date.
+  if (doc.isEnacted === true) {
+    // Priority: latest history date, then latest passage, then update/create timestamps.
+    return toDate(sortedHistory[0]?.date) ||
+           toDate(doc.latestPassageAt) ||
+           toDate(doc.updatedAt) ||
+           toDate(doc.createdAt);
   }
 
-  // Check history for enacted actions (search in reverse chronological order)
-  if (doc.history && Array.isArray(doc.history)) {
-    // Sort by date in descending order to find the most recent enacted action
-    const sortedHistory = [...doc.history].sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA;
-    });
+  // 2. Check latest action description for an enacted pattern.
+  if (checkPatterns(doc.latestActionDescription)) {
+    return toDate(doc.latestActionAt);
+  }
 
-    for (const historyItem of sortedHistory) {
-      if (historyItem.action) {
-        for (const pattern of enactedPatterns) {
-          if (pattern.test(historyItem.action)) {
-            // Return the date of the enacted action
-            return historyItem.date ? new Date(historyItem.date) : null;
-          }
-        }
-      }
-    }
+  // 3. Find the first history item that matches an enacted pattern.
+  const enactedHistoryItem = sortedHistory.find(item => checkPatterns(item.action));
+  if (enactedHistoryItem) {
+    return toDate(enactedHistoryItem.date);
   }
 
   return null;

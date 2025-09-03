@@ -49,7 +49,7 @@ export default function PostPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/posts/${id}`);
-      if (!res.ok) throw new Error("Post not found");
+      if (!res.ok) console.error("Post not found");
       const data = await res.json();
       setPost(data.post);
     } catch (error) {
@@ -111,7 +111,7 @@ export default function PostPage() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to save post');
+        console.error('Failed to save post');
       }
 
       toast({
@@ -155,7 +155,7 @@ export default function PostPage() {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
     try {
       const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete post on server.");
+      if (!res.ok) console.error("Failed to delete post on server.");
       toast({ title: "Success", description: "Post deleted." });
       router.push("/posts");
       router.refresh();
@@ -180,7 +180,7 @@ export default function PostPage() {
 
     try {
       const res = await fetch(`/api/posts/${postId}/like`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to update like status.");
+      if (!res.ok) console.error("Failed to update like status.");
     } catch (error) {
       setPost(originalPost);
       toast({ variant: "destructive", title: "Error", description: "Could not update like. Please try again." });
@@ -211,7 +211,7 @@ export default function PostPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: newComment.content }),
       });
-      if (!res.ok) throw new Error("Failed to post comment.");
+      if (!res.ok) console.error("Failed to post comment.");
       const { comment: savedComment } = await res.json();
       setPost(currentPost => {
         if (!currentPost) return null;
@@ -235,7 +235,7 @@ export default function PostPage() {
 
     try {
       const res = await fetch(`/api/posts/${postId}/comments/${commentId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete comment.");
+      if (!res.ok) console.error("Failed to delete comment.");
       toast({ title: "Success", description: "Comment deleted." });
     } catch (error) {
       setPost(originalPost);
@@ -260,7 +260,7 @@ export default function PostPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: editCommentContent }),
       });
-      if (!res.ok) throw new Error("Failed to update comment.");
+      if (!res.ok) console.error("Failed to update comment.");
       toast({ title: "Success", description: "Comment updated." });
     } catch (error) {
       setPost(originalPost);
@@ -303,7 +303,7 @@ export default function PostPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
-      if (!res.ok) throw new Error("Failed to post reply.");
+      if (!res.ok) console.error("Failed to post reply.");
       const { reply: savedReply } = await res.json();
       setPost(currentPost => {
         if (!currentPost) return null;
@@ -335,7 +335,7 @@ export default function PostPage() {
 
     try {
       const res = await fetch(`/api/comments/${commentId}/replies/${replyId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete reply.");
+      if (!res.ok) console.error("Failed to delete reply.");
       toast({ title: "Success", description: "Reply deleted." });
     } catch (error) {
       setPost(originalPost);
@@ -367,7 +367,7 @@ export default function PostPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: editReplyContent }),
       });
-      if (!res.ok) throw new Error("Failed to update reply.");
+      if (!res.ok) console.error("Failed to update reply.");
       toast({ title: "Success", description: "Reply updated." });
     } catch (error) {
       setPost(originalPost);

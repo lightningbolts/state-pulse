@@ -31,7 +31,7 @@ export function BallotInformation({userLocation, onClose}: BallotInformationProp
             const response = await fetch(`/api/ballot-info?${params.toString()}`);
 
             if (!response.ok) {
-                throw new Error('Failed to fetch ballot information');
+                console.error('Failed to fetch ballot information');
             }
 
             const data = await response.json();

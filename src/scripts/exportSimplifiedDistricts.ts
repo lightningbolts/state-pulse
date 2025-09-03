@@ -1,9 +1,9 @@
-import { getCollection } from '../lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 import fs from 'fs/promises';
 import path from 'path';
 import simplify from '@turf/simplify';
 import { featureCollection } from '@turf/helpers';
-import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
+import type { Feature } from 'geojson';
 
 const TOLERANCE = 0.0001;
 const OUTPUT_DIR = path.join(__dirname, '../../public/districts');
@@ -52,7 +52,7 @@ async function exportDistricts() {
       const features = await dbCollection.find({ type: dbType }, { projection: { geometry: 1, properties: 1, _id: 0 } }).toArray();
       console.log(`Loaded ${features.length} features for ${outName}`);
       
-      const simplified: Feature<Geometry, GeoJsonProperties>[] = [];
+      const simplified: Feature[] = [];
       
       const batchSize = 100;
       for (let i = 0; i < features.length; i += batchSize) {
@@ -60,14 +60,14 @@ async function exportDistricts() {
         const processedBatch = batch.map(f => {
           let geom = f.geometry;
           const props = stripProperties(f.properties || {});
-          const feature: Feature<Geometry, GeoJsonProperties> = {
+          const feature: Feature = {
             type: 'Feature',
             geometry: geom,
             properties: props,
           };
           
           try {
-            const s = simplify(feature, { tolerance: TOLERANCE, highQuality: false, mutate: false }) as Feature<Geometry, GeoJsonProperties>;
+            const s = simplify(feature, { tolerance: TOLERANCE, highQuality: false, mutate: false }) as Feature;
             geom = s.geometry;
           } catch {
           }

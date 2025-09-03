@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCollection } from '@/lib/mongodb';
+import {NextRequest, NextResponse} from 'next/server';
+import {getCollection} from '@/lib/mongodb';
 import {ABR_TO_FIPS, STATE_MAP} from "@/types/geo";
 
 function normalizeIds(...ids: (string | undefined | null)[]): string[] {
@@ -121,7 +121,7 @@ function getDistrictIdentifiers(rep: any): string[] {
   const atLargeStates = ['AK', 'DE', 'MT', 'ND', 'SD', 'VT', 'WY'];
 
   // Get the best state abbreviation we have
-  let repState = '';
+  let repState: string;
   if (stateFromTerms && stateFromTerms.length === 2) {
     repState = stateFromTerms.toUpperCase();
   } else if (stateFromCurrentRole && stateFromCurrentRole.length === 2) {
@@ -140,7 +140,8 @@ function getDistrictIdentifiers(rep: any): string[] {
   // For congressional districts, prioritize at-large state detection
   if (isCongress && fips && (isAtLargeState || isAtLarge || (!dStr || dStr === '0') || districtRaw === null)) {
     // For at-large districts, try multiple possible formats
-    const atLargeIdentifiers = [
+    // console.log(`At-large district identifiers for ${repState}: [${atLargeIdentifiers.join(', ')}]`);
+    return [
       fips + '00',  // Standard format: STATEFP + '00'
       fips + '0',   // Alternative format: STATEFP + '0'
       fips,         // Just the state FIPS
@@ -148,8 +149,6 @@ function getDistrictIdentifiers(rep: any): string[] {
       repState + '0',  // State abbreviation + '0'
       repState + 'AL'  // State abbreviation + 'AL' (at-large)
     ];
-    // console.log(`At-large district identifiers for ${repState}: [${atLargeIdentifiers.join(', ')}]`);
-    return atLargeIdentifiers;
   }
 
   if (fips && Number.isFinite(numeric)) {
@@ -366,15 +365,13 @@ export async function GET(request: NextRequest) {
 
     if (selectedTopic === 'all') {
       Object.entries(districtTopicCounts).forEach(([districtId, topicCounts]) => {
-        const total = Object.values(topicCounts).reduce((sum, count) => sum + (count as number), 0);
-        topicScores[districtId] = total;
+        topicScores[districtId] = Object.values(topicCounts).reduce((sum, count) => sum + (count as number), 0);
       });
     } else {
       Object.entries(districtTopicCounts).forEach(([districtId, topicCounts]) => {
-        const total = Object.entries(topicCounts)
-          .filter(([topic]) => topic.toLowerCase().includes(selectedTopic.toLowerCase()))
-          .reduce((sum, [, count]) => sum + (count as number), 0);
-        topicScores[districtId] = total;
+        topicScores[districtId] = Object.entries(topicCounts)
+            .filter(([topic]) => topic.toLowerCase().includes(selectedTopic.toLowerCase()))
+            .reduce((sum, [, count]) => sum + (count as number), 0);
       });
     }
 

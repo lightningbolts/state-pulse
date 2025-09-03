@@ -7,7 +7,7 @@ import {Button} from "@/components/ui/button";
 import {summarizeLegislationPlainEnglish} from "@/ai/flows/summarize-legislation";
 import {summarizeLegislationLegallyDense} from "@/ai/flows/summarize-legislation-legally-dense";
 import {summarizeLegislationTweetLength} from "@/ai/flows/summarize-legislation-tweet-length";
-import {BrainCircuit, FileText, Twitter} from "lucide-react";
+import {BrainCircuit, FileText} from "lucide-react";
 import {useToast} from "@/hooks/use-toast";
 import {ScrollArea} from "@/components/ui/scroll-area";
 
@@ -106,7 +106,7 @@ export function AISummarizationTool() {
                             disabled={isLoading || !billText.trim()}
                             variant="outline"
                         >
-                            <Twitter className="mr-2 h-4 w-4"/> Tweet-Length
+                            Tweet-Length
                         </Button>
                     </div>
                 </form>

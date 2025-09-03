@@ -1,8 +1,8 @@
 import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
-import { GovernorScrapedOrder, ExecutiveOrder } from '../types/executiveOrder';
-import { upsertExecutiveOrder } from '../services/executiveOrderService';
+import { GovernorScrapedOrder, ExecutiveOrder } from '@/types/executiveOrder';
+import { upsertExecutiveOrder } from '@/services/executiveOrderService';
 import { getCurrentGovernorName } from './governorInfoService';
 
 // Governor links for all 50 states executive orders pages

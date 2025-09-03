@@ -3,7 +3,7 @@ import { Legislation } from '@/types/legislation';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { fetchPoliticalContextForLegislation, PoliticalContext } from '@/services/politicalContextService';
-import { enhanceSponsorsWithDetails, DetailedSponsor } from '@/services/sponsorService';
+import { enhanceSponsorsWithDetails } from '@/services/sponsorService';
 
 export interface VotingPrediction extends PredictVotingOutcomeOutput {
   legislationId: string;

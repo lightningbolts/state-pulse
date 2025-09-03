@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCollection } from '@/lib/mongodb';
+import {NextRequest, NextResponse} from 'next/server';
+import {getCollection} from '@/lib/mongodb';
 
 const CHAMBER_MAP: Record<string, string[]> = {
   state_upper: ['upper', 'state senate', 'senate'],
@@ -168,11 +168,10 @@ function extractPartyInfo(rep: any): string {
 // Helper function to check if a state has a unicameral legislature
 function isUnicameralState(rep: any): boolean {
   // Nebraska is the only state with a unicameral legislature
-  const isNebraska = rep.jurisdiction?.name === 'Nebraska' ||
-                    rep.current_role?.division_id?.includes('/state:ne/') ||
-                    rep.state === 'Nebraska' ||
-                    rep.state === 'NE';
-  return isNebraska;
+  return rep.jurisdiction?.name === 'Nebraska' ||
+      rep.current_role?.division_id?.includes('/state:ne/') ||
+      rep.state === 'Nebraska' ||
+      rep.state === 'NE';
 }
 
 export async function GET(

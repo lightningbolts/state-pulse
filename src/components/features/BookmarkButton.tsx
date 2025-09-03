@@ -1,6 +1,6 @@
 'use client';
 
-import {createContext, useContext, useEffect, useState} from 'react';
+import React, {createContext, useContext, useEffect, useState} from 'react';
 import {Bookmark, BookmarkCheck} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {useToast} from '@/hooks/use-toast';
@@ -147,7 +147,7 @@ export function BookmarkButton({legislationId, className = ''}: BookmarkButtonPr
                         description: "Bookmark was already removed or not found.",
                     });
                 } else {
-                    throw new Error(error.error || 'Failed to update bookmark');
+                    console.error(error.error || 'Failed to update bookmark');
                 }
             }
         } catch (error) {

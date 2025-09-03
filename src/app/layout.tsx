@@ -3,11 +3,11 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
-import { ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+import { ClerkProvider, SignedIn } from '@clerk/nextjs';
 import { Geist, Geist_Mono } from 'next/font/google'
-import { Button } from "@/components/ui/button";
 import { UserSyncComponent } from '@/components/auth/UserSyncComponent';
 import { ThemeProvider } from '@/components/theme/theme-provider';
+import React from "react";
 
 const geistSans = Geist({
   variable: '--font-geist-sans',

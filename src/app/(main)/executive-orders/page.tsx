@@ -1,9 +1,9 @@
 import React from 'react';
-import { ExecutiveOrdersList } from '../../../components/features/ExecutiveOrdersList';
-import { ExecutiveOrderFilters } from '../../../components/features/ExecutiveOrderFilters';
-import { getRecentExecutiveOrders, getExecutiveOrdersByState } from '../../../services/executiveOrderService';
-import { ExecutiveOrder } from '../../../types/executiveOrder';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
+import { ExecutiveOrdersList } from '@/components/features/ExecutiveOrdersList';
+import { ExecutiveOrderFilters } from '@/components/features/ExecutiveOrderFilters';
+import { getRecentExecutiveOrders, getExecutiveOrdersByState } from '@/services/executiveOrderService';
+import { ExecutiveOrder } from '@/types/executiveOrder';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ExecutiveOrdersPageProps {
   searchParams: {

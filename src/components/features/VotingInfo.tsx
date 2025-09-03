@@ -28,7 +28,7 @@ export function VotingInfo({userLocation, onClose}: VotingInfoProps) {
             const response = await fetch(`/api/voting-info?${params.toString()}`);
 
             if (!response.ok) {
-                throw new Error('Failed to fetch voting information');
+                console.error('Failed to fetch voting information');
             }
 
             const data = await response.json();

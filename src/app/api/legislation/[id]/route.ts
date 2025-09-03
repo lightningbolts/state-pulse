@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   getLegislationById,
-  updateLegislation,
-  deleteLegislation
+  updateLegislation
 } from '@/services/legislationService'; // Corrected path
 import type { Legislation } from '@/types/legislation'; // Corrected path
 

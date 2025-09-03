@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { Card } from '@/components/ui/card';
 import { MapProps } from '@/types/geo';
 import { RepresentativesMapGL } from './RepresentativesMapGL';
 import { useTheme } from 'next-themes';

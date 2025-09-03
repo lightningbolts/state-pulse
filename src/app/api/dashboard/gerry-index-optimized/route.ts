@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { area } from '@turf/area';
-import { length } from '@turf/length';
-import { polygonToLine } from '@turf/polygon-to-line';
-import { bbox } from '@turf/bbox';
-import { feature } from 'topojson-client';
+import {NextRequest, NextResponse} from 'next/server';
+import {area} from '@turf/area';
+import {length} from '@turf/length';
+import {polygonToLine} from '@turf/polygon-to-line';
+import {bbox} from '@turf/bbox';
+import {feature} from 'topojson-client';
 
 /**
  * OPTIMIZED Gerrymandering Analysis API
@@ -398,8 +398,7 @@ async function processBatch(features: any[], globalBbox: number[], useEnhanced: 
           gerryIndex[districtId] = result.adjustedScore;
           detailedResults[districtId] = result;
         } else {
-          const score = calculatePolsbyPopperScore(feature);
-          gerryIndex[districtId] = score;
+          gerryIndex[districtId] = calculatePolsbyPopperScore(feature);
         }
       }
     }
