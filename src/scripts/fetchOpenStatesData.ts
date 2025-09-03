@@ -13,7 +13,7 @@ import {
   generateGeminiDetailedSummary
 } from '../services/aiSummaryUtil';
 import { classifyLegislationForFetch } from '../services/classifyLegislationService';
-import { enactedPatterns } from "@/types/legislation";
+import { enactedPatterns } from "../types/legislation";
 
 config({ path: '../../.env' });
 
