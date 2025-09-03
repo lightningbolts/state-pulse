@@ -70,17 +70,6 @@ const getTopicHeatmapColor = (score: number): string => {
     return `rgb(${r}, ${g}, ${b})`;
 };
 
-const getRepHeatmapColor = (score: number): string => {
-    if (score === 0) return '#f8f9fa';
-    const normalizedScore = Math.max(0, Math.min(1, score));
-    const lightPurple = { r: 221, g: 160, b: 221 };
-    const darkPurple = { r: 75, g: 0, b: 130 };
-    const r = Math.round(lightPurple.r + (darkPurple.r - lightPurple.r) * normalizedScore);
-    const g = Math.round(lightPurple.g + (darkPurple.g - lightPurple.g) * normalizedScore);
-    const b = Math.round(lightPurple.b + (darkPurple.b - lightPurple.b) * normalizedScore);
-    return `rgb(${r}, ${g}, ${b})`;
-};
-
 const DEFAULT_POSITION: [number, number] = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
 
@@ -149,6 +138,39 @@ export const MapUI = () => {
         onDistrictClickGL,
         forceGarbageCollection
     } = useInteractiveMap();
+
+    const maxRepScore = React.useMemo(() => {
+        if (!repScores || Object.keys(repScores).length === 0) {
+            return 1;
+        }
+        const max = Math.max(...Object.values(repScores));
+        return max > 0 ? max : 1;
+    }, [repScores]);
+
+    const getRepHeatmapColor = React.useCallback((score: number): string => {
+        if (score <= 0) return 'rgb(255,255,255)';
+        const normalizedScore = Math.sqrt(Math.min(score / maxRepScore, 1));
+        const darkPurple = { r: 75, g: 0, b: 130 };
+        const white = { r: 255, g: 255, b: 255 };
+        const r = Math.round(white.r + (darkPurple.r - white.r) * normalizedScore);
+        const g = Math.round(white.g + (darkPurple.g - white.g) * normalizedScore);
+        const b = Math.round(white.b + (darkPurple.b - white.b) * normalizedScore);
+        return `rgb(${r}, ${g}, ${b})`;
+    }, [maxRepScore]);
+
+    const repHeatmapLegendStyle = React.useMemo(() => {
+        const white = 'rgb(255,255,255)';
+        const darkPurple = 'rgb(75, 0, 130)';
+        if (maxRepScore <= 1) {
+            return { background: `linear-gradient(to right, ${white}, ${darkPurple})` };
+        }
+        const colorAt25 = getRepHeatmapColor(maxRepScore * (0.25 ** 2));
+        const colorAt50 = getRepHeatmapColor(maxRepScore * (0.5 ** 2));
+        const colorAt75 = getRepHeatmapColor(maxRepScore * (0.75 ** 2));
+        return {
+            background: `linear-gradient(to right, ${white}, ${colorAt25}, ${colorAt50}, ${colorAt75}, ${darkPurple})`
+        };
+    }, [getRepHeatmapColor, maxRepScore]);
 
     const getStateColor = React.useCallback((stateAbbr: string) => {
         const state = stateStats[stateAbbr];
@@ -309,7 +331,7 @@ export const MapUI = () => {
                         )}
                         {showGerrymandering && !gerryDataLoading && Object.keys(gerryScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Compactness Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }}></div><span className="text-xs">Very Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#60e8fa' }}></div><span className="text-xs">Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f5ce0b' }}></div><span className="text-xs">Less Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#d93706' }}></div><span className="text-xs">Irregular</span></div></div></div>)}
                         {showTopicHeatmap && !topicDataLoading && Object.keys(topicScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Topic Activity Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(25, 25, 112)' }}></div><span className="text-xs">High Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(99, 120, 171)' }}></div><span className="text-xs">Medium Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(173, 216, 230)' }}></div><span className="text-xs">Low Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div><span className="text-xs">No Data</span></div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Topic: {selectedTopic === 'all' ? 'All Topics' : selectedTopic}</div></div>)}
-                        {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Representative Scale'}</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(75, 0, 130)' }}></div><span className="text-xs">Highest</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(121, 48, 158)' }}></div><span className="text-xs">High</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(148, 80, 175)' }}></div><span className="text-xs">Medium</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(221, 160, 221)' }}></div><span className="text-xs">Low</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div><span className="text-xs">No Data</span></div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Metric: {selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored' : selectedRepMetric === 'recent_activity' ? 'Recent Activity' : selectedRepMetric === 'enacted_bills' ? 'Enacted Bills Sponsored' : selectedRepMetric === 'enacted_recent_activity' ? 'Enacted Bills - Recent Activity' : selectedRepMetric}</div></div>)}
+                        {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Representative Scale'}</h5><div className="w-full"><div className="h-3 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1"><span>0</span><span>{Math.round(maxRepScore * 0.0625)}</span><span>{Math.round(maxRepScore * 0.25)}</span><span>{Math.round(maxRepScore * 0.5625)}</span><span>{maxRepScore}</span></div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Spectrum from white to dark purple represents absolute metric value.</div></div>)}
                         {!['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0 text-xs sm:text-sm"><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary"></div><span>High Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/50"></div><span>Medium Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/20"></div><span>Low Activity</span></div></div></div>)}
                         {showPartyAffiliation && !partyDataLoading && Object.keys(districtPartyMapping).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Party Legend</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm">{Object.keys(PARTY_COLORS).map(party => (<div key={party} className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: PARTY_COLORS[party] }}></div><span className="text-xs">{party}</span></div>))}</div></div>)}
                         {showTopicHeatmap && availableTopics.length > 0 && (<div className="absolute top-16 sm:top-20 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-xs xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><label className="text-xs sm:text-sm font-medium block mb-1 sm:mb-2">Select Topic:</label><select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full text-xs sm:text-sm border rounded px-2 py-1 bg-background" disabled={topicDataLoading}><option value="all">All Topics</option>{availableTopics.map(topic => (<option key={topic} value={topic}>{topic}</option>))}</select></div>)}
@@ -392,7 +414,7 @@ export const MapUI = () => {
                                 {showRepHeatmap && (<div className="space-y-2"><label className="text-xs font-medium">Select Metric:</label><select value={selectedRepMetric} onChange={(e) => setSelectedRepMetric(e.target.value)} className="w-full text-xs border rounded px-2 py-1 bg-background" disabled={repDataLoading}>{availableRepMetrics.map(metric => (<option key={metric} value={metric}>{metric === 'sponsored_bills' ? 'Bills Sponsored' : metric === 'recent_activity' ? 'Recent Activity' : metric === 'enacted_bills' ? 'Enacted Bills Sponsored' : metric === 'enacted_recent_activity' ? 'Enacted Bills - Recent Activity' : metric}</option>))}</select></div>)}
                                 {repDataLoading && (<div className="flex items-center space-x-2 text-xs text-muted-foreground"><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div><span>Loading representative data...</span></div>)}
                                 {repDataError && (<div className="text-xs text-red-500">Error loading representative data: {repDataError}</div>)}
-                                {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="space-y-2"><h5 className="font-medium text-xs">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Score Scale'}</h5><div className="flex flex-wrap gap-2 text-xs"><div className="flex items-center space-x-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(75, 0, 130)' }}></div><span>Highest</span></div><div className="flex items-center space-x-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(121, 48, 158)' }}></div><span>High</span></div><div className="flex items-center space-x-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(148, 80, 175)' }}></div><span>Medium</span></div><div className="flex items-center space-x-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(221, 160, 221)' }}></div><span>Low</span></div><div className="flex items-center space-x-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div><span>No Data</span></div></div><p className="text-xs text-muted-foreground">{selectedRepMetric === 'sponsored_bills' ? 'Purple gradient: light purple = fewer bills sponsored in 2025, dark purple = more bills sponsored in 2025.' : selectedRepMetric === 'recent_activity' ? 'Purple gradient: light purple = older data updates, dark purple = more recent data updates.' : 'Purple gradient based on normalized scores from 0-1.'}</p></div>)}
+                                {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="space-y-2"><h5 className="font-medium text-xs">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Score Scale'}</h5><div className="w-full"><div className="h-4 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1"><span>0</span><span>{Math.round(maxRepScore * 0.0625)}</span><span>{Math.round(maxRepScore * 0.25)}</span><span>{Math.round(maxRepScore * 0.5625)}</span><span>{maxRepScore}</span></div></div><p className="text-xs text-muted-foreground">Spectrum from white (low) to dark purple (high) representing absolute metric value.</p></div>)}
                             </div>
                         )}
                         {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) && (
@@ -464,4 +486,3 @@ export const MapUI = () => {
         </AnimatedSection>
     );
 };
-''
