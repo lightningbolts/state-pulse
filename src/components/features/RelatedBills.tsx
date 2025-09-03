@@ -1,6 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, CalendarDays, MapPin, Link2 } from 'lucide-react';
+import { CalendarDays, MapPin, Link2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface RelatedBill {

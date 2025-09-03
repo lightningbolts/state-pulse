@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
-import { STATE_NAMES } from '@/types/geo';
 import { STATE_MAP } from '@/types/geo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -57,7 +56,7 @@ export default function RepresentativesFeed() {
         params.set('filterState', abbr);
       }
       const res = await fetch(`/api/representatives?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed to fetch representatives');
+      if (!res.ok) console.error('Failed to fetch representatives');
       const data = await res.json();
       const newReps: Representative[] = data.representatives || [];
       setReps(reset ? newReps : prev => [...prev, ...newReps]);

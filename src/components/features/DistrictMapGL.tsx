@@ -161,7 +161,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         }
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          console.error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         setLoadingProgress(30);
@@ -174,7 +174,7 @@ export const DistrictMapGL: React.FC<DistrictMapGLProps> = React.memo(({
         // Dynamically find the key for the main object within the TopoJSON file
         const objectKey = topojsonData.objects && Object.keys(topojsonData.objects)[0];
         if (!objectKey) {
-          throw new Error('Invalid TopoJSON file: No objects found.');
+          console.error('Invalid TopoJSON file: No objects found.');
         }
 
         // Convert the TopoJSON object back into a GeoJSON FeatureCollection

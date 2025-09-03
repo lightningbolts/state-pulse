@@ -1,5 +1,5 @@
-import { getCollection } from '../lib/mongodb';
-import { Legislation } from '../types/legislation';
+import { getCollection } from '@/lib/mongodb';
+import { Legislation } from '@/types/legislation';
 
 interface RelatedBill {
   id: string;

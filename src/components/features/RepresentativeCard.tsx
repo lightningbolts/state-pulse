@@ -1,13 +1,11 @@
 "use client";
 import React from "react";
-import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Mail, ExternalLink } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { FollowButton } from "@/components/ui/FollowButton";
 import type { Representative } from "@/types/representative";
-import {BookmarkButton} from "@/components/features/BookmarkButton";
 import {ShareButton} from "@/components/ui/ShareButton";
 
 
@@ -57,9 +55,7 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
   }
   
   // Ensure district is a string for display purposes
-  if (typeof district === 'number') {
-    district = district.toString();
-  }
+
 
   let chamber = (rep as any).chamber || '';
   if (!chamber && (rep as any).role) chamber = (rep as any).role;
@@ -184,7 +180,7 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                           ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0);
 
   // Format the role/office display for Congress members
-  let roleDisplay = '';
+  let roleDisplay: string;
   if (isCongressMember) {
     // For Congress members, determine chamber from terms or office
     let congressChamber = '';

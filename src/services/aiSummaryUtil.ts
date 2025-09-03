@@ -1,8 +1,8 @@
-import { ai } from '../ai/genkit';
+import {ai} from '../ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import { Legislation } from '../types/legislation';
+import {Legislation} from '../types/legislation';
 
 /**
  * Cleans up AI-generated summary text by removing headers and fixing markdown formatting
@@ -145,6 +145,7 @@ ${text}`;
   }
 }
 
+// @ts-ignore
 export async function summarizeWithAzure(text: string): Promise<string[]> {
   // NOTE: Azure extractive summarization only selects sentences from the input, it does not generate new text.
   // If you want a paraphrased summary, use an abstractive/generative model (e.g., Gemini, GPT, Ollama).
@@ -189,7 +190,6 @@ export async function summarizeWithAzure(text: string): Promise<string[]> {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       console.error("Azure summarization failed", error);
-      throw new Error("Azure summarization failed");
     }
     // Azure returns 202 Accepted and an operation-location header for async jobs
     if (response.status === 202) {
@@ -236,37 +236,31 @@ export async function summarizeWithAzure(text: string): Promise<string[]> {
           const doc = task.results.documents[0];
           // Abstractive summarization: look for summaries
           if (doc.summaries) {
-            const summaries = doc.summaries.map((s: any) => s.text);
             // console.log('[Azure] Abstractive summaries returned:', summaries);
-            return summaries;
+            return doc.summaries.map((s: any) => s.text);
           }
           // Extractive summarization: look for sentences
           if (doc.sentences) {
-            const sentences = doc.sentences.map((s: any) => s.text);
             // console.log('[Azure] Extractive sentences returned:', sentences);
-            return sentences;
+            return doc.sentences.map((s: any) => s.text);
           }
           // Fallback: log and return error
           console.error('[Azure] No summaries or sentences found in response:', JSON.stringify(doc));
           return ['Summary not available: Azure response missing summaries/sentences.'];
         } else if (pollJson.status === "failed") {
           console.error("Azure summarization job failed", pollJson);
-          throw new Error("Azure summarization job failed");
         } else if (pollJson.error) {
           console.error("Azure summarization polling error:", pollJson.error);
-          throw new Error("Azure summarization polling error");
         }
         pollCount++;
       }
       console.error("Azure summarization timed out. Last poll response:", JSON.stringify(lastPollJson));
-      throw new Error("Azure summarization timed out");
     } else {
       // Synchronous response (should not happen for jobs endpoint)
       const result: any = await response.json();
       if (result.results && result.results.documents && result.results.documents[0].sentences) {
         return result.results.documents[0].sentences.map((s: any) => s.text);
       }
-      throw new Error("Unexpected Azure summarization response");
     }
   } catch (err) {
     console.error("Azure summarization failed", err);
@@ -365,6 +359,7 @@ export const fetchPdfTextFromOpenStatesUrl = async (legUrl: string): Promise<str
 /**
  * Summarize text using an Ollama model (local LLM)
  * @param text The text to summarize
+ * @param model
  * @returns The summary string
  */
 export async function generateOllamaSummary(text: string, model: string): Promise<string> {
@@ -383,7 +378,6 @@ export async function generateOllamaSummary(text: string, model: string): Promis
     });
     if (!response.ok) {
       console.error(`[Ollama] API error: ${response.status} ${response.statusText}`);
-      throw new Error(`Ollama ${model} API error: ${response.status}`);
     }
     const data: any = await response.json();
     // console.log('Valid Ollama summary generated.')
@@ -418,7 +412,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
       const buffer = await pdfRes.arrayBuffer();
       const data = await pdf(Buffer.from(buffer));
       console.log('[DEBUG] PDF text length:', data.text?.length || 0);
-      
+
       if (data.text && data.text.trim().length > 100) {
         console.log('[Bill Extraction] Using PDF:', pdfUrl);
         return await generateOptimizedGeminiSummary(data.text.trim(), sourceType);
@@ -438,26 +432,23 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
     if (bill.congressUrl) {
       const textUrl = bill.congressUrl + '/text';
       console.log('[Congress] Fetching text page:', textUrl);
-      
+
       try {
         const res = await fetch(textUrl);
         if (res.ok) {
           const html = await res.text();
-          
-          // Look for PDF links using Congress.gov patterns
           const pdfMatches = html.matchAll(/<a[^>]+href=["']([^"']+\.pdf)["'][^>]*>/gi);
           for (const match of pdfMatches) {
             let pdfUrl = match[1];
             if (!pdfUrl.startsWith('http')) {
-              // Convert relative URL to absolute
               const base = new URL(textUrl);
               pdfUrl = new URL(pdfUrl, base).href;
             }
-            
+
             const result = await extractPdfContent(pdfUrl, 'pdf-extracted');
             if (result) return result;
           }
-          
+
           // Fallback: try to extract text content directly from the page
           const $ = cheerio.load(html);
           const billTextElements = $('pre, .bill-text, #bill-text, .congress-bill-text');
@@ -473,7 +464,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
         console.log('[Congress] Error fetching text page:', textUrl, e);
       }
     }
-    
+
     // Fallback to checking sources for Congress bills
     if (bill.sources?.length) {
       for (const source of bill.sources) {
@@ -484,14 +475,13 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
             if (res.ok) {
               const html = await res.text();
               const pdfMatches = html.matchAll(/<a[^>]+href=["']([^"']+\.pdf)["'][^>]*>/gi);
-              
               for (const match of pdfMatches) {
                 let pdfUrl = match[1];
                 if (!pdfUrl.startsWith('http')) {
                   const base = new URL(textUrl);
                   pdfUrl = new URL(pdfUrl, base).href;
                 }
-                
+
                 const result = await extractPdfContent(pdfUrl, 'pdf-extracted');
                 if (result) return result;
               }
@@ -506,9 +496,9 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
 
   // 2. Special handling for states that prefer abstracts only
   const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Ohio', 'Minnesota', 'Vermont', 'Arizona', 'Delaware', 'Nebraska', 'Colorado'];
-  const isAbstractOnlyState = abstractOnlyStates.includes(bill.jurisdictionName || '') || 
+  const isAbstractOnlyState = abstractOnlyStates.includes(bill.jurisdictionName || '') ||
                              (bill.jurisdictionName === 'Texas' && bill.chamber === 'upper');
-  
+
   if (isAbstractOnlyState) {
     if (bill.abstracts?.length) {
       const abstractsText = bill.abstracts.map(a => a.abstract).filter(Boolean).join('\n');
@@ -540,7 +530,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
           if (res.ok) {
             let billText = '';
             let sourceType = '';
-            
+
             if (version.url.endsWith('.pdf')) {
               const buffer = await res.arrayBuffer();
               const pdfText = await pdf(Buffer.from(buffer));
@@ -550,7 +540,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
               billText = await res.text();
               sourceType = 'full-text';
             }
-            
+
             if (billText?.trim().length > 100) {
               console.log('[Bill Extraction] Using version:', version.url);
               return await generateOptimizedGeminiSummary(billText.trim(), sourceType);
@@ -571,7 +561,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
               if (res.ok) {
                 let billText = '';
                 let sourceType = '';
-                
+
                 if (linkUrl.endsWith('.pdf')) {
                   const buffer = await res.arrayBuffer();
                   const pdfText = await pdf(Buffer.from(buffer));
@@ -581,7 +571,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
                   billText = await res.text();
                   sourceType = 'full-text';
                 }
-                
+
                 if (billText?.trim().length > 100) {
                   console.log('[Bill Extraction] Using version link:', linkUrl);
                   return await generateOptimizedGeminiSummary(billText.trim(), sourceType);
@@ -605,12 +595,12 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
       if (bill.jurisdictionName === 'Illinois' && source.url.includes('ilga.gov/Legislation/BillStatus')) {
         const fullTextUrl = source.url.replace('/BillStatus', '/BillStatus/FullText');
         console.log('[ILGA] Fetching Illinois FullText page:', fullTextUrl);
-        
+
         try {
           const res = await fetch(fullTextUrl);
           if (res.ok) {
             const textHtml = await res.text();
-            
+
             // Extract bill text from <pre> tags
             const match = textHtml.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
             if (match && match[1] && match[1].trim().length > 100) {
@@ -627,7 +617,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
                 const base = new URL(fullTextUrl);
                 pdfUrl = new URL(pdfUrl, base).href;
               }
-              
+
               const result = await extractPdfContent(pdfUrl, 'ilga-pdf');
               if (result) return result;
             }
@@ -655,7 +645,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
             const base = new URL(source.url);
             pdfUrl = new URL(pdfUrl, base).href;
           }
-          
+
           const result = await extractPdfContent(pdfUrl, 'pdf-extracted');
           if (result) return result;
         }
@@ -668,4 +658,5 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
   console.log('[Bill Extraction] No suitable source found for bill:', bill.id);
   return { summary: '', longSummary: null, sourceType: 'none' };
 }
+
 

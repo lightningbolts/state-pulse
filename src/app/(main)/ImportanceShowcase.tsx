@@ -2,8 +2,6 @@
 "use client";
 
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
-import { MapPin, BookOpen, Bell, Users, MessageSquare, CheckSquare, UserPlus, MessageCircle, Bug, Share2, Mail } from 'lucide-react';
 
 export default function ImportanceShowcase() {
   return (

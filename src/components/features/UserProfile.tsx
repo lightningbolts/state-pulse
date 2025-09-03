@@ -6,7 +6,7 @@ import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import { PostCard } from "./PostCard";
 import {Badge} from "@/components/ui/badge";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {AlertTriangle, Calendar, FileText, Heart, MessageCircle, MessageSquare, User} from "lucide-react";
+import {Calendar, FileText, MessageSquare, User} from "lucide-react";
 import {Comment, Post} from "@/types/media";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
 import Link from "next/link";

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ExecutiveOrder } from '../../types/executiveOrder';
+import { ExecutiveOrder } from '@/types/executiveOrder';
 import { Card, CardContent } from '../ui/card';
 import { LoadingOverlay } from '../ui/LoadingOverlay';
 import { ExecutiveOrderCard } from './ExecutiveOrderCard';

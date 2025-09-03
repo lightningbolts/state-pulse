@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getRepresentativeById, getOpenStatesPersonById, getBillsSponsoredByRep } from '@/services/representativesService';
+import { getRepresentativeById, getBillsSponsoredByRep } from '@/services/representativesService';
 
 export async function GET(req: NextRequest, context: { params: { id: string } }) {
   const { id } = await context.params;

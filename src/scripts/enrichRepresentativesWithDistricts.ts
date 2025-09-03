@@ -1,5 +1,5 @@
-import { getCollection } from '../lib/mongodb';
-import { STATE_MAP } from '../types/geo';
+import { getCollection } from '@/lib/mongodb';
+import { STATE_MAP } from '@/types/geo';
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
 const STATE_NAME_TO_ABBR: Record<string, string> = Object.fromEntries(
@@ -503,7 +503,7 @@ async function main() {
     }
 
     console.log(`[SKIP] Unrecognized rep structure for:`, rep.name);
-    continue;
+
   }
   console.log(`Checked ${checked} representatives. Updated ${updated} with district info.`);
 }

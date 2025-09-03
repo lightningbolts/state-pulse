@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
-import { FederalRegisterResponse, FederalRegisterDocument, ExecutiveOrder } from '../types/executiveOrder';
-import { upsertExecutiveOrder } from '../services/executiveOrderService';
+import { FederalRegisterDocument, ExecutiveOrder } from '@/types/executiveOrder';
+import { upsertExecutiveOrder } from '@/services/executiveOrderService';
 import pdf from 'pdf-parse';
 
 export class FederalRegisterClient {

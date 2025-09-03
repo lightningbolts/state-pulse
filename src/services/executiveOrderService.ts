@@ -1,5 +1,5 @@
-import { getCollection } from '../lib/mongodb';
-import { ExecutiveOrder } from '../types/executiveOrder';
+import { getCollection } from '@/lib/mongodb';
+import { ExecutiveOrder } from '@/types/executiveOrder';
 
 const COLLECTION_NAME = 'executive_orders';
 

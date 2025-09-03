@@ -1,5 +1,5 @@
-import { connectToDatabase } from '../lib/mongodb';
-import { getRelatedBills } from '../services/relatedBillsService';
+import { connectToDatabase } from '@/lib/mongodb';
+import { getRelatedBills } from '@/services/relatedBillsService';
 
 async function benchmarkRelatedBills() {
   await connectToDatabase();

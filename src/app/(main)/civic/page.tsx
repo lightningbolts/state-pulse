@@ -1,7 +1,6 @@
 import { RepresentativesFinder } from "@/components/features/RepresentativesFinder";
 import { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users } from "lucide-react";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { pageMetadata } from '@/lib/metadata';
 

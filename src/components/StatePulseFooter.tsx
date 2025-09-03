@@ -2,7 +2,6 @@ import { Gavel, ExternalLink, Mail } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { AnimatePresence, motion } from "framer-motion";
 
 export function StatePulseFooter() {

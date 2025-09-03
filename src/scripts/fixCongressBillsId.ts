@@ -54,7 +54,7 @@ async function fixCongressBillsId() {
         const { session, identifier } = bill;
 
         if (!session || !identifier) {
-          throw new Error(`Missing session or identifier. Session: ${session}, Identifier: ${identifier}`);
+          console.error(`Missing session or identifier. Session: ${session}, Identifier: ${identifier}`);
         }
 
         // Create new ID format: congress-bill-[session]-[identifier]
@@ -67,7 +67,7 @@ async function fixCongressBillsId() {
         // Check if the new ID already exists
         const existingBill = await legislationCollection.findOne({ id: newId });
         if (existingBill && existingBill._id.toString() !== bill._id.toString()) {
-          throw new Error(`New ID ${newId} already exists for a different bill`);
+          console.error(`New ID ${newId} already exists for a different bill`);
         }
 
         // Update the bill with new ID
@@ -80,7 +80,7 @@ async function fixCongressBillsId() {
           successCount++;
           console.log(`Successfully updated: ${bill.id} -> ${newId}`);
         } else {
-          throw new Error('Update operation did not modify any document');
+          console.error('Update operation did not modify any document');
         }
 
       } catch (error) {

@@ -1,7 +1,5 @@
-import { getDb } from '../lib/mongodb';
-import { Legislation } from '../types/legislation';
-import { BROAD_TOPIC_KEYWORDS, NARROW_TOPIC_KEYWORDS, ClassificationResult} from "../types/legislation";
-import {processLegislation, classifyLegislationTopics} from "@/services/classifyLegislationService";
+import { getDb } from '@/lib/mongodb';
+import {classifyLegislationTopics} from "@/services/classifyLegislationService";
 
 /**
  * Progress tracking for resumable operations

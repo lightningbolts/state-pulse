@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExecutiveOrder } from '../types/executiveOrder';
+import { ExecutiveOrder } from '@/types/executiveOrder';
 
 interface UseExecutiveOrdersOptions {
   state?: string;
@@ -36,13 +36,13 @@ export function useExecutiveOrders(options: UseExecutiveOrdersOptions = {}): Use
       const response = await fetch(`/api/executive-orders?${params}`);
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        console.error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
 
       if (result.error) {
-        throw new Error(result.error);
+        console.error(result.error);
       }
 
       setOrders(result.data || []);
@@ -86,15 +86,15 @@ export function useExecutiveOrderById(id: string) {
 
         if (!response.ok) {
           if (response.status === 404) {
-            throw new Error('Executive order not found');
+            console.error('Executive order not found');
           }
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          console.error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         const result = await response.json();
 
         if (result.error) {
-          throw new Error(result.error);
+          console.error(result.error);
         }
 
         setOrder(result.data);

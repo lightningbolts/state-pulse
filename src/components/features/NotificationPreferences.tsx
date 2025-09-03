@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Bell, Settings } from 'lucide-react';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
@@ -72,7 +71,7 @@ export function NotificationPreferences() {
           description: "Your notification preferences have been updated"
         });
       } else {
-        throw new Error('Failed to save preferences');
+        console.error('Failed to save preferences');
       }
     } catch (error) {
       console.error('Error updating preferences:', error);

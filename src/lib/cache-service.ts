@@ -29,7 +29,7 @@ interface CacheStats {
 class AdvancedCacheService {
   private cache = new Map<string, CacheEntry>();
   private stats = { hits: 0, misses: 0 };
-  private maxSize: number;
+  private readonly maxSize: number;
   private currentSize: number = 0;
   
   constructor(maxSizeMB: number = 100) {

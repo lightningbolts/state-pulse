@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Heart, UserPlus, UserMinus, Loader2 } from 'lucide-react';
+import { UserPlus, UserMinus, Loader2 } from 'lucide-react';
 import { useFollowRepresentative } from '@/hooks/use-follow-representative';
 import { cn } from '@/lib/utils';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExecutiveOrder } from '../../types/executiveOrder';
+import { ExecutiveOrder } from '@/types/executiveOrder';
 import { Badge } from '../ui/badge';
 import { ExternalLink, Calendar, User, MapPin } from 'lucide-react';
 

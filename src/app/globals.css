@@ -29,8 +29,7 @@
 @media (max-width: 768px) {
   .maplibregl-canvas {
     /* Reduce quality on mobile for better performance */
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: optimize-contrast;
+    image-rendering: auto;
   }
 
   /* Optimize animations on mobile */
@@ -145,5 +144,11 @@
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
+  }
+}
+
+@layer components {
+  .avatar-image {
+    @apply rounded-full flex-shrink-0 cursor-default select-none pointer-events-none object-cover;
   }
 }

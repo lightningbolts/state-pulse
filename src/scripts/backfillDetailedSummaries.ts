@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
-import { getCollection } from '../lib/mongodb';
-import { generateGeminiDetailedSummary } from '../services/aiSummaryUtil';
-import { Legislation } from '../types/legislation';
+import { getCollection } from '@/lib/mongodb';
+import { generateGeminiDetailedSummary } from '@/services/aiSummaryUtil';
+import { Legislation } from '@/types/legislation';
 
 config({ path: '../../.env' });
 

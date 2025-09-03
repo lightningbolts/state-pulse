@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getLegislationById } from '@/services/legislationService';
 import { getVotingPrediction } from '@/services/votingPredictionService';
 import { checkRateLimit } from '@/services/rateLimitService';
-import { headers } from 'next/headers';
 
 function getClientIdentifier(request: NextRequest): string {
   // Try to get user ID from auth headers first (if available)

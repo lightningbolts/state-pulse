@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getCollection } from '../lib/mongodb';
-import { MongoClient } from 'mongodb';
+import { getCollection } from '@/lib/mongodb';
 import * as shapefile from 'shapefile';
 
 const DATA_DIRS = [

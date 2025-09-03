@@ -1,6 +1,6 @@
 
 import * as React from 'react';
-import Map, { Source, Layer, MapRef, Marker, Popup } from 'react-map-gl/maplibre';
+import Map, { Source, Layer, MapRef, Marker } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTheme } from 'next-themes';
 import { Card } from '@/components/ui/card';

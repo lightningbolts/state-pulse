@@ -1,5 +1,5 @@
 import { ABR_TO_FIPS } from '@/types/geo';
-import { getCollection } from '../lib/mongodb';
+import { getCollection } from '@/lib/mongodb';
 
 const stateToFips: Record<string, string> = ABR_TO_FIPS
 

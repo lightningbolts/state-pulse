@@ -1,6 +1,5 @@
 // src/lib/firebaseAdmin.ts
 import * as admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
 
 // Ensure you have your Firebase Admin SDK credentials set up,
 // typically via environment variables like GOOGLE_APPLICATION_CREDENTIALS

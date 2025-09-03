@@ -5,7 +5,7 @@ import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Bookmark, MapPin, Plus, Search, X } from "lucide-react";
-import { BookmarkButton, BookmarksContext } from "@/components/features/BookmarkButton";
+import { BookmarksContext } from "@/components/features/BookmarkButton";
 import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -15,10 +15,8 @@ import {
     DropdownMenuRadioItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { STATE_MAP } from "@/types/geo";
-import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import PolicyUpdateCard from "@/components/features/PolicyUpdateCard";
 import { BROAD_TOPIC_KEYWORDS } from "@/types/legislation";
 

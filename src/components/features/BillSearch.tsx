@@ -1,6 +1,6 @@
 "use client";
 
-import {useState} from "react";
+import React, {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Badge} from "@/components/ui/badge";
@@ -35,7 +35,7 @@ export function BillSearch({selectedBills, onBillSelect, userLocation, className
                     statusText: response.statusText,
                     errorData
                 });
-                throw new Error(`Failed to search bills: ${response.status} ${response.statusText}. ${errorData.error || ''}`);
+                console.error(`Failed to search bills: ${response.status} ${response.statusText}. ${errorData.error || ''}`);
             }
 
             const data = await response.json();

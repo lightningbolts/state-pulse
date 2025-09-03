@@ -102,7 +102,7 @@ export function useVotingPrediction({
       }
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch prediction: ${response.statusText}`);
+        console.error(`Failed to fetch prediction: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -151,7 +151,7 @@ export function useVotingPrediction({
       }
 
       if (!response.ok) {
-        throw new Error(`Failed to generate prediction: ${response.statusText}`);
+        console.error(`Failed to generate prediction: ${response.statusText}`);
       }
 
       const data = await response.json();

@@ -1,9 +1,9 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, MapPin, ArrowRight, TrendingUp, Users } from 'lucide-react';
+import { FileText, ArrowRight, TrendingUp, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { StateData } from '@/types/jurisdictions';
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
@@ -37,13 +37,13 @@ export default function MapShowcase() {
         try {
             const response = await fetch('/api/dashboard/map-data');
             if (!response.ok) {
-                throw new Error('Failed to fetch map data');
+                console.error('Failed to fetch map data');
             }
             const result = await response.json();
             if (result.success) {
                 setStateStats(result.data);
             } else {
-                throw new Error(result.error || 'Unknown error');
+                console.error(result.error || 'Unknown error');
             }
         } catch (error) {
             console.error('Error fetching map data:', error);
@@ -82,7 +82,7 @@ export default function MapShowcase() {
             const minSize = 8;
             const count = state.legislationCount || 0;
             const k = 0.5;
-            let size = 15;
+            let size: number;
             if (count < 1) {
                 size = minSize;
             } else {

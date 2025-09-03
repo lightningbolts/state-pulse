@@ -11,11 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Play,
-  Upload,
   Download,
   CheckCircle,
-  XCircle,
-  Clock,
   AlertCircle,
   FileText
 } from 'lucide-react';
@@ -86,7 +83,7 @@ export function VotingPredictionDashboard() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate batch predictions');
+        console.error(errorData.error || 'Failed to generate batch predictions');
       }
 
       const data = await response.json();

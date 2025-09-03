@@ -1,8 +1,6 @@
-import { NextResponse } from 'next/server';
-import {
-  addLegislation,
-  getAllLegislation
-} from '@/services/legislationService';
+import {NextResponse} from 'next/server';
+import {addLegislation, getAllLegislation} from '@/services/legislationService';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -44,7 +42,7 @@ export async function GET(request: Request) {
     const sortField = searchParams.get('sortBy');
     const sortDirection = searchParams.get('sortDir');
 
-    let sort: Record<string, 1 | -1> = {};
+    let sort: Record<string, 1 | -1>;
     if (showOnlyEnactedParam === 'true' || showOnlyEnactedParam === 'false') {
       if (sortField === 'createdAt' || sortField === 'updatedAt' || sortField === 'latestActionAt') {
         if (sortDirection === 'asc') {
@@ -88,8 +86,7 @@ export async function GET(request: Request) {
       console.log('[API] Filtering for ALL Congress sessions');
       otherFilters.jurisdictionName = 'United States Congress';
     } else if (searchParams.get('jurisdictionName')) {
-      const jurisdictionNameParam = searchParams.get('jurisdictionName');
-      otherFilters.jurisdictionName = jurisdictionNameParam;
+      otherFilters.jurisdictionName = searchParams.get('jurisdictionName');
     }
     if (searchParams.get('subject')) {
       otherFilters.subjects = searchParams.get('subject');
@@ -113,8 +110,7 @@ export async function GET(request: Request) {
           { 'sponsors.id': normalizedId }
         ];
       } else {
-        const sponsorName = searchParams.get('sponsor');
-        otherFilters['sponsors.name'] = sponsorName;
+        otherFilters['sponsors.name'] = searchParams.get('sponsor');
       }
     }
     // Date range filters (e.g., firstActionAt_gte, firstActionAt_lte)

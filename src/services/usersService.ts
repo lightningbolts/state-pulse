@@ -1,12 +1,9 @@
-import { getCollection } from '../lib/mongodb';
-import { Collection, ObjectId } from 'mongodb';
-import { User } from '../types/user';
-import { UserMongoDbDocument } from "../types/user";
+import {getCollection} from '@/lib/mongodb';
+import {Collection, ObjectId} from 'mongodb';
+import {User, UserMongoDbDocument} from '@/types/user';
 
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
-    const cleanData = { ...data };
-    // Add any specific cleanup logic if needed
-    return cleanData;
+    return {...data};
 }
 
 export async function addUser(userData: User): Promise<void> {
@@ -86,19 +83,16 @@ export async function getUserById(userId: string): Promise<User | null> {
             return null;
         }
 
-        // Ensure trackingTopics are arrays
-        const user: User = {
-            ...userDoc,
-            id: userDoc.id,
-            trackingTopics: Array.isArray(userDoc.trackingTopics) ? userDoc.trackingTopics : [],
-        };
-
         // console.log('getUserById - Processed user object:', {
         //     id: user.id,
         //     trackingTopics: user.trackingTopics
         // });
 
-        return user;
+        return {
+            ...userDoc,
+            id: userDoc.id,
+            trackingTopics: Array.isArray(userDoc.trackingTopics) ? userDoc.trackingTopics : [],
+        };
     } catch (error) {
         console.error('Error getting user by ID:', error);
         throw error;

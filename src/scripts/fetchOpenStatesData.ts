@@ -1,19 +1,9 @@
-import { getLegislationById, upsertLegislationSelective } from '../services/legislationService';
-import { config } from 'dotenv';
-import { ai } from '../ai/genkit';
+import {getLegislationById, upsertLegislationSelective} from '@/services/legislationService';
+import {config} from 'dotenv';
 import fetch from 'node-fetch';
-import pdf from 'pdf-parse';
-import * as cheerio from 'cheerio';
-import {
-  generateOllamaSummary,
-  fetchPdfTextFromOpenStatesUrl,
-  extractBestTextForSummary,
-  generateGeminiSummary,
-  summarizeLegislationOptimized,
-  generateGeminiDetailedSummary
-} from '../services/aiSummaryUtil';
-import { classifyLegislationForFetch } from '../services/classifyLegislationService';
-import { enactedPatterns } from "../types/legislation";
+import {generateGeminiSummary, summarizeLegislationOptimized} from '@/services/aiSummaryUtil';
+import {classifyLegislationForFetch} from '@/services/classifyLegislationService';
+import {enactedPatterns} from "@/types/legislation";
 
 config({ path: '../../.env' });
 
@@ -668,9 +658,7 @@ async function fetchAndStoreUpdatedBills(
                 // Merge the existing subjects with classified topics (avoid duplicates)
                 const existingSubjects = legislationToStore.subjects || [];
                 const newSubjects = classificationResult.subjects || [];
-                const combinedSubjects = [...new Set([...existingSubjects, ...newSubjects])];
-
-                legislationToStore.subjects = combinedSubjects;
+                legislationToStore.subjects = [...new Set([...existingSubjects, ...newSubjects])];
                 legislationToStore.topicClassification = classificationResult.topicClassification;
 
                 console.log(`  Classified into ${classificationResult.topicClassification.broadTopics.length} broad + ${classificationResult.topicClassification.narrowTopics.length} narrow topics (confidence: ${classificationResult.topicClassification.confidence}%)`);
@@ -1125,18 +1113,15 @@ async function fetchCongressBills(updatedSince: string) {
             ]);
 
             if (actionsResponse.ok) {
-              const actionsData: any = await actionsResponse.json();
-              congressBill.actions = actionsData;
+              congressBill.actions = await actionsResponse.json();
             }
 
             if (textResponse.ok) {
-              const textData: any = await textResponse.json();
-              congressBill.textVersions = textData;
+              congressBill.textVersions = await textResponse.json();
             }
 
             if (summariesResponse.ok) {
-              const summariesData: any = await summariesResponse.json();
-              congressBill.summaries = summariesData;
+              congressBill.summaries = await summariesResponse.json();
             }
 
             const legislationToStore = transformCongressBillToMongoDB(congressBill);
@@ -1183,9 +1168,7 @@ async function fetchCongressBills(updatedSince: string) {
                 // Merge the existing subjects with classified topics (avoid duplicates)
                 const existingSubjects = legislationToStore.subjects || [];
                 const newSubjects = classificationResult.subjects || [];
-                const combinedSubjects = [...new Set([...existingSubjects, ...newSubjects])];
-
-                legislationToStore.subjects = combinedSubjects;
+                legislationToStore.subjects = [...new Set([...existingSubjects, ...newSubjects])];
                 legislationToStore.topicClassification = classificationResult.topicClassification;
 
                 console.log(`  Classified into ${classificationResult.topicClassification.broadTopics.length} broad + ${classificationResult.topicClassification.narrowTopics.length} narrow topics (confidence: ${classificationResult.topicClassification.confidence}%)`);

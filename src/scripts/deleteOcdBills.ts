@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 import path from 'path';
-import { getCollection, connectToDatabase } from '../lib/mongodb';
+import { getCollection, connectToDatabase } from '@/lib/mongodb';
 
 config({ path: path.resolve(__dirname, '../../.env') });
 

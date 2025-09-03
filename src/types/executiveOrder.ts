@@ -17,12 +17,12 @@ export interface ExecutiveOrder {
 }
 
 // Federal Register API response types
+// noinspection JSDuplicatedDeclaration
 export interface FederalRegisterDocument {
   document_number: string;
   title: string;
   type: string;
   abstract: string;
-  document_number: string;
   html_url: string;
   pdf_url: string;
   publication_date: string;

@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       };
     }
 
-    let jurisdictionAb = '';
+    let jurisdictionAb: string;
     if (legislation.jurisdictionName === "United States Congress") {
       jurisdictionAb = "US";
     } else {
@@ -153,7 +153,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
     geminiSummary,
   } = legislation;
 
-  let jurisdictionAb = '';
+  let jurisdictionAb: string;
   if (jurisdictionName === "United States Congress") {
     jurisdictionAb = "US";
   } else {

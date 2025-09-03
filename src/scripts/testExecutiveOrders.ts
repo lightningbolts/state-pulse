@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
-import { connectToDatabase } from '../lib/mongodb';
-import { fetchFederalExecutiveOrders } from '../services/federalRegisterService';
+import { connectToDatabase } from '@/lib/mongodb';
+import { fetchFederalExecutiveOrders } from '@/services/federalRegisterService';
 
 // Load environment variables
 config({ path: '../../.env' });

@@ -1,6 +1,6 @@
-import { getCollection } from '../lib/mongodb';
-import { Representative, OpenStatesPerson } from '../types/representative';
-import { Bill } from '../types/legislation';
+import { getCollection } from '@/lib/mongodb';
+import { Representative, OpenStatesPerson } from '@/types/representative';
+import { Bill } from '@/types/legislation';
 
 export async function getRepresentativeById(id: string): Promise<Representative | null> {
   const collection = await getCollection('representatives');

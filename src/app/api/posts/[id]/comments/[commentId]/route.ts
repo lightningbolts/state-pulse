@@ -132,11 +132,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting comment:', error);
             // Return the updated post object
-            const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
-            return NextResponse.json({ post: updatedPost });
-    return NextResponse.json(
-      { error: 'Failed to delete comment' },
-      { status: 500 }
-    );
+    const updatedPost = await db.collection('posts').findOne({ _id: new ObjectId(id) });
+    return NextResponse.json({ post: updatedPost });
   }
 }

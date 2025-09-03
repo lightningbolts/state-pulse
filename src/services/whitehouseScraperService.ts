@@ -1,8 +1,7 @@
 import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
-import pdf from 'pdf-parse';
-import { ExecutiveOrder } from '../types/executiveOrder';
-import { upsertExecutiveOrder } from '../services/executiveOrderService';
+import { ExecutiveOrder } from '@/types/executiveOrder';
+import { upsertExecutiveOrder } from '@/services/executiveOrderService';
 
 interface WhitehouseExecutiveOrder {
   title: string;

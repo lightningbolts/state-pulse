@@ -32,7 +32,7 @@ export function PublicHearings({userLocation, onClose}: PublicHearingsProps) {
             const response = await fetch(`/api/public-hearings?${params.toString()}`);
 
             if (!response.ok) {
-                throw new Error('Failed to fetch hearing information');
+                console.error('Failed to fetch hearing information');
             }
 
             const data = await response.json();

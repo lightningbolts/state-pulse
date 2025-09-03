@@ -1,8 +1,8 @@
-import { transformCongressBillToMongoDB } from './utils/transformCongressBillToMongoDB';
-import { getLegislationById, upsertLegislation } from '../services/legislationService';
-import { config } from 'dotenv';
+import {transformCongressBillToMongoDB} from './utils/transformCongressBillToMongoDB';
+import {getLegislationById, upsertLegislation} from '../services/legislationService';
+import {config} from 'dotenv';
 import fetch from 'node-fetch';
-import { getCollection } from '../lib/mongodb';
+import {getCollection} from '../lib/mongodb';
 import {enactedPatterns} from "@/types/legislation";
 
 config({ path: '../../.env' });
@@ -151,21 +151,19 @@ function processCongressSponsors(congressBill: any): any[] {
 }
 
 function processCongressHistory(congressBill: any): any[] {
-  const history = (congressBill.actions?.actions || [])
-    .map((action: any) => {
-      const eventDate = toMongoDate(action.actionDate);
-      if (!eventDate) return null;
-      return {
-        date: eventDate,
-        action: action.text,
-        actor: action.sourceSystem?.name || 'Congress',
-        classification: action.type ? [action.type] : [],
-        order: action.actionCode || 0,
-      };
-    })
-    .filter((h: any): h is NonNullable<typeof h> => h !== null);
-
-  return history;
+  return (congressBill.actions?.actions || [])
+      .map((action: any) => {
+        const eventDate = toMongoDate(action.actionDate);
+        if (!eventDate) return null;
+        return {
+          date: eventDate,
+          action: action.text,
+          actor: action.sourceSystem?.name || 'Congress',
+          classification: action.type ? [action.type] : [],
+          order: action.actionCode || 0,
+        };
+      })
+      .filter((h: any): h is NonNullable<typeof h> => h !== null);
 }
 
 /**
@@ -220,8 +218,7 @@ async function fetchHistoricalCongressBills(congressNumber: number) {
             const actionsResponse = await fetch(`${CONGRESS_API_BASE_URL}/bill/${congressNumber}/${bill.type.toLowerCase()}/${bill.number}/actions?api_key=${CONGRESS_API_KEY}&format=json`);
 
             if (actionsResponse.ok) {
-              const actionsData: any = await actionsResponse.json();
-              congressBill.actions = actionsData;
+              congressBill.actions = await actionsResponse.json();
             }
 
             const sponsors = processCongressSponsors(congressBill);
@@ -240,13 +237,11 @@ async function fetchHistoricalCongressBills(congressNumber: number) {
               ]);
 
               if (textResponse.ok) {
-                const textData: any = await textResponse.json();
-                congressBill.textVersions = textData;
+                congressBill.textVersions = await textResponse.json();
               }
 
               if (summariesResponse.ok) {
-                const summariesData: any = await summariesResponse.json();
-                congressBill.summaries = summariesData;
+                congressBill.summaries = await summariesResponse.json();
               }
 
               const legislationToStore = transformCongressBillToMongoDB(congressBill);

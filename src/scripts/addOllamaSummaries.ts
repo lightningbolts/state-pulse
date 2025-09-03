@@ -1,11 +1,8 @@
-import fetch from 'node-fetch';
-import pdf from 'pdf-parse';
-import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getAllLegislation, upsertLegislationSelective } from '../services/legislationService';
-import { generateOllamaSummary, fetchPdfTextFromOpenStatesUrl } from '../services/aiSummaryUtil';
-import { getCollection } from '../lib/mongodb';
+import {getAllLegislation, upsertLegislationSelective} from '../services/legislationService';
+import {fetchPdfTextFromOpenStatesUrl, generateOllamaSummary} from '../services/aiSummaryUtil';
+import {getCollection} from '../lib/mongodb';
 
 function getStateAbbrFromJuriId(jurisdictionId: string): string | null {
   const match = jurisdictionId.match(/state:([a-z]{2})/);
@@ -70,8 +67,7 @@ async function main() {
           console.warn(`[Ollama] No text available to summarize for ${bill.identifier || bill.id}.`);
           continue;
         }
-        const summary = await generateOllamaSummary(textToSummarize, "mistral");
-        bill.geminiSummary = summary;
+        bill.geminiSummary = await generateOllamaSummary(textToSummarize, "mistral");
         await upsertLegislationSelective(bill);
         processed++;
         const current = skip + i + 1;

@@ -1,12 +1,11 @@
-import { getCollection } from '../lib/mongodb';
-import { Collection, ObjectId } from 'mongodb';
-import { LegislationBookmark, BookmarkMongoDbDocument, BookmarkMetadata } from '../types/legislation';
-import { randomUUID } from 'crypto';
+import {getCollection} from '../lib/mongodb';
+import {Collection, ObjectId} from 'mongodb';
+import {BookmarkMetadata, BookmarkMongoDbDocument, LegislationBookmark} from '../types/legislation';
+import {randomUUID} from 'crypto';
 
 // Helper function to clean up data for MongoDB
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
-    const cleanData = { ...data };
-    return cleanData;
+    return {...data};
 }
 
 // Add a new bookmark
@@ -19,7 +18,7 @@ export async function addBookmark(
         // Check if a bookmark already exists
         const existingBookmark = await getBookmark(userId, legislationId);
         if (existingBookmark) {
-            throw new Error('Legislation is already bookmarked');
+            console.error('Legislation is already bookmarked');
         }
 
         const bookmarkId = randomUUID();

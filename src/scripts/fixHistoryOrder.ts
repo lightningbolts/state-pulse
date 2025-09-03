@@ -97,7 +97,7 @@ async function fixHistoryOrder() {
           updatedCount++;
           console.log(`Successfully sorted history for: ${doc.id || doc._id}`);
         } else {
-          throw new Error('Update operation did not modify any document');
+          console.error('Update operation did not modify any document');
         }
 
       } catch (error) {

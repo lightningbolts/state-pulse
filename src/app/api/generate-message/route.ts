@@ -98,7 +98,7 @@ function buildPrompt({
   };
 }): string {
 
-  let messageIntent = '';
+  let messageIntent: string;
   switch (messageType) {
     case 'support':
       messageIntent = 'expressing strong support for';
@@ -116,7 +116,7 @@ function buildPrompt({
       messageIntent = 'sharing thoughts about';
   }
 
-  let positionGuidance = '';
+  let positionGuidance: string;
   if (position === 'support') {
     positionGuidance = 'The constituent supports this issue and wants the representative to take action in favor of it.';
   } else if (position === 'oppose') {

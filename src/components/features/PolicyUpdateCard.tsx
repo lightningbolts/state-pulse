@@ -101,7 +101,7 @@ const PolicyUpdateCard: React.FC<PolicyUpdateCardProps> = ({
   const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
   const uniqueKey = update.id && updates.filter(u => u.id === update.id).length === 1 ? update.id : `${update.id || 'no-id'}-${idx}`;
 
-  let jurisdictionAb = ''
+  let jurisdictionAb: string
   if (update.jurisdictionName === "United States Congress") {
     jurisdictionAb = "US"
   } else {

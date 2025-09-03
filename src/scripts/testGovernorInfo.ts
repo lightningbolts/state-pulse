@@ -1,4 +1,4 @@
-import { fetchCurrentGovernors, getCurrentGovernorName } from '../services/governorInfoService';
+import { fetchCurrentGovernors, getCurrentGovernorName } from '@/services/governorInfoService';
 import { config } from 'dotenv';
 
 // Load environment variables

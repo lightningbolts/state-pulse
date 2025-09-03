@@ -62,13 +62,13 @@ export function ChamberMakeup({ state }: PartyMakeupProps) {
       try {
         const response = await fetch(`/api/chamber-makeup/${encodeURIComponent(state)}`);
         if (!response.ok) {
-          throw new Error(`Failed to fetch chamber makeup: ${response.status}`);
+          console.error(`Failed to fetch chamber makeup: ${response.status}`);
         }
         const result = await response.json();
         if (result.success) {
           setData(result);
         } else {
-          throw new Error(result.error || 'Failed to fetch chamber makeup');
+          console.error(result.error || 'Failed to fetch chamber makeup');
         }
       } catch (err) {
         console.error('Error fetching chamber makeup:', err);

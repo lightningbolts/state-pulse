@@ -2,8 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import {
   addUser,
   upsertUser,
-  getUserById,
-  cleanupLegacySavedLegislation
+  getUserById
 } from '@/services/usersService';
 import { User } from '@/types/user';
 /**
@@ -64,7 +63,6 @@ export async function syncUserToMongoDB(clerkUser: any): Promise<{success: boole
 
     if (existingUser && (existingUser as any).savedLegislation) {
       legacySavedLegislation = (existingUser as any).savedLegislation;
-      shouldMigrate = legacySavedLegislation.length > 0;
       console.log('Found legacy savedLegislation to migrate:', legacySavedLegislation);
     }
 
@@ -115,7 +113,7 @@ export async function saveUserPreferences(userId: string, preferences: any): Pro
     const user = await getUserById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      console.error('User not found');
     }
 
     const updatedUser: User = {
@@ -150,7 +148,7 @@ export async function addUserTrackingTopic(userId: string, topic: string): Promi
     const user = await getUserById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      console.error('User not found');
     }
 
     // Check if topic is already tracked

@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { connectToDatabase, getDb } from '../lib/mongodb';
-import { syncUserToMongoDB } from '../lib/clerkMongoIntegration';
+import { connectToDatabase, getDb } from '@/lib/mongodb';
+import { syncUserToMongoDB } from '@/lib/clerkMongoIntegration';
 
 // Sample Clerk user data for testing
 const sampleClerkUser = {
