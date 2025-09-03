@@ -30,6 +30,12 @@ export async function GET(request: Request) {
       ];
     }
 
+      // Add enacted filter if showOnlyEnacted param is present
+      const showOnlyEnactedParam = searchParams.get('showOnlyEnacted');
+      if (showOnlyEnactedParam === 'true') {
+        otherFilters.enactedAt = { $ne: null };
+      }
+
     // Parse pagination parameters
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '100', 10) : 100;
     const skip = searchParams.get('skip') ? parseInt(searchParams.get('skip') || '0', 10) : 0;
@@ -39,11 +45,24 @@ export async function GET(request: Request) {
     const sortDirection = searchParams.get('sortDir');
 
     let sort: Record<string, 1 | -1> = {};
-    if (sortField) {
-      sort = { [sortField]: sortDirection === 'asc' ? 1 : -1 };
+    if (showOnlyEnactedParam === 'true' || showOnlyEnactedParam === 'false') {
+      if (sortField === 'createdAt' || sortField === 'updatedAt' || sortField === 'latestActionAt') {
+        if (sortDirection === 'asc') {
+          sort = { enactedAt: 1, latestActionAt: 1 };
+        } else {
+          sort = { enactedAt: -1, latestActionAt: -1 };
+        }
+      } else if (sortField) {
+        sort = { [sortField]: sortDirection === 'asc' ? 1 : -1 };
+      } else {
+        sort = { enactedAt: -1, latestActionAt: -1 };
+      }
     } else {
-      // Default sort if not provided
-      sort = { updatedAt: -1 };
+      if (sortField) {
+        sort = { [sortField]: sortDirection === 'asc' ? 1 : -1 };
+      } else {
+        sort = { updatedAt: -1 };
+      }
     }
 
     // Common filters

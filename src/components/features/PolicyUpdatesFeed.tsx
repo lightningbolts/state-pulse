@@ -110,14 +110,16 @@ async function fetchUpdatesFeed({
     if (sponsor) params.append("sponsor", sponsor);
     if (sponsorId) params.append("sponsorId", sponsorId);
 
-    // Use the enacted endpoint if filtering for enacted legislation
-    const endpoint = showOnlyEnacted ? '/api/legislation/enacted' : '/api/legislation';
-    const res = await fetch(`${endpoint}?${params.toString()}`);
+    // Always use the main endpoint and pass showOnlyEnacted as a param
+    if (showOnlyEnacted) {
+        params.append('showOnlyEnacted', 'true');
+    }
+    const res = await fetch(`/api/legislation?${params.toString()}`);
     if (!res.ok) throw new Error("Failed to fetch updates");
 
     const responseData = await res.json();
 
-    // Handle both response formats: direct array (regular API) and object with data property (enacted API)
+    // Handle response format: direct array
     if (Array.isArray(responseData)) {
         return responseData;
     } else if (responseData.data && Array.isArray(responseData.data)) {
