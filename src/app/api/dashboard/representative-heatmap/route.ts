@@ -124,12 +124,7 @@ function getDistrictIdentifiers(rep: any): string[] {
 
   const isAtLargeState = isCongress && atLargeStates.includes(repState);
 
-  // console.log(`Processing rep: ${rep.name}, State: ${repState}, District: ${dStr}, IsAtLarge: ${isAtLargeState}, FIPS: ${fips}`);
-
-  // For congressional districts, prioritize at-large state detection
   if (isCongress && fips && (isAtLargeState || isAtLarge || (!dStr || dStr === '0') || districtRaw === null)) {
-    // For at-large districts, try multiple possible formats
-    // console.log(`At-large district identifiers for ${repState}: [${atLargeIdentifiers.join(', ')}]`);
     return [
       fips + '00',  // Standard format: STATEFP + '00'
       fips + '0',   // Alternative format: STATEFP + '0'
@@ -216,7 +211,6 @@ async function getBulkBillsSponsoredCount(representatives: any[], enactedOnly: b
       }
     });
 
-    // console.log(`Sponsorship counts found for ${Object.keys(sponsorshipCounts).length} representatives`);
     return sponsorshipCounts;
   } catch (error) {
     console.error('Error counting sponsored bills in bulk:', error);
@@ -433,18 +427,9 @@ export async function GET(request: NextRequest) {
       ] };
     }
 
-    // console.log(`Chamber query for ${chamber}:`, JSON.stringify(chamberQuery, null, 2));
-
     const representatives = await repsCollection.find(chamberQuery).toArray();
-    // console.log(`Found ${representatives.length} representatives for chamber ${chamber}`);
-    if (representatives.length > 0) {
-      // console.log(`Sample representative structure:`, JSON.stringify(representatives[0], null, 2));
-      // console.log(`Sample district identifiers for first rep:`, getDistrictIdentifiers(representatives[0]));
-    }
-
     const districtDetails: Record<string, any> = {};
 
-    // Check if enacted filter is requested
     const enactedOnly = metric === 'enacted_bills' || metric === 'enacted_recent_activity';
     const baseMetric = enactedOnly ?
       (metric === 'enacted_bills' ? 'sponsored_bills' : 'recent_activity') :
@@ -452,13 +437,6 @@ export async function GET(request: NextRequest) {
 
     const sponsorshipCounts = (baseMetric === 'sponsored_bills') ? await getBulkBillsSponsoredCount(representatives, enactedOnly) : {};
     const recentActivityScores = (baseMetric === 'recent_activity') ? await getBulkRecentActivityScores(representatives, enactedOnly) : {};
-
-    if (baseMetric === 'sponsored_bills' && Object.keys(sponsorshipCounts).length > 0) {
-      // console.log(`Sponsorship counts found for ${Object.keys(sponsorshipCounts).length} representatives`);
-    }
-    if (baseMetric === 'recent_activity' && Object.keys(recentActivityScores).length > 0) {
-      // console.log(`Recent activity scores found for ${Object.keys(recentActivityScores).length} representatives`);
-    }
 
     const districtScores: Record<string, number> = {};
     const districtRepCount: Record<string, number> = {};
@@ -482,99 +460,23 @@ export async function GET(request: NextRequest) {
       if (districtRepCount[id] > 1) districtScores[id] = districtScores[id] / districtRepCount[id];
     }
 
-    // Improved normalization: different strategies for better color variation
-    const values = Object.values(districtScores);
-    const maxScore = Math.max(...values, 1);
-    const normalizedScores: Record<string, number> = {};
-
-    const isStateLeg = districtType === 'state-upper-districts' || districtType === 'state-lower-districts';
-
-    if (metric === 'sponsored_bills') {
-      if (isStateLeg) {
-        // For state legislative districts, use improved quantile-based normalization
-        const positive = values.filter(v => v > 0).sort((a, b) => a - b);
-
-        if (positive.length === 0) {
-          // No data, all districts get 0
-          Object.keys(districtScores).forEach(id => {
-            normalizedScores[id] = 0;
-          });
-        } else {
-          // Use quantile-based scaling with more aggressive distribution
-          const getQuantile = (p: number) => {
-            const idx = Math.floor((positive.length - 1) * p);
-            return positive[Math.min(idx, positive.length - 1)] || 0;
-          };
-
-          const q25 = getQuantile(0.25);
-          const q50 = getQuantile(0.5);
-          const q75 = getQuantile(0.75);
-          const q90 = getQuantile(0.9);
-
-          Object.entries(districtScores).forEach(([districtId, score]) => {
-            if (score === 0) {
-              normalizedScores[districtId] = 0;
-            } else if (score <= q25) {
-              // Bottom 25% get values 0.1-0.3
-              normalizedScores[districtId] = 0.1 + (score / q25) * 0.2;
-            } else if (score <= q50) {
-              // 25-50% get values 0.3-0.5
-              normalizedScores[districtId] = 0.3 + ((score - q25) / (q50 - q25)) * 0.2;
-            } else if (score <= q75) {
-              // 50-75% get values 0.5-0.7
-              normalizedScores[districtId] = 0.5 + ((score - q50) / (q75 - q50)) * 0.2;
-            } else if (score <= q90) {
-              // 75-90% get values 0.7-0.9
-              normalizedScores[districtId] = 0.7 + ((score - q75) / (q90 - q75)) * 0.2;
-            } else {
-              // Top 10% get values 0.9-1.0
-              const maxVal = Math.max(q90, maxScore);
-              normalizedScores[districtId] = 0.9 + ((score - q90) / (maxVal - q90)) * 0.1;
-            }
-          });
-        }
-      } else {
-        // For congressional districts, use square root scaling for better mid-range variation
-        const sqrtMax = Math.sqrt(maxScore);
-        Object.entries(districtScores).forEach(([districtId, score]) => {
-          if (sqrtMax > 0) {
-            normalizedScores[districtId] = Math.sqrt(score) / sqrtMax;
-          } else {
-            normalizedScores[districtId] = 0;
-          }
-        });
-      }
-    } else {
-      // For recent activity, use linear normalization
-      Object.entries(districtScores).forEach(([districtId, score]) => {
-        normalizedScores[districtId] = maxScore > 0 ? score / maxScore : 0;
-      });
-    }
-
-    // console.log(`Representative heatmap for ${districtType} - ${metric}:`);
-    // console.log(`Raw scores range: 0 to ${maxScore}`);
-    // console.log(`Sample scores:`, Object.entries(districtScores).slice(0, 5));
-    // console.log(`Normalized sample:`, Object.entries(normalizedScores).slice(0, 5));
-
-    const scores = Object.values(normalizedScores);
+    const scores = Object.values(districtScores);
+    const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
     const avgScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
     const minScore = scores.length > 0 ? Math.min(...scores) : 0;
-    const maxNormalizedScore = scores.length > 0 ? Math.max(...scores) : 0;
 
     return NextResponse.json({
       success: true,
-      scores: normalizedScores,
+      scores: districtScores,
       details: districtDetails,
       metric,
       districtType,
       metadata: {
-        totalDistricts: Object.keys(normalizedScores).length,
+        totalDistricts: Object.keys(districtScores).length,
         totalRepresentatives: representatives.length,
         avgScore: Math.round(avgScore * 100) / 100,
         minScore: Math.round(minScore * 100) / 100,
         maxScoreRaw: maxScore,
-        maxScoreP90: (baseMetric === 'sponsored_bills' && isStateLeg) ? Math.max(...values.filter(v => v > 0).sort((a,b)=>a-b).slice(0, Math.ceil(values.filter(v=>v>0).length*0.9))) || 0 : undefined,
-        maxScoreNormalized: Math.round(maxNormalizedScore * 100) / 100,
         availableMetrics: ['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity'],
         enactedOnly
       }
