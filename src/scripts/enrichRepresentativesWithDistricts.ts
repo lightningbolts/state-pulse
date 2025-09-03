@@ -77,7 +77,6 @@ async function main() {
   const reps = await getCollection('representatives');
   const boundaries = await getCollection('map_boundaries');
 
-  // Iterate over all representatives who do not have a map_boundary
   const cursor = reps.find({
     map_boundary: { $exists: false }
   });
@@ -90,7 +89,6 @@ async function main() {
       continue;
     }
 
-    // OpenStates-style
     if (rep.current_role && rep.current_role.district && rep.current_role.org_classification && rep.jurisdiction && rep.jurisdiction.id) {
       const stateMatch = rep.jurisdiction.id.match(/state:([a-z]{2})/i);
       if (!stateMatch) {
@@ -110,11 +108,10 @@ async function main() {
           paddedDistrict = districtNum.padStart(3, '0');
         } else if (/^\d+[A-Za-z]$/.test(districtNum)) {
           // Handle multi-member districts with letter suffixes (e.g., "1A", "13B")
-          // Extract the numeric part and pad it, keeping the letter
           const match = districtNum.match(/^(\d+)([A-Za-z])$/);
           if (match) {
             const numPart = match[1].padStart(3, '0');
-            paddedDistrict = numPart; // Use just the numeric part for boundary lookup
+            paddedDistrict = numPart; 
             console.log(`[MULTI-MEMBER] Detected multi-member district ${districtNum}, using numeric part ${numPart} for boundary lookup`);
           }
         }
@@ -133,7 +130,6 @@ async function main() {
           type: 'congressional'
         });
       } else {
-        // State legislative
         console.log(`[MATCH] Looking for boundary: STATEFP=${stateFips}, ${districtProp}=${paddedDistrict}, type=${type} for rep: ${rep.name}`);
         boundary = await boundaries.findOne({
           'properties.STATEFP': stateFips,
@@ -188,10 +184,7 @@ async function main() {
 
         // Special handling for multi-county districts (e.g., "Norfolk, Worcester and Middlesex")
         if (!boundary && districtNum.includes(',')) {
-          // Split on commas and "and", then try to match patterns
           const counties = districtNum.split(/,| and | & /).map((c: string) => c.trim());
-
-          // Try different permutations and formats
           const permutations = [
             counties.join(' and '), // "Norfolk and Worcester and Middlesex"
             counties.join(', '), // "Norfolk, Worcester, Middlesex"

@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load environment variables from the project root
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 import { connectToDatabase } from '@/lib/mongodb';
@@ -50,5 +49,4 @@ async function createMapDataIndexes() {
   }
 }
 
-// Run the script
 createMapDataIndexes();

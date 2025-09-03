@@ -54,10 +54,8 @@ async function classifyAndUpdateBulk(documents: any[], db: any): Promise<number>
   const bulkOperations = [];
   let classifiedCount = 0;
 
-  // Process all documents and prepare bulk operations
   for (const doc of documents) {
     try {
-      // Extract text for classification
       const title = doc.title || '';
       const summary = doc.geminiSummary || doc.summary;
       const abstract = doc.abstracts && doc.abstracts.length > 0
@@ -65,19 +63,17 @@ async function classifyAndUpdateBulk(documents: any[], db: any): Promise<number>
         : undefined;
 
       if (!title && !summary && !abstract) {
-        continue; // Skip documents with no text
+        continue;
       }
 
       const classification = classifyLegislationTopics(title, summary, abstract);
 
       if (classification.broadTopics.length === 0 && classification.narrowTopics.length === 0) {
-        continue; // Skip documents that couldn't be classified
+        continue;
       }
 
-      // Combine broad and narrow topics for the subjects field
       const allTopics = [...classification.broadTopics, ...classification.narrowTopics];
 
-      // Prepare bulk update operation
       bulkOperations.push({
         updateOne: {
           filter: { _id: doc._id },
@@ -102,17 +98,15 @@ async function classifyAndUpdateBulk(documents: any[], db: any): Promise<number>
     }
   }
 
-  // Execute bulk operations if we have any
   if (bulkOperations.length > 0) {
     try {
       const result = await db.collection('legislation').bulkWrite(bulkOperations, {
-        ordered: false, // Continue processing even if some operations fail
-        writeConcern: { w: 1, j: false } // Optimize write concern for speed
+        ordered: false,
+        writeConcern: { w: 1, j: false } 
       });
       console.log(`  Bulk update completed: ${result.modifiedCount} documents updated`);
     } catch (error) {
       console.error('  Bulk update failed:', error.message);
-      // Don't throw - continue processing
     }
   }
 
@@ -127,23 +121,20 @@ async function processDocumentsStream(db: any, query: any, batchSize: number, co
   let lastProcessedId = null;
   const startTime = new Date().toISOString();
 
-  // Load existing progress
   const existingProgress = loadProgress();
   if (existingProgress) {
     totalProcessed = existingProgress.totalProcessed;
     lastProcessedId = existingProgress.lastProcessedId;
     console.log(`Resuming from progress: ${totalProcessed} documents processed, last ID: ${lastProcessedId}`);
 
-    // Modify query to continue from where we left off
     if (lastProcessedId) {
       query._id = { $gt: lastProcessedId };
     }
   }
 
-  // Use cursor with proper sorting for consistent pagination
   const cursor = db.collection('legislation')
     .find(query)
-    .sort({ _id: 1 }) // Sort by _id for consistent ordering
+    .sort({ _id: 1 })
     .batchSize(batchSize);
 
   let currentBatch = [];
@@ -156,7 +147,6 @@ async function processDocumentsStream(db: any, query: any, batchSize: number, co
       currentBatch.push(doc);
       lastProcessedId = doc._id;
 
-      // Process batch when it's full
       if (currentBatch.length >= batchSize) {
         const batchProcessed = await classifyAndUpdateBulk(currentBatch, db);
         totalProcessed += batchProcessed;
@@ -166,7 +156,6 @@ async function processDocumentsStream(db: any, query: any, batchSize: number, co
 
         console.log(`Processed batch: ${currentBatch.length} docs, ${batchProcessed} classified (${docsPerSecond} docs/sec)`);
 
-        // Save progress
         saveProgress({
           lastProcessedId: lastProcessedId,
           totalProcessed,
@@ -177,12 +166,10 @@ async function processDocumentsStream(db: any, query: any, batchSize: number, co
         currentBatch = [];
         batchStartTime = Date.now();
 
-        // Brief pause to prevent overwhelming the database
         await new Promise(resolve => setTimeout(resolve, 50));
       }
     }
 
-    // Process remaining documents
     if (currentBatch.length > 0) {
       const batchProcessed = await classifyAndUpdateBulk(currentBatch, db);
       totalProcessed += batchProcessed;
@@ -191,7 +178,6 @@ async function processDocumentsStream(db: any, query: any, batchSize: number, co
 
   } catch (error) {
     console.error('Error during streaming processing:', error);
-    // Save progress even on error
     saveProgress({
       lastProcessedId,
       totalProcessed,
@@ -210,7 +196,6 @@ async function processDocumentsStream(db: any, query: any, batchSize: number, co
 async function getClassificationStats(db: any) {
   console.log('Analyzing documents for classification...');
 
-  // Count documents that need classification
   const unclassifiedQuery = {
     $or: [
       { subjects: { $exists: false } },
@@ -232,10 +217,8 @@ async function getClassificationStats(db: any) {
 
   const unclassifiedCount = await db.collection('legislation').countDocuments(unclassifiedQuery);
 
-  // Count total documents
   const totalCount = await db.collection('legislation').countDocuments({});
 
-  // Count already classified
   const classifiedCount = await db.collection('legislation').countDocuments({
     topicClassification: { $exists: true }
   });
@@ -258,7 +241,6 @@ async function main() {
 
     const db = await getDb();
 
-    // Get statistics
     const stats = await getClassificationStats(db);
 
     if (stats.unclassifiedCount === 0) {
@@ -267,7 +249,6 @@ async function main() {
       return;
     }
 
-    // Optimized query for unclassified documents
     const query = {
       // $or: [
       //   { subjects: { $exists: false } },
@@ -287,9 +268,8 @@ async function main() {
       ]
     };
 
-    // Optimized batch sizes for better performance
-    const batchSize = 500; // Smaller batches for better memory management
-    const concurrencyLimit = 10; // Conservative concurrency
+    const batchSize = 500; 
+    const concurrencyLimit = 10;
 
     console.log(`Processing ${stats.unclassifiedCount.toLocaleString()} documents in batches of ${batchSize}...`);
 
@@ -305,7 +285,6 @@ async function main() {
     console.log(`  Total time: ${Math.round(totalTimeSeconds)} seconds`);
     console.log(`  Average speed: ${docsPerSecond.toFixed(1)} documents/second`);
 
-    // Clear progress file on successful completion
     clearProgress();
 
   } catch (error) {
@@ -340,7 +319,6 @@ async function processInParallel(items: any[], processFn: (item: any) => Promise
     });
 
     if (running.size >= concurrencyLimit) {
-      // Wait for at least one task to complete before adding more
       await Promise.race(Array.from(running));
     }
   }
@@ -369,7 +347,6 @@ function testClassification() {
   console.log(`Reasoning: ${result.reasoning}`);
 }
 
-// Check if script is run directly
 if (require.main === module) {
   const args = process.argv.slice(2);
 

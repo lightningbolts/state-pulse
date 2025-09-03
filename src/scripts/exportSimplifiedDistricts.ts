@@ -5,7 +5,6 @@ import simplify from '@turf/simplify';
 import { featureCollection } from '@turf/helpers';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
 
-// Disable simplification for maximum accuracy
 const TOLERANCE = 0.0001;
 const OUTPUT_DIR = path.join(__dirname, '../../public/districts');
 
@@ -16,14 +15,11 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 function stripProperties(props: any) {
-  // Keep essential properties for display and party matching
   const keep: Record<string, any> = {};
   if (props && props.name) keep.name = props.name;
   if (props && props.state) keep.state = props.state;
   if (props && props.district) keep.district = props.district;
   if (props && props.type) keep.type = props.type;
-  
-  // Keep GEOID and related fields for party affiliation matching
   if (props && props.GEOID) keep.GEOID = props.GEOID;
   if (props && props.CD) keep.CD = props.CD;
   if (props && props.ID) keep.ID = props.ID;
@@ -49,7 +45,6 @@ async function exportDistricts() {
   const dbCollection = await getCollection('map_boundaries');
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
   
-  // Process one district type at a time to manage memory
   for (const [outName, dbType] of Object.entries(TYPE_MAP)) {
     console.log(`Starting export of ${outName} (${dbType})...`);
     
@@ -59,7 +54,6 @@ async function exportDistricts() {
       
       const simplified: Feature<Geometry, GeoJsonProperties>[] = [];
       
-      // Process features in batches to avoid memory issues
       const batchSize = 100;
       for (let i = 0; i < features.length; i += batchSize) {
         const batch = features.slice(i, i + batchSize);
@@ -76,10 +70,8 @@ async function exportDistricts() {
             const s = simplify(feature, { tolerance: TOLERANCE, highQuality: false, mutate: false }) as Feature<Geometry, GeoJsonProperties>;
             geom = s.geometry;
           } catch {
-            // Keep original geometry if simplification fails
           }
           
-          // Reduce coordinate precision
           if (geom && geom.coordinates) {
             geom.coordinates = reducePrecision(geom.coordinates, 5);
           }
@@ -93,7 +85,6 @@ async function exportDistricts() {
         
         simplified.push(...processedBatch);
         
-        // Force garbage collection hint
         if (global.gc) {
           global.gc();
         }
@@ -106,13 +97,11 @@ async function exportDistricts() {
       await fs.writeFile(outPath, JSON.stringify(fc));
       console.log(`Exported ${outName} to ${outPath} (${simplified.length} features)`);
       
-      // Clear memory
       simplified.length = 0;
       features.length = 0;
       
     } catch (error) {
       console.error(`Failed to export ${outName}:`, error);
-      // Continue with next district type
     }
   }
   

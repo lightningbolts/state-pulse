@@ -15,11 +15,9 @@ class GeminiRateLimiter {
   async waitForRateLimit(): Promise<void> {
     const now = Date.now();
 
-    // Clean old entries
     this.requestsPerMinute = this.requestsPerMinute.filter(time => now - time < 60000);
     this.requestsPerDay = this.requestsPerDay.filter(time => now - time < 86400000);
 
-    // Check daily limit
     if (this.requestsPerDay.length >= this.MAX_RPD) {
       const oldestRequest = Math.min(...this.requestsPerDay);
       const waitTime = 86400000 - (now - oldestRequest);
@@ -28,7 +26,6 @@ class GeminiRateLimiter {
       return this.waitForRateLimit();
     }
 
-    // Check requests per minute
     if (this.requestsPerMinute.length >= this.MAX_RPM) {
       const oldestRequest = Math.min(...this.requestsPerMinute);
       const waitTime = 60000 - (now - oldestRequest) + 1000;
@@ -37,7 +34,6 @@ class GeminiRateLimiter {
       return this.waitForRateLimit();
     }
 
-    // Record this request
     this.requestsPerMinute.push(now);
     this.requestsPerDay.push(now);
   }
@@ -109,12 +105,10 @@ async function backfillDetailedSummaries() {
     console.log(`  Current longGeminiSummary length: ${legislation.longGeminiSummary?.length || 0}`);
 
     try {
-      // Wait for rate limit
       await rateLimiter.waitForRateLimit();
       const stats = rateLimiter.getStats();
       console.log(`  Rate limit status - RPM: ${stats.rpm}, RPD: ${stats.rpd}`);
 
-      // Extract full text
       const { fullText, sourceType } = await extractLegislationFullText(legislation);
 
       if (!fullText || fullText.length < 500) {
@@ -124,7 +118,6 @@ async function backfillDetailedSummaries() {
 
       console.log(`  Full text extracted: ${fullText.length} characters from ${sourceType}`);
 
-      // Generate detailed summary
       const detailedSummary = await generateGeminiDetailedSummary(fullText);
 
       if (!detailedSummary || detailedSummary.length < 100) {
@@ -133,7 +126,6 @@ async function backfillDetailedSummaries() {
         continue;
       }
 
-      // Update the document
       await collection.updateOne(
         { _id: doc._id },
         {
@@ -147,7 +139,6 @@ async function backfillDetailedSummaries() {
       successCount++;
       console.log(`  ✓ Generated detailed summary: ${detailedSummary.length} characters`);
 
-      // Add a small delay between requests
       await new Promise(resolve => setTimeout(resolve, 500));
 
     } catch (error) {
@@ -163,7 +154,6 @@ async function backfillDetailedSummaries() {
   console.log(`Skipped: ${processed - successCount - errorCount}`);
 }
 
-// Run the backfill
 backfillDetailedSummaries()
   .then(() => {
     console.log('Backfill completed successfully');

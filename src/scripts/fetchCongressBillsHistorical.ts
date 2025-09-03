@@ -10,7 +10,6 @@ config({ path: '../../.env' });
 const CONGRESS_API_KEY = process.env.US_CONGRESS_API_KEY;
 const CONGRESS_API_BASE_URL = 'https://api.congress.gov/v3';
 
-// Historical Congress sessions to fetch (adjust as needed)
 const HISTORICAL_CONGRESS_SESSIONS = [
   119
 ];
@@ -27,11 +26,9 @@ function toMongoDate(
     }
 
     if (typeof dateInput === 'object' && 'seconds' in dateInput && 'nanoseconds' in dateInput) {
-        // Convert Firebase Timestamp format to Date
         return new Date(dateInput.seconds * 1000);
     }
 
-    // Handle string dates
     if (typeof dateInput === 'string') {
         const date = new Date(dateInput.split(' ')[0]);
         return isNaN(date.getTime()) ? null : date;
@@ -44,21 +41,18 @@ function toMongoDate(
 function detectEnactedDate(history: any[]): Date | null {
     if (!history || history.length === 0) return null;
 
-    // Sort history by date in descending order to find the most recent enacted action
     const sortedHistory = [...history].sort((a, b) => {
         const dateA = a.date ? new Date(a.date).getTime() : 0;
         const dateB = b.date ? new Date(b.date).getTime() : 0;
         return dateB - dateA;
     });
 
-    // Check if any action in the history matches the enacted patterns
     for (const action of sortedHistory) {
         const actionText = (action.action || '').trim();
         if (!actionText) continue;
 
         for (const pattern of enactedPatterns) {
             if (pattern.test(actionText)) {
-                // Return the date of the enacted action
                 return action.date ? new Date(action.date) : null;
             }
         }
@@ -67,7 +61,6 @@ function detectEnactedDate(history: any[]): Date | null {
     return null;
 }
 
-// Helper function to introduce delays (milliseconds)
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -84,7 +77,6 @@ async function updateBillSponsorsAndHistory(billId: string, sponsors: any[], his
       updatedAt: new Date()
     };
 
-    // Also update related fields that depend on history
     if (history.length > 0) {
       const lastActionAt = history.reduce((latest: any, action: any) => {
         return action.date > latest ? action.date : latest;
@@ -97,7 +89,6 @@ async function updateBillSponsorsAndHistory(billId: string, sponsors: any[], his
       updateFields.latestActionAt = lastActionAt;
       updateFields.firstActionAt = firstActionAt;
 
-      // Get the latest action description
       const sortedHistory = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       if (sortedHistory.length > 0) {
         updateFields.latestActionDescription = sortedHistory[0].action;
@@ -117,7 +108,6 @@ async function updateBillSponsorsAndHistory(billId: string, sponsors: any[], his
   }
 }
 
-// Process sponsors from Congress API data
 function processCongressSponsors(congressBill: any): any[] {
   const sponsors: Array<{
     name: string;
@@ -143,7 +133,6 @@ function processCongressSponsors(congressBill: any): any[] {
     });
   }
 
-  // Process cosponsors
   if (congressBill.cosponsors && congressBill.cosponsors.length > 0) {
     congressBill.cosponsors.forEach((cosponsor: any) => {
       sponsors.push({
@@ -161,7 +150,6 @@ function processCongressSponsors(congressBill: any): any[] {
   return sponsors;
 }
 
-// Process history from Congress API data
 function processCongressHistory(congressBill: any): any[] {
   const history = (congressBill.actions?.actions || [])
     .map((action: any) => {
@@ -216,10 +204,8 @@ async function fetchHistoricalCongressBills(congressNumber: number) {
           try {
             const billId = `congress-bill-${congressNumber}-${bill.type.toLowerCase()}-${bill.number}`;
 
-            // Check if bill already exists
             const existingLegislation = await getLegislationById(billId);
 
-            // Fetch detailed bill information including actions
             const detailUrl = `${CONGRESS_API_BASE_URL}/bill/${congressNumber}/${bill.type.toLowerCase()}/${bill.number}?api_key=${CONGRESS_API_KEY}&format=json`;
             const detailResponse = await fetch(detailUrl);
 
@@ -231,7 +217,6 @@ async function fetchHistoricalCongressBills(congressNumber: number) {
             const detailData: any = await detailResponse.json();
             const congressBill = detailData.bill;
 
-            // Fetch actions (required for sponsors and history)
             const actionsResponse = await fetch(`${CONGRESS_API_BASE_URL}/bill/${congressNumber}/${bill.type.toLowerCase()}/${bill.number}/actions?api_key=${CONGRESS_API_KEY}&format=json`);
 
             if (actionsResponse.ok) {
@@ -239,20 +224,16 @@ async function fetchHistoricalCongressBills(congressNumber: number) {
               congressBill.actions = actionsData;
             }
 
-            // Process sponsors and history
             const sponsors = processCongressSponsors(congressBill);
             const history = processCongressHistory(congressBill);
             const enactedAt = detectEnactedDate(history);
 
             if (existingLegislation) {
-              // Bill exists - only update sponsors and history
               await updateBillSponsorsAndHistory(billId, sponsors, history, enactedAt);
               console.log(`Updated existing bill: ${bill.type} ${bill.number} (${congressNumber}th Congress)`);
             } else {
-              // Bill doesn't exist - insert complete bill
               console.log(`Bill ${bill.type} ${bill.number} doesn't exist. Inserting complete bill...`);
 
-              // Fetch additional data for complete insertion
               const [textResponse, summariesResponse] = await Promise.all([
                 fetch(`${CONGRESS_API_BASE_URL}/bill/${congressNumber}/${bill.type.toLowerCase()}/${bill.number}/text?api_key=${CONGRESS_API_KEY}&format=json`),
                 fetch(`${CONGRESS_API_BASE_URL}/bill/${congressNumber}/${bill.type.toLowerCase()}/${bill.number}/summaries?api_key=${CONGRESS_API_KEY}&format=json`)
@@ -280,8 +261,7 @@ async function fetchHistoricalCongressBills(congressNumber: number) {
 
             billsProcessed++;
 
-            // Rate limiting for Congress API
-            await delay(150); // Be respectful to the API
+            await delay(150); 
 
           } catch (transformError) {
             console.error(`Error processing Congress bill ${bill.type} ${bill.number}:`, transformError);
@@ -303,7 +283,6 @@ async function fetchHistoricalCongressBills(congressNumber: number) {
   console.log(`Finished fetching bills from ${congressNumber}th Congress. Processed ${billsProcessed} bills.`);
 }
 
-// Parse command line arguments
 function parseArguments(): {
   specificCongress?: number;
   startCongress?: number;
@@ -399,8 +378,6 @@ async function main() {
 
   for (const congressNumber of congressSessions) {
     await fetchHistoricalCongressBills(congressNumber);
-
-    // Add delay between different Congress sessions
     await delay(2000);
   }
 
