@@ -73,7 +73,7 @@ const getTopicHeatmapColor = (score: number): string => {
 const DEFAULT_POSITION: [number, number] = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
 
-export const MapUI = () => {
+export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
     const {
         resolvedTheme,
         isClient,
@@ -146,6 +146,18 @@ export const MapUI = () => {
         const max = Math.max(...Object.values(repScores));
         return max > 0 ? max : 1;
     }, [repScores]);
+
+    const repHeatmapLegendLabels = React.useMemo(() => {
+        const rawLabels = [
+            0,
+            Math.round(maxRepScore * 0.0625),
+            Math.round(maxRepScore * 0.25),
+            Math.round(maxRepScore * 0.5625),
+            maxRepScore
+        ];
+        const uniqueLabels = [...new Set(rawLabels)];
+        return uniqueLabels.sort((a, b) => a - b);
+    }, [maxRepScore]);
 
     const getRepHeatmapColor = React.useCallback((score: number): string => {
         if (score <= 0) return 'rgb(255,255,255)';
@@ -282,11 +294,14 @@ export const MapUI = () => {
                                         <div className="flex items-center space-x-1"><span className="text-xs text-muted-foreground">Borders:</span><Switch checked={showDistrictBorders} onCheckedChange={setShowDistrictBorders}/></div>
                                     </div>
                                 )}
-                                <Button variant="outline" size="sm" onClick={() => setIsFullScreen(false)} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3"><Minimize className="h-3 w-3 sm:h-4 sm:w-4" /><span className="hidden sm:inline">Exit Full Screen</span><span className="sm:hidden">Exit</span></Button>
+                                <div className="flex items-center space-x-2">
+                                    {exportButton}
+                                    <Button variant="outline" size="sm" onClick={() => setIsFullScreen(false)} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3"><Minimize className="h-3 w-3 sm:h-4 sm:w-4" /><span className="hidden sm:inline">Exit Full Screen</span><span className="sm:hidden">Exit</span></Button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div className="absolute top-0 left-0 w-full h-full">
+                    <div className="absolute top-0 left-0 w-full h-full statepulse-map-export-target">
                         {(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (
                             <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 xl:left-72 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 sm:p-3 text-xs text-amber-800">
                                 <div className="flex items-center space-x-2"><svg className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg><span className="text-xs">Loading districts with mobile optimizations.{memoryPressure && ' Memory optimization active.'}</span></div>
@@ -331,7 +346,7 @@ export const MapUI = () => {
                         )}
                         {showGerrymandering && !gerryDataLoading && Object.keys(gerryScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Compactness Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }}></div><span className="text-xs">Very Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#60e8fa' }}></div><span className="text-xs">Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f5ce0b' }}></div><span className="text-xs">Less Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#d93706' }}></div><span className="text-xs">Irregular</span></div></div></div>)}
                         {showTopicHeatmap && !topicDataLoading && Object.keys(topicScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Topic Activity Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(25, 25, 112)' }}></div><span className="text-xs">High Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(99, 120, 171)' }}></div><span className="text-xs">Medium Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(173, 216, 230)' }}></div><span className="text-xs">Low Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div><span className="text-xs">No Data</span></div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Topic: {selectedTopic === 'all' ? 'All Topics' : selectedTopic}</div></div>)}
-                        {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Representative Scale'}</h5><div className="w-full"><div className="h-3 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1"><span>0</span><span>{Math.round(maxRepScore * 0.0625)}</span><span>{Math.round(maxRepScore * 0.25)}</span><span>{Math.round(maxRepScore * 0.5625)}</span><span>{maxRepScore}</span></div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Spectrum from white to dark purple represents absolute metric value.</div></div>)}
+                        {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Representative Scale'}</h5><div className="w-full"><div className="h-3 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1">{repHeatmapLegendLabels.map(label => <span key={label}>{label}</span>)}</div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Spectrum from white to dark purple represents absolute metric value.</div></div>)}
                         {!['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0 text-xs sm:text-sm"><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary"></div><span>High Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/50"></div><span>Medium Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/20"></div><span>Low Activity</span></div></div></div>)}
                         {showPartyAffiliation && !partyDataLoading && Object.keys(districtPartyMapping).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Party Legend</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm">{Object.keys(PARTY_COLORS).map(party => (<div key={party} className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: PARTY_COLORS[party] }}></div><span className="text-xs">{party}</span></div>))}</div></div>)}
                         {showTopicHeatmap && availableTopics.length > 0 && (<div className="absolute top-16 sm:top-20 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-xs xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><label className="text-xs sm:text-sm font-medium block mb-1 sm:mb-2">Select Topic:</label><select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full text-xs sm:text-sm border rounded px-2 py-1 bg-background" disabled={topicDataLoading}><option value="all">All Topics</option>{availableTopics.map(topic => (<option key={topic} value={topic}>{topic}</option>))}</select></div>)}
@@ -349,9 +364,12 @@ export const MapUI = () => {
                                 <CardTitle className="font-headline text-lg md:text-xl"><span className="hidden sm:inline">Interactive Dashboard</span></CardTitle>
                                 <CardDescription className="text-xs md:text-sm"><span className="hidden sm:inline">Explore legislative activity, representatives, and policy trends across the United States.</span><span className="sm:hidden">Explore legislative activity and trends.</span></CardDescription>
                             </div>
-                            <Button variant="outline" size="sm" onClick={() => setIsFullScreen(!isFullScreen)} className="flex items-center gap-1" title={isFullScreen ? "Exit full screen" : "Enter full screen"}>
-                                {isFullScreen ? (<><Minimize className="h-4 w-4" /><span className="hidden sm:inline">Exit Full Screen</span></>) : (<><Maximize className="h-4 w-4" /><span className="hidden sm:inline">Full Screen</span></>)}
-                            </Button>
+                            <div className="flex items-center space-x-2">
+                                {exportButton}
+                                <Button variant="outline" size="sm" onClick={() => setIsFullScreen(!isFullScreen)} className="flex items-center gap-1" title={isFullScreen ? "Exit full screen" : "Enter full screen"}>
+                                    {isFullScreen ? (<><Minimize className="h-4 w-4" /><span className="hidden sm:inline">Exit Full Screen</span></>) : (<><Maximize className="h-4 w-4" /><span className="hidden sm:inline">Full Screen</span></>)}
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4 md:space-y-6">
@@ -414,7 +432,7 @@ export const MapUI = () => {
                                 {showRepHeatmap && (<div className="space-y-2"><label className="text-xs font-medium">Select Metric:</label><select value={selectedRepMetric} onChange={(e) => setSelectedRepMetric(e.target.value)} className="w-full text-xs border rounded px-2 py-1 bg-background" disabled={repDataLoading}>{availableRepMetrics.map(metric => (<option key={metric} value={metric}>{metric === 'sponsored_bills' ? 'Bills Sponsored' : metric === 'recent_activity' ? 'Recent Activity' : metric === 'enacted_bills' ? 'Enacted Bills Sponsored' : metric === 'enacted_recent_activity' ? 'Enacted Bills - Recent Activity' : metric}</option>))}</select></div>)}
                                 {repDataLoading && (<div className="flex items-center space-x-2 text-xs text-muted-foreground"><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div><span>Loading representative data...</span></div>)}
                                 {repDataError && (<div className="text-xs text-red-500">Error loading representative data: {repDataError}</div>)}
-                                {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="space-y-2"><h5 className="font-medium text-xs">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Score Scale'}</h5><div className="w-full"><div className="h-4 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1"><span>0</span><span>{Math.round(maxRepScore * 0.0625)}</span><span>{Math.round(maxRepScore * 0.25)}</span><span>{Math.round(maxRepScore * 0.5625)}</span><span>{maxRepScore}</span></div></div><p className="text-xs text-muted-foreground">Spectrum from white (low) to dark purple (high) representing absolute metric value.</p></div>)}
+                                {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="space-y-2"><h5 className="font-medium text-xs">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : 'Score Scale'}</h5><div className="w-full"><div className="h-4 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1">{repHeatmapLegendLabels.map(label => <span key={label}>{label}</span>)}</div></div><p className="text-xs text-muted-foreground">Spectrum from white (low) to dark purple (high) representing absolute metric value.</p></div>)}
                             </div>
                         )}
                         {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) && (
@@ -422,7 +440,7 @@ export const MapUI = () => {
                                 <div className="flex items-center justify-between"><div className="space-y-1"><h4 className="font-semibold text-xs md:text-sm"><span className="hidden sm:inline">District Borders</span><span className="sm:hidden">Borders</span></h4><p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Show or hide district boundary lines</span><span className="sm:hidden">Show boundary lines</span></p></div><Switch checked={showDistrictBorders} onCheckedChange={setShowDistrictBorders}/></div>
                             </div>
                         )}
-                        <div className="relative">
+                        <div className="relative statepulse-map-export-target">
                             {(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (<div className="absolute top-2 left-2 right-2 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 text-xs text-amber-800"><div className="flex items-center space-x-1"><svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg><span>Loading districts with mobile optimizations.{memoryPressure && ' Memory optimization active.'}</span></div><div className="mt-1 text-xs text-amber-700">Districts will load progressively to prevent crashes.</div></div>)}
                             <div className="h-[300px] sm:h-[400px] md:h-[500px] w-full rounded-md overflow-hidden border">
                                 {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
