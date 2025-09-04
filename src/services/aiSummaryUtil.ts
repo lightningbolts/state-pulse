@@ -44,7 +44,7 @@ export async function generateOptimizedGeminiSummary(text: string, detectedSourc
   // For rich sources, generate both summaries in one call to save tokens and API calls
   const prompt = `Please provide TWO summaries of the following legislation:
 
-FIRST - A brief summary in approximately 100 words, focusing on the main points and specific impact. Remove fluff and filler.
+FIRST - A brief summary in approximately 100 words, focusing on the main points and specific impact. Remove fluff and filler. DO NOT say "Brief summary" or "Detailed/comprehensive summary/analysis " at the start of each summary.
 
 SECOND - A comprehensive, detailed analysis that includes:
 - Key Provisions: What the legislation specifically does, changes, or establishes
@@ -52,7 +52,7 @@ SECOND - A comprehensive, detailed analysis that includes:
 - Implementation Details: Timeline, funding mechanisms, enforcement procedures
 - Direct Citations: Quote specific sections or language from the text when relevant
 
-Format the detailed summary using a mix of paragraphs and bullet points where appropriate. Keep paragraphs to 3-4 sentences for readability. Use single asterisks for emphasis and avoid excessive markdown formatting.
+Format the detailed summary using a mix of paragraphs and bullet points where appropriate. Keep paragraphs to 3-4 sentences for readability. Use italics for emphasis and avoid excessive markdown formatting.
 
 Please clearly separate the two summaries with "---DETAILED---" between them.
 
@@ -495,9 +495,8 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
   }
 
   // 2. Special handling for states that prefer abstracts only
-  const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Ohio', 'Minnesota', 'Vermont', 'Arizona', 'Delaware', 'Nebraska', 'Colorado'];
-  const isAbstractOnlyState = abstractOnlyStates.includes(bill.jurisdictionName || '') ||
-                             (bill.jurisdictionName === 'Texas' && bill.chamber === 'upper');
+  const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Ohio', 'Minnesota', 'Vermont', 'Arizona', 'Delaware', 'Nebraska', 'Colorado', 'Texas'];
+  const isAbstractOnlyState = abstractOnlyStates.includes(bill.jurisdictionName || '')
 
   if (isAbstractOnlyState) {
     if (bill.abstracts?.length) {

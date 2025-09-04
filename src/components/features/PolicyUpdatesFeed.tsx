@@ -28,7 +28,7 @@ interface PolicyUpdate {
     subjects?: string[];
     createdAt?: string;
     summary?: string;
-    geminiSummary?: string; // Add geminiSummary field
+    geminiSummary?: string;
     classification?: string[];
     openstatesUrl?: string;
     latestActionDescription?: string;
