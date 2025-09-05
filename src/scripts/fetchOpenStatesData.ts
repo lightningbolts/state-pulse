@@ -1132,7 +1132,8 @@ async function fetchCongressBills(updatedSince: string) {
             }
             const existingLegislation = await getLegislationById(legislationToStore.id);
             if (existingLegislation) {
-              if (existingLegislation.geminiSummary && existingLegislation.geminiSummary.length > 100) {
+              const isRichSource = ['pdf-extracted', 'pdf', 'full-text', 'ilga-pdf', 'ilga-fulltext'].includes(existingLegislation.geminiSummarySource || '');
+              if (existingLegislation.geminiSummary && existingLegislation.geminiSummary.length > 100 && existingLegislation.longGeminiSummary && existingLegislation.longGeminiSummary.length > 250 && !isRichSource) {
                 // If it exists and has a good summary, skip it
                 console.log(`Bill ${legislationToStore.identifier} already exists with a good summary. Skipping.`);
                 billsProcessed++;
