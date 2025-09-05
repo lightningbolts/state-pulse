@@ -248,6 +248,7 @@ async function main() {
                 <div style="font-size:0.95em;color:#6b7280;margin-bottom:8px;">
                   ${legislation.session} - ${legislation.jurisdictionName}${legislation.chamber ? ` (${legislation.chamber})` : ''}
                 </div>
+                ${legislation.latestActionAt ? `<div style="font-size:0.9em;color:#374151;margin-bottom:8px;"><strong>Last Action:</strong> ${new Date(legislation.latestActionAt).toLocaleDateString()}</div>` : ''}
                 ${legislation.geminiSummary ? `<div style='background:#f0f6ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#71a3a0;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
                 <div style="margin-top:10px;">
                   <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #e7eaf3;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#71a3a0;text-decoration:none;background:#f9fafb;">View Details</a>
