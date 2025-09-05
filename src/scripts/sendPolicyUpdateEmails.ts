@@ -1,8 +1,8 @@
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
-import { sendEmail } from '@/lib/email';
-import { renderBrandedEmail } from '@/lib/emailTemplate';
-import { searchLegislationByTopic } from '@/services/legislationService';
+import { sendEmail } from '../lib/email';
+import { renderBrandedEmail } from '../lib/emailTemplate';
+import { searchLegislationByTopic } from '../services/legislationService';
 
 import fetch from 'node-fetch';
 
@@ -211,9 +211,9 @@ async function main() {
       for (const topic of topics) {
         const bills = await searchLegislationByTopic(topic, timeRange);
         const recentBills = (bills || []).filter(bill => {
-          if (!bill.latestActionAt) return false;
-          const latest = new Date(bill.latestActionAt);
-          return Date.now() - latest.getTime() <= timeRangeMs;
+          const latestAction = bill.latestActionAt && (Date.now() - new Date(bill.latestActionAt).getTime() <= timeRangeMs);
+          const latestUpdate = bill.updatedAt && (Date.now() - new Date(bill.updatedAt).getTime() <= timeRangeMs);
+          return latestAction || latestUpdate;
         });
         if (recentBills.length > 0) {
           newLegislation.push({ topic, bills: recentBills });
