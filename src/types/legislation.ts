@@ -1,4 +1,28 @@
-import {ObjectId} from "mongodb";
+import { ObjectId } from 'mongodb';
+
+export interface MemberVote {
+  bioguideId: string;
+  firstName: string;
+  lastName: string;
+  voteCast: string;
+  voteParty: string;
+  voteState: string;
+}
+
+export interface VotingRecord {
+  identifier: string;
+  rollCallNumber: number;
+  legislationType: string;
+  legislationNumber: string;
+  bill_id?: string;
+  voteQuestion: string;
+  result: string;
+  date: string;
+  memberVotes: MemberVote[];
+  congress: number;
+  session: number;
+  chamber: 'US House' | 'US Senate';
+}
 
 export interface Legislation {
   id: string;
