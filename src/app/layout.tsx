@@ -46,7 +46,6 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <SignedIn>
-              {/* This component will run when a user is signed in and sync their data with MongoDB */}
               <UserSyncComponent />
             </SignedIn>
             {children}

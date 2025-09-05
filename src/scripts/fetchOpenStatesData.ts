@@ -1,9 +1,9 @@
-import {getLegislationById, upsertLegislationSelective} from '@/services/legislationService';
+import {getLegislationById, upsertLegislationSelective} from '../services/legislationService';
 import {config} from 'dotenv';
 import fetch from 'node-fetch';
-import {generateGeminiSummary, summarizeLegislationOptimized} from '@/services/aiSummaryUtil';
-import {classifyLegislationForFetch} from '@/services/classifyLegislationService';
-import {enactedPatterns} from "@/types/legislation";
+import {generateGeminiSummary, summarizeLegislationOptimized} from '../services/aiSummaryUtil';
+import {classifyLegislationForFetch} from '../services/classifyLegislationService';
+import {enactedPatterns} from "../types/legislation";
 
 config({ path: '../../.env' });
 

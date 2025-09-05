@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { upsertVotingRecord } from '@/services/votingRecordService';
+import * as cheerio from 'cheerio';
 import { VotingRecord, MemberVote } from '@/types/legislation';
 import { parseStringPromise } from 'xml2js';
 import {config} from 'dotenv';
@@ -53,57 +54,29 @@ function buildSenateBioguideIdMap(yamlPath: string) {
 }
 
 
-async function fetchSenateRollCallVotes(): Promise<SenateRollCallVote[]> {
-  console.log('Fetching Senate roll call votes XML...');
-  const res = await fetch(SENATE_XML_URL);
-  if (!res.ok) throw new Error(`Failed to fetch Senate XML: ${res.status}`);
-  const xml = await res.text();
-  const parsed = await parseStringPromise(xml, { explicitArray: false });
-  if (!parsed.vote_menu || !parsed.vote_menu.vote) {
-    console.warn('Senate XML structure unexpected or empty:', JSON.stringify(parsed, null, 2));
-    return [];
-  }
-  const votes = parsed.vote_menu.vote;
-  const results: SenateRollCallVote[] = [];
-  for (const vote of Array.isArray(votes) ? votes : [votes]) {
-    // Each vote has a link to the detailed XML for member votes
-    const detailUrl = vote.vote_document_url;
-    if (!detailUrl) continue;
-    try {
-      const detailRes = await fetch(detailUrl);
-      if (!detailRes.ok) continue;
-      const detailXml = await detailRes.text();
-      const detailParsed = await parseStringPromise(detailXml, { explicitArray: false });
-      const members = detailParsed.roll_call_vote.members.member;
-      const memberVotes: SenateMemberVote[] = Array.isArray(members)
-        ? members.map((m: any) => ({
-            name: `${m.last_name}, ${m.first_name}`,
-            state: m.state,
-            party: m.party,
-            vote: m.vote_cast,
-          }))
-        : [
-            {
-              name: `${members.last_name}, ${members.first_name}`,
-              state: members.state,
-              party: members.party,
-              vote: members.vote_cast,
-            },
-          ];
-      results.push({
-        voteNumber: vote.vote_number,
-        date: vote.vote_date,
-        question: vote.vote_question,
-        result: vote.vote_result,
-        billNumber: vote.bill_number,
-        memberVotes,
-      });
-      console.log(`Fetched Senate vote ${vote.vote_number} (${memberVotes.length} member votes)`);
-    } catch (err) {
-      console.warn(`Failed to parse Senate vote ${vote.vote_number}:`, err);
+
+// Scrape the HTML roll call menu for all vote links
+async function fetchSenateRollCallVoteLinks(): Promise<{url: string, voteNumber: string, date?: string, question?: string}[]> {
+  console.log('Fetching Senate roll call votes HTML menu...');
+  const res = await fetch('https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_1.htm');
+  if (!res.ok) throw new Error(`Failed to fetch Senate HTML menu: ${res.status}`);
+  const html = await res.text();
+  const $ = cheerio.load(html);
+  const links: {url: string, voteNumber: string, date?: string, question?: string}[] = [];
+  // Find all links to roll call votes
+  $('a').each((_: number, el: any) => {
+    const href = $(el).attr('href');
+    const text = $(el).text();
+    if (href && href.includes('/legislative/LIS/roll_call_votes/vote1191/vote_119_1_')) {
+      // Extract vote number from text, e.g. "503 (83-13)"
+      const match = text.match(/(\d+)/);
+      if (match) {
+        links.push({ url: 'https://www.senate.gov' + href, voteNumber: match[1] });
+      }
     }
-  }
-  return results;
+  });
+  console.log(`Found ${links.length} Senate roll call vote links.`);
+  return links;
 }
 
 
@@ -189,45 +162,101 @@ async function fetchAndUpsertSenateVotes() {
   // Build the mapping from (lastName, state) => bioguideId
   const yamlPath = path.resolve(__dirname, 'legislators-current.yaml');
   const bioguideMap = buildSenateBioguideIdMap(yamlPath);
-  const senateVotes = await fetchSenateRollCallVotes();
-  for (const vote of senateVotes) {
-    const identifier = `senate-${CONGRESS}-${vote.voteNumber}`;
-    let bill_id: string | undefined = undefined;
-    if (vote.billNumber) {
-      bill_id = `congress-bill-${CONGRESS}-senate-${vote.billNumber}`.toLowerCase();
-    }
-    const memberVotes: MemberVote[] = vote.memberVotes.map((m: any) => {
-      const [lastName, firstName] = m.name.split(',').map((s: string) => s.trim());
-      const key = `${lastName.toLowerCase()}|${m.state}`;
-      const bioguideId = bioguideMap.get(key) || '';
-      if (!bioguideId) {
-        console.warn(`No bioguideId found for senator: ${firstName} ${lastName} (${m.state})`);
+  const senateVoteLinks = await fetchSenateRollCallVoteLinks();
+  // For each Senate roll call vote link, fetch and parse the vote page for member-level votes
+  for (const link of senateVoteLinks) {
+    try {
+      const res = await fetch(link.url);
+      if (!res.ok) {
+        console.warn(`Failed to fetch vote page: ${link.url}`);
+        continue;
       }
-      return {
-        bioguideId,
-        firstName: firstName || '',
-        lastName: lastName || '',
-        voteCast: m.vote,
-        voteParty: m.party,
-        voteState: m.state,
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      // Find the section with 'Alphabetical by Senator Name'
+      const bodyText = $('body').text();
+      const sectionMatch = bodyText.match(/Alphabetical by Senator Name\s+([\s\S]*?)(Grouped By Vote Position|Grouped by Home State|Vote Summary|$)/);
+      if (!sectionMatch) {
+        console.warn(`Could not find 'Alphabetical by Senator Name' section for vote ${link.voteNumber}`);
+        continue;
+      }
+      // Use a global regex to match each senator's entry individually
+      let memberVotes: MemberVote[] = [];
+      const memberRegex = /(.*?)(?: \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes))/g;
+      let match;
+      while ((match = memberRegex.exec(sectionMatch[1])) !== null) {
+        // match[1]: name, match[2]: party, match[3]: state, match[4]: voteCast
+        const name = match[1].trim();
+        const party = match[2];
+        const state = match[3];
+        const voteCast = match[4];
+        const [lastName, firstName = ''] = name.split(',').map(s => s.trim());
+        const key = `${lastName.toLowerCase()}|${state}`;
+        const bioguideId = bioguideMap.get(key) || '';
+        if (!bioguideId) {
+          console.warn(`No bioguideId found for senator: ${firstName} ${lastName} (${state})`);
+        }
+        memberVotes.push({
+          bioguideId,
+          firstName,
+          lastName,
+          voteCast,
+          voteParty: party,
+          voteState: state,
+        });
+      }
+      // Fallback: If no member votes found, try parsing the 'Grouped by Home State' section
+      if (memberVotes.length === 0) {
+        console.warn(`Falling back to parsing 'Grouped by Home State' section for vote ${link.voteNumber}`);
+        // Find all divs with class 'responsive_col' that contain senator votes
+        const senatorDivs = $("div.responsive_col").toArray();
+        for (const div of senatorDivs) {
+          const text = $(div).text().trim();
+          // Skip state headers (e.g., 'Alabama:')
+          if (/^[A-Za-z ]+:$/.test(text)) continue;
+          // Match: Name (Party-State), Vote
+          const m = text.match(/^(.*?) \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes)$/);
+          if (!m) continue;
+          const name = m[1].trim();
+          const party = m[2];
+          const state = m[3];
+          const voteCast = m[4];
+          const [lastName, firstName = ''] = name.split(',').map(s => s.trim());
+          const key = `${lastName.toLowerCase()}|${state}`;
+          const bioguideId = bioguideMap.get(key) || '';
+          if (!bioguideId) {
+            console.warn(`No bioguideId found for senator: ${firstName} ${lastName} (${state})`);
+          }
+          memberVotes.push({
+            bioguideId,
+            firstName,
+            lastName,
+            voteCast,
+            voteParty: party,
+            voteState: state,
+          });
+        }
+      }
+      // Compose VotingRecord
+      const identifier = `senate-${CONGRESS}-${link.voteNumber}`;
+      const votingRecord: VotingRecord = {
+        identifier,
+        rollCallNumber: Number(link.voteNumber),
+        legislationType: 'Senate',
+        legislationNumber: '', // TODO: parse from page if possible
+        voteQuestion: '', // TODO: parse from page if possible
+        result: '', // TODO: parse from page if possible
+        date: '', // TODO: parse from page if possible
+        memberVotes,
+        congress: CONGRESS,
+        session: 1,
+        chamber: 'US Senate',
       };
-    });
-    const votingRecord: VotingRecord = {
-      identifier,
-      rollCallNumber: Number(vote.voteNumber),
-      legislationType: 'Senate',
-      legislationNumber: vote.billNumber || '',
-      voteQuestion: vote.question,
-      result: vote.result,
-      date: vote.date,
-      memberVotes,
-      congress: CONGRESS,
-      session: 1,
-      chamber: 'US Senate',
-      ...(bill_id ? { bill_id } : {}),
-    };
-    await upsertVotingRecord(votingRecord);
-    console.log(`Upserted voting record for Senate vote ${vote.voteNumber} (identifier: ${identifier})`);
+      await upsertVotingRecord(votingRecord);
+      console.log(`Upserted voting record for Senate vote ${link.voteNumber} (identifier: ${identifier})`);
+    } catch (err) {
+      console.error(`Error processing Senate vote ${link.voteNumber}:`, err);
+    }
   }
   console.log(`Done! Saved Senate votes to MongoDB collection 'voting_records'`);
 }
