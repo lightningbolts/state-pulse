@@ -44,7 +44,7 @@ export async function generateOptimizedGeminiSummary(text: string, detectedSourc
   // For rich sources, generate both summaries in one call to save tokens and API calls
   const prompt = `Please provide TWO summaries of the following legislation:
 
-FIRST - A brief summary in approximately 100 words, focusing on the main points and specific impact. Remove fluff and filler. DO NOT say "Brief summary" or "Detailed/comprehensive summary/analysis " at the start of each summary.
+FIRST - A brief summary in approximately 100 words, focusing on the main points and specific impact. Remove fluff and filler.
 
 SECOND - A comprehensive, detailed analysis that includes:
 - Key Provisions: What the legislation specifically does, changes, or establishes
@@ -53,7 +53,7 @@ SECOND - A comprehensive, detailed analysis that includes:
 - Direct Citations: Quote specific sections or language from the text when relevant
 
 Format the detailed summary using a mix of paragraphs and bullet points where appropriate. Keep paragraphs to 3-4 sentences for readability. Use italics for emphasis and avoid excessive markdown formatting.
-
+DO NOT say "Brief summary" or "Detailed/comprehensive summary/analysis " at the start of each summary.
 Please clearly separate the two summaries with "---DETAILED---" between them.
 
 Legislation text:
