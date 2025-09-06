@@ -597,7 +597,15 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
       // General source processing
       console.log('[DEBUG] Checking source URL:', source.url);
       try {
-        const pdfLinks = await getBillPdfLinksFromPage(source.url);
+        // First try regular fetch-based extraction
+        let pdfLinks = await getBillPdfLinksFromPage(source.url);
+        
+        // If no PDFs found with regular approach, try Puppeteer for JS-rendered pages
+        if (pdfLinks.length === 0) {
+          console.log('[DEBUG] No PDFs found with fetch, trying Puppeteer for:', source.url);
+          pdfLinks = await getBillPdfLinksFromPagePuppeteer(source.url);
+        }
+        
         for (let pdfUrl of pdfLinks) {
           const result = await extractPdfContent(pdfUrl, 'pdf-extracted');
           if (result) return result;
@@ -616,20 +624,112 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
  * Returns all PDF URLs from a web page that contain the word 'bill' (case-insensitive).
  */
 export async function getBillPdfLinksFromPage(url: string): Promise<string[]> {
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+  });
   if (!res.ok) throw new Error(`Failed to fetch page: ${url} (status: ${res.status})`);
   const html = await res.text();
-  // Find all PDF links with 'bill' in the URL
-  const pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi))
-    .map(m => m[1])
-    .filter(link => link.toLowerCase().includes('bill'))
-    .map(link => {
-      // Make relative links absolute
-      if (!link.startsWith('http')) {
-        const base = new URL(url);
-        return new URL(link, base).href;
+  
+  // Multiple regex patterns to catch different PDF link formats
+  const pdfRegexes = [
+    // Standard <a href="...pdf"> links
+    /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi,
+    // Links that might not end in .pdf but contain PDF in path
+    /<a[^>]+href=["']([^"']*pdf[^"']*)["'][^>]*>/gi,
+    // Data attributes that might contain PDF URLs
+    /data-[^=]*=["']([^"']*\.pdf[^"']*)["']/gi,
+    // Plain text URLs in the HTML
+    /https?:\/\/[^\s"'<>]+\.pdf[\w\/\-\?=&]*/gi
+  ];
+  
+  const allPdfUrls = new Set<string>();
+  
+  for (const regex of pdfRegexes) {
+    const matches = Array.from(html.matchAll(regex));
+    for (const match of matches) {
+      const url = match[1] || match[0];
+      if (url && url.toLowerCase().includes('bill')) {
+        allPdfUrls.add(url);
       }
-      return link;
-    });
+    }
+  }
+  
+  // Convert to array and make relative links absolute
+  const pdfLinks = Array.from(allPdfUrls).map(link => {
+    if (!link.startsWith('http')) {
+      const base = new URL(url);
+      return new URL(link, base).href;
+    }
+    return link;
+  });
+  
   return pdfLinks;
+}
+
+/**
+ * Uses Puppeteer to extract all bill PDF links from a page after JS rendering.
+ * Returns all links that contain both 'pdf' and 'bill' in the URL (case-insensitive, deduped).
+ */
+export async function getBillPdfLinksFromPagePuppeteer(url: string): Promise<string[]> {
+  const puppeteer = await import('puppeteer');
+  const browser = await puppeteer.default.launch({ 
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'] // Better compatibility
+  });
+  
+  try {
+    const page = await browser.newPage();
+    
+    // Set a user agent to avoid blocking
+    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    
+    // Navigate and wait for network to settle
+    await page.goto(url, { 
+      waitUntil: 'networkidle2',
+      timeout: 30000 
+    });
+    
+    // Wait a bit more for any lazy-loaded content
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const pdfLinks: string[] = await page.evaluate(() => {
+      const anchors = Array.from(document.querySelectorAll('a'));
+      const allLinks = anchors
+        .map(a => a.href)
+        .filter(href => href && 
+          href.toLowerCase().includes('pdf') && 
+          href.toLowerCase().includes('bill')
+        );
+      
+      // Also check for any links in data attributes or other sources
+      const dataLinks: string[] = [];
+      document.querySelectorAll('[data-url], [data-href], [data-link]').forEach(el => {
+        const attrs = ['data-url', 'data-href', 'data-link'];
+        attrs.forEach(attr => {
+          const value = el.getAttribute(attr);
+          if (value && value.toLowerCase().includes('pdf') && value.toLowerCase().includes('bill')) {
+            dataLinks.push(value);
+          }
+        });
+      });
+      
+      return [...allLinks, ...dataLinks];
+    });
+    
+    await browser.close();
+    // Deduplicate and filter out invalid URLs
+    return Array.from(new Set(pdfLinks)).filter(link => {
+      try {
+        new URL(link);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
 }
