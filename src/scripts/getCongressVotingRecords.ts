@@ -34,6 +34,10 @@ interface SenateRollCallVote {
   memberVotes: SenateMemberVote[];
 }
 
+function normalizeName(name: string): string {
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 function buildSenateBioguideIdMap(yamlPath: string) {
   const file = fs.readFileSync(yamlPath, 'utf8');
   const legislators = yaml.load(file) as any[];
@@ -44,7 +48,7 @@ function buildSenateBioguideIdMap(yamlPath: string) {
     if (currentSenTerm) {
       const lastName = (leg.name && leg.name.last) ? leg.name.last.trim().toLowerCase() : '';
       const state = currentSenTerm.state;
-      const key = `${lastName}|${state}`;
+      const key = `${normalizeName(lastName)}|${state}`;
       if (leg.id && leg.id.bioguide) {
         map.set(key, leg.id.bioguide);
       }
@@ -173,56 +177,62 @@ async function fetchAndUpsertSenateVotes() {
       }
       const html = await res.text();
       const $ = cheerio.load(html);
-      // Find the section with 'Alphabetical by Senator Name'
-      const bodyText = $('body').text();
-      const sectionMatch = bodyText.match(/Alphabetical by Senator Name\s+([\s\S]*?)(Grouped By Vote Position|Grouped by Home State|Vote Summary|$)/);
-      if (!sectionMatch) {
-        console.warn(`Could not find 'Alphabetical by Senator Name' section for vote ${link.voteNumber}`);
-        continue;
-      }
-      // Use a global regex to match each senator's entry individually
-      let memberVotes: MemberVote[] = [];
-      const memberRegex = /(.*?)(?: \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes))/g;
-      let match;
-      while ((match = memberRegex.exec(sectionMatch[1])) !== null) {
-        // match[1]: name, match[2]: party, match[3]: state, match[4]: voteCast
-        const name = match[1].trim();
-        const party = match[2];
-        const state = match[3];
-        const voteCast = match[4];
-        const [lastName, firstName = ''] = name.split(',').map(s => s.trim());
-        const key = `${lastName.toLowerCase()}|${state}`;
-        const bioguideId = bioguideMap.get(key) || '';
-        if (!bioguideId) {
-          console.warn(`No bioguideId found for senator: ${firstName} ${lastName} (${state})`);
+
+      // Helper to get text content following a bolded label
+      const getNextText = (selector: string) => {
+        const element = $(`b:contains("${selector}")`);
+        if (element.length > 0 && element[0].nextSibling && element[0].nextSibling.type === 'text') {
+            return element[0].nextSibling.nodeValue.trim().replace(/^:/, '').trim();
         }
-        memberVotes.push({
-          bioguideId,
-          firstName,
-          lastName,
-          voteCast,
-          voteParty: party,
-          voteState: state,
-        });
+        return '';
+      };
+
+      const voteQuestion = getNextText('Question');
+      const result = getNextText('Result');
+      const dateText = getNextText('Vote Date');
+      const date = dateText ? new Date(dateText).toISOString() : '';
+      
+      let measureText = getNextText('Measure Number');
+      if (!measureText) {
+          measureText = getNextText('Bill Number');
       }
-      // Fallback: If no member votes found, try parsing the 'Grouped by Home State' section
-      if (memberVotes.length === 0) {
-        console.warn(`Falling back to parsing 'Grouped by Home State' section for vote ${link.voteNumber}`);
-        // Find all divs with class 'responsive_col' that contain senator votes
-        const senatorDivs = $("div.responsive_col").toArray();
-        for (const div of senatorDivs) {
-          const text = $(div).text().trim();
-          // Skip state headers (e.g., 'Alabama:')
-          if (/^[A-Za-z ]+:$/.test(text)) continue;
-          // Match: Name (Party-State), Vote
-          const m = text.match(/^(.*?) \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes)$/);
-          if (!m) continue;
+      
+      let legislationNumber = '';
+      let legislationType = '';
+      let bill_id: string | undefined = undefined;
+
+      if (measureText) {
+        const measureMatch = measureText.match(/([A-Za-z\.]+)\s*(\d+)/);
+        if (measureMatch) {
+          legislationType = measureMatch[1].replace(/\./g, '').trim();
+          legislationNumber = measureMatch[2].trim();
+          bill_id = `congress-bill-${CONGRESS}-${legislationType.toLowerCase()}-${legislationNumber}`;
+        }
+      }
+
+      let memberVotes: MemberVote[] = [];
+      const bodyText = $('body').text();
+
+      // Primary Strategy: Grouped by Home State
+      const groupedByStateSectionMatch = bodyText.match(/Grouped by Home State\s+([\s\S]*?)(Vote Summary|$)/);
+      if (groupedByStateSectionMatch) {
+        const votesText = groupedByStateSectionMatch[1];
+        const lines = votesText.trim().split('\n');
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || /^[A-Za-z ]+:$/.test(trimmedLine)) continue; // Skip empty lines and state headers
+          
+          const m = trimmedLine.match(/^(.*?) \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes)$/);
+          if (!m) {
+              console.warn(`Could not parse member vote line: "${trimmedLine}"`);
+              continue;
+          }
           const name = m[1].trim();
           const party = m[2];
           const state = m[3];
           const voteCast = m[4];
           const [lastName, firstName = ''] = name.split(',').map(s => s.trim());
-          const key = `${lastName.toLowerCase()}|${state}`;
+          const key = `${normalizeName(lastName.toLowerCase())}|${state}`;
           const bioguideId = bioguideMap.get(key) || '';
           if (!bioguideId) {
             console.warn(`No bioguideId found for senator: ${firstName} ${lastName} (${state})`);
@@ -237,16 +247,48 @@ async function fetchAndUpsertSenateVotes() {
           });
         }
       }
+
+      // Fallback Strategy: Alphabetical by Senator Name
+      if (memberVotes.length === 0) {
+        console.warn(`Falling back to parsing 'Alphabetical by Senator Name' section for vote ${link.voteNumber}`);
+        const sectionMatch = bodyText.match(/Alphabetical by Senator Name\s+([\s\S]*?)(Grouped By Vote Position|Grouped by Home State|Vote Summary|$)/);
+        if (sectionMatch) {
+          const memberRegex = /(.*?)(?: \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes))/g;
+          let match;
+          while ((match = memberRegex.exec(sectionMatch[1])) !== null) {
+            const name = match[1].trim();
+            const party = match[2];
+            const state = match[3];
+            const voteCast = match[4];
+            const [lastName, firstName = ''] = name.split(',').map(s => s.trim());
+            const key = `${normalizeName(lastName.toLowerCase())}|${state}`;
+            const bioguideId = bioguideMap.get(key) || '';
+            if (!bioguideId) {
+              console.warn(`No bioguideId found for senator: ${firstName} ${lastName} (${state})`);
+            }
+            memberVotes.push({
+              bioguideId,
+              firstName,
+              lastName,
+              voteCast,
+              voteParty: party,
+              voteState: state,
+            });
+          }
+        }
+      }
+
       // Compose VotingRecord
       const identifier = `senate-${CONGRESS}-${link.voteNumber}`;
       const votingRecord: VotingRecord = {
         identifier,
         rollCallNumber: Number(link.voteNumber),
-        legislationType: 'Senate',
-        legislationNumber: '', // TODO: parse from page if possible
-        voteQuestion: '', // TODO: parse from page if possible
-        result: '', // TODO: parse from page if possible
-        date: '', // TODO: parse from page if possible
+        legislationType,
+        legislationNumber,
+        bill_id,
+        voteQuestion,
+        result,
+        date,
         memberVotes,
         congress: CONGRESS,
         session: 1,

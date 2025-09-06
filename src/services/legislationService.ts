@@ -1,7 +1,7 @@
-import { getCollection } from '@/lib/mongodb';
+import { getCollection } from '../lib/mongodb';
 import { ObjectId } from 'mongodb';
-import type { Legislation } from '@/types/legislation';
-import type { LegislationMongoDbDocument } from '@/types/legislation';
+import type { Legislation } from '../types/legislation';
+import type { LegislationMongoDbDocument } from '../types/legislation';
 
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
   const cleanData = { ...data };
