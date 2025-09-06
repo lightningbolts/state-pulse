@@ -23,6 +23,9 @@ function cleanSummaryText(text: string): string {
 
 export async function generateGeminiSummary(text: string, sourceType?: string): Promise<string> {
   // Use Gemini to generate a ~100-word summary
+  if (!text || text.trim().length === 0) return 'Summary not available due to insufficient information.';
+  if (text.length < 30) return 'Summary not available due to insufficient information.';
+  if (sourceType === 'none') return 'Summary not available due to insufficient information.';
   const prompt = `Summarize the following legislation in 100 words, focusing on the main points and specific impact. Remove fluff and filler. If there is not enough information to summarize, say so in a single sentence: 'Summary not available due to insufficient information.'\n\n${text}`;
   const response = await ai.generate({ prompt });
   return response.text.trim();
