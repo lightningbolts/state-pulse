@@ -1,6 +1,6 @@
-import {getCollection} from '../lib/mongodb';
+import {getCollection} from '@/lib/mongodb';
 import {Collection, ObjectId} from 'mongodb';
-import {BookmarkMetadata, BookmarkMongoDbDocument, LegislationBookmark} from '../types/legislation';
+import {BookmarkMetadata, BookmarkMongoDbDocument, LegislationBookmark} from '@/types/legislation';
 import {randomUUID} from 'crypto';
 
 // Helper function to clean up data for MongoDB

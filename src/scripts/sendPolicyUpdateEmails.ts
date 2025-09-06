@@ -1,8 +1,8 @@
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
-import { sendEmail } from '../lib/email';
-import { renderBrandedEmail } from '../lib/emailTemplate';
-import { searchLegislationByTopic } from '../services/legislationService';
+import { sendEmail } from '@/lib/email';
+import { renderBrandedEmail } from '@/lib/emailTemplate';
+import { searchLegislationByTopic } from '@/services/legislationService';
 
 import fetch from 'node-fetch';
 

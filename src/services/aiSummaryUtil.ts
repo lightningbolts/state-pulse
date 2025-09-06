@@ -1,8 +1,8 @@
-import {ai} from '../ai/genkit';
+import {ai} from '@/ai/genkit';
 import fetch from 'node-fetch';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
-import {Legislation} from '../types/legislation';
+import {Legislation} from '@/types/legislation';
 
 /**
  * Cleans up AI-generated summary text by removing headers and fixing markdown formatting
@@ -592,26 +592,13 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
   // 4. Try sources for PDF/text content with jurisdiction-specific handling
   if (bill.sources?.length) {
     for (const source of bill.sources) {
-      if (!source.url) continue;    
+      if (!source.url) continue;
 
       // General source processing
       console.log('[DEBUG] Checking source URL:', source.url);
       try {
-        const res = await fetch(source.url);
-        if (!res.ok) {
-          console.log('[Bill Extraction] Source fetch failed:', source.url, 'Status:', res.status);
-          continue;
-        }
-
-        const html = await res.text();
-        const pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi)).map(m => m[1]);
-
+        const pdfLinks = await getBillPdfLinksFromPage(source.url);
         for (let pdfUrl of pdfLinks) {
-          if (!pdfUrl.startsWith('http')) {
-            const base = new URL(source.url);
-            pdfUrl = new URL(pdfUrl, base).href;
-          }
-
           const result = await extractPdfContent(pdfUrl, 'pdf-extracted');
           if (result) return result;
         }
@@ -625,4 +612,24 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
   return { summary: '', longSummary: null, sourceType: 'none' };
 }
 
-
+/**
+ * Returns all PDF URLs from a web page that contain the word 'bill' (case-insensitive).
+ */
+export async function getBillPdfLinksFromPage(url: string): Promise<string[]> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch page: ${url} (status: ${res.status})`);
+  const html = await res.text();
+  // Find all PDF links with 'bill' in the URL
+  const pdfLinks = Array.from(html.matchAll(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/gi))
+    .map(m => m[1])
+    .filter(link => link.toLowerCase().includes('bill'))
+    .map(link => {
+      // Make relative links absolute
+      if (!link.startsWith('http')) {
+        const base = new URL(url);
+        return new URL(link, base).href;
+      }
+      return link;
+    });
+  return pdfLinks;
+}

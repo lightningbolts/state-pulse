@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {getAllLegislation, upsertLegislationSelective} from '../services/legislationService';
-import {fetchPdfTextFromOpenStatesUrl, generateOllamaSummary} from '../services/aiSummaryUtil';
-import {getCollection} from '../lib/mongodb';
+import {getAllLegislation, upsertLegislationSelective} from '@/services/legislationService';
+import {fetchPdfTextFromOpenStatesUrl, generateOllamaSummary} from '@/services/aiSummaryUtil';
+import {getCollection} from '@/lib/mongodb';
 
 function getStateAbbrFromJuriId(jurisdictionId: string): string | null {
   const match = jurisdictionId.match(/state:([a-z]{2})/);

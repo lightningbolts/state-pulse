@@ -1,8 +1,8 @@
 import {transformCongressBillToMongoDB} from './utils/transformCongressBillToMongoDB';
-import {getLegislationById, upsertLegislation} from '../services/legislationService';
+import {getLegislationById, upsertLegislation} from '@/services/legislationService';
 import {config} from 'dotenv';
 import fetch from 'node-fetch';
-import {getCollection} from '../lib/mongodb';
+import {getCollection} from '@/lib/mongodb';
 import {enactedPatterns} from "@/types/legislation";
 
 config({ path: '../../.env' });

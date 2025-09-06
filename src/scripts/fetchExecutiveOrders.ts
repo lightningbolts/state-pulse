@@ -1,8 +1,8 @@
 import { config } from 'dotenv';
-import { connectToDatabase } from '../lib/mongodb';
-import { fetchWhitehouseExecutiveOrders } from '../services/whitehouseScraperService';
-import { scrapeStatesExecutiveOrders } from '../services/governorScraperService';
-import { processExecutiveOrderSummarization } from '../services/executiveOrderAIService';
+import { connectToDatabase } from '@/lib/mongodb';
+import { fetchWhitehouseExecutiveOrders } from '@/services/whitehouseScraperService';
+import { scrapeStatesExecutiveOrders } from '@/services/governorScraperService';
+import { processExecutiveOrderSummarization } from '@/services/executiveOrderAIService';
 
 // Load environment variables
 config({ path: '../../.env' });
