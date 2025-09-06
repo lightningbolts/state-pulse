@@ -290,7 +290,7 @@ export async function fetchPdfFromOpenStatesUrl(legUrl: string): Promise<{ text:
       return { text: null, debug };
     }
     const html = await res.text();
-    // Try to find a PDF link with common phrases for final/official bill text
+    // Try to find a PDF link with the word "bill" in the URL (case-insensitive)
     // This covers WA and other states with similar markup
     const pdfRegexes = [
       /<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>([^<]*Passed Legislature[^<]*)<\/a>/i, // WA style
@@ -305,10 +305,11 @@ export async function fetchPdfFromOpenStatesUrl(legUrl: string): Promise<{ text:
     let match = null;
     for (const regex of pdfRegexes) {
       match = html.match(regex);
-      if (match) break;
+      if (match && match[1].toLowerCase().includes('bill')) break;
+      match = null;
     }
     if (!match) {
-      debug.push('Could not find a final/official PDF link on the page.');
+      debug.push('Could not find a final/official PDF link on the page with the word "bill" in the URL.');
       return { text: null, debug };
     }
     let pdfUrl = match[1];
@@ -588,44 +589,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
   // 4. Try sources for PDF/text content with jurisdiction-specific handling
   if (bill.sources?.length) {
     for (const source of bill.sources) {
-      if (!source.url) continue;
-
-      // Illinois-specific handling
-      if (bill.jurisdictionName === 'Illinois' && source.url.includes('ilga.gov/Legislation/BillStatus')) {
-        const fullTextUrl = source.url.replace('/BillStatus', '/BillStatus/FullText');
-        console.log('[ILGA] Fetching Illinois FullText page:', fullTextUrl);
-
-        try {
-          const res = await fetch(fullTextUrl);
-          if (res.ok) {
-            const textHtml = await res.text();
-
-            // Extract bill text from <pre> tags
-            const match = textHtml.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
-            if (match && match[1] && match[1].trim().length > 100) {
-              const billText = match[1].replace(/<[^>]+>/g, '').trim();
-              console.log('[ILGA] Extracted bill text length:', billText.length);
-              return await generateOptimizedGeminiSummary(billText, 'ilga-fulltext');
-            }
-
-            // Fallback: try PDF links in the FullText page
-            const pdfMatch = textHtml.match(/<a[^>]+href=["']([^"']+\.pdf[^"']*)["'][^>]*>/i);
-            if (pdfMatch && pdfMatch[1]) {
-              let pdfUrl = pdfMatch[1];
-              if (!pdfUrl.startsWith('http')) {
-                const base = new URL(fullTextUrl);
-                pdfUrl = new URL(pdfUrl, base).href;
-              }
-
-              const result = await extractPdfContent(pdfUrl, 'ilga-pdf');
-              if (result) return result;
-            }
-          }
-        } catch (e) {
-          console.log('[ILGA] Error fetching FullText page:', fullTextUrl, e);
-        }
-        continue; // Skip normal processing for Illinois
-      }
+      if (!source.url) continue;    
 
       // General source processing
       console.log('[DEBUG] Checking source URL:', source.url);
