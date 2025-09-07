@@ -27,11 +27,19 @@ export default function HomePageClient() {
           Your comprehensive source for fast legislative tracking and policy analysis. Stay informed, make impactful decisions.
         </p>
         <div className="space-x-2 sm:space-x-4">
-          {/*<Button asChild size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-md hover:shadow-lg transition-shadow px-8 py-3 rounded-lg">*/}
-          {/*  <Link href="/legislation">*/}
-          {/*    Explore Legislation <ArrowRight className="ml-2.5 h-5 w-5" />*/}
-          {/*  </Link>*/}
-          {/*</Button>*/}
+          {!isSignedIn ? (
+              <Button asChild size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-md hover:shadow-lg transition-shadow px-8 py-3 rounded-lg">
+                <Link href="/sign-up">
+                  Join Us Today <ArrowRight className="ml-2.5 h-5 w-5" />
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild size="lg" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-md hover:shadow-lg transition-shadow px-8 py-3 rounded-lg">
+                <Link href="/tracker">
+                  Jump Right Back In <ArrowRight className="ml-2.5 h-5 w-5" />
+                </Link>
+              </Button>
+            )}
           <Button asChild size="lg" variant="outline" className="border-2 border-white/80 text-white bg-white/10 hover:bg-white/20 hover:text-white hover:border-white shadow-md hover:shadow-lg transition-all duration-200 px-8 py-3 rounded-lg backdrop-blur-sm">
             <Link href="/about">
               Who We Are <ArrowRight className="ml-2.5 h-5 w-5" />
