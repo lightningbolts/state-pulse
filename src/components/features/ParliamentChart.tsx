@@ -66,16 +66,26 @@ const getChamberTotalSeats = (chamberName?: string): number | null => {
 };
 
 // **FIXED**: Replaced with a simpler, more robust position calculation algorithm
-const calculateParliamentPositions = (totalSeats: number) => {
+const calculateParliamentPositions = (totalSeats: number, screenSize: 'mobile' | 'tablet' | 'desktop' = 'desktop') => {
   const positions: Array<{ x: number, y: number }> = [];
-  const centerX = 400; // Use a consistent virtual coordinate system
-  const centerY = 50;   // Start chart near the top
+  
+  // Responsive scaling factors
+  const scales = {
+    mobile: { centerX: 200, centerY: 40, startRadius: 50, sizeMultiplier: 0.6 },
+    tablet: { centerX: 300, centerY: 45, startRadius: 65, sizeMultiplier: 0.8 },
+    desktop: { centerX: 400, centerY: 50, startRadius: 80, sizeMultiplier: 1.0 }
+  };
+  
+  const scale = scales[screenSize];
+  const centerX = scale.centerX;
+  const centerY = scale.centerY;
 
-  // Dynamically adjust dot size and spacing based on seat count for better visuals
-  const markerRadius = totalSeats <= 150 ? 7 : 5;
-  const rowSpacing = markerRadius * 2.5;
-  const dotSpacing = markerRadius * 2.4;
-  const startRadius = 80;
+  // Dynamically adjust dot size and spacing based on seat count and screen size
+  const baseMarkerRadius = totalSeats <= 150 ? 7 : 5;
+  const markerRadius = Math.max(2, baseMarkerRadius * scale.sizeMultiplier);
+  const rowSpacing = markerRadius * 2.2; // Tighter spacing on mobile
+  const dotSpacing = markerRadius * (screenSize === 'mobile' ? 2.0 : 2.4);
+  const startRadius = scale.startRadius;
 
   let seatsPlaced = 0;
   let row = 0;
@@ -105,9 +115,31 @@ const calculateParliamentPositions = (totalSeats: number) => {
 
 const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => {
   const [isReady, setIsReady] = useState(false);
+  const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
 
   useEffect(() => {
     loadHighchartsModules().then(() => setIsReady(true));
+  }, []);
+
+  // Screen size detection hook
+  useEffect(() => {
+    const updateScreenSize = () => {
+      const width = window.innerWidth;
+      if (width < 640) {
+        setScreenSize('mobile');
+      } else if (width < 1024) {
+        setScreenSize('tablet');
+      } else {
+        setScreenSize('desktop');
+      }
+    };
+
+    // Set initial screen size
+    updateScreenSize();
+
+    // Listen for window resize
+    window.addEventListener('resize', updateScreenSize);
+    return () => window.removeEventListener('resize', updateScreenSize);
   }, []);
 
   const chartData = useMemo(() => {
@@ -128,13 +160,15 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
         return acc; // This line fixes the error
       }, {} as Record<string, ExtendedMemberVote[]>);
 
-      // Use the new, robust calculation function
-      const { positions, markerRadius } = calculateParliamentPositions(totalSeats);
+      // Use the responsive calculation function
+      const { positions, markerRadius } = calculateParliamentPositions(totalSeats, screenSize);
 
       // Sort positions by angle to ensure a clean left-to-right path for coloring
       const sortedPositions = [...positions].sort((a, b) => {
-        const angleA = Math.atan2(a.y - 50, a.x - 400);
-        const angleB = Math.atan2(b.y - 50, b.x - 400);
+        const centerX = screenSize === 'mobile' ? 200 : screenSize === 'tablet' ? 300 : 400;
+        const centerY = screenSize === 'mobile' ? 40 : screenSize === 'tablet' ? 45 : 50;
+        const angleA = Math.atan2(a.y - centerY, a.x - centerX);
+        const angleB = Math.atan2(b.y - centerY, b.x - centerX);
         return angleB - angleA;
       });
 
@@ -190,7 +224,7 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
 
       return { chamberName, series, totalVoted: chamberVotes.length, totalSeats, voteTypeCounts };
     });
-  }, [votes, chamber]);
+  }, [votes, chamber, screenSize]);
   
   if (!isReady || votes.length === 0) {
     return <div className="flex justify-center items-center h-96 text-gray-500 dark:text-gray-400">
@@ -201,10 +235,34 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
   return (
     <div className="w-full">
       {chartData.map(({ chamberName, series, totalVoted, totalSeats, voteTypeCounts }, index) => {
+        // Responsive chart configuration
+        const chartConfig = {
+          mobile: { 
+            height: 300, 
+            titleSize: '1.2rem',
+            subtitleSize: '0.85rem',
+            tooltipSize: '12px'
+          },
+          tablet: { 
+            height: 400, 
+            titleSize: '1.35rem',
+            subtitleSize: '0.9rem',
+            tooltipSize: '13px'
+          },
+          desktop: { 
+            height: 500, 
+            titleSize: '1.5rem',
+            subtitleSize: '1rem',
+            tooltipSize: '14px'
+          }
+        };
+
+        const config = chartConfig[screenSize];
+
         const options: Highcharts.Options = {
-          chart: { type: 'scatter', backgroundColor: 'transparent', height: 500 },
-          title: { text: chamberName.replace(/_/g, ' '), style: { color: 'var(--text-foreground)', fontSize: '1.5rem', fontWeight: 'bold' } },
-          subtitle: { text: `${totalVoted} voted out of ${totalSeats} seats`, style: { color: 'var(--text-muted-foreground)' } },
+          chart: { type: 'scatter', backgroundColor: 'transparent', height: config.height },
+          title: { text: chamberName.replace(/_/g, ' '), style: { color: 'var(--text-foreground)', fontSize: config.titleSize, fontWeight: 'bold' } },
+          subtitle: { text: `${totalVoted} voted out of ${totalSeats} seats`, style: { color: 'var(--text-muted-foreground)', fontSize: config.subtitleSize } },
           xAxis: { visible: false, minPadding: 0.05, maxPadding: 0.05 },
           yAxis: { visible: false, minPadding: 0.05, maxPadding: 0.05, startOnTick: false, endOnTick: false },
           legend: { enabled: false },
@@ -214,7 +272,7 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
             backgroundColor: 'rgba(31, 41, 55, 0.95)',
             borderColor: '#4b5563',
             borderRadius: 8,
-            style: { color: '#F9FAFB', fontSize: '14px' },
+            style: { color: '#F9FAFB', fontSize: config.tooltipSize },
             formatter: function () {
               const point = this.point as any;
               const member = point.member as ExtendedMemberVote | undefined;
@@ -262,15 +320,23 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
 
         return (
           <div key={chamberName || index} className="mb-8">
-            <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-2 sm:p-4">
               <HighchartsReact highcharts={Highcharts} options={options} />
-              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-600">
                 <div className="flex justify-center">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className={`grid gap-2 sm:gap-4 text-xs sm:text-sm ${
+                    screenSize === 'mobile' 
+                      ? 'grid-cols-2' 
+                      : 'grid-cols-2 md:grid-cols-4'
+                  }`}>
                     {voteTypeCounts.map(({ name, count, color }) => (
-                      <div key={name} className="flex items-center gap-3 min-w-[120px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
+                      <div key={name} className={`flex items-center gap-2 sm:gap-3 ${
+                        screenSize === 'mobile' ? 'min-w-[100px]' : 'min-w-[120px]'
+                      }`}>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <div className={`rounded-full border-2 border-white shadow-sm ${
+                            screenSize === 'mobile' ? 'w-3 h-3' : 'w-4 h-4'
+                          }`} style={{ backgroundColor: color }} />
                           <div className="text-gray-900 dark:text-gray-100">
                             <div className="font-semibold">{name}</div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">{count} seats</div>
@@ -280,7 +346,9 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
                     ))}
                   </div>
                 </div>
-                <div className="text-center mt-3 text-xs text-gray-500 dark:text-gray-400">
+                <div className={`text-center mt-2 sm:mt-3 text-xs text-gray-500 dark:text-gray-400 ${
+                  screenSize === 'mobile' ? 'text-xs' : ''
+                }`}>
                   Click on any seat to view representative details
                 </div>
               </div>
