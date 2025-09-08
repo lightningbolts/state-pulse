@@ -15,6 +15,7 @@ import { generateRepresentativeMetadata } from '@/lib/metadata';
 import type { Metadata } from 'next';
 import { FollowButton } from '@/components/ui/FollowButton';
 import { ShareButton } from '@/components/ui/ShareButton';
+import RepVotingRecord from '@/components/features/RepVotingRecord';
 
 const fetchRepresentativeData = async (id: string) => {
   try {
@@ -323,13 +324,13 @@ export default async function RepresentativeDetailPage({
                 )}
               </div>
               <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">
-                {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) && (
+                {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (typeof rep.jurisdiction === 'object' && rep.jurisdiction?.name)) && (
                   <span>{typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name}</span>
                 )}
                 {/* Show district for US House reps or state reps */}
                 {(rep.district || rep.current_role?.district) && (
                   <span>
-                    {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (rep.jurisdiction?.name)) ? ' - ' : ''}
+                    {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (typeof rep.jurisdiction === 'object' && rep.jurisdiction?.name)) ? ' - ' : ''}
                     District {rep.district || rep.current_role?.district}
                   </span>
                 )}
@@ -598,6 +599,41 @@ export default async function RepresentativeDetailPage({
                 </section>
               </AnimatedSection>
             ) : null;
+          })()}
+
+          {/* Voting Record Section - Only show for Congress members */}
+          {(() => {
+            // Check if this is a Congress member
+            const jurisdiction = typeof rep.jurisdiction === 'string' ? rep.jurisdiction : (typeof rep.jurisdiction === 'object' && rep.jurisdiction?.name) || '';
+            const office = rep.office || '';
+            const chamber = (rep as any).chamber || '';
+            
+            // More comprehensive check for Congress members
+            const isCongressMember = 
+              // Check chamber field
+              chamber === 'House of Representatives' || chamber === 'Senate' ||
+              // Check if they have congressional terms
+              ((rep as any).terms && Array.isArray((rep as any).terms) && (rep as any).terms.length > 0 && 
+               (rep as any).terms.some((term: any) => term.chamber === 'House of Representatives' || term.chamber === 'Senate')) ||
+              // Check office field
+              office.toLowerCase().includes('representative') || office.toLowerCase().includes('senator') ||
+              // Check if they have congressional leadership roles
+              ((rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0) ||
+              // Check if they have sponsored/cosponsored federal legislation
+              ((rep as any).sponsoredLegislation || (rep as any).cosponsoredLegislation);
+            
+            if (isCongressMember) {
+              return (
+                <AnimatedSection>
+                  <RepVotingRecord 
+                    key={`voting-record-${id}`}
+                    representativeId={id}
+                    representativeName={rep.name}
+                  />
+                </AnimatedSection>
+              );
+            }
+            return null;
           })()}
 
           {(() => {
