@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "fetch-voting-records": "tsx src/scripts/fetchVotingRecords.ts"
   },
   "dependencies": {
     "@azure/ai-text-analytics": "^5.1.0",
