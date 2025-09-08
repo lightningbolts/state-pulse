@@ -11,12 +11,13 @@ import { ShareButton } from '@/components/ui/ShareButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
 import { RelatedBillsWrapper } from '@/components/features/RelatedBillsWrapper';
 import { RelatedBillsLoading } from '@/components/features/RelatedBillsLoading';
+import { VotingBillPositionsWrapper } from '@/components/features/VotingBillPositionsWrapper';
+import { VotingBillPositionsLoading } from '@/components/features/VotingBillPositionsLoading';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { enactedPatterns } from "@/types/legislation";
 import {STATE_MAP} from "@/types/geo";
-import VotingBillPositions from "@/components/features/VotingBillPositions";
 
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -268,10 +269,13 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </AnimatedSection>
           )}
 
-          <AnimatedSection>{legislation.id && <VotingBillPositions billId={legislation.id} />}</AnimatedSection>
-
-          {/* Sponsors Section with Collapsible Functionality */}
           <AnimatedSection><CollapsibleSponsors sponsors={sponsors} /></AnimatedSection>
+
+          <AnimatedSection>
+            <Suspense fallback={<VotingBillPositionsLoading />}>
+              <VotingBillPositionsWrapper billId={id} />
+            </Suspense>
+          </AnimatedSection>
 
           {abstracts && abstracts.length > 0 && (
             <AnimatedSection>
