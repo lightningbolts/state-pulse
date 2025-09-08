@@ -300,6 +300,7 @@ async function fetchAndUpsertSenateVotes() {
 }
 
 async function main() {
+  await fetchAndUpsertHouseVotes();
   await fetchAndUpsertSenateVotes();
   process.exit(0);
 }

@@ -1,3 +1,4 @@
+"use client"
 import React from 'react';
 import { MemberVote } from '@/types/legislation';
 import Link from 'next/link';
@@ -25,7 +26,7 @@ const VoteCircle: React.FC<VoteCircleProps> = ({ vote, cx, cy, onMouseEnter, onM
   };
 
   return (
-    <Link href={`/representative/${vote.bioguideId}`} passHref>
+    <Link href={`/representatives/${vote.bioguideId}`} passHref>
       <circle
         cx={cx}
         cy={cy}

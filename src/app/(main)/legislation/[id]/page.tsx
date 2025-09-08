@@ -16,6 +16,7 @@ import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { enactedPatterns } from "@/types/legislation";
 import {STATE_MAP} from "@/types/geo";
+import VotingBillPositions from "@/components/features/VotingBillPositions";
 
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -267,6 +268,8 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </AnimatedSection>
           )}
 
+          <AnimatedSection>{legislation.id && <VotingBillPositions billId={legislation.id} />}</AnimatedSection>
+
           {/* Sponsors Section with Collapsible Functionality */}
           <AnimatedSection><CollapsibleSponsors sponsors={sponsors} /></AnimatedSection>
 
@@ -292,7 +295,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
           )}
 
           {legislation.longGeminiSummary && (
-            <AnimatedSection className="p-4 border border-blue-500/30 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+            <AnimatedSection className="p-4 border border-blue-500/30 rounded-lg bg-blue-950/20">
               <h3 className="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-3">Detailed AI Summary</h3>
               <div className="text-sm text-muted-foreground space-y-2">
                 {legislation.longGeminiSummary.split('\n').map((paragraph, index) => (
