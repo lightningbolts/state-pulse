@@ -163,11 +163,10 @@ async function fetchAndUpsertHouseVotes() {
 }
 
 async function fetchAndUpsertSenateVotes() {
-  // Build the mapping from (lastName, state) => bioguideId
   const yamlPath = path.resolve(__dirname, 'legislators-current.yaml');
   const bioguideMap = buildSenateBioguideIdMap(yamlPath);
   const senateVoteLinks = await fetchSenateRollCallVoteLinks();
-  // For each Senate roll call vote link, fetch and parse the vote page for member-level votes
+
   for (const link of senateVoteLinks) {
     try {
       const res = await fetch(link.url);
@@ -178,25 +177,25 @@ async function fetchAndUpsertSenateVotes() {
       const html = await res.text();
       const $ = cheerio.load(html);
 
-      // Helper to get text content following a bolded label
-      const getNextText = (selector: string) => {
-        const element = $(`b:contains("${selector}")`);
-        if (element.length > 0 && element[0].nextSibling && element[0].nextSibling.type === 'text') {
-            return element[0].nextSibling.nodeValue.trim().replace(/^:/, '').trim();
-        }
-        return '';
+      const summaryText = $('.contenttext').first().text().replace(/\s+/g, ' ').trim();
+
+      const extractMetadata = (text: string) => {
+        const voteQuestionMatch = text.match(/Question: (.*?)(?= Vote Number:| Vote Date:| Required For Majority:| Vote Result:| Measure Number:| Measure Title:|$)/);
+        const resultMatch = text.match(/(?:Vote Result|Result): (.*?)(?= Measure Number:| Measure Title:|$)/);
+        const dateMatch = text.match(/Vote Date: (.*?)(?= Required For Majority:| Vote Result:|$)/);
+        const measureMatch = text.match(/(?:Measure Number|Bill Number): (.*?)(?= Measure Title:|$)/);
+
+        const voteQuestion = voteQuestionMatch ? voteQuestionMatch[1].trim() : '';
+        const result = resultMatch ? resultMatch[1].trim() : '';
+        const dateText = dateMatch ? dateMatch[1].trim() : '';
+        const date = dateText ? new Date(dateText).toISOString() : '';
+        const measureText = measureMatch ? measureMatch[1].trim() : '';
+
+        return { voteQuestion, result, date, measureText };
       };
 
-      const voteQuestion = getNextText('Question');
-      const result = getNextText('Result');
-      const dateText = getNextText('Vote Date');
-      const date = dateText ? new Date(dateText).toISOString() : '';
-      
-      let measureText = getNextText('Measure Number');
-      if (!measureText) {
-          measureText = getNextText('Bill Number');
-      }
-      
+      const { voteQuestion, result, date, measureText } = extractMetadata(summaryText);
+
       let legislationNumber = '';
       let legislationType = '';
       let bill_id: string | undefined = undefined;
@@ -213,19 +212,18 @@ async function fetchAndUpsertSenateVotes() {
       let memberVotes: MemberVote[] = [];
       const bodyText = $('body').text();
 
-      // Primary Strategy: Grouped by Home State
       const groupedByStateSectionMatch = bodyText.match(/Grouped by Home State\s+([\s\S]*?)(Vote Summary|$)/);
       if (groupedByStateSectionMatch) {
         const votesText = groupedByStateSectionMatch[1];
         const lines = votesText.trim().split('\n');
         for (const line of lines) {
           const trimmedLine = line.trim();
-          if (!trimmedLine || /^[A-Za-z ]+:$/.test(trimmedLine)) continue; // Skip empty lines and state headers
-          
+          if (!trimmedLine || /^[A-Za-z ]+:$/.test(trimmedLine)) continue;
+
           const m = trimmedLine.match(/^(.*?) \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes)$/);
           if (!m) {
-              console.warn(`Could not parse member vote line: "${trimmedLine}"`);
-              continue;
+            console.warn(`Could not parse member vote line: "${trimmedLine}"`);
+            continue;
           }
           const name = m[1].trim();
           const party = m[2];
@@ -248,7 +246,6 @@ async function fetchAndUpsertSenateVotes() {
         }
       }
 
-      // Fallback Strategy: Alphabetical by Senator Name
       if (memberVotes.length === 0) {
         console.warn(`Falling back to parsing 'Alphabetical by Senator Name' section for vote ${link.voteNumber}`);
         const sectionMatch = bodyText.match(/Alphabetical by Senator Name\s+([\s\S]*?)(Grouped By Vote Position|Grouped by Home State|Vote Summary|$)/);
@@ -278,7 +275,6 @@ async function fetchAndUpsertSenateVotes() {
         }
       }
 
-      // Compose VotingRecord
       const identifier = `senate-${CONGRESS}-${link.voteNumber}`;
       const votingRecord: VotingRecord = {
         identifier,
@@ -304,9 +300,8 @@ async function fetchAndUpsertSenateVotes() {
 }
 
 async function main() {
-//   await fetchAndUpsertHouseVotes();
   await fetchAndUpsertSenateVotes();
-  await process.exit(0);
+  process.exit(0);
 }
 
 main().catch(err => {
