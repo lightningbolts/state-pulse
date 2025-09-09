@@ -81,7 +81,7 @@ export default function RepVotingRecord({ representativeId, representativeName }
       
       try {
         // Test direct API call first
-        const directResponse = await fetch(`/api/representatives/${representativeId}/voting-records`);
+        // const directResponse = await fetch(`/api/representatives/${representativeId}/voting-records`);
         
         if (!isMounted) return; // Check if component is still mounted
         
