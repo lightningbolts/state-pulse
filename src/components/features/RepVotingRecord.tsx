@@ -117,22 +117,87 @@ export default function RepVotingRecord({ representativeId, representativeName }
     };
   }, [representativeId]);
 
-  // Filter and sort records
-  const filteredRecords = votingRecords.filter(record => {
-    const matchesSearch = !searchTerm || 
-      record.legislationNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.voteQuestion?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesVoteFilter = filterByVote === 'all' || record.representativeVote?.voteCast === filterByVote;
-    
-    return matchesSearch && matchesVoteFilter;
-  }).sort((a, b) => {
-    if (sortBy === 'date') {
-      return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
-    } else {
-      return (a.legislationNumber || '').localeCompare(b.legislationNumber || '');
+  // Helper to normalize strings for robust search (remove spaces, punctuation, lowercase)
+  function normalizeText(str: string | number | undefined | null): string {
+    if (!str) return '';
+    return String(str)
+      .toLowerCase()
+      .replace(/[^a-z0-9]/gi, '');
+  }
+
+  // Full-text search across all relevant fields, robust to spaces/punctuation, and prioritize best matches
+
+  function getBestMatchScore(record: RepresentativeVotingRecord, normSearch: string, rawSearch: string): number {
+    // Lower score is better (0 = exact, 1 = startsWith, 2 = substring, 3 = not found)
+    // Shorter field length is better for tie-breaker
+    const fields = [
+      record.legislationNumber,
+      record.voteQuestion,
+      record.result,
+      record.chamber,
+      record.date,
+      record.rollCallNumber,
+      record.session,
+      record.representativeVote?.voteCast,
+      record.bill_id,
+    ];
+    let bestScore = 3;
+    let bestLength = Infinity;
+    for (const f of fields) {
+      if (typeof f !== 'string') continue;
+      const normField = normalizeText(f);
+      if (normField === normSearch) {
+        if (0 < bestScore || normField.length < bestLength) {
+          bestScore = 0;
+          bestLength = normField.length;
+        }
+      } else if (normField.startsWith(normSearch)) {
+        if (1 < bestScore || normField.length < bestLength) {
+          bestScore = 1;
+          bestLength = normField.length;
+        }
+      } else if (normField.includes(normSearch)) {
+        if (2 < bestScore || normField.length < bestLength) {
+          bestScore = 2;
+          bestLength = normField.length;
+        }
+      }
     }
-  });
+    // Special: vote number search (e.g. 'house vote 239', '#239')
+    const voteNumMatch = rawSearch.match(/(?:house|senate)?\s*vote\s*#?(\d+)/i) || rawSearch.match(/^#(\d+)$/);
+    if (voteNumMatch && record.rollCallNumber) {
+      const searchNum = voteNumMatch[1];
+      if (String(record.rollCallNumber) === searchNum) {
+        // Highest priority for exact vote number
+        return -1000;
+      }
+    }
+    return bestScore * 10000 + bestLength; // Lower is better
+  }
+
+  const filteredRecords = votingRecords
+    .map(record => {
+      const matchesVoteFilter = filterByVote === 'all' || record.representativeVote?.voteCast === filterByVote;
+      if (!searchTerm) {
+        return matchesVoteFilter ? { record, matchScore: 0 } : null;
+      }
+      const normSearch = normalizeText(searchTerm);
+      const matchScore = getBestMatchScore(record, normSearch, searchTerm);
+      // Only include if there's a match and vote filter passes
+      const hasMatch = matchScore < 30000;
+      return hasMatch && matchesVoteFilter ? { record, matchScore } : null;
+    })
+    .filter(Boolean) // Remove nulls
+    .sort((a: any, b: any) => {
+      // Prioritize best match, then current sort
+      if (a.matchScore !== b.matchScore) return a.matchScore - b.matchScore;
+      if (sortBy === 'date') {
+        return new Date(b.record.date || 0).getTime() - new Date(a.record.date || 0).getTime();
+      } else {
+        return (a.record.legislationNumber || '').localeCompare(b.record.legislationNumber || '');
+      }
+    })
+    .map((x: any) => x.record);
 
   // Pagination
   const totalPages = Math.ceil(filteredRecords.length / recordsPerPage);
