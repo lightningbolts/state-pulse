@@ -624,13 +624,11 @@ export default async function RepresentativeDetailPage({
             
             if (isCongressMember) {
               return (
-                <AnimatedSection>
-                  <RepVotingRecord 
+                  <RepVotingRecord
                     key={`voting-record-${id}`}
                     representativeId={id}
                     representativeName={rep.name}
                   />
-                </AnimatedSection>
               );
             }
             return null;

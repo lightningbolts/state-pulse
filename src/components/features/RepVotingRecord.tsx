@@ -307,7 +307,9 @@ export default function RepVotingRecord({ representativeId, representativeName }
       ) : (
         <div className="space-y-4">
           {paginatedRecords.map((record, index) => (
-            <VotingRecordCard key={`${record.rollCallNumber}-${index}`} record={record} />
+            <AnimatedSection key={`${record.rollCallNumber}-${index}`}>
+              <VotingRecordCard record={record} />
+            </AnimatedSection>
           ))}
         </div>
       )}
