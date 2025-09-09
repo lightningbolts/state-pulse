@@ -15,7 +15,7 @@ export async function GET(
     // Get URL search params for pagination and filtering
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = parseInt(searchParams.get('limit') || '10000'); // Increased from 20 to 10000
     const chamber = searchParams.get('chamber'); // 'US House' or 'US Senate'
     const votePosition = searchParams.get('votePosition'); // 'Yea', 'Nay', etc.
     const sortBy = searchParams.get('sortBy') || 'date'; // 'date' or 'bill'
@@ -27,24 +27,31 @@ export async function GET(
 
     // Build aggregation pipeline to find voting records where the representative voted
     const matchStage: any = {
-      'memberVotes.bioguideId': id,
-      // Only include votes that are related to actual bills (not undefined/null legislation)
-      bill_id: { 
+      'memberVotes.bioguideId': id
+    };
+
+    // Only exclude clearly malformed bill_ids with "undefined" in them
+    // This preserves procedural votes and other legitimate voting records
+    if (searchParams.get('billsOnly') === 'true') {
+      matchStage.bill_id = { 
         $exists: true, 
         $ne: null, 
         $not: /undefined/ 
-      },
-      legislationType: { 
+      };
+      matchStage.legislationType = { 
         $exists: true, 
         $ne: null, 
         $nin: ['', undefined] 
-      },
-      legislationNumber: { 
+      };
+      matchStage.legislationNumber = { 
         $exists: true, 
         $ne: null, 
         $nin: ['', undefined] 
-      }
-    };
+      };
+    } else {
+      // Just exclude the clearly malformed ones
+      matchStage.bill_id = { $not: /undefined/ };
+    }
 
     // Add chamber filter if specified
     if (chamber) {

@@ -86,7 +86,11 @@ export default function RepVotingRecord({ representativeId, representativeName }
         if (!isMounted) return; // Check if component is still mounted
         
         // Now test service function
-        const response = await getRepresentativeVotingRecords(representativeId);
+        const response = await getRepresentativeVotingRecords(representativeId, {
+          limit: 500, // Request more records by default
+          sortBy: 'date',
+          sortOrder: 'desc'
+        });
         
         if (!isMounted) return; // Check if component is still mounted
         
