@@ -30,28 +30,22 @@ export async function GET(
       'memberVotes.bioguideId': id
     };
 
-    // Only exclude clearly malformed bill_ids with "undefined" in them
-    // This preserves procedural votes and other legitimate voting records
-    if (searchParams.get('billsOnly') === 'true') {
-      matchStage.bill_id = { 
-        $exists: true, 
-        $ne: null, 
-        $not: /undefined/ 
-      };
-      matchStage.legislationType = { 
-        $exists: true, 
-        $ne: null, 
-        $nin: ['', undefined] 
-      };
-      matchStage.legislationNumber = { 
-        $exists: true, 
-        $ne: null, 
-        $nin: ['', undefined] 
-      };
-    } else {
-      // Just exclude the clearly malformed ones
-      matchStage.bill_id = { $not: /undefined/ };
-    }
+    // Always filter to only bill-related voting records (exclude nominations and non-bill types)
+    matchStage.bill_id = { 
+      $exists: true, 
+      $ne: null, 
+      $not: /undefined/ 
+    };
+    matchStage.legislationType = { 
+      $exists: true, 
+      $ne: null, 
+      $nin: ['', undefined, 'nomination', 'Nomination'] // Exclude nominations
+    };
+    matchStage.legislationNumber = { 
+      $exists: true, 
+      $ne: null, 
+      $nin: ['', undefined] 
+    };
 
     // Add chamber filter if specified
     if (chamber) {
