@@ -111,7 +111,7 @@ export const useInteractiveMap = () => {
     const [selectedRepMetric, setSelectedRepMetric] = useState<string>('sponsored_bills');
     const [repDataLoading, setRepDataLoading] = useState<boolean>(false);
     const [repDataError, setRepDataError] = useState<string | null>(null);
-    const [availableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity', 'voted_with_majority']);
+    const [availableRepMetrics, setAvailableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity', 'voted_with_majority', 'voted_against_party']);
     const [showEnactedOnly, setShowEnactedOnly] = useState<boolean>(false);
     const [showDistrictBorders, setShowDistrictBorders] = useState<boolean>(true);
     const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -358,6 +358,12 @@ export const useInteractiveMap = () => {
                 setRepScores(result.scores);
                 if (result.details) {
                     setRepDetails(result.details);
+                }
+                if (result.metadata?.availableMetrics) {
+                    setAvailableRepMetrics(prevMetrics => {
+                        const newMetrics = new Set([...prevMetrics, ...result.metadata.availableMetrics]);
+                        return Array.from(newMetrics);
+                    });
                 }
             } else {
                 console.error(result.error || 'No representative data returned');

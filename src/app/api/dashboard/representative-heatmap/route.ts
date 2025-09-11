@@ -13,6 +13,16 @@ function normalizeIds(...ids: (string | undefined | null)[]): string[] {
   return Array.from(out);
 }
 
+function normalizePartyName(party: string): string {
+    if (!party) return 'Unknown';
+    const lowerParty = party.toLowerCase();
+    if (lowerParty.includes('democratic') || lowerParty.includes('democrat')) return 'Democratic';
+    if (lowerParty.includes('republican') || lowerParty.includes('conservative')) return 'Republican';
+    if (lowerParty.includes('nonpartisan')) return 'Nonpartisan';
+    if (lowerParty.includes('independent') || lowerParty.includes('forward') || lowerParty.includes('other') || lowerParty.includes('libertarian') || lowerParty.includes('green')) return 'Independent';
+    return 'Unknown';
+}
+
 function getDistrictIdentifiers(rep: any): string[] {
   // Canonical ID that matches GeoJSON: prefer GEOID (STATEFP + padded district)
   const getStateFipsFromDivision = (divisionId?: string): string | null => {
@@ -302,6 +312,131 @@ async function getBulkVotingMajorityScores(representatives: any[]): Promise<Reco
   }
 }
 
+async function getBulkVotingAgainstPartyScores(representatives: any[]): Promise<Record<string, number>> {
+  try {
+    const votingRecordsCollection = await getCollection('voting_records');
+    const representativesCollection = await getCollection('representatives');
+
+    // Create a comprehensive map of any representative ID to their party.
+    const allReps = await representativesCollection.find({}, { projection: { id: 1, _id: 1, person_id: 1, bioguideId: 1, party: 1 } }).toArray();
+    const idToPartyMap = new Map<string, string>();
+    for (const rep of allReps) {
+        if (rep.party) {
+            const party = normalizePartyName(rep.party);
+            const ids = normalizeIds(rep.id, rep._id?.toString(), rep.person_id, rep.bioguideId);
+            for (const id of ids) {
+                idToPartyMap.set(id, party);
+            }
+        }
+    }
+
+    // Prepare ID maps for the specific representatives we need to score.
+    const repIdMap = new Map<string, string>();
+    const allRepIdsToScore = new Set<string>();
+
+    representatives.forEach(rep => {
+      const repKey = rep.id;
+      if (!repKey) return;
+      
+      const ids = normalizeIds(rep.id, rep._id?.toString(), rep.person_id, rep.bioguideId);
+      ids.forEach(id => {
+        if (id) {
+          repIdMap.set(id, repKey);
+          allRepIdsToScore.add(id);
+        }
+      });
+    });
+
+    if (allRepIdsToScore.size === 0) return {};
+
+    // Fetch all voting records involving the representatives to be scored.
+    const votingRecords = await votingRecordsCollection.find({
+      $or: [
+        { 'memberVotes.bioguideId': { $in: Array.from(allRepIdsToScore) } },
+        { 'memberVotes.person_id': { $in: Array.from(allRepIdsToScore) } },
+        { 'memberVotes.id': { $in: Array.from(allRepIdsToScore) } }
+      ]
+    }).toArray();
+
+    const repScores: Record<string, { totalVotes: number; againstPartyVotes: number }> = {};
+
+    // Process each voting record.
+    for (const record of votingRecords) {
+      if (!record.memberVotes || record.memberVotes.length === 0) continue;
+
+      // Calculate party-line votes for this specific record.
+      const partyVotes = {
+          Democratic: { yea: 0, nay: 0 },
+          Republican: { yea: 0, nay: 0 },
+      };
+
+      for (const vote of record.memberVotes) {
+          const voterId = vote.bioguideId || vote.person_id || vote.id;
+          if (!voterId) continue;
+          
+          const voterParty = idToPartyMap.get(voterId);
+
+          if (voterParty === 'Democratic' || voterParty === 'Republican') {
+              const voteCast = vote.voteCast?.toLowerCase();
+              if (voteCast === 'yea' || voteCast === 'yes' || voteCast === 'aye') {
+                  partyVotes[voterParty].yea++;
+              } else if (voteCast === 'nay' || voteCast === 'no') {
+                  partyVotes[voterParty].nay++;
+              }
+          }
+      }
+
+      const democraticMajority = partyVotes.Democratic.yea > partyVotes.Democratic.nay ? 'yea' : (partyVotes.Democratic.nay > partyVotes.Democratic.yea ? 'nay' : undefined);
+      const republicanMajority = partyVotes.Republican.yea > partyVotes.Republican.nay ? 'yea' : (partyVotes.Republican.nay > partyVotes.Republican.yea ? 'nay' : undefined);
+
+      // Score the target representatives based on the calculated party majorities.
+      for (const vote of record.memberVotes) {
+        const memberId = vote.bioguideId || vote.person_id || vote.id;
+        if (!memberId) continue;
+
+        const repKey = repIdMap.get(memberId);
+        if (repKey) { // Is this member one of the ones we are scoring?
+          const party = idToPartyMap.get(memberId); // Use the comprehensive map
+          if (!party || (party !== 'Democratic' && party !== 'Republican')) {
+              continue;
+          }
+
+          if (!repScores[repKey]) {
+            repScores[repKey] = { totalVotes: 0, againstPartyVotes: 0 };
+          }
+
+          const voteCast = vote.voteCast?.toLowerCase();
+          let normalizedVote;
+          if (voteCast === 'yea' || voteCast === 'yes' || voteCast === 'aye') normalizedVote = 'yea';
+          else if (voteCast === 'nay' || voteCast === 'no') normalizedVote = 'nay';
+          
+          if (normalizedVote) {
+            repScores[repKey].totalVotes++;
+            
+            const partyMajority = (party === 'Democratic') ? democraticMajority : republicanMajority;
+
+            if (partyMajority && normalizedVote !== partyMajority) {
+              repScores[repKey].againstPartyVotes++;
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate final percentage scores.
+    const finalScores: Record<string, number> = {};
+    for (const repKey in repScores) {
+      const { totalVotes, againstPartyVotes } = repScores[repKey];
+      finalScores[repKey] = totalVotes > 0 ? (againstPartyVotes / totalVotes) * 100 : 0;
+    }
+
+    return finalScores;
+  } catch (error) {
+    console.error('Error calculating voting against party scores:', error);
+    return {};
+  }
+}
+
 
 function calculateRecentActivityScore(rep: any): number {
   let score = 0;
@@ -523,6 +658,7 @@ export async function GET(request: NextRequest) {
     const sponsorshipCounts = (baseMetric === 'sponsored_bills') ? await getBulkBillsSponsoredCount(representatives, enactedOnly) : {};
     const recentActivityScores = (baseMetric === 'recent_activity') ? await getBulkRecentActivityScores(representatives, enactedOnly) : {};
     const votingMajorityScores = (baseMetric === 'voted_with_majority') ? await getBulkVotingMajorityScores(representatives) : {};
+    const votingAgainstPartyScores = (baseMetric === 'voted_against_party') ? await getBulkVotingAgainstPartyScores(representatives) : {};
 
 
     const districtScores: Record<string, number> = {};
@@ -533,12 +669,14 @@ export async function GET(request: NextRequest) {
       const repSponsorshipCount = sponsorshipCounts[rep.id] || 0;
       const repRecentScore = recentActivityScores[rep.id] || calculateRecentActivityScore(rep);
       const repVotingMajorityScore = votingMajorityScores[rep.id] || 0;
+      const repVotingAgainstPartyScore = votingAgainstPartyScores[rep.id] || 0;
 
 
       let score = 0;
       if (baseMetric === 'sponsored_bills') score = repSponsorshipCount;
       else if (baseMetric === 'recent_activity') score = repRecentScore;
       else if (baseMetric === 'voted_with_majority') score = repVotingMajorityScore;
+      else if (baseMetric === 'voted_against_party') score = repVotingAgainstPartyScore;
 
 
       for (const id of identifiers) {
@@ -568,7 +706,7 @@ export async function GET(request: NextRequest) {
         avgScore: Math.round(avgScore * 100) / 100,
         minScore: Math.round(minScore * 100) / 100,
         maxScoreRaw: maxScore,
-        availableMetrics: ['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity', 'voted_with_majority'],
+        availableMetrics: ['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity', 'voted_with_majority', 'voted_against_party'],
         enactedOnly
       }
     });
