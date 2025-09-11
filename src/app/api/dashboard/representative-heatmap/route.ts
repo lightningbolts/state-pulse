@@ -218,6 +218,92 @@ async function getBulkBillsSponsoredCount(representatives: any[], enactedOnly: b
   }
 }
 
+async function getBulkVotingMajorityScores(representatives: any[]): Promise<Record<string, number>> {
+  try {
+    const votingRecordsCollection = await getCollection('voting_records');
+    const repIdMap = new Map<string, string>();
+    const allRepIds = new Set<string>();
+
+    representatives.forEach(rep => {
+      const repKey = rep.id;
+      if (!repKey) return;
+      // Use normalizeIds to handle various ID formats (person_id, internal id, etc.)
+      const ids = normalizeIds(rep.id, rep._id?.toString(), rep.person_id);
+      ids.forEach(id => {
+        if (id) {
+          repIdMap.set(id, repKey);
+          allRepIds.add(id);
+        }
+      });
+    });
+
+    if (allRepIds.size === 0) return {};
+
+    // Fetch all voting records that involve any of the representatives.
+    // This query is broad and robust, checking multiple possible ID fields.
+    const votingRecords = await votingRecordsCollection.find({
+      $or: [
+        { 'memberVotes.bioguideId': { $in: Array.from(allRepIds) } },
+        { 'memberVotes.person_id': { $in: Array.from(allRepIds) } },
+        { 'memberVotes.id': { $in: Array.from(allRepIds) } }
+      ]
+    }).toArray();
+
+    const repScores: Record<string, { totalVotes: number; majorityVotes: number }> = {};
+
+    for (const record of votingRecords) {
+      if (!record.memberVotes || record.memberVotes.length === 0) continue;
+
+      let yea = 0;
+      let nay = 0;
+      for (const vote of record.memberVotes) {
+        const voteCast = vote.voteCast?.toLowerCase();
+        if (voteCast === 'yea' || voteCast === 'yes' || voteCast === 'aye') yea++;
+        else if (voteCast === 'nay' || voteCast === 'no') nay++;
+      }
+
+      if (yea === nay) continue; // Skip ties
+      const majorityPosition = yea > nay ? 'yea' : 'nay';
+
+      for (const vote of record.memberVotes) {
+        // Find the representative's internal ID using any of the possible ID fields
+        const memberId = vote.bioguideId || vote.person_id || vote.id;
+        if (!memberId) continue;
+
+        const repKey = repIdMap.get(memberId);
+        if (repKey) {
+          if (!repScores[repKey]) {
+            repScores[repKey] = { totalVotes: 0, majorityVotes: 0 };
+          }
+
+          const voteCast = vote.voteCast?.toLowerCase();
+          // Only count yea/nay votes in the total
+          if (voteCast === 'yea' || voteCast === 'yes' || voteCast === 'aye' || voteCast === 'nay' || voteCast === 'no') {
+            repScores[repKey].totalVotes++;
+            const normalizedVote = (voteCast === 'yes' || voteCast === 'aye') ? 'yea' : (voteCast === 'no' ? 'nay' : voteCast);
+            if (normalizedVote === majorityPosition) {
+              repScores[repKey].majorityVotes++;
+            }
+          }
+        }
+      }
+    }
+
+    const finalScores: Record<string, number> = {};
+    for (const repKey in repScores) {
+      const { totalVotes, majorityVotes } = repScores[repKey];
+      finalScores[repKey] = totalVotes > 0 ? (majorityVotes / totalVotes) * 100 : 0;
+    }
+    console.log(finalScores)
+
+    return finalScores;
+  } catch (error) {
+    console.error('Error calculating voting majority scores:', error);
+    return {};
+  }
+}
+
+
 function calculateRecentActivityScore(rep: any): number {
   let score = 0;
   if (rep.updated_at) {
@@ -251,7 +337,7 @@ async function getBulkRecentActivityScores(representatives: any[], enactedOnly: 
         rep.current_role?.person_id,
         rep.current_role?.id,
         // OpenStates ID patterns
-        rep.openstates_url?.split('/').pop()?.replace('-', '_')
+        rep.openstates_url?.split('/')?.pop()?.replace('-', '_')
       );
       ids.forEach(id => repIdToRepKey.set(id, repKey));
     });
@@ -437,6 +523,8 @@ export async function GET(request: NextRequest) {
 
     const sponsorshipCounts = (baseMetric === 'sponsored_bills') ? await getBulkBillsSponsoredCount(representatives, enactedOnly) : {};
     const recentActivityScores = (baseMetric === 'recent_activity') ? await getBulkRecentActivityScores(representatives, enactedOnly) : {};
+    const votingMajorityScores = (baseMetric === 'voted_with_majority') ? await getBulkVotingMajorityScores(representatives) : {};
+
 
     const districtScores: Record<string, number> = {};
     const districtRepCount: Record<string, number> = {};
@@ -445,10 +533,14 @@ export async function GET(request: NextRequest) {
       const identifiers = getDistrictIdentifiers(rep);
       const repSponsorshipCount = sponsorshipCounts[rep.id] || 0;
       const repRecentScore = recentActivityScores[rep.id] || calculateRecentActivityScore(rep);
+      const repVotingMajorityScore = votingMajorityScores[rep.id] || 0;
+
 
       let score = 0;
       if (baseMetric === 'sponsored_bills') score = repSponsorshipCount;
       else if (baseMetric === 'recent_activity') score = repRecentScore;
+      else if (baseMetric === 'voted_with_majority') score = repVotingMajorityScore;
+
 
       for (const id of identifiers) {
         districtScores[id] = (districtScores[id] || 0) + score;
@@ -477,7 +569,7 @@ export async function GET(request: NextRequest) {
         avgScore: Math.round(avgScore * 100) / 100,
         minScore: Math.round(minScore * 100) / 100,
         maxScoreRaw: maxScore,
-        availableMetrics: ['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity'],
+        availableMetrics: ['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity', 'voted_with_majority'],
         enactedOnly
       }
     });

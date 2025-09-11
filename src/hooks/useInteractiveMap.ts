@@ -111,7 +111,7 @@ export const useInteractiveMap = () => {
     const [selectedRepMetric, setSelectedRepMetric] = useState<string>('sponsored_bills');
     const [repDataLoading, setRepDataLoading] = useState<boolean>(false);
     const [repDataError, setRepDataError] = useState<string | null>(null);
-    const [availableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity']);
+    const [availableRepMetrics] = useState<string[]>(['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity', 'voted_with_majority']);
     const [showEnactedOnly, setShowEnactedOnly] = useState<boolean>(false);
     const [showDistrictBorders, setShowDistrictBorders] = useState<boolean>(true);
     const [isMobile, setIsMobile] = useState<boolean>(false);
