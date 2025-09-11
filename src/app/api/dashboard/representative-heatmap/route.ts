@@ -294,7 +294,6 @@ async function getBulkVotingMajorityScores(representatives: any[]): Promise<Reco
       const { totalVotes, majorityVotes } = repScores[repKey];
       finalScores[repKey] = totalVotes > 0 ? (majorityVotes / totalVotes) * 100 : 0;
     }
-    console.log(finalScores)
 
     return finalScores;
   } catch (error) {
