@@ -53,14 +53,18 @@ export function PolicyTracker() {
     // Toggle daily email notification for a topic
     const handleToggleNotification = async (topic: string) => {
         if (!isSignedIn) return;
-        const enabled = !topicNotifications[topic];
+        const currentStatus = topicNotifications[topic] || false;
+        const enabled = !currentStatus;
+        
         const res = await fetch("/api/policy-tracker", {
             method: "PUT",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ oldTopic: topic, notifyByEmail: enabled }),
         });
         if (res.ok) {
+            // Update local state immediately
             setTopicNotifications((prev) => ({ ...prev, [topic]: enabled }));
+            
             toast({
                 title: enabled ? `Email notifications enabled for "${topic}"` : `Email notifications disabled for "${topic}"`,
                 description: enabled
@@ -68,6 +72,9 @@ export function PolicyTracker() {
                     : "You will no longer receive daily emails for this topic.",
                 variant: "default",
             });
+            
+            // Refresh the data to ensure consistency
+            fetchUpdates();
         } else {
             toast({
                 title: "Error updating notification",
@@ -89,7 +96,9 @@ export function PolicyTracker() {
             // Track notification status for each topic
             const notifications: Record<string, boolean> = {};
             (data.updates || []).forEach((u: any) => {
-                if (u.topic) notifications[u.topic] = !!u.notifyByEmail;
+                if (u.topic) {
+                    notifications[u.topic] = !!u.notifyByEmail;
+                }
             });
             setTopicNotifications(notifications);
         }

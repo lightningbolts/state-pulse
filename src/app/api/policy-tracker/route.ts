@@ -29,13 +29,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
   }
   const collection = await getCollection('topic_subscriptions');
-  const subs = await collection.find({ userId }).toArray();
-  const topics = subs.map((s) => s.topic);
-  const updates = await collection
-    .find({ topic: { $in: topics } })
-    .sort({ date: -1 })
-    .limit(20)
-    .toArray();
+  
+  // Get the user's specific subscriptions with their notification preferences
+  const userSubscriptions = await collection.find({ userId }).toArray();
+  
+  // Return the user's subscriptions as updates (each subscription is an "update" record)
+  const updates = userSubscriptions.map(sub => ({
+    topic: sub.topic,
+    notifyByEmail: sub.notifyByEmail || false,
+    message: `Tracking "${sub.topic}"`,
+    date: sub.createdAt || new Date(),
+    userId: sub.userId
+  }));
+
   return NextResponse.json({ updates });
 }
 
