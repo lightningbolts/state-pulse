@@ -33,50 +33,12 @@ export async function generateGeminiSummary(text: string, sourceType?: string): 
 
 /**
  * Optimized function that determines source type from text characteristics and generates appropriate summaries
+ * TEMPORARILY MODIFIED: Only generates brief summaries to reduce API costs
  */
 export async function generateOptimizedGeminiSummary(text: string, detectedSourceType: string): Promise<{ summary: string; longSummary: string | null; sourceType: string }> {
-  // Determine if this is a rich source that warrants detailed summary
-  const isRichSource = ['pdf-extracted', 'pdf', 'full-text', 'ilga-pdf', 'ilga-fulltext'].includes(detectedSourceType);
-  
-  if (!isRichSource || text.length < 500) {
-    // For non-rich sources or short text, just generate regular summary
-    const summary = await generateGeminiSummary(text);
-    return { summary, longSummary: null, sourceType: detectedSourceType };
-  }
-
-  // For rich sources, generate both summaries in one call to save tokens and API calls
-  const prompt = `Please provide TWO summaries of the following legislation:
-
-FIRST - A brief summary in approximately 100 words, focusing on the main points and specific impact. Remove fluff and filler.
-
-SECOND - A comprehensive, detailed analysis that includes:
-- Key Provisions: What the legislation specifically does, changes, or establishes
-- Impact Analysis: Who this affects and how (citizens, businesses, government agencies, etc.)  
-- Implementation Details: Timeline, funding mechanisms, enforcement procedures
-- Direct Citations: Quote specific sections or language from the text when relevant
-
-Format the detailed summary using a mix of paragraphs and bullet points where appropriate. Keep paragraphs to 3-4 sentences for readability. Use italics for emphasis and avoid excessive markdown formatting.
-DO NOT say "Brief summary" or "Detailed/comprehensive summary/analysis " at the start of each summary.
-Please clearly separate the two summaries with "---DETAILED---" between them.
-
-Legislation text:
-${text}`;
-
-  const response = await ai.generate({ prompt });
-  const fullResponse = response.text.trim();
-
-  // Split the response into brief and detailed summaries
-  const parts = fullResponse.split('---DETAILED---');
-
-  if (parts.length >= 2) {
-    const summary = cleanSummaryText(parts[0].trim());
-    const longSummary = cleanSummaryText(parts[1].trim());
-    return { summary, longSummary, sourceType: detectedSourceType };
-  } else {
-    // Fallback if parsing fails - use the whole response as summary
-    console.warn('Failed to parse dual summary response, falling back to single summary');
-    return { summary: cleanSummaryText(fullResponse), longSummary: null, sourceType: detectedSourceType };
-  }
+  // TEMPORARY: Only generate brief summaries to reduce costs
+  const summary = await generateGeminiSummary(text, detectedSourceType);
+  return { summary, longSummary: null, sourceType: detectedSourceType };
 }
 
 export async function generateGeminiDetailedSummary(text: string): Promise<string> {
