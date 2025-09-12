@@ -175,19 +175,107 @@ export function PolicyTracker() {
         setExpandedTopics(newExpandedTopics);
     };
 
+    // Helper function to parse location information from topic strings
+    const parseTopicForLocation = (topic: string) => {
+        const topicLower = topic.toLowerCase();
+        
+  // State names mapping (longer names first to prevent partial matches)
+  const stateNames = [
+    'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota',
+    'rhode island', 'south carolina', 'south dakota', 'west virginia', 'massachusetts',
+    'pennsylvania', 'connecticut', 'washington', 'wisconsin', 'minnesota', 'mississippi',
+    'louisiana', 'california', 'colorado', 'delaware', 'illinois', 'indiana', 'kentucky',
+    'maryland', 'michigan', 'missouri', 'montana', 'nebraska', 'oklahoma', 'tennessee',
+    'virginia', 'wyoming', 'alabama', 'alaska', 'arizona', 'arkansas', 'florida', 'georgia',
+    'hawaii', 'idaho', 'kansas', 'maine', 'nevada', 'oregon', 'vermont', 'iowa', 'ohio',
+    'texas', 'utah'
+  ];        // Federal keywords
+        const federalKeywords = [
+            'congress', 'united states congress', 'us congress', 'federal', 'national', 
+            'house of representatives', 'senate', 'capitol hill', 'washington dc', 'dc congress'
+        ];
+
+        // Check for federal terms first
+        const detectedFederal = federalKeywords.some(fed => topicLower.includes(fed));
+        if (detectedFederal) {
+            // Remove federal terms and return cleaned search with congress flag
+            let cleanedSearch = topic;
+            federalKeywords.forEach(fed => {
+                const regex = new RegExp(`\\b${fed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+                cleanedSearch = cleanedSearch.replace(regex, '').replace(/\s+/g, ' ').trim();
+            });
+            // Remove common prepositions and connecting words
+            cleanedSearch = cleanedSearch.replace(/\b(in|for|about|on|at|from|to|with|by)\s*/gi, '').trim();
+            
+            return {
+                search: cleanedSearch,
+                showCongress: true,
+                jurisdictionName: undefined
+            };
+        }
+
+        // Check for state names
+        for (const state of stateNames) {
+            if (topicLower.includes(state)) {
+                // Extract the state name and clean the search term
+                let cleanedSearch = topic;
+                const regex = new RegExp(`\\b${state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+                cleanedSearch = cleanedSearch.replace(regex, '').replace(/\s+/g, ' ').trim();
+                // Remove common prepositions and connecting words
+                cleanedSearch = cleanedSearch.replace(/\b(in|for|about|on|at|from|to|with|by)\s*/gi, '').trim();
+                
+                // Capitalize state name properly
+                const properStateName = state.split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ');
+
+                return {
+                    search: cleanedSearch,
+                    showCongress: false,
+                    jurisdictionName: properStateName
+                };
+            }
+        }
+
+        // If no location detected, return original search
+        return {
+            search: topic,
+            showCongress: false,
+            jurisdictionName: undefined
+        };
+    };
+
     const fetchRelatedLegislation = async (topic: string) => {
         if (loadingLegislation.has(topic)) return;
 
         setLoadingLegislation((prev) => new Set(prev).add(topic));
 
         try {
-            const res = await fetch(`/api/search-legislation-by-topic?topic=${encodeURIComponent(topic)}`);
+            // Parse the topic to extract location information
+            const { search, showCongress, jurisdictionName } = parseTopicForLocation(topic);
+            
+            // Build query parameters
+            const params = new URLSearchParams({
+                limit: '10',
+                skip: '0',
+                sortBy: 'createdAt',
+                sortDir: 'desc'
+            });
+
+            if (search) {
+                params.set('search', search);
+            }
+            if (showCongress) {
+                params.set('showCongress', 'true');
+            }
+            if (jurisdictionName) {
+                params.set('jurisdictionName', jurisdictionName);
+            }
+
+            const res = await fetch(`/api/legislation?${params.toString()}`);
             if (res.ok) {
-                const data = await res.json();
-                // console.log('Search results for topic:', topic, data);
-                // console.log('Legislation array length:', data.legislation?.length);
-                // console.log('Sample legislation:', data.legislation?.[0]);
-                setRelatedLegislation((prev) => ({...prev, [topic]: data.legislation || []}));
+                const legislation = await res.json();
+                setRelatedLegislation((prev) => ({...prev, [topic]: legislation || []}));
             } else {
                 console.error('Failed to fetch related legislation:', res.statusText);
                 setRelatedLegislation((prev) => ({...prev, [topic]: []}));
@@ -387,12 +475,12 @@ export function PolicyTracker() {
                                                                                     from {relatedLegislation[topic][0]?.jurisdictionName || 'this jurisdiction'}:
                                                                                 </p>
                                                                             </div>
-                                                                            <div
+                                                                            {/* <div
                                                                                 className="text-xs text-muted-foreground mb-2 bg-blue-50 p-2 rounded">
                                                                                 Note: Showing general legislation from the
                                                                                 detected location since no specific topic
                                                                                 matches were found.
-                                                                            </div>
+                                                                            </div> */}
                                                                             {relatedLegislation[topic].map((legislation, i) => (
                                                                                 <AnimatedSection key={legislation.id}>
                                                                                     <Card

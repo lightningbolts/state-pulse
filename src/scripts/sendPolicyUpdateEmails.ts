@@ -2,7 +2,7 @@ import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import { sendEmail } from '@/lib/email';
 import { renderBrandedEmail } from '@/lib/emailTemplate';
-import { searchLegislationByTopic } from '@/services/legislationService';
+import { getAllLegislationWithFiltering } from '@/services/legislationService';
 
 import fetch from 'node-fetch';
 
@@ -10,6 +10,99 @@ type ClerkUser = {
   email_addresses?: { email_address: string }[];
 };
 
+// Helper function to parse location information from topic strings
+function parseTopicForLocation(topic: string) {
+  const topicLower = topic.toLowerCase();
+  
+  // State names mapping (longer names first to prevent partial matches)
+  const stateNames = [
+    'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota',
+    'rhode island', 'south carolina', 'south dakota', 'west virginia', 'massachusetts',
+    'pennsylvania', 'connecticut', 'washington', 'wisconsin', 'minnesota', 'mississippi',
+    'louisiana', 'california', 'colorado', 'delaware', 'illinois', 'indiana', 'kentucky',
+    'maryland', 'michigan', 'missouri', 'montana', 'nebraska', 'oklahoma', 'tennessee',
+    'virginia', 'wyoming', 'alabama', 'alaska', 'arizona', 'arkansas', 'florida', 'georgia',
+    'hawaii', 'idaho', 'kansas', 'maine', 'nevada', 'oregon', 'vermont', 'iowa', 'ohio',
+    'texas', 'utah'
+  ];
+
+  // Federal keywords
+  const federalKeywords = [
+    'congress', 'united states congress', 'us congress', 'federal', 'national', 
+    'house of representatives', 'senate', 'capitol hill', 'washington dc', 'dc congress'
+  ];
+
+  // Check for federal terms first
+  const detectedFederal = federalKeywords.some(fed => topicLower.includes(fed));
+  if (detectedFederal) {
+    // Remove federal terms and return cleaned search with congress flag
+    let cleanedSearch = topic;
+    federalKeywords.forEach(fed => {
+      const regex = new RegExp(`\\b${fed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+      cleanedSearch = cleanedSearch.replace(regex, '').replace(/\s+/g, ' ').trim();
+    });
+    // Remove common prepositions and connecting words
+    cleanedSearch = cleanedSearch.replace(/\b(in|for|about|on|at|from|to|with|by)\s*/gi, '').trim();
+    
+    return {
+      search: cleanedSearch,
+      showCongress: true,
+      jurisdictionName: undefined
+    };
+  }
+
+  // Check for state names
+  for (const state of stateNames) {
+    if (topicLower.includes(state)) {
+      // Extract the state name and clean the search term
+      let cleanedSearch = topic;
+      const regex = new RegExp(`\\b${state.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+      cleanedSearch = cleanedSearch.replace(regex, '').replace(/\s+/g, ' ').trim();
+    // Remove common prepositions and connecting words
+    cleanedSearch = cleanedSearch.replace(/\b(in|for|about|on|at|from|to|with|by)\s*/gi, '').trim();      // Capitalize state name properly
+      const properStateName = state.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+
+      return {
+        search: cleanedSearch,
+        showCongress: false,
+        jurisdictionName: properStateName
+      };
+    }
+  }
+
+  // If no location detected, return original search
+  return {
+    search: topic,
+    showCongress: false,
+    jurisdictionName: undefined
+  };
+}
+
+// Helper function to search legislation by topic using the new unified function
+async function searchLegislationByTopicReplacement(topic: string, daysBack: number = 7) {
+  try {
+    // Calculate cutoff date for filtering recent legislation
+    const cutoffDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000));
+    
+    // Parse the topic to extract location information
+    const { search, showCongress, jurisdictionName } = parseTopicForLocation(topic);
+    
+    return await getAllLegislationWithFiltering({
+      search: search || undefined,
+      limit: 100,
+      sortBy: 'createdAt',
+      sortDir: 'desc',
+      showCongress,
+      jurisdictionName,
+      latestActionAt_gte: cutoffDate.toISOString()
+    });
+  } catch (error) {
+    console.error('Error searching legislation by topic:', error);
+    return [];
+  }
+}
 
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 
@@ -92,7 +185,7 @@ async function main() {
     // Get recent legislation with sponsors for sponsorship notifications
     // Add debugging and optimize the query
     console.log('Querying for recent legislation with sponsors...');
-    const query = {
+    const query: any = {
       updatedAt: { $gte: cutoffDate },
       sponsors: { $exists: true, $ne: [], $not: { $size: 0 } }
     };
@@ -103,7 +196,7 @@ async function main() {
     console.log(`Documents with updatedAt field: ${countWithUpdatedAt}`);
 
     // If no documents have updatedAt, fall back to createdAt
-    let actualQuery = query;
+    let actualQuery: any = query;
     if (countWithUpdatedAt === 0) {
       console.log('No documents with updatedAt found, falling back to createdAt');
       actualQuery = {
@@ -209,8 +302,8 @@ async function main() {
       let newLegislation: { topic: string; bills: any[] }[] = [];
 
       for (const topic of topics) {
-        const bills = await searchLegislationByTopic(topic, timeRange);
-        const recentBills = (bills || []).filter(bill => {
+        const bills = await searchLegislationByTopicReplacement(topic, timeRange);
+        const recentBills = (bills || []).filter((bill: any) => {
           const latestAction = bill.latestActionAt && (Date.now() - new Date(bill.latestActionAt).getTime() <= timeRangeMs);
           const latestUpdate = bill.updatedAt && (Date.now() - new Date(bill.updatedAt).getTime() <= timeRangeMs);
           return latestAction || latestUpdate;

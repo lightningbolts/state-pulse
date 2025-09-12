@@ -121,8 +121,8 @@ export async function upsertLegislationSelective(legislationData: Legislation): 
     const updateFields: Record<string, any> = {};
     for (const key of Object.keys(dataForSet)) {
       if (ignoreFields.includes(key)) continue;
-      const newValue = dataForSet[key];
-      const oldValue = existing[key];
+      const newValue = (dataForSet as any)[key];
+      const oldValue = (existing as any)[key];
       // Compare arrays and objects by JSON.stringify, primitives by ===
       if (Array.isArray(newValue) || typeof newValue === 'object') {
         if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
@@ -222,6 +222,301 @@ export async function getLegislationsByIds(ids: string[]): Promise<Legislation[]
   }
 }
 
+export async function getAllLegislationWithFiltering({
+  search,
+  limit = 100,
+  skip = 0,
+  sortBy,
+  sortDir = 'desc',
+  showCongress = false,
+  sponsorId,
+  showOnlyEnacted,
+  session,
+  identifier,
+  jurisdiction,
+  jurisdictionName,
+  subject,
+  chamber,
+  classification,
+  statusText,
+  sponsor,
+  firstActionAt_gte,
+  firstActionAt_lte,
+  updatedAt_gte,
+  updatedAt_lte,
+  latestActionAt_gte,
+  latestActionAt_lte,
+  state,
+  stateAbbr
+}: {
+  search?: string;
+  limit?: number;
+  skip?: number;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+  showCongress?: boolean;
+  sponsorId?: string;
+  showOnlyEnacted?: string;
+  session?: string;
+  identifier?: string;
+  jurisdiction?: string;
+  jurisdictionName?: string;
+  subject?: string;
+  chamber?: string;
+  classification?: string;
+  statusText?: string;
+  sponsor?: string;
+  firstActionAt_gte?: string;
+  firstActionAt_lte?: string;
+  updatedAt_gte?: string;
+  updatedAt_lte?: string;
+  latestActionAt_gte?: string;
+  latestActionAt_lte?: string;
+  state?: string;
+  stateAbbr?: string;
+}): Promise<Legislation[]> {
+  try {
+    // Parse filtering parameters
+    const otherFilters: Record<string, any> = {};
+    
+    // Always filter by sponsorId if present
+    if (sponsorId) {
+      // Normalize id to use slashes (ocd-person/uuid) for matching sponsors.id
+      const normalizedId = sponsorId.replace(/^ocd-person_/, 'ocd-person/').replace(/_/g, '-').replace('ocd-person/-', 'ocd-person/');
+      otherFilters['$or'] = [
+        { 'sponsors.id': sponsorId },
+        { 'sponsors.id': normalizedId }
+      ];
+    }
+
+    // Add enacted filter if showOnlyEnacted param is present
+    if (showOnlyEnacted === 'true') {
+      otherFilters.enactedAt = { $ne: null };
+    }
+
+    // Parse sorting parameters - Always prioritize latestActionAt for better UX
+    let sort: Record<string, 1 | -1>;
+    if (showOnlyEnacted === 'true' || showOnlyEnacted === 'false') {
+      // For enacted filtering, always sort by enactedAt first, then latestActionAt
+      if (sortDir === 'asc') {
+        sort = { enactedAt: 1, latestActionAt: 1 };
+      } else {
+        sort = { enactedAt: -1, latestActionAt: -1 };
+      }
+    } else {
+      // For all other cases, always default to latestActionAt sorting for most recent activity
+      // This provides better user experience by showing most recently active bills first
+      if (sortDir === 'asc') {
+        sort = { latestActionAt: 1, updatedAt: 1 };
+      } else {
+        sort = { latestActionAt: -1, updatedAt: -1 };
+      }
+    }
+
+    // Common filters
+    if (session) {
+      otherFilters.session = session;
+    }
+    if (identifier) {
+      otherFilters.identifier = identifier;
+    }
+    if (jurisdiction) {
+      otherFilters.jurisdictionId = jurisdiction;
+    }
+    
+    // Handle Congress vs State filtering
+    const isCongress: boolean = !!(
+      showCongress ||
+      (state && state.toLowerCase() === 'united states congress') ||
+      (stateAbbr && stateAbbr.toUpperCase() === 'US')
+    );
+    if (isCongress) {
+      console.log('[Service] Filtering for ALL Congress sessions');
+      otherFilters.jurisdictionName = 'United States Congress';
+    } else if (jurisdictionName) {
+      otherFilters.jurisdictionName = jurisdictionName;
+    }
+    
+    if (subject) {
+      otherFilters.subjects = subject;
+    }
+    if (chamber) {
+      otherFilters.chamber = chamber;
+    }
+    if (classification) {
+      otherFilters.classification = classification;
+    }
+    if (statusText) {
+      otherFilters.statusText = statusText;
+    }
+    if (sponsor) {
+      if (showCongress) {
+        // Congress sponsor handling
+      } else if (sponsorId) {
+        const normalizedId = sponsorId.replace(/^ocd-person_/, 'ocd-person/').replace(/_/g, '-').replace('ocd-person/-', 'ocd-person/');
+        otherFilters['$or'] = [
+          { 'sponsors.id': sponsorId },
+          { 'sponsors.id': normalizedId }
+        ];
+      } else {
+        otherFilters['sponsors.name'] = sponsor;
+      }
+    }
+    
+    // Date range filters (e.g., firstActionAt_gte, firstActionAt_lte)
+    if (firstActionAt_gte || firstActionAt_lte) {
+      otherFilters.firstActionAt = {};
+      if (firstActionAt_gte) otherFilters.firstActionAt.$gte = new Date(firstActionAt_gte);
+      if (firstActionAt_lte) otherFilters.firstActionAt.$lte = new Date(firstActionAt_lte);
+    }
+    
+    // updatedAt date range filters
+    if (updatedAt_gte || updatedAt_lte) {
+      otherFilters.updatedAt = {};
+      if (updatedAt_gte) otherFilters.updatedAt.$gte = new Date(updatedAt_gte);
+      if (updatedAt_lte) otherFilters.updatedAt.$lte = new Date(updatedAt_lte);
+    }
+    
+    // latestActionAt date range filters
+    if (latestActionAt_gte || latestActionAt_lte) {
+      otherFilters.latestActionAt = {};
+      if (latestActionAt_gte) otherFilters.latestActionAt.$gte = new Date(latestActionAt_gte);
+      if (latestActionAt_lte) otherFilters.latestActionAt.$lte = new Date(latestActionAt_lte);
+    }
+
+    // Full text search
+    let finalFilter = { ...otherFilters };
+    if (search) {
+      const searchOr = [
+        { title: { $regex: search, $options: 'i' } },
+        { summary: { $regex: search, $options: 'i' } },
+        { identifier: { $regex: search, $options: 'i' } },
+        { classification: search },
+        { classification: { $regex: search, $options: 'i' } },
+        { subjects: search },
+        { subjects: { $regex: search, $options: 'i' } }
+      ];
+      // If there are other filters, combine with $and
+      const filtersWithoutOr = { ...otherFilters };
+      delete filtersWithoutOr.$or;
+      finalFilter = { $and: [filtersWithoutOr, { $or: searchOr }] };
+    }
+
+    // Get legislation using the improved search approach
+    let legislations = await getAllLegislation({
+      limit: limit + 50, // Get more results to allow for proper sorting
+      skip,
+      sort,
+      filter: finalFilter,
+      showCongress: isCongress
+    });
+
+    // Apply consistent sorting by latest action date for better user experience
+    // Always sort by most recent activity (latestActionAt) to show most relevant bills first
+    legislations.sort((a, b) => {
+      // Get the actual latest date for each bill
+      const getLatestDate = (bill: any) => {
+        if (bill.latestActionAt) {
+          return new Date(bill.latestActionAt).getTime();
+        }
+        if (bill.history && bill.history.length > 0) {
+          const historyDates = bill.history
+            .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
+            .filter((date: number) => date > 0);
+          if (historyDates.length > 0) {
+            return Math.max(...historyDates);
+          }
+        }
+        // Fallback to updatedAt or createdAt
+        if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+        if (bill.createdAt) return new Date(bill.createdAt).getTime();
+        return 0;
+      };
+
+      // Always prioritize latestActionAt for most recent activity
+      const dateA = getLatestDate(a);
+      const dateB = getLatestDate(b);
+      
+      // Sort descending by default (most recent first) unless explicitly ascending
+      return sortDir === 'asc' ? dateA - dateB : dateB - dateA;
+    });
+
+    // Trim back to requested limit
+    legislations = legislations.slice(0, limit);
+
+    // Fuzzy search fallback: only if no results and a search term is present
+    if (search && legislations.length === 0) {
+      // Strictly apply all non-search filters (deep copy, excluding $or)
+      const fuzzyFilter: Record<string, any> = JSON.parse(JSON.stringify(otherFilters));
+      if (fuzzyFilter.$or) delete fuzzyFilter.$or;
+      // Congress, session, chamber, etc. are already present if set
+      const allCandidates = await getAllLegislation({
+        limit: 100,
+        skip: 0,
+        sort,
+        filter: fuzzyFilter,
+        showCongress: isCongress
+      });
+      if (allCandidates.length > 0) {
+        const Fuse = (await import('fuse.js')).default;
+        // Only use the same fields as regular full text search
+        const fuseKeys = [
+          "title",
+          "summary",
+          "identifier",
+          "classification",
+          "subjects"
+        ];
+        const normalizedCandidates = allCandidates.map((u: any, idx: number) => ({
+          idx,
+          title: u.title ? String(u.title).toLowerCase().trim() : '',
+          summary: u.summary ? String(u.summary).toLowerCase().trim() : '',
+          identifier: u.identifier ? String(u.identifier).toLowerCase().trim() : '',
+          classification: Array.isArray(u.classification) ? u.classification.map((v: any) => String(v).toLowerCase().trim()) : [],
+          subjects: Array.isArray(u.subjects) ? u.subjects.map((v: any) => String(v).toLowerCase().trim()) : [],
+        }));
+        const fuse = new Fuse(normalizedCandidates, {
+          keys: fuseKeys,
+          threshold: 0.4,
+          ignoreLocation: true,
+          includeScore: true,
+          findAllMatches: true,
+          minMatchCharLength: 2,
+        });
+        const fuzzyResults = fuse.search(search.trim().toLowerCase()).map(r => r.item.idx);
+        let fuzzyLegislations = fuzzyResults.map(idx => allCandidates[idx]);
+        
+        // Sort fuzzy results by latest action date for consistency
+        fuzzyLegislations.sort((a, b) => {
+          const getLatestDate = (bill: any) => {
+            if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
+            if (bill.history && bill.history.length > 0) {
+              const historyDates = bill.history
+                .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
+                .filter((date: number) => date > 0);
+              if (historyDates.length > 0) return Math.max(...historyDates);
+            }
+            if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+            if (bill.createdAt) return new Date(bill.createdAt).getTime();
+            return 0;
+          };
+          
+          const dateA = getLatestDate(a);
+          const dateB = getLatestDate(b);
+          return sortDir === 'asc' ? dateA - dateB : dateB - dateA;
+        });
+        
+        legislations = fuzzyLegislations.slice(0, limit);
+      }
+    }
+
+    return legislations;
+  } catch (error) {
+    console.error('Error in getAllLegislationWithFiltering:', error);
+    throw new Error('Failed to fetch legislation with filtering.');
+  }
+}
+
 export async function getAllLegislation({
   limit = 100,
   skip = 0,
@@ -312,9 +607,77 @@ export async function testLegislationCollectionService(): Promise<void> {
   }
 }
 
-export async function searchLegislationByTopic(topic: string, daysBack: number = 7): Promise<Legislation[]> {
+/**
+ * @deprecated This function is deprecated. Use getAllLegislation with search filters instead.
+ * 
+ * Migration guide:
+ * OLD: await searchLegislationByTopic(topic, daysBack)
+ * NEW: await fetch(`/api/legislation?search=${encodeURIComponent(topic)}&limit=100&sortBy=latestActionAt&sortDir=desc`)
+ * 
+ * Or directly in code:
+ * await getAllLegislation({
+ *   limit: 100,
+ *   sort: { latestActionAt: -1, updatedAt: -1 },
+ *   filter: {
+ *     $or: [
+ *       { title: { $regex: topic, $options: 'i' } },
+ *       { summary: { $regex: topic, $options: 'i' } },
+ *       { subjects: { $regex: topic, $options: 'i' } }
+ *     ]
+ *   }
+ * })
+ * 
+ * This function will be removed in a future version.
+ */
+// Overload for backward compatibility
+export async function searchLegislationByTopic(topic: string, daysBack: number): Promise<Legislation[]>;
+export async function searchLegislationByTopic(
+  topic: string, 
+  options: {
+    daysBack?: number;
+    limit?: number;
+    skip?: number;
+    sort?: Record<string, 1 | -1>;
+    filters?: Record<string, any>;
+    showCongress?: boolean;
+  }
+): Promise<Legislation[]>;
+export async function searchLegislationByTopic(
+  topic: string, 
+  optionsOrDaysBack: number | {
+    daysBack?: number;
+    limit?: number;
+    skip?: number;
+    sort?: Record<string, 1 | -1>;
+    filters?: Record<string, any>;
+    showCongress?: boolean;
+  } = {}
+): Promise<Legislation[]> {
   try {
-    const legislationCollection = await getCollection('legislation');
+    // Handle both old signature (topic, daysBack) and new signature (topic, options)
+    let options: {
+      daysBack?: number;
+      limit?: number;
+      skip?: number;
+      sort?: Record<string, 1 | -1>;
+      filters?: Record<string, any>;
+      showCongress?: boolean;
+    };
+    
+    if (typeof optionsOrDaysBack === 'number') {
+      options = { daysBack: optionsOrDaysBack };
+    } else {
+      options = optionsOrDaysBack || {};
+    }
+
+    const {
+      daysBack = 7,
+      limit = 100,
+      skip = 0,
+      sort = { latestActionAt: -1, updatedAt: -1 },
+      filters = {},
+      showCongress = false
+    } = options;
 
     // Extract location keywords from the topic (state names, cities, etc.)
     const locationKeywords = [
@@ -331,7 +694,8 @@ export async function searchLegislationByTopic(topic: string, daysBack: number =
     ];
     // Add federal keywords
     const federalKeywords = [
-      'congress', 'united states congress', 'us congress', 'federal', 'national', 'house of representatives', 'senate', 'capitol hill', 'washington dc', 'dc congress'
+      'congress', 'united states congress', 'us congress', 'federal', 'national', 
+      'house of representatives', 'senate', 'capitol hill', 'washington dc', 'dc congress'
     ];
 
     const topicLower = topic.toLowerCase();
@@ -344,107 +708,108 @@ export async function searchLegislationByTopic(topic: string, daysBack: number =
       .filter(term => term.length > 2 && !locationKeywords.includes(term) && !federalKeywords.includes(term))
       .filter(term => !['in', 'of', 'the', 'and', 'or', 'laws', 'law', 'bill', 'bills'].includes(term));
 
-    // console.log('Search debug:', { topic, detectedStates, searchTerms });
+    // Build base filters from options
+    let otherFilters = { ...filters };
 
-    let docs = [];
+    // Auto-detect Congress vs State filtering if not explicitly set
+    if (showCongress || detectedFederal.length > 0) {
+      otherFilters.jurisdictionName = 'United States Congress';
+    } else if (detectedStates.length > 0) {
+      const statePatterns = detectedStates.map(state => new RegExp(state, 'i'));
+      otherFilters.jurisdictionName = { $in: statePatterns };
+    }
 
-    // Simplified Congress search: only match jurisdictionName: 'United States Congress'
-    if (detectedFederal.length > 0) {
-      const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
-      let query: Record<string, any> = { jurisdictionName: "United States Congress" };
-      if (searchTerms.length > 0) {
-        query.$or = [
-          { title: { $in: regexPatterns } },
-          { subjects: { $in: regexPatterns } },
-          { summary: { $in: regexPatterns } },
-          { geminiSummary: { $in: regexPatterns } },
-          { latestActionDescription: { $in: regexPatterns } }
+    // Full text search using the same approach as main legislation endpoint
+    const searchValue = topic.trim();
+    let finalFilter = { ...otherFilters };
+    
+    if (searchValue) {
+      const searchOr = [
+        { title: { $regex: searchValue, $options: 'i' } },
+        { summary: { $regex: searchValue, $options: 'i' } },
+        { identifier: { $regex: searchValue, $options: 'i' } },
+        { classification: searchValue },
+        { classification: { $regex: searchValue, $options: 'i' } },
+        { subjects: searchValue },
+        { subjects: { $regex: searchValue, $options: 'i' } },
+        { geminiSummary: { $regex: searchValue, $options: 'i' } },
+        { latestActionDescription: { $regex: searchValue, $options: 'i' } }
+      ];
+      // If there are other filters, combine with $and
+      const filtersWithoutOr = { ...otherFilters };
+      delete filtersWithoutOr.$or;
+      finalFilter = { $and: [filtersWithoutOr, { $or: searchOr }] };
+    }
+
+    // Get legislation using the improved search approach
+    let legislations = await getAllLegislation({
+      limit,
+      skip,
+      sort,
+      filter: finalFilter,
+      showCongress: showCongress || detectedFederal.length > 0
+    });
+
+    // Fuzzy search fallback: only if no results and a search term is present
+    if (searchValue && legislations.length === 0) {
+      console.log('[Topic Search] No exact matches found, trying fuzzy search...');
+      
+      // Strictly apply all non-search filters (deep copy, excluding $or)
+      const fuzzyFilter: Record<string, any> = JSON.parse(JSON.stringify(otherFilters));
+      if (fuzzyFilter.$or) delete fuzzyFilter.$or;
+      
+      // Get all candidates that match the non-search filters
+      const allCandidates = await getAllLegislation({
+        limit: 500, // Get more candidates for fuzzy matching
+        skip: 0,
+        sort,
+        filter: fuzzyFilter,
+        showCongress: showCongress || detectedFederal.length > 0
+      });
+
+      if (allCandidates.length > 0) {
+        const Fuse = (await import('fuse.js')).default;
+        
+        // Only use the same fields as regular full text search
+        const fuseKeys = [
+          "title",
+          "summary", 
+          "identifier",
+          "classification",
+          "subjects",
+          "geminiSummary",
+          "latestActionDescription"
         ];
+        
+        const normalizedCandidates = allCandidates.map((u: any, idx: number) => ({
+          idx,
+          title: u.title ? String(u.title).toLowerCase().trim() : '',
+          summary: u.summary ? String(u.summary).toLowerCase().trim() : '',
+          identifier: u.identifier ? String(u.identifier).toLowerCase().trim() : '',
+          classification: Array.isArray(u.classification) ? u.classification.map((v: any) => String(v).toLowerCase().trim()) : [],
+          subjects: Array.isArray(u.subjects) ? u.subjects.map((v: any) => String(v).toLowerCase().trim()) : [],
+          geminiSummary: u.geminiSummary ? String(u.geminiSummary).toLowerCase().trim() : '',
+          latestActionDescription: u.latestActionDescription ? String(u.latestActionDescription).toLowerCase().trim() : '',
+        }));
+        
+        const fuse = new Fuse(normalizedCandidates, {
+          keys: fuseKeys,
+          threshold: 0.4,
+          ignoreLocation: true,
+          includeScore: true,
+          findAllMatches: true,
+          minMatchCharLength: 2,
+        });
+        
+        const fuzzyResults = fuse.search(searchValue.trim().toLowerCase()).map(r => r.item.idx);
+        legislations = fuzzyResults.map(idx => allCandidates[idx]).slice(0, limit);
+        
+        console.log(`[Topic Search] Fuzzy search found ${legislations.length} results`);
       }
-      docs = await legislationCollection
-        .find(query)
-        .sort({ latestActionAt: -1, createdAt: -1 })
-        .limit(10)
-        .toArray();
-      console.log('Federal search results:', docs.length);
-    }
-    // Try specific search first (location + content)
-    if (docs.length === 0 && detectedStates.length > 0 && searchTerms.length > 0) {
-      const statePatterns = detectedStates.map(state => new RegExp(state, 'i'));
-      const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
-
-      const query = {
-        $and: [
-          { jurisdictionName: { $in: statePatterns } },
-          {
-            $or: [
-              { title: { $in: regexPatterns } },
-              { subjects: { $in: regexPatterns } },
-              { summary: { $in: regexPatterns } },
-              { geminiSummary: { $in: regexPatterns } },
-              { latestActionDescription: { $in: regexPatterns } }
-            ]
-          }
-        ]
-      };
-
-      docs = await legislationCollection
-        .find(query)
-        .sort({ latestActionAt: -1, createdAt: -1 })
-        .limit(10)
-        .toArray();
-
-      // console.log('Specific search results:', docs.length);
     }
 
-    // Fallback to location-only search if no results
-    if (docs.length === 0 && detectedStates.length > 0) {
-      const statePatterns = detectedStates.map(state => new RegExp(state, 'i'));
-      const query = { jurisdictionName: { $in: statePatterns } };
-
-      docs = await legislationCollection
-        .find(query)
-        .sort({ latestActionAt: -1, createdAt: -1 })
-        .limit(10)
-        .toArray();
-
-      console.log('Location-only search results:', docs.length);
-    }
-
-    // Fallback to content-only search if no results
-    if (docs.length === 0 && searchTerms.length > 0) {
-      const regexPatterns = searchTerms.map(term => new RegExp(term, 'i'));
-      const query = {
-        $or: [
-          { title: { $in: regexPatterns } },
-          { subjects: { $in: regexPatterns } },
-          { summary: { $in: regexPatterns } },
-          { geminiSummary: { $in: regexPatterns } },
-          { latestActionDescription: { $in: regexPatterns } }
-        ]
-      };
-
-      docs = await legislationCollection
-        .find(query)
-        .sort({ latestActionAt: -1, createdAt: -1 })
-        .limit(10)
-        .toArray();
-
-      console.log('Content-only search results:', docs.length);
-    }
-
-    // Final fallback - just get any recent legislation
-    if (docs.length === 0) {
-      docs = await legislationCollection
-        .find({})
-        .sort({ latestActionAt: -1, createdAt: -1 })
-        .limit(10)
-        .toArray();
-
-      console.log('Fallback search results:', docs.length);
-    }
-
-    return docs.map(convertDocumentToLegislation);
+    console.log(`[Topic Search] Final results: ${legislations.length} for topic: "${topic}"`);
+    return legislations;
   } catch (error) {
     console.error('Error searching legislation by topic:', error);
     return [];

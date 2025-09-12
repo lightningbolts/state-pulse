@@ -169,7 +169,8 @@ export const enactedPatterns = [
   /notification.*is.*now.*act/i,
   /approved.*p.*l.*c/i,
   /signed.*chap/i,
-  /signed.*by.*gov/i
+  /signed.*by.*gov/i,
+  /effective\s*\d{1,2}\/\d{1,2}\/\d{2,4}/i
 ];
 
 export const BROAD_TOPIC_KEYWORDS: Record<string, string[]> = {
