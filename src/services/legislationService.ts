@@ -247,7 +247,8 @@ export async function getAllLegislationWithFiltering({
   latestActionAt_gte,
   latestActionAt_lte,
   state,
-  stateAbbr
+  stateAbbr,
+  context
 }: {
   search?: string;
   limit?: number;
@@ -274,6 +275,7 @@ export async function getAllLegislationWithFiltering({
   latestActionAt_lte?: string;
   state?: string;
   stateAbbr?: string;
+  context?: 'policy-updates-feed' | 'policy-tracker' | 'email-script' | 'api';
 }): Promise<Legislation[]> {
   try {
     // Parse filtering parameters
@@ -294,8 +296,9 @@ export async function getAllLegislationWithFiltering({
       otherFilters.enactedAt = { $ne: null };
     }
 
-    // Parse sorting parameters - Always prioritize latestActionAt for better UX
+    // Parse sorting parameters with context-aware logic
     let sort: Record<string, 1 | -1>;
+    
     if (showOnlyEnacted === 'true' || showOnlyEnacted === 'false') {
       // For enacted filtering, always sort by enactedAt first, then latestActionAt
       if (sortDir === 'asc') {
@@ -303,9 +306,36 @@ export async function getAllLegislationWithFiltering({
       } else {
         sort = { enactedAt: -1, latestActionAt: -1 };
       }
+    } else if (context === 'policy-tracker' || context === 'email-script') {
+      // PolicyTracker and email scripts always sort by updatedAt for most recently updated legislation
+      if (sortDir === 'asc') {
+        sort = { updatedAt: 1, latestActionAt: 1 };
+      } else {
+        sort = { updatedAt: -1, latestActionAt: -1 };
+      }
+    } else if (context === 'policy-updates-feed') {
+      // PolicyUpdatesFeed respects user-selected sorting but defaults to createdAt for "Most Recent"
+      if (sortBy === 'lastActionAt' || sortBy === 'latestActionAt') {
+        // User explicitly selected "Latest Action" - sort by legislative activity
+        if (sortDir === 'asc') {
+          sort = { latestActionAt: 1, updatedAt: 1 };
+        } else {
+          sort = { latestActionAt: -1, updatedAt: -1 };
+        }
+      } else if (sortBy === 'createdAt' || !sortBy) {
+        // User selected "Most Recent" or default - sort by creation date
+        if (sortDir === 'asc') {
+          sort = { createdAt: 1, updatedAt: 1 };
+        } else {
+          sort = { createdAt: -1, updatedAt: -1 };
+        }
+      } else {
+        // Other sorting options (title, etc.)
+        const sortField = sortBy || 'createdAt';
+        sort = { [sortField]: sortDir === 'asc' ? 1 : -1 };
+      }
     } else {
-      // For all other cases, always default to latestActionAt sorting for most recent activity
-      // This provides better user experience by showing most recently active bills first
+      // Default behavior for API and other contexts - use latestActionAt for better UX
       if (sortDir === 'asc') {
         sort = { latestActionAt: 1, updatedAt: 1 };
       } else {
@@ -411,33 +441,46 @@ export async function getAllLegislationWithFiltering({
       showCongress: isCongress
     });
 
-    // Apply consistent sorting by latest action date for better user experience
-    // Always sort by most recent activity (latestActionAt) to show most relevant bills first
+    // Apply context-aware consistent sorting
     legislations.sort((a, b) => {
-      // Get the actual latest date for each bill
-      const getLatestDate = (bill: any) => {
-        if (bill.latestActionAt) {
-          return new Date(bill.latestActionAt).getTime();
-        }
-        if (bill.history && bill.history.length > 0) {
-          const historyDates = bill.history
-            .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
-            .filter((date: number) => date > 0);
-          if (historyDates.length > 0) {
-            return Math.max(...historyDates);
+      // Helper function to get the appropriate date based on context and sort field
+      const getComparisonDate = (bill: any) => {
+        if (context === 'policy-updates-feed') {
+          // For PolicyUpdatesFeed, respect the user's sorting choice
+          if (sortBy === 'lastActionAt' || sortBy === 'latestActionAt') {
+            // User chose "Latest Action"
+            if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
+            if (bill.history && bill.history.length > 0) {
+              const historyDates = bill.history
+                .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
+                .filter((date: number) => date > 0);
+              if (historyDates.length > 0) return Math.max(...historyDates);
+            }
+            if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+            if (bill.createdAt) return new Date(bill.createdAt).getTime();
+          } else if (sortBy === 'createdAt' || !sortBy) {
+            // User chose "Most Recent" (creation date)
+            if (bill.createdAt) return new Date(bill.createdAt).getTime();
+            if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
           }
+        } else {
+          // For PolicyTracker, email script, and other contexts - always use latest legislative activity
+          if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
+          if (bill.history && bill.history.length > 0) {
+            const historyDates = bill.history
+              .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
+              .filter((date: number) => date > 0);
+            if (historyDates.length > 0) return Math.max(...historyDates);
+          }
+          if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+          if (bill.createdAt) return new Date(bill.createdAt).getTime();
         }
-        // Fallback to updatedAt or createdAt
-        if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
-        if (bill.createdAt) return new Date(bill.createdAt).getTime();
         return 0;
       };
 
-      // Always prioritize latestActionAt for most recent activity
-      const dateA = getLatestDate(a);
-      const dateB = getLatestDate(b);
+      const dateA = getComparisonDate(a);
+      const dateB = getComparisonDate(b);
       
-      // Sort descending by default (most recent first) unless explicitly ascending
       return sortDir === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
@@ -486,18 +529,39 @@ export async function getAllLegislationWithFiltering({
         const fuzzyResults = fuse.search(search.trim().toLowerCase()).map(r => r.item.idx);
         let fuzzyLegislations = fuzzyResults.map(idx => allCandidates[idx]);
         
-        // Sort fuzzy results by latest action date for consistency
+        // Sort fuzzy results consistently with context-aware logic
         fuzzyLegislations.sort((a, b) => {
           const getLatestDate = (bill: any) => {
-            if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
-            if (bill.history && bill.history.length > 0) {
-              const historyDates = bill.history
-                .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
-                .filter((date: number) => date > 0);
-              if (historyDates.length > 0) return Math.max(...historyDates);
+            if (context === 'policy-updates-feed') {
+              // For PolicyUpdatesFeed, respect the user's sorting choice
+              if (sortBy === 'lastActionAt' || sortBy === 'latestActionAt') {
+                // User chose "Latest Action"
+                if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
+                if (bill.history && bill.history.length > 0) {
+                  const historyDates = bill.history
+                    .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
+                    .filter((date: number) => date > 0);
+                  if (historyDates.length > 0) return Math.max(...historyDates);
+                }
+                if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+                if (bill.createdAt) return new Date(bill.createdAt).getTime();
+              } else if (sortBy === 'createdAt' || !sortBy) {
+                // User chose "Most Recent" (creation date)
+                if (bill.createdAt) return new Date(bill.createdAt).getTime();
+                if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+              }
+            } else {
+              // For PolicyTracker, email script, and other contexts - always use latest legislative activity
+              if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
+              if (bill.history && bill.history.length > 0) {
+                const historyDates = bill.history
+                  .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
+                  .filter((date: number) => date > 0);
+                if (historyDates.length > 0) return Math.max(...historyDates);
+              }
+              if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+              if (bill.createdAt) return new Date(bill.createdAt).getTime();
             }
-            if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
-            if (bill.createdAt) return new Date(bill.createdAt).getTime();
             return 0;
           };
           

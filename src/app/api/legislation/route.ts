@@ -38,6 +38,7 @@ export async function GET(request: Request) {
       firstActionAt_lte: searchParams.get('firstActionAt_lte') || undefined,
       state: searchParams.get('state') || undefined,
       stateAbbr: searchParams.get('stateAbbr') || undefined,
+      context: (searchParams.get('context') as 'policy-updates-feed' | 'policy-tracker' | 'email-script' | 'api') || 'api',
     });
 
     return NextResponse.json(legislations, { status: 200 });

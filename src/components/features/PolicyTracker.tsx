@@ -258,8 +258,9 @@ export function PolicyTracker() {
             const params = new URLSearchParams({
                 limit: '10',
                 skip: '0',
-                sortBy: 'createdAt',
-                sortDir: 'desc'
+                sortBy: 'updatedAt',
+                sortDir: 'desc',
+                context: 'policy-tracker'
             });
 
             if (search) {

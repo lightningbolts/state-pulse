@@ -112,6 +112,10 @@ async function fetchUpdatesFeed({
     if (showOnlyEnacted) {
         params.append('showOnlyEnacted', 'true');
     }
+    
+    // Add context for proper sorting behavior
+    params.append('context', 'policy-updates-feed');
+    
     const res = await fetch(`/api/legislation?${params.toString()}`);
     if (!res.ok) throw new Error("Failed to fetch updates");
 

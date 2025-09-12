@@ -92,11 +92,12 @@ async function searchLegislationByTopicReplacement(topic: string, daysBack: numb
     return await getAllLegislationWithFiltering({
       search: search || undefined,
       limit: 100,
-      sortBy: 'createdAt',
+      sortBy: 'updatedAt',
       sortDir: 'desc',
       showCongress,
       jurisdictionName,
-      latestActionAt_gte: cutoffDate.toISOString()
+      latestActionAt_gte: cutoffDate.toISOString(),
+      context: 'email-script'
     });
   } catch (error) {
     console.error('Error searching legislation by topic:', error);
