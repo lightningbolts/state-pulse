@@ -91,17 +91,17 @@ const VotingBillPositions: React.FC<VotingBillPositionsProps> = ({ votingData })
 
       <div className="p-4 border rounded-md bg-muted/50">
         <div className="mb-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-sm text-muted-foreground">
             Showing {displayVotes.length} votes
             {selectedChamber !== 'all' && ` from ${selectedChamber}`}
             {votingData.chambers.length > 1 && selectedChamber === 'all' && ` from ${votingData.chambers.length} chambers`}
           </div>
           {voteContext?.voteQuestion && (
-            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+            <div className="mt-2 p-3 bg-blue-50/80 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 rounded-lg">
               <div className="text-sm font-medium text-blue-900 dark:text-blue-100">Vote Question:</div>
-              <div className="text-sm text-blue-800 dark:text-blue-200 mt-1">{voteContext.voteQuestion}</div>
+              <div className="text-sm text-blue-800 dark:text-blue-100 mt-1">{voteContext.voteQuestion}</div>
               {voteContext.result && (
-                <div className="text-xs text-blue-700 dark:text-blue-300 mt-1">Result: {voteContext.result}</div>
+                <div className="text-xs text-blue-700 dark:text-blue-200 mt-1">Result: {voteContext.result}</div>
               )}
             </div>
           )}

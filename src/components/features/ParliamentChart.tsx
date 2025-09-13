@@ -116,6 +116,7 @@ const calculateParliamentPositions = (totalSeats: number, screenSize: 'mobile' |
 const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => {
   const [isReady, setIsReady] = useState(false);
   const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     loadHighchartsModules().then(() => setIsReady(true));
@@ -140,6 +141,34 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
     // Listen for window resize
     window.addEventListener('resize', updateScreenSize);
     return () => window.removeEventListener('resize', updateScreenSize);
+  }, []);
+
+  // Dark mode detection hook
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateTheme = () => {
+      const isDark = document.documentElement.classList.contains('dark') ||
+                     window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDarkMode(isDark);
+    };
+
+    updateTheme();
+
+    // Listen for theme changes
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', updateTheme);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', updateTheme);
+    };
   }, []);
 
   const chartData = useMemo(() => {
@@ -224,7 +253,7 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
 
       return { chamberName, series, totalVoted: chamberVotes.length, totalSeats, voteTypeCounts };
     });
-  }, [votes, chamber, screenSize]);
+  }, [votes, chamber, screenSize, isDarkMode]);
   
   if (!isReady || votes.length === 0) {
     return <div className="flex justify-center items-center h-96 text-gray-500 dark:text-gray-400">
@@ -259,10 +288,14 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
 
         const config = chartConfig[screenSize];
 
+        // Use isDarkMode state for proper theme colors
+        const titleColor = isDarkMode ? '#f1f5f9' : '#0f172a';
+        const subtitleColor = isDarkMode ? '#94a3b8' : '#64748b';
+
         const options: Highcharts.Options = {
           chart: { type: 'scatter', backgroundColor: 'transparent', height: config.height },
-          title: { text: chamberName.replace(/_/g, ' '), style: { color: 'var(--text-foreground)', fontSize: config.titleSize, fontWeight: 'bold' } },
-          subtitle: { text: `${totalVoted} voted out of ${totalSeats} seats`, style: { color: 'var(--text-muted-foreground)', fontSize: config.subtitleSize } },
+          title: { text: chamberName.replace(/_/g, ' '), style: { color: titleColor, fontSize: config.titleSize, fontWeight: 'bold' } },
+          subtitle: { text: `${totalVoted} voted out of ${totalSeats} seats`, style: { color: subtitleColor, fontSize: config.subtitleSize } },
           xAxis: { visible: false, minPadding: 0.05, maxPadding: 0.05 },
           yAxis: { visible: false, minPadding: 0.05, maxPadding: 0.05, startOnTick: false, endOnTick: false },
           legend: { enabled: false },
