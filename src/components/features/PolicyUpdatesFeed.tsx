@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bookmark, MapPin, Plus, Search, X } from "lucide-react";
+import { Bookmark, MapPin, Plus, Search, X, Grid3X3, List } from "lucide-react";
 import { BookmarksContext } from "@/components/features/BookmarkButton";
 import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -19,6 +19,119 @@ import { useUser } from "@clerk/nextjs";
 import { STATE_MAP } from "@/types/geo";
 import PolicyUpdateCard from "@/components/features/PolicyUpdateCard";
 import { BROAD_TOPIC_KEYWORDS } from "@/types/legislation";
+import Link from "next/link";
+import { isLegislationEnacted } from '@/utils/enacted-legislation';
+import { AnimatedSection } from "@/components/ui/AnimatedSection";
+
+
+let compactViewCardNumber = 100;
+
+// Compact Policy Update Card Component
+const PolicyUpdateCardCompact: React.FC<{
+    update: PolicyUpdate;
+    idx: number;
+}> = ({ update, idx }) => {
+    const getFormattedDate = (dateString: string | null | undefined) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+        return typeof window !== 'undefined'
+            ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+            : date.toISOString().slice(0, 10);
+    };
+
+    // Get jurisdiction abbreviation
+    let jurisdictionAb: string;
+    if (update.jurisdictionName === "United States Congress") {
+        jurisdictionAb = "US";
+    } else {
+        // @ts-ignore
+        jurisdictionAb = STATE_MAP[update.jurisdictionName] || update.jurisdictionName?.substring(0, 2).toUpperCase() || '';
+    }
+
+    // Get last action date
+    let lastActionDate: Date | null = null;
+    if (Array.isArray(update.history) && update.history.length > 0) {
+        const sortedHistory = [...update.history]
+            .filter(h => h.date && h.action)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const latestHistoryAction = sortedHistory[0];
+        if (latestHistoryAction && latestHistoryAction.date) {
+            lastActionDate = new Date(latestHistoryAction.date);
+        }
+    } else {
+        lastActionDate = update.lastActionAt ? new Date(update.lastActionAt) : null;
+    }
+
+    const formattedLastActionDate = lastActionDate && !isNaN(lastActionDate.getTime()) ? getFormattedDate(lastActionDate.toISOString()) : null;
+
+    const billIsEnacted = isLegislationEnacted(update);
+
+    return (
+        <AnimatedSection key={`compact-${update.id}-${idx}`}>
+            <Link
+                href={`/legislation/${update.id}`}
+                className={`block p-3 border rounded-md bg-background transition hover:bg-accent/50 text-sm h-full flex flex-col ${
+                    billIsEnacted ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'hover:border-primary/30'
+                }`}
+            >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm leading-tight mb-1 truncate">
+                            {update.identifier ? `${update.identifier} - ${update.title}` : update.title}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded text-xs font-mono font-medium">
+                                {jurisdictionAb}
+                            </span>
+                            {update.classification && update.classification[0] && (
+                                <span className="capitalize font-medium">
+                                    {update.classification[0].replace(/\b\w/g, l => l.toUpperCase())}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    {billIsEnacted && (
+                        <div className="flex-shrink-0">
+                            <div className="bg-green-600 text-white text-xs px-1.5 py-0.5 rounded font-medium">
+                                Enacted
+                            </div>
+                        </div>
+                    )}
+                </div>
+                
+                <div className="text-xs text-muted-foreground space-y-1 flex-1">
+                    {formattedLastActionDate && (
+                        <div>Last: {formattedLastActionDate}</div>
+                    )}
+                    {update.sponsors && update.sponsors.length > 0 && (
+                        <div className="truncate">
+                            By: {update.sponsors.map(sp => sp.name).join(', ')}
+                        </div>
+                    )}
+                </div>
+
+                {update.topicClassification?.broadTopics && update.topicClassification.broadTopics.length > 0 && (
+                    <div className="mt-auto pt-2 flex flex-wrap gap-1">
+                        {update.topicClassification.broadTopics.slice(0, 2).map((topic, i) => (
+                            <span
+                                key={topic + i}
+                                className="text-xs bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-medium"
+                            >
+                                #{topic}
+                            </span>
+                        ))}
+                        {update.topicClassification.broadTopics.length > 2 && (
+                            <span className="text-xs text-muted-foreground font-medium">
+                                +{update.topicClassification.broadTopics.length - 2}
+                            </span>
+                        )}
+                    </div>
+                )}
+            </Link>
+        </AnimatedSection>
+    );
+};
 
 interface PolicyUpdate {
     id: string;
@@ -39,6 +152,7 @@ interface PolicyUpdate {
     history?: { date: string; action: string }[];
     firstActionAt?: string | null;
     versions?: { date: string; note?: string; classification?: string | null; links?: any[] }[];
+    topicClassification?: { broadTopics: string[] };
 }
 
 // Classification tags (no descriptions)
@@ -157,6 +271,7 @@ export function PolicyUpdatesFeed() {
     const [newTagInput, setNewTagInput] = useState("");
     const [showCustomTagInput, setShowCustomTagInput] = useState(false);
     const [showOnlyEnacted, setShowOnlyEnacted] = useState(false);
+    const [compactView, setCompactView] = useState(false);
     const loader = useRef<HTMLDivElement | null>(null);
     const skipRef = useRef(0);
     const loadingRef = useRef(false); // Ref to prevent concurrent loads
@@ -264,10 +379,11 @@ export function PolicyUpdatesFeed() {
         setLoading(true);
         try {
             const currentSkip = skipRef.current;
+            const limit = compactView ? compactViewCardNumber : 20; // Load more items in compact mode
             // Only use sponsorId for filtering by representative
             const newUpdates = await fetchUpdatesFeed({
                 skip: currentSkip,
-                limit: 20,
+                limit,
                 search,
                 subject,
                 sortField: sort.field,
@@ -290,7 +406,8 @@ export function PolicyUpdatesFeed() {
             }
             skipRef.current = currentSkip + newUpdates.length;
             setSkip(skipRef.current);
-            setHasMore(newUpdates.length === 20);
+            const expectedLength = compactView ? compactViewCardNumber : 20;
+            setHasMore(newUpdates.length === expectedLength);
         } catch (e) {
             console.error('[FEED] loadMore error', e);
             setHasMore(false);
@@ -298,7 +415,7 @@ export function PolicyUpdatesFeed() {
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
+    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
@@ -318,9 +435,10 @@ export function PolicyUpdatesFeed() {
         setHasMore(true);
         setLoading(true);
         try {
+            const limit = compactView ? compactViewCardNumber : 20;
             const newUpdates = await fetchUpdatesFeed({
                 skip: 0,
-                limit: 20,
+                limit,
                 search,
                 subject,
                 sortField: sort.field,
@@ -337,13 +455,14 @@ export function PolicyUpdatesFeed() {
             setUpdates(filteredUpdates);
             skipRef.current = filteredUpdates.length;
             setSkip(filteredUpdates.length);
-            setHasMore(newUpdates.length === 20 && (!showOnlyBookmarked || filteredUpdates.length === 20));
+            const expectedLength = compactView ? compactViewCardNumber : 20;
+            setHasMore(newUpdates.length === expectedLength && (!showOnlyBookmarked || filteredUpdates.length === expectedLength));
         } catch (e) {
             console.error('[FEED] refresh error', e);
         } finally {
             setLoading(false);
         }
-    }, [search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted]);
+    }, [search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView]);
 
     // --- Seamless state/scroll restore ---
     // Use a ref to block the initial fetch until state/scroll is restored
@@ -377,6 +496,7 @@ export function PolicyUpdatesFeed() {
                 setJurisdictionName(state.jurisdictionName || "");
                 setShowCongress(state.showCongress || false);
                 setShowOnlyEnacted(state.showOnlyEnacted || false);
+                setCompactView(state.compactView || false);
                 setSort(state.sort || { field: 'createdAt', dir: 'desc' });
                 setSkip(state.skip || 0);
                 skipRef.current = state.skip || 0;
@@ -403,6 +523,12 @@ export function PolicyUpdatesFeed() {
             // console.log('URL parameters detected, clearing existing state to prioritize URL params');
         }
 
+        // Also load compact view preference from localStorage as fallback
+        const savedCompactView = localStorage.getItem('policyUpdatesFeedCompactView');
+        if (savedCompactView && !saved) {
+            setCompactView(JSON.parse(savedCompactView));
+        }
+
         // Restore scroll position *before* paint for seamlessness
         const scrollY = sessionStorage.getItem('policyUpdatesFeedScrollY');
         if (scrollY && !hasUrlParams) { // Only restore scroll if not coming from URL navigation
@@ -422,10 +548,11 @@ export function PolicyUpdatesFeed() {
         const fetchAndSet = async () => {
             setLoading(true);
             try {
+                const limit = compactView ? compactViewCardNumber : 20;
                 // Only use sponsorId for filtering by representative
                 const newUpdates = await fetchUpdatesFeed({
                     skip: 0,
-                    limit: 20,
+                    limit,
                     search,
                     subject,
                     sortField: sort.field,
@@ -446,7 +573,8 @@ export function PolicyUpdatesFeed() {
                 setUpdates(filteredUpdates);
                 skipRef.current = filteredUpdates.length;
                 setSkip(filteredUpdates.length);
-                setHasMore(newUpdates.length === 20 && (!showOnlyBookmarked || filteredUpdates.length === 20));
+                const expectedLength = compactView ? compactViewCardNumber : 20;
+                setHasMore(newUpdates.length === expectedLength && (!showOnlyBookmarked || filteredUpdates.length === expectedLength));
             } catch {
                 if (!isMounted) return;
                 setHasMore(false);
@@ -459,7 +587,7 @@ export function PolicyUpdatesFeed() {
         return () => {
             isMounted = false;
         };
-    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, didRestore.current]);
+    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView, didRestore.current]);
 
 
     // Intersection Observer for infinite scroll
@@ -522,6 +650,7 @@ export function PolicyUpdatesFeed() {
                 jurisdictionName,
                 showCongress,
                 showOnlyEnacted,
+                compactView,
                 updates
             }));
         } catch (error) {
@@ -530,13 +659,18 @@ export function PolicyUpdatesFeed() {
             try {
                 sessionStorage.removeItem('policyUpdatesFeedState');
                 sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-                    search, subject, classification, sort, showCongress, showOnlyEnacted
+                    search, subject, classification, sort, showCongress, showOnlyEnacted, compactView
                 }));
             } catch (retryError) {
                 console.error('Failed to save even minimal state:', retryError);
             }
         }
-    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, showOnlyEnacted, updates]);
+    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, showOnlyEnacted, compactView, updates]);
+
+    // Save compact view preference to localStorage separately for persistence
+    useEffect(() => {
+        localStorage.setItem('policyUpdatesFeedCompactView', JSON.stringify(compactView));
+    }, [compactView]);
 
     // Save scroll position
     useEffect(() => {
@@ -671,6 +805,8 @@ export function PolicyUpdatesFeed() {
                                 setClassification("");
                                 setSort({ field: 'createdAt', dir: 'desc' });
                                 setShowOnlyBookmarked(false);
+                                // Keep compact view preference when clearing filters
+                                const currentCompactView = compactView;
                                 // Remove all filter params from URL
                                 const params = new URLSearchParams([...searchParams.entries()]);
                                 params.delete('rep');
@@ -679,11 +815,13 @@ export function PolicyUpdatesFeed() {
                                 params.delete('stateAbbr');
                                 params.delete('congress');
                                 router.replace(`/legislation?${params.toString()}`);
-                                // Clear sessionStorage so feed resets after reload
+                                // Clear sessionStorage so feed resets after reload, but preserve compact view
                                 sessionStorage.removeItem('policyUpdatesFeedState');
                                 sessionStorage.removeItem('policyUpdatesFeedScrollY');
                                 sessionStorage.removeItem('policyUpdatesFeedSearch');
                                 sessionStorage.removeItem('policyUpdatesFeedCustomTags');
+                                // Restore compact view after clearing
+                                setTimeout(() => setCompactView(currentCompactView), 0);
                                 console.log('[FEED] Cleared all filters and session storage');
                             }}
                         >
@@ -696,11 +834,11 @@ export function PolicyUpdatesFeed() {
 
             {/*<AnimatedSection>*/}
             <div className="mb-6 flex flex-col md:flex-row flex-wrap gap-4 items-center justify-center md:justify-start">
-                <div className="relative flex-grow w-full sm:w-auto flex">
+                <div className="relative flex-grow w-full sm:w-auto flex min-w-[300px] md:min-w-[400px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                         placeholder="Search updates..."
-                        className="pl-10 w-full"
+                        className="pl-10 w-full min-w-0"
                         value={searchInput}
                         onChange={e => setSearchInput(e.target.value)}
                         onKeyDown={e => {
@@ -708,7 +846,7 @@ export function PolicyUpdatesFeed() {
                         }}
                     />
                     <Button
-                        className="ml-2"
+                        className="ml-2 flex-shrink-0"
                         variant="default"
                         onClick={handleSearch}
                         aria-label="Search"
@@ -813,6 +951,15 @@ export function PolicyUpdatesFeed() {
                     }}
                 >
                     <span className="ml-2">{showOnlyEnacted ? "Show All Bills" : "Enacted into Law"}</span>
+                </Button>
+                {/* View Toggle Button */}
+                <Button
+                    variant={compactView ? "default" : "outline"}
+                    className="w-full sm:w-auto"
+                    onClick={() => setCompactView(!compactView)}
+                >
+                    {compactView ? <List className="mr-2 h-4 w-4" /> : <Grid3X3 className="mr-2 h-4 w-4" />}
+                    {compactView ? "List View" : "Compact View"}
                 </Button>
                 {/* Refresh Feed button */}
                 <Button
@@ -994,23 +1141,34 @@ export function PolicyUpdatesFeed() {
             {/*</AnimatedSection>*/}
 
             {/* Updates Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+            <div className={compactView 
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 items-stretch" 
+                : "grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch"
+            }>
                 {updates.map((update, idx) => (
-                    <PolicyUpdateCard
-                        key={update.id || idx}
-                        update={update}
-                        idx={idx}
-                        updates={updates}
-                        classification={classification}
-                        subject={subject}
-                        setClassification={setClassification}
-                        setSubject={setSubject}
-                        setUpdates={setUpdates}
-                        setSkip={setSkip}
-                        skipRef={skipRef}
-                        setHasMore={setHasMore}
-                        setLoading={setLoading}
-                    />
+                    compactView ? (
+                        <PolicyUpdateCardCompact
+                            key={update.id || idx}
+                            update={update}
+                            idx={idx}
+                        />
+                    ) : (
+                        <PolicyUpdateCard
+                            key={update.id || idx}
+                            update={update}
+                            idx={idx}
+                            updates={updates}
+                            classification={classification}
+                            subject={subject}
+                            setClassification={setClassification}
+                            setSubject={setSubject}
+                            setUpdates={setUpdates}
+                            setSkip={setSkip}
+                            skipRef={skipRef}
+                            setHasMore={setHasMore}
+                            setLoading={setLoading}
+                        />
+                    )
                 ))}
             </div>
             <div ref={loader} />
