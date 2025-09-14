@@ -13,6 +13,7 @@ import { RelatedBillsWrapper } from '@/components/features/RelatedBillsWrapper';
 import { RelatedBillsLoading } from '@/components/features/RelatedBillsLoading';
 import { VotingBillPositionsWrapper } from '@/components/features/VotingBillPositionsWrapper';
 import { VotingBillPositionsLoading } from '@/components/features/VotingBillPositionsLoading';
+import { DetailedAISummarySection } from '@/components/features/DetailedAISummarySection';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
 import { Suspense } from 'react';
@@ -298,16 +299,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
             </AnimatedSection>
           )}
 
-          {legislation.longGeminiSummary && (
-            <AnimatedSection className="p-4 border border-blue-500/30 rounded-lg bg-blue-950/20">
-              <h3 className="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-3">Detailed AI Summary</h3>
-              <div className="text-sm text-muted-foreground space-y-2">
-                {legislation.longGeminiSummary.split('\n').map((paragraph, index) => (
-                  <p key={index} className="break-words">{paragraph}</p>
-                ))}
-              </div>
-            </AnimatedSection>
-          )}
+          <DetailedAISummarySection legislation={legislation} />
 
           {versions && versions.length > 0 && (
             <AnimatedSection>
