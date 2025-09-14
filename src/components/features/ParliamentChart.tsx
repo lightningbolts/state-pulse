@@ -289,8 +289,8 @@ const ParliamentChart: React.FC<ParliamentChartProps> = ({ votes, chamber }) => 
         const config = chartConfig[screenSize];
 
         // Use isDarkMode state for proper theme colors
-        const titleColor = isDarkMode ? '#f1f5f9' : '#0f172a';
-        const subtitleColor = isDarkMode ? '#94a3b8' : '#64748b';
+        const titleColor = isDarkMode ? '#f200ffff' : '#1e293b';
+        const subtitleColor = isDarkMode ? '#f200ffff' : '#dbdbdbff';
 
         const options: Highcharts.Options = {
           chart: { type: 'scatter', backgroundColor: 'transparent', height: config.height },
