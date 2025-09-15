@@ -119,6 +119,12 @@ export const useInteractiveMap = () => {
     const [memoryPressure, setMemoryPressure] = useState<boolean>(false);
     const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+    
+    // Voting power states
+    const [votingPowerData, setVotingPowerData] = useState<Record<string, any>>({});
+    const [votingPowerLoading, setVotingPowerLoading] = useState<boolean>(false);
+    const [votingPowerError, setVotingPowerError] = useState<string | null>(null);
+    const [selectedChamber, setSelectedChamber] = useState<'house' | 'senate'>('house');
 
     const fetchMapData = async () => {
         setLoading(true);
@@ -135,6 +141,30 @@ export const useInteractiveMap = () => {
             setStateStats({});
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchVotingPowerData = async (chamber: 'house' | 'senate') => {
+        setVotingPowerLoading(true);
+        setVotingPowerError(null);
+        try {
+            // Add cache-busting parameter to ensure fresh data
+            const response = await fetch(`/api/dashboard/voting-power?chamber=${chamber}&_t=${Date.now()}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            const result = await response.json();
+            if (result.success) {
+                setVotingPowerData(result.data);
+            } else {
+                throw new Error(result.error || 'Failed to fetch voting power data');
+            }
+        } catch (error) {
+            console.error('Error fetching voting power data:', error);
+            setVotingPowerError(error instanceof Error ? error.message : 'Unknown error');
+            setVotingPowerData({});
+        } finally {
+            setVotingPowerLoading(false);
         }
     };
 
@@ -397,6 +427,15 @@ export const useInteractiveMap = () => {
         }
     }, [showRepHeatmap, mapMode, selectedRepMetric, memoizedFetchRepresentativeHeatmapData]);
 
+    // Fetch voting power data when in voting-power mode
+    useEffect(() => {
+        if (mapMode === 'voting-power') {
+            fetchVotingPowerData(selectedChamber);
+        } else {
+            setVotingPowerData({});
+        }
+    }, [mapMode, selectedChamber]);
+
     const onDistrictClickGL = async (feature: any, lngLat: { lng: number, lat: number }) => {
         const isDistrictMode = ['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode);
         if (isFullScreen && isDistrictMode) return;
@@ -489,7 +528,14 @@ export const useInteractiveMap = () => {
         handleMapModeChange,
         handleStateClick,
         onDistrictClickGL,
-        forceGarbageCollection
+        forceGarbageCollection,
+        // Voting power related
+        votingPowerData,
+        votingPowerLoading,
+        votingPowerError,
+        selectedChamber,
+        setSelectedChamber,
+        fetchVotingPowerData
     };
 };
 

@@ -9,6 +9,12 @@ export interface StateData {
     keyTopics: string[];
     center: LatLngExpression;
     color: string;
+    // Voting power fields (optional for backward compatibility)
+    population?: number;
+    houseSeats?: number;
+    senateSeats?: number;
+    houseVotingPower?: number;
+    senateVotingPower?: number;
 }
 
 export interface StateDetailData {

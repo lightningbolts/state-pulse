@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Calendar, FileText, MapPin, Maximize, Minimize, TrendingUp, Users } from 'lucide-react';
+import { Calendar, FileText, MapPin, Maximize, Minimize, TrendingUp, Users, Scale } from 'lucide-react';
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { DistrictMapGL } from './DistrictMapGL';
+import { StateMapGL } from './StateMapGL';
 import { RepresentativesResults } from "./RepresentativesResults";
 import { ChamberMakeup } from "./ChamberMakeup";
 import MapLibreMap, { Marker as MapLibreMarker, Popup as MapLibrePopup } from 'react-map-gl/maplibre';
@@ -20,6 +21,7 @@ const mapModes: MapMode[] = [
     { id: 'representatives', label: 'Representatives', description: 'Explore representative density and activity', icon: Users },
     { id: 'trends', label: 'Trending Topics', description: 'See what policy areas are most active', icon: TrendingUp },
     { id: 'recent', label: 'Recent Activity', description: 'Latest legislative developments', icon: Calendar },
+    { id: 'voting-power', label: 'Voting Power', description: 'Compare voting power per person across states', icon: Scale },
     { id: 'congressional-districts', label: 'Congressional Districts', description: 'View all U.S. congressional districts', icon: MapPin },
     { id: 'state-upper-districts', label: 'State Upper Districts', description: 'View all state senate (upper chamber) districts', icon: MapPin },
     { id: 'state-lower-districts', label: 'State Lower Districts', description: 'View all state house (lower chamber) districts', icon: MapPin }
@@ -70,10 +72,105 @@ const getTopicHeatmapColor = (score: number): string => {
     return `rgb(${r}, ${g}, ${b})`;
 };
 
+const getVotingPowerColor = (normalizedPower: number): string => {
+    if (normalizedPower <= 0) return 'rgb(255, 255, 255)'; 
+    const clampedScore = Math.max(0, Math.min(1, normalizedPower));
+    
+    const white = { r: 255, g: 255, b: 255 };
+    const darkBlue = { r: 30, g: 100, b: 200 };
+    
+    const r = Math.round(white.r + (darkBlue.r - white.r) * clampedScore);
+    const g = Math.round(white.g + (darkBlue.g - white.g) * clampedScore);
+    const b = Math.round(white.b + (darkBlue.b - white.b) * clampedScore);
+    
+    return `rgb(${r}, ${g}, ${b})`;
+};
+
+// Legend with Maryland baseline (1.0×) centered and based on actual data range
+const getVotingPowerLegend = (
+    votingPowerData: Record<string, any>,
+    getVotingPowerColor: (power: number) => string,
+    chamber: 'house' | 'senate'
+) => {
+    const all = Object.values(votingPowerData || {}).filter((s: any) =>
+        s && isFinite(s.relativeToMaryland) && isFinite(s.normalizedPower)
+    );
+    
+    if (all.length === 0) {
+        const fallbackLabels = ['0.5×', '0.75×', '1.0×', '1.25×', '1.5×'];
+        const fallbackStops = [0, 0.25, 0.5, 0.75, 1].map(getVotingPowerColor);
+        return { labels: fallbackLabels, style: { background: `linear-gradient(to right, ${fallbackStops.join(', ')})` } };
+    }
+
+    const relatives = all.map((s: any) => s.relativeToMaryland).sort((a, b) => a - b);
+    const minRel = relatives[0];
+    const maxRel = relatives[relatives.length - 1];
+
+    const md = Object.values(votingPowerData).find((s: any) => s.abbreviation === 'MD');
+    const mdRel = md?.relativeToMaryland ?? 1.0;
+    const mdNorm = md?.normalizedPower ?? 0.5;
+
+    const belowMd = Math.max(mdRel - minRel, 0.1);  // Distance from min to Maryland
+    const aboveMd = Math.max(maxRel - mdRel, 0.1);  // Distance from Maryland to max
+    const maxRange = Math.max(belowMd, aboveMd) * 1.1; // Use larger range for symmetry
+
+    const legendPoints = [
+        Math.max(mdRel - maxRange, minRel),     // Far left
+        Math.max(mdRel - maxRange * 0.5, minRel), // Mid left  
+        mdRel,                                   // Center (Maryland)
+        Math.min(mdRel + maxRange * 0.5, maxRel), // Mid right
+        Math.min(mdRel + maxRange, maxRel)      // Far right
+    ];
+
+    const uniquePoints = [...new Set(legendPoints.map(p => parseFloat(p.toFixed(3))))];
+    if (uniquePoints.length < 3) {
+        const spread = Math.max(maxRel - minRel, 0.2);
+        uniquePoints.length = 0;
+        uniquePoints.push(minRel, mdRel, maxRel);
+        if (spread > 0.4) {
+            uniquePoints.splice(1, 0, (minRel + mdRel) / 2);
+            uniquePoints.splice(3, 0, (mdRel + maxRel) / 2);
+        }
+    }
+
+    const needOneDecimal = maxRel >= 2 || (maxRel - minRel) > 0.5;
+    const labels = uniquePoints.map(v => {
+        const formatted = Math.abs(v - mdRel) < 0.001 
+            ? '1.0×' // Always show Maryland as 1.0×
+            : (needOneDecimal ? v.toFixed(1) : v.toFixed(2)) + '×';
+        return formatted;
+    });
+
+    const colorStops = uniquePoints.map((targetRel) => {
+        const matchingState = Object.values(votingPowerData).find((s: any) => 
+            Math.abs(s.relativeToMaryland - targetRel) < 0.01 // Slightly larger tolerance
+        );
+        
+        if (matchingState) {
+            return getVotingPowerColor(matchingState.normalizedPower);
+        }
+        
+        const allRelatives = Object.values(votingPowerData).map((s: any) => s.relativeToMaryland);
+        const sortedRelatives = allRelatives.sort((a, b) => a - b);
+        
+        let rank = 0;
+        for (const v of sortedRelatives) {
+            if (v < targetRel) rank++;
+            else break;
+        }
+        const estimatedNormalized = rank / Math.max(sortedRelatives.length - 1, 1);
+        
+        return getVotingPowerColor(estimatedNormalized);
+    });
+
+    const style = { background: `linear-gradient(to right, ${colorStops.join(', ')})` };
+    return { labels, style };
+};
+
 const DEFAULT_POSITION: [number, number] = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
 
-export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
+export const MapUI = () => {
     const {
         resolvedTheme,
         isClient,
@@ -136,7 +233,13 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
         handleMapModeChange,
         handleStateClick,
         onDistrictClickGL,
-        forceGarbageCollection
+        forceGarbageCollection,
+        // Voting power related
+        votingPowerData,
+        votingPowerLoading,
+        votingPowerError,
+        selectedChamber,
+        setSelectedChamber
     } = useInteractiveMap();
 
     const maxRepScore = React.useMemo(() => {
@@ -164,6 +267,11 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
         const uniqueLabels = [...new Set(rawLabels)];
         return uniqueLabels.sort((a, b) => a - b);
     }, [maxRepScore, selectedRepMetric]);
+
+    const { labels: votingPowerLegendLabels, style: votingPowerLegendStyle } = React.useMemo(
+        () => getVotingPowerLegend(votingPowerData, getVotingPowerColor, selectedChamber),
+        [votingPowerData, getVotingPowerColor, selectedChamber]
+    );
 
     const getRepHeatmapColor = React.useCallback((score: number): string => {
         if (score <= 0) return 'rgb(255,255,255)';
@@ -209,10 +317,14 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                 if (recentIntensity >= 0.7) return 'hsl(var(--primary))';
                 if (recentIntensity >= 0.3) return 'hsl(var(--primary) / 0.5)';
                 return 'hsl(var(--primary) / 0.2)';
+            case 'voting-power':
+                const votingData = votingPowerData[stateAbbr];
+                if (!votingData) return '#e0e0e0';
+                return getVotingPowerColor(votingData.normalizedPower);
             default:
                 return state.color;
         }
-    }, [mapMode, stateStats]);
+    }, [mapMode, stateStats, votingPowerData]);
 
     const memoizedMarkers = React.useMemo(() => {
         const markers: Record<string, { color: string, size: number }> = {};
@@ -253,6 +365,12 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                 if (recentIntensity >= 0.7) return 'High Activity';
                 if (recentIntensity >= 0.3) return 'Medium Activity';
                 return 'Low Activity';
+            case 'voting-power':
+                const votingData = votingPowerData[stateAbbr];
+                if (!votingData) return 'No Data';
+                if (votingData.normalizedPower >= 0.7) return 'High Power';
+                if (votingData.normalizedPower >= 0.3) return 'Medium Power';
+                return 'Low Power';
             default:
                 return 'General';
         }
@@ -289,6 +407,20 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                                         {mapModes.map((mode) => (<option key={mode.id} value={mode.id}>{mode.label}</option>))}
                                     </select>
                                 </div>
+                                {mapMode === 'voting-power' && (
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-xs sm:text-sm text-muted-foreground">Chamber:</span>
+                                        <select 
+                                            value={selectedChamber} 
+                                            onChange={(e) => setSelectedChamber(e.target.value as 'house' | 'senate')} 
+                                            className="text-xs sm:text-sm border rounded px-2 py-1 bg-background min-w-[100px] sm:min-w-[120px]" 
+                                            disabled={votingPowerLoading}
+                                        >
+                                            <option value="house">House</option>
+                                            <option value="senate">Senate</option>
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:space-x-2 lg:space-y-0">
                                 {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
@@ -301,7 +433,6 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                                     </div>
                                 )}
                                 <div className="flex items-center space-x-2">
-                                    {exportButton}
                                     <Button variant="outline" size="sm" onClick={() => setIsFullScreen(false)} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3"><Minimize className="h-3 w-3 sm:h-4 sm:w-4" /><span className="hidden sm:inline">Exit Full Screen</span><span className="sm:hidden">Exit</span></Button>
                                 </div>
                             </div>
@@ -317,6 +448,22 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                         <div className="h-full w-full">
                             {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
                                 <DistrictMapGL geojsonUrl={getDistrictGeoJsonUrl(mapMode, isMobile)} color={DISTRICT_COLORS[mapMode]} onDistrictClick={onDistrictClickGL} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'} showPartyAffiliation={showPartyAffiliation} districtPartyMapping={districtPartyMapping} partyColors={PARTY_COLORS} showGerrymandering={showGerrymandering} gerryScores={gerryScores} getGerrymanderingColor={getGerrymanderingColor} showTopicHeatmap={showTopicHeatmap} topicScores={topicScores} getTopicHeatmapColor={getTopicHeatmapColor} showRepHeatmap={showRepHeatmap} repScores={repScores} repDetails={repDetails} getRepHeatmapColor={getRepHeatmapColor} showDistrictBorders={showDistrictBorders} popupMarker={districtPopupLatLng ? { lng: districtPopupLatLng.lng, lat: districtPopupLatLng.lat, iconHtml: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`, draggable: !isMobile, onDragEnd: !isMobile ? (lngLat) => { setDistrictPopupLatLng(lngLat); if (selectedDistrict) { onDistrictClickGL(selectedDistrict, lngLat); } } : undefined } : undefined}/>
+                            ) : mapMode === 'voting-power' ? (
+                                <StateMapGL 
+                                    votingPowerData={votingPowerData}
+                                    chamber={selectedChamber}
+                                    onStateClick={(stateAbbr, stateData) => {
+                                        // Get coordinates from stateStats for popup positioning
+                                        const state = stateStats[stateAbbr];
+                                        if (state && state.center) {
+                                            const coords: [number, number] = Array.isArray(state.center) 
+                                                ? [state.center[0], state.center[1]]
+                                                : [state.center.lat, state.center.lng];
+                                            handleStateClick(stateAbbr, coords);
+                                        }
+                                    }}
+                                    mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
+                                />
                             ) : (
                                 <MapLibreMap ref={mapRef} initialViewState={{ longitude: DEFAULT_POSITION[1], latitude: DEFAULT_POSITION[0], zoom: DEFAULT_ZOOM }} style={{ height: '100%', width: '100%' }} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}>
                                     {Object.entries(stateStats).map(([abbr, state]) => {
@@ -353,7 +500,25 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                         {showGerrymandering && !gerryDataLoading && Object.keys(gerryScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Compactness Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }}></div><span className="text-xs">Very Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#60e8fa' }}></div><span className="text-xs">Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f5ce0b' }}></div><span className="text-xs">Less Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#d93706' }}></div><span className="text-xs">Irregular</span></div></div></div>)}
                         {showTopicHeatmap && !topicDataLoading && Object.keys(topicScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Topic Activity Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(25, 25, 112)' }}></div><span className="text-xs">High Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(99, 120, 171)' }}></div><span className="text-xs">Medium Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(173, 216, 230)' }}></div><span className="text-xs">Low Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div><span className="text-xs">No Data</span></div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Topic: {selectedTopic === 'all' ? 'All Topics' : selectedTopic}</div></div>)}
                         {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : selectedRepMetric === 'voted_with_majority' ? 'Vote with Majority %' : selectedRepMetric === 'voted_against_party' ? 'Vote Against Party %' : 'Representative Scale'}</h5><div className="w-full"><div className="h-3 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1">{repHeatmapLegendLabels.map(label => <span key={label}>{label}{(selectedRepMetric === 'voted_with_majority' || selectedRepMetric === 'voted_against_party') ? '%' : ''}</span>)}</div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Spectrum from white to dark purple represents absolute metric value.</div></div>)}
-                        {!['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0 text-xs sm:text-sm"><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary"></div><span>High Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/50"></div><span>Medium Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/20"></div><span>Low Activity</span></div></div></div>)}
+                        {mapMode === 'voting-power' && !votingPowerLoading && votingPowerData && Object.keys(votingPowerData).length > 0 && (
+                            <div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg">
+                                <h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">
+                                    Voting Power Scale ({selectedChamber === 'house' ? 'House' : 'Senate'})
+                                </h5>
+                                <div className="w-full">
+                                    <div className="h-3 rounded-sm" style={votingPowerLegendStyle}></div>
+                                    <div className="flex justify-between text-xs mt-1">
+                                        {votingPowerLegendLabels.map((label, index) => (
+                                            <span key={index}>{label}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="mt-1 sm:mt-2 text-xs text-muted-foreground">
+                                    Voting power relative to Maryland (1.0×). Darker = higher per-capita influence.
+                                </div>
+                            </div>
+                        )}
+                        {!['congressional-districts', 'state-upper-districts', 'state-lower-districts', 'voting-power'].includes(mapMode) && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0 text-xs sm:text-sm"><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary"></div><span>High Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/50"></div><span>Medium Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/20"></div><span>Low Activity</span></div></div></div>)}
                         {showPartyAffiliation && !partyDataLoading && Object.keys(districtPartyMapping).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Party Legend</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm">{Object.keys(PARTY_COLORS).map(party => (<div key={party} className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: PARTY_COLORS[party] }}></div><span className="text-xs">{party}</span></div>))}</div></div>)}
                         {showTopicHeatmap && availableTopics.length > 0 && (<div className="absolute top-16 sm:top-20 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-xs xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><label className="text-xs sm:text-sm font-medium block mb-1 sm:mb-2">Select Topic:</label><select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full text-xs sm:text-sm border rounded px-2 py-1 bg-background" disabled={topicDataLoading}><option value="all">All Topics</option>{availableTopics.map(topic => (<option key={topic} value={topic}>{topic}</option>))}</select></div>)}
                         {showRepHeatmap && (<div className="absolute top-16 sm:top-20 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-xs xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><label className="text-xs sm:text-sm font-medium block mb-1 sm:mb-2">Select Metric:</label><select value={selectedRepMetric} onChange={(e) => setSelectedRepMetric(e.target.value)} className="w-full text-xs sm:text-sm border rounded px-2 py-1 bg-background" disabled={repDataLoading}>{availableRepMetrics.map(metric => (<option key={metric} value={metric}>{metric === 'sponsored_bills' ? 'Bills Sponsored' : metric === 'recent_activity' ? 'Recent Activity' : metric === 'enacted_bills' ? 'Enacted Bills Sponsored' : metric === 'enacted_recent_activity' ? 'Enacted Bills - Recent Activity' : metric === 'voted_with_majority' ? 'Voted with Majority' : metric === 'voted_against_party' ? 'Voted Against Party' : metric}</option>))}</select></div>)}
@@ -371,7 +536,6 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                                 <CardDescription className="text-xs md:text-sm"><span className="hidden sm:inline">Explore legislative activity, representatives, and policy trends across the United States.</span><span className="sm:hidden">Explore legislative activity and trends.</span></CardDescription>
                             </div>
                             <div className="flex items-center space-x-2">
-                                {exportButton}
                                 <Button variant="outline" size="sm" onClick={() => setIsFullScreen(!isFullScreen)} className="flex items-center gap-1" title={isFullScreen ? "Exit full screen" : "Enter full screen"}>
                                     {isFullScreen ? (<><Minimize className="h-4 w-4" /><span className="hidden sm:inline">Exit Full Screen</span></>) : (<><Maximize className="h-4 w-4" /><span className="hidden sm:inline">Full Screen</span></>)}
                                 </Button>
@@ -441,6 +605,53 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                                 {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="space-y-2"><h5 className="font-medium text-xs">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : selectedRepMetric === 'voted_with_majority' ? 'Vote with Majority %' : selectedRepMetric === 'voted_against_party' ? 'Vote Against Party %' : 'Score Scale'}</h5><div className="w-full"><div className="h-4 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1">{repHeatmapLegendLabels.map(label => <span key={label}>{label}{(selectedRepMetric === 'voted_with_majority' || selectedRepMetric === 'voted_against_party') ? '%' : ''}</span>)}</div></div><p className="text-xs text-muted-foreground">Spectrum from white (low) to dark purple (high) representing absolute metric value.</p></div>)}
                             </div>
                         )}
+                        {mapMode === 'voting-power' && (
+                            <div className="space-y-2 md:space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-xs md:text-sm"><span className="hidden sm:inline">Congressional Chamber</span><span className="sm:hidden">Chamber</span></h4>
+                                        <p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Select House or Senate to compare voting power</span><span className="sm:hidden">House vs Senate voting power</span></p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-medium">Select Chamber:</label>
+                                    <select 
+                                        value={selectedChamber} 
+                                        onChange={(e) => setSelectedChamber(e.target.value as 'house' | 'senate')} 
+                                        className="w-full text-xs border rounded px-2 py-1 bg-background" 
+                                        disabled={votingPowerLoading}
+                                    >
+                                        <option value="house">House of Representatives</option>
+                                        <option value="senate">U.S. Senate</option>
+                                    </select>
+                                </div>
+                                {votingPowerLoading && (
+                                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                                        <span>Loading voting power data...</span>
+                                    </div>
+                                )}
+                                {votingPowerError && (
+                                    <div className="text-xs text-red-500">Error loading voting power data: {votingPowerError}</div>
+                                )}
+                                {!votingPowerLoading && Object.keys(votingPowerData).length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="font-medium text-xs">Voting Power Scale</h5>
+                                        <div className="w-full">
+                                            <div className="h-4 rounded-sm" style={votingPowerLegendStyle}></div>
+                                            <div className="flex justify-between text-xs mt-1">
+                                                {votingPowerLegendLabels.map((label, index) => (
+                                                    <span key={index}>{label}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Voting power relative to Maryland baseline. Darker = higher per-capita influence in {selectedChamber === 'house' ? 'House' : 'Senate'}.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (showPartyAffiliation || showGerrymandering || showTopicHeatmap || showRepHeatmap) && (
                             <div className="space-y-2 md:space-y-3">
                                 <div className="flex items-center justify-between"><div className="space-y-1"><h4 className="font-semibold text-xs md:text-sm"><span className="hidden sm:inline">District Borders</span><span className="sm:hidden">Borders</span></h4><p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Show or hide district boundary lines</span><span className="sm:hidden">Show boundary lines</span></p></div><Switch checked={showDistrictBorders} onCheckedChange={setShowDistrictBorders}/></div>
@@ -451,6 +662,22 @@ export const MapUI = ({ exportButton }: { exportButton: React.ReactNode }) => {
                             <div className="h-[300px] sm:h-[400px] md:h-[500px] w-full rounded-md overflow-hidden border">
                                 {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
                                     <DistrictMapGL geojsonUrl={getDistrictGeoJsonUrl(mapMode, isMobile)} color={DISTRICT_COLORS[mapMode]} onDistrictClick={onDistrictClickGL} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'} showPartyAffiliation={showPartyAffiliation} districtPartyMapping={districtPartyMapping} partyColors={PARTY_COLORS} showGerrymandering={showGerrymandering} gerryScores={gerryScores} getGerrymanderingColor={getGerrymanderingColor} showTopicHeatmap={showTopicHeatmap} topicScores={topicScores} getTopicHeatmapColor={getTopicHeatmapColor} showRepHeatmap={showRepHeatmap} repScores={repScores} repDetails={repDetails} getRepHeatmapColor={getRepHeatmapColor} showDistrictBorders={showDistrictBorders} popupMarker={districtPopupLatLng ? { lng: districtPopupLatLng.lng, lat: districtPopupLatLng.lat, iconHtml: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`, draggable: !isMobile, onDragEnd: !isMobile ? (lngLat) => { setDistrictPopupLatLng(lngLat); if (selectedDistrict) { onDistrictClickGL(selectedDistrict, lngLat); } } : undefined } : undefined}/>
+                                ) : mapMode === 'voting-power' ? (
+                                    <StateMapGL 
+                                        votingPowerData={votingPowerData}
+                                        chamber={selectedChamber}
+                                        onStateClick={(stateAbbr, stateData) => {
+                                            // Get coordinates from stateStats for popup positioning
+                                            const state = stateStats[stateAbbr];
+                                            if (state && state.center) {
+                                                const coords: [number, number] = Array.isArray(state.center) 
+                                                    ? [state.center[0], state.center[1]]
+                                                    : [state.center.lat, state.center.lng];
+                                                handleStateClick(stateAbbr, coords);
+                                            }
+                                        }}
+                                        mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
+                                    />
                                 ) : (
                                     <MapLibreMap ref={mapRef} initialViewState={{ longitude: DEFAULT_POSITION[1], latitude: DEFAULT_POSITION[0], zoom: DEFAULT_ZOOM }} style={{ height: '100%', width: '100%' }} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}>
                                         {Object.entries(stateStats).map(([abbr, state]) => {
