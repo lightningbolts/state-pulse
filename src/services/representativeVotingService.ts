@@ -10,6 +10,7 @@ export interface RepresentativeVotingRecord extends Omit<VotingRecord, 'memberVo
     Present: number;
     Other: number;
   };
+  votedAgainstParty: boolean;
 }
 
 export interface VotingRecordsResponse {

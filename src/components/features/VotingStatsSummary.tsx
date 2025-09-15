@@ -9,7 +9,8 @@ import {
   BarChart3,
   Users,
   Calendar,
-  Building
+  Building,
+  UserX
 } from 'lucide-react';
 import { RepresentativeVotingRecord, formatVoteCount } from '@/services/representativeVotingService';
 
@@ -30,7 +31,7 @@ interface VotingStats {
     'US House': number;
     'US Senate': number;
   };
-  agreementWithMajority: number;
+  votedAgainstParty: number;
   participationRate: number;
   recentActivity: {
     last30Days: number;
@@ -57,7 +58,7 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
         'US House': 0,
         'US Senate': 0
       },
-      agreementWithMajority: 0,
+      votedAgainstParty: 0,
       participationRate: 0,
       recentActivity: {
         last30Days: 0,
@@ -65,7 +66,7 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
       }
     };
 
-    let agreementCount = 0;
+    let votedAgainstPartyCount = 0;
     let participationCount = 0;
 
     records.forEach(record => {
@@ -97,18 +98,14 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
         participationCount++;
       }
 
-      // Agreement with majority (simplified: if rep voted same as the majority)
-      const totalBallotsCast = record.voteBreakdown.Yea + record.voteBreakdown.Nay;
-      if (totalBallotsCast > 0) {
-        const majorityVote = record.voteBreakdown.Yea > record.voteBreakdown.Nay ? 'Yea' : 'Nay';
-        if (position === majorityVote || (position === 'Yes' && majorityVote === 'Yea') || (position === 'No' && majorityVote === 'Nay')) {
-          agreementCount++;
-        }
+      // Voted against party
+      if (record.votedAgainstParty) {
+        votedAgainstPartyCount++;
       }
     });
 
     stats.participationRate = records.length > 0 ? (participationCount / records.length) * 100 : 0;
-    stats.agreementWithMajority = records.length > 0 ? (agreementCount / records.length) * 100 : 0;
+    stats.votedAgainstParty = participationCount > 0 ? (votedAgainstPartyCount / participationCount) * 100 : 0;
 
     return stats;
   };
@@ -137,16 +134,16 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
             <div className="flex items-center gap-2">
               <p className={`text-2xl font-bold ${color}`}>{value}</p>
-              {trend && (
-                <div className={`flex items-center ${
-                  trend === 'up' ? 'text-green-600' : 
-                  trend === 'down' ? 'text-red-600' : 
-                  'text-gray-600'
-                }`}>
-                  {trend === 'up' && <TrendingUp className="h-4 w-4" />}
-                  {trend === 'down' && <TrendingDown className="h-4 w-4" />}
-                </div>
-              )}
+              {/*{trend && (*/}
+              {/*  <div className={`flex items-center ${*/}
+              {/*    trend === 'up' ? 'text-green-600' : */}
+              {/*    trend === 'down' ? 'text-red-600' : */}
+              {/*    'text-gray-600'*/}
+              {/*  }`}>*/}
+              {/*    {trend === 'up' && <TrendingUp className="h-4 w-4" />}*/}
+              {/*    {trend === 'down' && <TrendingDown className="h-4 w-4" />}*/}
+              {/*  </div>*/}
+              {/*)}*/}
             </div>
             {description && (
               <p className="text-xs text-muted-foreground">{description}</p>
@@ -184,11 +181,12 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
         />
         
         <StatCard
-          title="Majority Agreement"
-          value={`${stats.agreementWithMajority.toFixed(1)}%`}
-          icon={TrendingUp}
-          description="Voted with majority"
+          title="Against Party"
+          value={`${stats.votedAgainstParty.toFixed(1)}%`}
+          icon={UserX}
+          description="Voted against party line"
           color="text-green-600"
+          trend={stats.votedAgainstParty > 10 ? 'down' : 'neutral'}
         />
         
         <StatCard

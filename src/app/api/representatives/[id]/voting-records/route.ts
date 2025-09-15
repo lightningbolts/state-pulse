@@ -70,6 +70,87 @@ export async function GET(
             ]
           }
         }
+      },
+      {
+        $addFields: {
+          partyVotes: {
+            $filter: {
+              input: '$memberVotes',
+              as: 'vote',
+              cond: { $eq: ['$$vote.voteParty', '$representativeVote.voteParty'] }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          partyVoteBreakdown: {
+            $reduce: {
+              input: '$partyVotes',
+              initialValue: { Yea: 0, Nay: 0 },
+              in: {
+                $switch: {
+                  branches: [
+                    {
+                      case: { $in: ['$$this.voteCast', ['Yea', 'Yes', 'Aye']] },
+                      then: { $mergeObjects: ['$$value', { Yea: { $add: ['$$value.Yea', 1] } }] }
+                    },
+                    {
+                      case: { $in: ['$$this.voteCast', ['Nay', 'No']] },
+                      then: { $mergeObjects: ['$$value', { Nay: { $add: ['$$value.Nay', 1] } }] }
+                    }
+                  ],
+                  default: '$$value'
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          partyPosition: {
+            $cond: [
+              { $gt: ['$partyVoteBreakdown.Yea', '$partyVoteBreakdown.Nay'] },
+              'Yea',
+              {
+                $cond: [
+                  { $gt: ['$partyVoteBreakdown.Nay', '$partyVoteBreakdown.Yea'] },
+                  'Nay',
+                  'No Majority'
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        $addFields: {
+          votedAgainstParty: {
+            $let: {
+              vars: {
+                repVote: '$representativeVote.voteCast'
+              },
+              in: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ['$partyPosition', 'No Majority'] },
+                      {
+                        $or: [
+                          { $and: [{ $eq: ['$partyPosition', 'Yea'] }, { $in: ['$$repVote', ['Nay', 'No']] }] },
+                          { $and: [{ $eq: ['$partyPosition', 'Nay'] }, { $in: ['$$repVote', ['Yea', 'Yes', 'Aye']] }] }
+                        ]
+                      }
+                    ]
+                  },
+                  true,
+                  false
+                ]
+              }
+            }
+          }
+        }
       }
     ];
 
@@ -111,6 +192,7 @@ export async function GET(
         session: 1,
         chamber: 1,
         representativeVote: 1,
+        votedAgainstParty: 1,
         totalVotes: { $size: '$memberVotes' },
         // Calculate vote breakdown
         voteBreakdown: {
