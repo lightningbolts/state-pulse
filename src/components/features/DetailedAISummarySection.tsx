@@ -116,14 +116,14 @@ export function DetailedAISummarySection({ legislation }: DetailedAISummarySecti
         </CardHeader>
         <CardContent className="p-4 pt-0 space-y-4">
           {/* Eligibility info */}
-          <div className="flex items-center gap-2 text-sm">
+          {/* <div className="flex items-center gap-2 text-sm">
             <Badge variant="outline" className="text-blue-600 border-blue-300">
               Congress Bill
             </Badge>
             <Badge variant="outline" className="text-green-600 border-green-300">
               {legislation.geminiSummarySource === 'pdf-extracted' ? 'PDF Source' : 'PDF Available'}
             </Badge>
-          </div>
+          </div> */}
 
           {/* Show existing long summary or generate button */}
           {!showDetailedSummary && !existingLongSummary && (
