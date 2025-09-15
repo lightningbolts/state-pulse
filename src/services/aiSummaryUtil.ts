@@ -460,7 +460,41 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
     }
   }
 
-  // 2. Special handling for states that prefer abstracts only
+  // 2. Special handling for California bills
+  if (bill.jurisdictionName === 'California') {
+    if (bill.sources?.length) {
+      for (const source of bill.sources) {
+        if (source.url) {
+          console.log('[California] Fetching bill page:', source.url);
+          try {
+            const res = await fetch(source.url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+              }
+            });
+            if (res.ok) {
+              const html = await res.text();
+              const $ = cheerio.load(html);
+              
+              // Extract text from the specific California bill element
+              const billAllElement = $('#bill_all[align="justify"]');
+              if (billAllElement.length > 0) {
+                const billText = billAllElement.text().trim();
+                if (billText.length > 100) {
+                  console.log('[California] Using extracted HTML text, length:', billText.length);
+                  return await generateOptimizedGeminiSummary(billText, 'california-text');
+                }
+              }
+            }
+          } catch (e) {
+            console.log('[California] Error fetching source:', source.url, e);
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Special handling for states that prefer abstracts only
   const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Ohio', 'Minnesota', 'Vermont', 'Arizona', 'Delaware', 'Nebraska', 'Colorado', 'Texas'];
   const isAbstractOnlyState = abstractOnlyStates.includes(bill.jurisdictionName || '')
 
@@ -478,7 +512,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
     return { summary, longSummary: null, sourceType: 'title' };
   }
 
-  // 3. Try bill versions (PDFs and text files)
+  // 4. Try bill versions (PDFs and text files)
   if (bill.versions?.length) {
     const sortedVersions = bill.versions.slice().sort((a, b) => {
       const dateA = a.date ? new Date(a.date).getTime() : 0;
@@ -551,7 +585,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
     }
   }
 
-  // 4. Try sources for PDF/text content with jurisdiction-specific handling
+  // 5. Try sources for PDF/text content with jurisdiction-specific handling
   if (bill.sources?.length) {
     for (const source of bill.sources) {
       if (!source.url) continue;
