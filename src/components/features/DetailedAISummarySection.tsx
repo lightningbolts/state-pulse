@@ -155,7 +155,7 @@ export function DetailedAISummarySection({ legislation }: DetailedAISummarySecti
                   {existingLongSummary}
                 </ReactMarkdown>
               </div>
-              <div className="flex gap-2">
+              {/* <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -168,7 +168,7 @@ export function DetailedAISummarySection({ legislation }: DetailedAISummarySecti
                     <span className="ml-2 text-xs">({timeUntilCanRefresh}s)</span>
                   )}
                 </Button>
-              </div>
+              </div> */}
             </div>
           )}
 
@@ -212,14 +212,14 @@ export function DetailedAISummarySection({ legislation }: DetailedAISummarySecti
               )}
 
               {/* Rate limit info alert */}
-              {!canRefresh && showDetailedSummary && (
+              {/* {!canRefresh && showDetailedSummary && (
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     You can generate a new analysis in {timeUntilCanRefresh} seconds. This helps us manage server resources.
                   </AlertDescription>
                 </Alert>
-              )}
+              )} */}
 
               {error && (
                 <Alert variant="destructive">
