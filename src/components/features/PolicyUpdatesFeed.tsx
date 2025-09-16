@@ -174,7 +174,34 @@ const CLASSIFICATIONS = [
 
 let cardNumber = 20;
 
-// Fetch updates with optional filters and sorting
+async function fetchBookmarkedUpdates({
+    limit = cardNumber,
+    offset = 0,
+}: {
+    limit?: number;
+    offset?: number;
+}) {
+    const res = await fetch(`/api/bookmarks?includeLegislation=true&limit=${limit}&offset=${offset}&sortBy=createdAt&sortOrder=desc`);
+    if (!res.ok) throw new Error("Failed to fetch bookmarked updates");
+    
+    const responseData = await res.json();
+    
+    // Extract the legislation from bookmarksWithLegislation
+    if (responseData.bookmarksWithLegislation) {
+        return {
+            data: responseData.bookmarksWithLegislation.map((item: any) => item.legislation),
+            hasMore: responseData.hasMore || false,
+            totalCount: responseData.totalCount || 0
+        };
+    }
+    
+    return {
+        data: [],
+        hasMore: false,
+        totalCount: 0
+    };
+}
+
 async function fetchUpdatesFeed({
     skip = 0,
     limit = cardNumber,
@@ -380,34 +407,52 @@ export function PolicyUpdatesFeed() {
         try {
             const currentSkip = skipRef.current;
             const limit = compactView ? compactViewCardNumber : 20; // Load more items in compact mode
-            // Only use sponsorId for filtering by representative
-            const newUpdates = await fetchUpdatesFeed({
-                skip: currentSkip,
-                limit,
-                search,
-                subject,
-                sortField: sort.field,
-                sortDir: sort.dir,
-                classification,
-                jurisdictionName,
-                showCongress,
-                sponsorId: sponsorId, // Only send sponsorId, not sponsor name
-                showOnlyEnacted
-            });
-            const filteredNewUpdates = showOnlyBookmarked
-                ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
-                : newUpdates;
-            if (filteredNewUpdates.length > 0) {
-                setUpdates((prev) => {
-                    const existingIds = new Set(prev.map((u: PolicyUpdate) => u.id));
-                    const newUniqueUpdates = filteredNewUpdates.filter((u: PolicyUpdate) => !existingIds.has(u.id));
-                    return [...prev, ...newUniqueUpdates];
+            
+            if (showOnlyBookmarked) {
+                // Fetch more bookmarked items
+                const bookmarkedResult = await fetchBookmarkedUpdates({
+                    limit,
+                    offset: currentSkip
                 });
+                
+                if (bookmarkedResult.data.length > 0) {
+                    setUpdates((prev) => {
+                        const existingIds = new Set(prev.map((u: PolicyUpdate) => u.id));
+                        const newUniqueUpdates = bookmarkedResult.data.filter((u: PolicyUpdate) => !existingIds.has(u.id));
+                        return [...prev, ...newUniqueUpdates];
+                    });
+                }
+                skipRef.current = currentSkip + bookmarkedResult.data.length;
+                setSkip(skipRef.current);
+                setHasMore(bookmarkedResult.hasMore);
+            } else {
+                // Regular feed load more
+                const newUpdates = await fetchUpdatesFeed({
+                    skip: currentSkip,
+                    limit,
+                    search,
+                    subject,
+                    sortField: sort.field,
+                    sortDir: sort.dir,
+                    classification,
+                    jurisdictionName,
+                    showCongress,
+                    sponsorId: sponsorId, // Only send sponsorId, not sponsor name
+                    showOnlyEnacted
+                });
+                
+                if (newUpdates.length > 0) {
+                    setUpdates((prev) => {
+                        const existingIds = new Set(prev.map((u: PolicyUpdate) => u.id));
+                        const newUniqueUpdates = newUpdates.filter((u: PolicyUpdate) => !existingIds.has(u.id));
+                        return [...prev, ...newUniqueUpdates];
+                    });
+                }
+                skipRef.current = currentSkip + newUpdates.length;
+                setSkip(skipRef.current);
+                const expectedLength = compactView ? compactViewCardNumber : 20;
+                setHasMore(newUpdates.length === expectedLength);
             }
-            skipRef.current = currentSkip + newUpdates.length;
-            setSkip(skipRef.current);
-            const expectedLength = compactView ? compactViewCardNumber : 20;
-            setHasMore(newUpdates.length === expectedLength);
         } catch (e) {
             console.error('[FEED] loadMore error', e);
             setHasMore(false);
@@ -436,27 +481,38 @@ export function PolicyUpdatesFeed() {
         setLoading(true);
         try {
             const limit = compactView ? compactViewCardNumber : 20;
-            const newUpdates = await fetchUpdatesFeed({
-                skip: 0,
-                limit,
-                search,
-                subject,
-                sortField: sort.field,
-                sortDir: sort.dir,
-                classification,
-                jurisdictionName,
-                showCongress,
-                sponsorId,
-                showOnlyEnacted
-            });
-            const filteredUpdates = showOnlyBookmarked
-                ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
-                : newUpdates;
-            setUpdates(filteredUpdates);
-            skipRef.current = filteredUpdates.length;
-            setSkip(filteredUpdates.length);
-            const expectedLength = compactView ? compactViewCardNumber : 20;
-            setHasMore(newUpdates.length === expectedLength && (!showOnlyBookmarked || filteredUpdates.length === expectedLength));
+            
+            if (showOnlyBookmarked) {
+                // Fetch bookmarked legislation directly
+                const bookmarkedResult = await fetchBookmarkedUpdates({
+                    limit,
+                    offset: 0
+                });
+                setUpdates(bookmarkedResult.data);
+                skipRef.current = bookmarkedResult.data.length;
+                setSkip(bookmarkedResult.data.length);
+                setHasMore(bookmarkedResult.hasMore);
+            } else {
+                // Regular feed fetch
+                const newUpdates = await fetchUpdatesFeed({
+                    skip: 0,
+                    limit,
+                    search,
+                    subject,
+                    sortField: sort.field,
+                    sortDir: sort.dir,
+                    classification,
+                    jurisdictionName,
+                    showCongress,
+                    sponsorId,
+                    showOnlyEnacted
+                });
+                setUpdates(newUpdates);
+                skipRef.current = newUpdates.length;
+                setSkip(newUpdates.length);
+                const expectedLength = compactView ? compactViewCardNumber : 20;
+                setHasMore(newUpdates.length === expectedLength);
+            }
         } catch (e) {
             console.error('[FEED] refresh error', e);
         } finally {
@@ -549,32 +605,42 @@ export function PolicyUpdatesFeed() {
             setLoading(true);
             try {
                 const limit = compactView ? compactViewCardNumber : 20;
-                // Only use sponsorId for filtering by representative
-                const newUpdates = await fetchUpdatesFeed({
-                    skip: 0,
-                    limit,
-                    search,
-                    subject,
-                    sortField: sort.field,
-                    sortDir: sort.dir,
-                    classification,
-                    jurisdictionName,
-                    showCongress,
-                    sponsorId: sponsorId, // Only send sponsorId, not sponsor name
-                    showOnlyEnacted
-                });
-                if (!isMounted) return;
+                
+                if (showOnlyBookmarked) {
+                    // Fetch bookmarked legislation directly
+                    const bookmarkedResult = await fetchBookmarkedUpdates({
+                        limit,
+                        offset: 0
+                    });
+                    if (!isMounted) return;
+                    
+                    setUpdates(bookmarkedResult.data);
+                    skipRef.current = bookmarkedResult.data.length;
+                    setSkip(bookmarkedResult.data.length);
+                    setHasMore(bookmarkedResult.hasMore);
+                } else {
+                    // Regular feed fetch
+                    const newUpdates = await fetchUpdatesFeed({
+                        skip: 0,
+                        limit,
+                        search,
+                        subject,
+                        sortField: sort.field,
+                        sortDir: sort.dir,
+                        classification,
+                        jurisdictionName,
+                        showCongress,
+                        sponsorId: sponsorId, // Only send sponsorId, not sponsor name
+                        showOnlyEnacted
+                    });
+                    if (!isMounted) return;
 
-                // Filter to only bookmarked items if showOnlyBookmarked is true
-                const filteredUpdates = showOnlyBookmarked
-                    ? newUpdates.filter((update: PolicyUpdate) => bookmarks.includes(update.id))
-                    : newUpdates;
-
-                setUpdates(filteredUpdates);
-                skipRef.current = filteredUpdates.length;
-                setSkip(filteredUpdates.length);
-                const expectedLength = compactView ? compactViewCardNumber : 20;
-                setHasMore(newUpdates.length === expectedLength && (!showOnlyBookmarked || filteredUpdates.length === expectedLength));
+                    setUpdates(newUpdates);
+                    skipRef.current = newUpdates.length;
+                    setSkip(newUpdates.length);
+                    const expectedLength = compactView ? compactViewCardNumber : 20;
+                    setHasMore(newUpdates.length === expectedLength);
+                }
             } catch {
                 if (!isMounted) return;
                 setHasMore(false);

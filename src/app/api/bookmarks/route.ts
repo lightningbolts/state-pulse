@@ -6,6 +6,7 @@ import {
   isBookmarked,
   getBookmarkCount
 } from '@/services/bookmarksService';
+import { getLegislationsByIds } from '@/services/legislationService';
 import { auth } from '@clerk/nextjs/server';
 
 // GET /api/bookmarks - Get user's bookmarks
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') as 'asc' | 'desc' || 'desc';
     const tags = searchParams.get('tags')?.split(',').filter(Boolean);
     const priority = searchParams.get('priority') as 'low' | 'medium' | 'high' | undefined;
+    const includeLegislation = searchParams.get('includeLegislation') === 'true';
 
     const bookmarks = await getUserBookmarks(userId, {
       limit,
@@ -36,11 +38,28 @@ export async function GET(request: NextRequest) {
 
     const totalCount = await getBookmarkCount(userId);
 
-    return NextResponse.json({
+    // If includeLegislation is requested, fetch full legislation data
+    let result: any = {
       bookmarks,
       totalCount,
       hasMore: offset !== undefined && limit !== undefined ? (offset + limit) < totalCount : false
-    });
+    };
+
+    if (includeLegislation) {
+      const legislationIds = bookmarks.map(bookmark => bookmark.legislationId);
+      const legislation = await getLegislationsByIds(legislationIds);
+      
+      // Create a map for quick lookup
+      const legislationMap = new Map(legislation.map(leg => [leg.id, leg]));
+      
+      // Add legislation data to each bookmark
+      result.bookmarksWithLegislation = bookmarks.map(bookmark => ({
+        ...bookmark,
+        legislation: legislationMap.get(bookmark.legislationId)
+      })).filter(item => item.legislation); // Only include bookmarks where we found the legislation
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('GET /api/bookmarks - Error fetching bookmarks:', error);
     return NextResponse.json({ error: 'Failed to fetch bookmarks' }, { status: 500 });
@@ -77,7 +96,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('POST /api/bookmarks - Error bookmarking legislation:', error);
-    return NextResponse.json({ error: `Failed to bookmark legislation: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `Failed to bookmark legislation: ${error instanceof Error ? error.message : 'Unknown error'}` }, { status: 500 });
   }
 }
 

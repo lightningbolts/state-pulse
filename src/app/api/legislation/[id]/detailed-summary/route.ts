@@ -59,7 +59,7 @@ async function getBillPdfLinksFromPage(url: string): Promise<string[]> {
  * Generates a detailed summary from bill text using AI
  */
 async function generateDetailedSummary(text: string): Promise<string> {
-  const prompt = `Provide a comprehensive, detailed analysis of this legislation. Your response should be 3-5 paragraphs long and include:
+  const prompt = `Provide a comprehensive, detailed analysis of this legislation. Your response should include:
 
 1. **Key Provisions**: What the legislation specifically does, changes, or establishes
 2. **Impact Analysis**: Who this affects and how (citizens, businesses, government agencies, etc.)
@@ -72,7 +72,9 @@ Format your response using proper markdown:
 - Use > for important quotes from the legislation
 - Keep paragraphs to 3-4 sentences for readability
 
-Use direct quotes from the source text to support your analysis. Go straight into the analysis.
+Use a mix of paragraphs and bullet points where appropriate.
+Use direct quotes from the source text to support your analysis. 
+Go straight into the analysis.
 
 Legislation text:
 ${text}`;
