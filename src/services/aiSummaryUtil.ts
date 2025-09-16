@@ -4,6 +4,69 @@ import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
 import {Legislation} from '@/types/legislation';
 
+// Global flag to track Puppeteer availability
+let puppeteerEnabled = true;
+let puppeteerFailureCount = 0;
+const MAX_PUPPETEER_FAILURES = 3;
+
+/**
+ * Checks if Puppeteer dependencies are available and provides installation instructions if not
+ */
+export async function checkPuppeteerDependencies(): Promise<{ available: boolean; instructions?: string }> {
+  try {
+    const puppeteer = await import('puppeteer');
+    const browser = await puppeteer.default.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    await browser.close();
+    return { available: true };
+  } catch (error: any) {
+    const instructions = `
+Puppeteer requires system dependencies that are not installed. Please install them:
+
+For Ubuntu/Debian:
+sudo apt-get update && sudo apt-get install -y \\
+  gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 \\
+  libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 \\
+  libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 \\
+  libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 \\
+  libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 \\
+  libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates \\
+  fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils \\
+  wget libgbm-dev
+
+For CentOS/RHEL/Amazon Linux:
+sudo yum install -y alsa-lib.x86_64 atk.x86_64 cups-libs.x86_64 \\
+  gtk3.x86_64 ipa-gothic-fonts libXcomposite.x86_64 libXcursor.x86_64 \\
+  libXdamage.x86_64 libXext.x86_64 libXi.x86_64 libXrandr.x86_64 \\
+  libXScrnSaver.x86_64 libXtst.x86_64 pango.x86_64 xorg-x11-fonts-100dpi \\
+  xorg-x11-fonts-75dpi xorg-x11-fonts-cyrillic xorg-x11-fonts-misc \\
+  xorg-x11-fonts-Type1 xorg-x11-utils
+sudo yum update nss -y
+
+Error: ${error.message}
+    `;
+    return { available: false, instructions };
+  }
+}
+
+/**
+ * Resets Puppeteer state and re-enables it. Call this after installing system dependencies.
+ */
+export function resetPuppeteerState(): void {
+  puppeteerEnabled = true;
+  puppeteerFailureCount = 0;
+  console.log('[Puppeteer] State reset - Puppeteer re-enabled');
+}
+
+/**
+ * Gets current Puppeteer status
+ */
+export function getPuppeteerStatus(): { enabled: boolean; failureCount: number } {
+  return { enabled: puppeteerEnabled, failureCount: puppeteerFailureCount };
+}
+
 /**
  * Cleans up AI-generated summary text by removing headers and fixing markdown formatting
  */
@@ -494,8 +557,62 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
     }
   }
 
-  // 3. Special handling for states that prefer abstracts only
-  const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Ohio', 'Minnesota', 'Vermont', 'Arizona', 'Delaware', 'Nebraska', 'Colorado', 'Texas'];
+  // 3. Special handling for Texas bills
+  if (bill.jurisdictionName === 'Texas') {
+    if (bill.sources?.length) {
+      for (const source of bill.sources) {
+        if (source.url && source.url.includes('capitol.texas.gov')) {
+          // Convert History.aspx URL to Text.aspx URL for better PDF access
+          const textUrl = source.url.replace('/History.aspx', '/Text.aspx');
+          console.log('[Texas] Fetching bill text page:', textUrl);
+          try {
+            const res = await fetch(textUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+              }
+            });
+            if (res.ok) {
+              // Try to extract PDF links from the text page
+              let pdfLinks = await getBillPdfLinksFromPage(textUrl);
+              
+              // If no PDFs found with regular approach, try Puppeteer for JS-rendered pages (if enabled)
+              if (pdfLinks.length === 0 && puppeteerEnabled) {
+                console.log('[Texas] No PDFs found with fetch, trying Puppeteer for:', textUrl);
+                try {
+                  pdfLinks = await getBillPdfLinksFromPagePuppeteer(textUrl);
+                  // Reset failure count on success
+                  puppeteerFailureCount = 0;
+                } catch (puppeteerError: any) {
+                  console.log('[Texas] Puppeteer failed for:', textUrl, 'Error:', puppeteerError.message);
+                  
+                  // Track failures and disable Puppeteer if it consistently fails
+                  puppeteerFailureCount++;
+                  if (puppeteerFailureCount >= MAX_PUPPETEER_FAILURES) {
+                    console.warn(`[Puppeteer] Disabling Puppeteer after ${MAX_PUPPETEER_FAILURES} consecutive failures. System appears to be missing required dependencies.`);
+                    puppeteerEnabled = false;
+                  }
+                  
+                  // Continue with empty pdfLinks array - don't fail the entire process
+                  pdfLinks = [];
+                }
+              }
+              
+              // Process any found PDF links
+              for (let pdfUrl of pdfLinks) {
+                const result = await extractPdfContent(pdfUrl, 'pdf-extracted');
+                if (result) return result;
+              }
+            }
+          } catch (e) {
+            console.log('[Texas] Error fetching text page:', textUrl, e);
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Special handling for states that prefer abstracts only
+  const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Ohio', 'Minnesota', 'Vermont', 'Arizona', 'Delaware', 'Nebraska', 'Colorado'];
   const isAbstractOnlyState = abstractOnlyStates.includes(bill.jurisdictionName || '')
 
   if (isAbstractOnlyState) {
@@ -512,7 +629,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
     return { summary, longSummary: null, sourceType: 'title' };
   }
 
-  // 4. Try bill versions (PDFs and text files)
+  // 5. Try bill versions (PDFs and text files)
   if (bill.versions?.length) {
     const sortedVersions = bill.versions.slice().sort((a, b) => {
       const dateA = a.date ? new Date(a.date).getTime() : 0;
@@ -585,7 +702,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
     }
   }
 
-  // 5. Try sources for PDF/text content with jurisdiction-specific handling
+  // 6. Try sources for PDF/text content with jurisdiction-specific handling
   if (bill.sources?.length) {
     for (const source of bill.sources) {
       if (!source.url) continue;
@@ -596,18 +713,38 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
         // First try regular fetch-based extraction
         let pdfLinks = await getBillPdfLinksFromPage(source.url);
         
-        // If no PDFs found with regular approach, try Puppeteer for JS-rendered pages
-        if (pdfLinks.length === 0) {
+        // If no PDFs found with regular approach, try Puppeteer for JS-rendered pages (if enabled)
+        if (pdfLinks.length === 0 && puppeteerEnabled) {
           console.log('[DEBUG] No PDFs found with fetch, trying Puppeteer for:', source.url);
-          pdfLinks = await getBillPdfLinksFromPagePuppeteer(source.url);
+          try {
+            pdfLinks = await getBillPdfLinksFromPagePuppeteer(source.url);
+            // Reset failure count on success
+            puppeteerFailureCount = 0;
+          } catch (puppeteerError: any) {
+            console.log('[DEBUG] Puppeteer failed for:', source.url, 'Error:', puppeteerError.message);
+            
+            // Track failures and disable Puppeteer if it consistently fails
+            puppeteerFailureCount++;
+            if (puppeteerFailureCount >= MAX_PUPPETEER_FAILURES) {
+              console.warn(`[Puppeteer] Disabling Puppeteer after ${MAX_PUPPETEER_FAILURES} consecutive failures. System appears to be missing required dependencies.`);
+              puppeteerEnabled = false;
+            }
+            
+            // Continue with empty pdfLinks array - don't fail the entire process
+            pdfLinks = [];
+          }
+        } else if (pdfLinks.length === 0 && !puppeteerEnabled) {
+          console.log('[DEBUG] Skipping Puppeteer (disabled due to previous failures) for:', source.url);
         }
         
+        // Process any found PDF links
         for (let pdfUrl of pdfLinks) {
           const result = await extractPdfContent(pdfUrl, 'pdf-extracted');
           if (result) return result;
         }
-      } catch (e) {
-        console.log('[Bill Extraction] Error processing source:', source.url, e);
+      } catch (e: any) {
+        console.log('[Bill Extraction] Error processing source:', source.url, 'Error:', e.message);
+        // Continue processing other sources instead of failing completely
       }
     }
   }
@@ -667,65 +804,148 @@ export async function getBillPdfLinksFromPage(url: string): Promise<string[]> {
 /**
  * Uses Puppeteer to extract all bill PDF links from a page after JS rendering.
  * Returns all links that contain both 'pdf' and 'bill' in the URL (case-insensitive, deduped).
+ * Includes graceful fallback handling for missing system dependencies.
  */
 export async function getBillPdfLinksFromPagePuppeteer(url: string): Promise<string[]> {
-  const puppeteer = await import('puppeteer');
-  const browser = await puppeteer.default.launch({ 
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] // Better compatibility
-  });
-  
   try {
-    const page = await browser.newPage();
+    const puppeteer = await import('puppeteer');
     
-    // Set a user agent to avoid blocking
-    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    // Comprehensive browser launch options for better Linux compatibility
+    const launchOptions = {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process', // <- This is important for environments with limited resources
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding'
+      ],
+      timeout: 60000, // Increase timeout for slower environments
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false
+    };
+
+    console.log('[Puppeteer] Attempting to launch browser with enhanced compatibility options...');
+    const browser = await puppeteer.default.launch(launchOptions);
     
-    // Navigate and wait for network to settle
-    await page.goto(url, { 
-      waitUntil: 'networkidle2',
-      timeout: 30000 
-    });
-    
-    // Wait a bit more for any lazy-loaded content
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const pdfLinks: string[] = await page.evaluate(() => {
-      const anchors = Array.from(document.querySelectorAll('a'));
-      const allLinks = anchors
-        .map(a => a.href)
-        .filter(href => href && 
-          href.toLowerCase().includes('pdf') && 
-          href.toLowerCase().includes('bill')
-        );
+    try {
+      const page = await browser.newPage();
       
-      // Also check for any links in data attributes or other sources
-      const dataLinks: string[] = [];
-      document.querySelectorAll('[data-url], [data-href], [data-link]').forEach(el => {
-        const attrs = ['data-url', 'data-href', 'data-link'];
-        attrs.forEach(attr => {
-          const value = el.getAttribute(attr);
-          if (value && value.toLowerCase().includes('pdf') && value.toLowerCase().includes('bill')) {
-            dataLinks.push(value);
-          }
-        });
+      // Set a user agent to avoid blocking
+      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+      
+      // Navigate and wait for network to settle
+      await page.goto(url, { 
+        waitUntil: 'networkidle2',
+        timeout: 30000 
       });
       
-      return [...allLinks, ...dataLinks];
-    });
+      // Wait a bit more for any lazy-loaded content
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const pdfLinks: string[] = await page.evaluate(() => {
+        const anchors = Array.from(document.querySelectorAll('a'));
+        const allLinks = anchors
+          .map(a => a.href)
+          .filter(href => href && 
+            href.toLowerCase().includes('pdf') && 
+            href.toLowerCase().includes('bill')
+          );
+        
+        // Also check for any links in data attributes or other sources
+        const dataLinks: string[] = [];
+        document.querySelectorAll('[data-url], [data-href], [data-link]').forEach(el => {
+          const attrs = ['data-url', 'data-href', 'data-link'];
+          attrs.forEach(attr => {
+            const value = el.getAttribute(attr);
+            if (value && value.toLowerCase().includes('pdf') && value.toLowerCase().includes('bill')) {
+              dataLinks.push(value);
+            }
+          });
+        });
+        
+        return [...allLinks, ...dataLinks];
+      });
+      
+      await browser.close();
+      console.log('[Puppeteer] Successfully extracted PDF links:', pdfLinks.length);
+      
+      // Deduplicate and filter out invalid URLs
+      return Array.from(new Set(pdfLinks)).filter(link => {
+        try {
+          new URL(link);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+    } catch (error) {
+      await browser.close();
+      throw error;
+    }
+  } catch (error: any) {
+    console.error('[Puppeteer] Browser launch failed:', error.message);
     
-    await browser.close();
-    // Deduplicate and filter out invalid URLs
-    return Array.from(new Set(pdfLinks)).filter(link => {
-      try {
-        new URL(link);
-        return true;
-      } catch {
-        return false;
-      }
-    });
-  } catch (error) {
-    await browser.close();
-    throw error;
+    // Check for specific missing library errors and provide helpful guidance
+    if (error.message.includes('libatk-1.0.so.0') || 
+        error.message.includes('libnss3.so') ||
+        error.message.includes('libgtk') ||
+        error.message.includes('shared libraries')) {
+      
+      console.error(`
+[Puppeteer] Missing system dependencies detected. This is a common issue on Linux systems.
+
+To fix this issue, install the required dependencies:
+
+For Ubuntu/Debian:
+sudo apt-get update && sudo apt-get install -y \\
+  gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 \\
+  libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 \\
+  libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 \\
+  libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 \\
+  libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 \\
+  libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates \\
+  fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils \\
+  wget libgbm-dev
+
+For Ubuntu 24.04+ (with t64 libraries):
+sudo apt-get update && sudo apt-get install -y \\
+  libasound2t64 libatk1.0-0t64 libc6 libcairo2 libcups2t64 \\
+  libdbus-1-3 libexpat1 libfontconfig1 libgcc-s1 libgdk-pixbuf2.0-0 \\
+  libglib2.0-0t64 libgtk-3-0t64 libnspr4 libpango-1.0-0 \\
+  libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 \\
+  libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 \\
+  libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates \\
+  fonts-liberation libnss3 lsb-release xdg-utils wget libgbm-dev
+
+For CentOS/RHEL/Amazon Linux:
+sudo yum install -y alsa-lib.x86_64 atk.x86_64 cups-libs.x86_64 \\
+  gtk3.x86_64 ipa-gothic-fonts libXcomposite.x86_64 libXcursor.x86_64 \\
+  libXdamage.x86_64 libXext.x86_64 libXi.x86_64 libXrandr.x86_64 \\
+  libXScrnSaver.x86_64 libXtst.x86_64 pango.x86_64 xorg-x11-fonts-100dpi \\
+  xorg-x11-fonts-75dpi xorg-x11-fonts-cyrillic xorg-x11-fonts-misc \\
+  xorg-x11-fonts-Type1 xorg-x11-utils
+sudo yum update nss -y
+
+For Amazon Linux with EPEL:
+sudo amazon-linux-extras install epel -y
+sudo yum install -y chromium
+
+Falling back to regular HTTP fetch for PDF extraction...
+      `);
+    }
+    
+    // Graceful fallback: return empty array so the process can continue with other extraction methods
+    console.log('[Puppeteer] Falling back to regular fetch-based PDF extraction...');
+    return [];
   }
 }
