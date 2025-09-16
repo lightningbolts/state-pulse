@@ -243,23 +243,23 @@ export default async function RepresentativeDetailPage({
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 md:px-6">
-      <Card className="w-full max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden">
-        <CardHeader className="bg-gray-700 text-primary-foreground p-6">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-6">
-            <div className="flex justify-center sm:block mb-4 sm:mb-0">
+    <div className="w-full min-w-0 py-2 sm:py-4 md:py-8 px-1 sm:px-2 md:px-4 lg:px-6">
+      <Card className="w-full max-w-full sm:max-w-2xl lg:max-w-4xl mx-auto shadow-xl rounded-lg overflow-hidden min-w-0">
+        <CardHeader className="bg-gray-700 text-primary-foreground p-2 sm:p-3 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3 md:gap-6">
+            <div className="flex justify-center sm:block mb-1 sm:mb-2 md:mb-0">
               <img
                 src={rep.image || rep.photo || 'https://via.placeholder.com/150'}
                 alt={rep.name}
-                className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border shadow-lg"
+                className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-full object-cover border shadow-lg"
               />
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col items-center justify-center sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="text-2xl md:text-3xl font-bold tracking-tight break-words text-center sm:text-left">{rep.name}</CardTitle>
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="flex flex-col items-center justify-center sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 min-w-0">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight break-words text-center sm:text-left min-w-0 max-w-full truncate sm:truncate-none">{rep.name}</CardTitle>
                 {rep.party && <PartyBadge party={rep.party} />}
               </div>
-              <div className="text-primary-foreground/80 text-sm mt-2 break-words text-center sm:text-left">
+              <div className="text-primary-foreground/80 text-xs sm:text-sm mt-1 sm:mt-2 break-words text-center sm:text-left">
                 {(() => {
                   // Check if this is a Congress member and format accordingly
                   const office = rep.office || '';
@@ -323,7 +323,7 @@ export default async function RepresentativeDetailPage({
                   </span>
                 )}
               </div>
-              <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">
+              <div className="text-primary-foreground/80 text-xs sm:text-sm mt-1 break-words text-center sm:text-left">
                 {((typeof rep.jurisdiction === 'string' && rep.jurisdiction) || (typeof rep.jurisdiction === 'object' && rep.jurisdiction?.name)) && (
                   <span>{typeof rep.jurisdiction === 'string' ? rep.jurisdiction : rep.jurisdiction?.name}</span>
                 )}
@@ -335,11 +335,11 @@ export default async function RepresentativeDetailPage({
                   </span>
                 )}
               </div>
-              <div className="text-primary-foreground/80 text-sm mt-1 break-words text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
+              <div className="text-primary-foreground/80 text-xs sm:text-sm mt-1 break-words text-center sm:text-left">Time in office: <span className="font-semibold">{timeInOffice}</span></div>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-4 md:p-6 space-y-6 bg-background">
+        <CardContent className="p-1 sm:p-2 md:p-4 lg:p-6 space-y-3 sm:space-y-4 md:space-y-6 bg-background overflow-hidden">
           <AnimatedSection>
             <div className="flex gap-2 items-center h-10"> {/* reserve button height to avoid layout shift */}
               <FollowButton repId={rep.id} showText />
@@ -347,40 +347,40 @@ export default async function RepresentativeDetailPage({
             </div>
           </AnimatedSection>
           <AnimatedSection>
-            <section>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-3">
-                <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Contact Information
+            <section className="min-w-0 overflow-hidden">
+              <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center mb-2 sm:mb-3">
+                <Info className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" /> Contact Information
               </h3>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm min-w-0">
                 {rep.phone && (
-                  <div className="flex items-center">
-                    <span className="font-medium text-muted-foreground w-20">Phone:</span>
-                    <a href={`tel:${rep.phone}`} className="text-primary hover:underline">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                    <span className="font-medium text-muted-foreground sm:w-20 sm:flex-shrink-0">Phone:</span>
+                    <a href={`tel:${rep.phone}`} className="text-primary hover:underline truncate">
                       {rep.phone}
                     </a>
                   </div>
                 )}
                 {rep.email && (
-                  <div className="flex items-center">
-                    <span className="font-medium text-muted-foreground w-20">Email:</span>
-                    <a href={`mailto:${rep.email}`} className="text-primary hover:underline break-all">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                    <span className="font-medium text-muted-foreground sm:w-20 sm:flex-shrink-0">Email:</span>
+                    <a href={`mailto:${rep.email}`} className="text-primary hover:underline break-all min-w-0">
                       {rep.email}
                     </a>
                   </div>
                 )}
                 {((rep as any).address || (rep.addresses && rep.addresses[0]?.address)) && (
-                  <div className="flex items-start">
-                    <span className="font-medium text-muted-foreground w-20 flex-shrink-0">Address:</span>
-                    <span className="text-foreground">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2 min-w-0">
+                    <span className="font-medium text-muted-foreground sm:w-20 sm:flex-shrink-0">Address:</span>
+                    <span className="text-foreground break-words min-w-0">
                       {(rep as any).address || rep.addresses?.[0]?.address}
                     </span>
                   </div>
                 )}
                 {rep.website && (
-                  <div className="flex items-center">
-                    <span className="font-medium text-muted-foreground w-20">Website:</span>
-                    <a href={rep.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center">
-                      Official Website <ExternalLink className="ml-1 h-3 w-3" />
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                    <span className="font-medium text-muted-foreground sm:w-20 sm:flex-shrink-0">Website:</span>
+                    <a href={rep.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center break-all min-w-0">
+                      Official Website <ExternalLink className="ml-1 h-3 w-3 flex-shrink-0" />
                     </a>
                   </div>
                 )}
@@ -395,18 +395,42 @@ export default async function RepresentativeDetailPage({
             }
             return (Array.isArray(terms) && terms.length > 0) ? (
               <AnimatedSection>
-                <section>
-                  <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                    <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Past Terms
+                <section className="min-w-0 overflow-hidden">
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center mb-2">
+                    <Info className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" /> Past Terms
                   </h3>
-                  <div className="overflow-x-auto rounded-lg bg-muted/50">
+                  {/* Mobile Card Layout */}
+                  <div className="block md:hidden space-y-2">
+                    {terms.map((term: any, idx: number) => (
+                      <div key={idx} className="bg-muted/50 rounded-lg p-3 border text-sm">
+                        <div className="space-y-2">
+                          <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1">
+                            <span className="font-semibold text-primary text-xs sm:text-sm">
+                              {term.chamber || 'Unknown Chamber'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Congress {term.congress || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="text-xs space-y-1">
+                            <div><span className="font-medium">Years:</span> {term.startYear || '-'}{term.endYear ? `–${term.endYear}` : ''}</div>
+                            <div><span className="font-medium">State:</span> {term.stateName || term.stateCode || '-'}</div>
+                            {term.district && <div><span className="font-medium">District:</span> {term.district}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Desktop Table Layout */}
+                  <div className="hidden md:block overflow-x-auto rounded-lg bg-muted/50">
                     <table className="min-w-full text-sm border">
                       <thead>
                         <tr className="bg-muted">
                           <th className="px-3 py-2 text-left">Chamber</th>
                           <th className="px-3 py-2 text-left">Congress</th>
                           <th className="px-3 py-2 text-left">Years</th>
-                          <th className="px-3 py-2 text-left">Party</th>
+                          {/* <th className="px-3 py-2 text-left">Party</th> */}
                           <th className="px-3 py-2 text-left">State</th>
                           <th className="px-3 py-2 text-left">District</th>
                         </tr>
@@ -417,7 +441,7 @@ export default async function RepresentativeDetailPage({
                             <td className="px-3 py-2">{term.chamber || '-'}</td>
                             <td className="px-3 py-2">{term.congress || '-'}</td>
                             <td className="px-3 py-2">{term.startYear || '-'}{term.endYear ? `–${term.endYear}` : ''}</td>
-                            <td className="px-3 py-2">{term.partyName || term.party || '-'}</td>
+                            {/* <td className="px-3 py-2">{term.partyName || term.party || '-'}</td> */}
                             <td className="px-3 py-2">{term.stateName || term.stateCode || '-'}</td>
                             <td className="px-3 py-2">{term.district || '-'}</td>
                           </tr>
@@ -433,39 +457,58 @@ export default async function RepresentativeDetailPage({
           {(((rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0) ||
             ((rep as any).extras?.title)) && (
             <AnimatedSection>
-              <section className="">
-                <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                  <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Leadership Roles
+              <section className="min-w-0 overflow-hidden">
+                <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center mb-2">
+                  <Info className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" /> Leadership Roles
                 </h3>
 
                 {/* Federal Leadership Roles (Congress members) */}
                 {(rep as any).leadership && Array.isArray((rep as any).leadership) && (rep as any).leadership.length > 0 && (
-                  <div className="overflow-x-auto rounded-lg bg-muted/50 mb-3">
-                    <table className="min-w-full text-sm border">
-                      <thead>
-                        <tr className="bg-muted">
-                          <th className="px-3 py-2 text-left">Type</th>
-                          <th className="px-3 py-2 text-left">Congress</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(rep as any).leadership.map((role: any, idx: number) => (
-                          <tr key={idx} className="border-t">
-                            <td className="px-3 py-2">{role.type || '-'}</td>
-                            <td className="px-3 py-2">{role.congress || '-'}</td>
+                  <>
+                    {/* Mobile Card Layout */}
+                    <div className="block md:hidden space-y-2 mb-3">
+                      {(rep as any).leadership.map((role: any, idx: number) => (
+                        <div key={idx} className="bg-muted/50 rounded-lg p-3 border">
+                          <div className="space-y-1">
+                            <div className="font-semibold text-primary text-sm">
+                              {role.type || 'Unknown Role'}
+                            </div>
+                            <div className="text-xs">
+                              <span className="font-medium">Congress:</span> {role.congress || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Desktop Table Layout */}
+                    <div className="hidden md:block overflow-x-auto rounded-lg bg-muted/50 mb-3">
+                      <table className="min-w-full text-sm border">
+                        <thead>
+                          <tr className="bg-muted">
+                            <th className="px-3 py-2 text-left">Type</th>
+                            <th className="px-3 py-2 text-left">Congress</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {(rep as any).leadership.map((role: any, idx: number) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-3 py-2">{role.type || '-'}</td>
+                              <td className="px-3 py-2">{role.congress || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
 
                 {/* State Leadership Roles (from extras.title) */}
                 {(rep as any).extras?.title && (
-                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-primary">Current Leadership Position:</span>
-                      <span className="text-foreground">{(rep as any).extras.title}</span>
+                  <div className="p-2 sm:p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                      <span className="font-semibold text-primary text-sm">Current Leadership Position:</span>
+                      <span className="text-foreground text-sm">{(rep as any).extras.title}</span>
                     </div>
                   </div>
                 )}
@@ -474,26 +517,26 @@ export default async function RepresentativeDetailPage({
           )}
 
           <AnimatedSection>
-            <section>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                <FileText className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Bills Sponsored
+            <section className="min-w-0 overflow-hidden">
+              <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center mb-2">
+                <FileText className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" /> Bills Sponsored
               </h3>
-              <div className="text-md mb-2">Total (this year): <span className="font-bold">{bills.length}</span></div>
+              <div className="text-sm sm:text-base mb-2">Total (this year): <span className="font-bold">{bills.length}</span></div>
               {bills.length === 0 ? (
                 <div className="text-sm text-muted-foreground">No bills sponsored by this representative.</div>
               ) : (
                 <>
-                  <h4 className="text-md font-semibold mb-1">Recent Bills</h4>
+                  <h4 className="text-sm sm:text-base font-semibold mb-1">Recent Bills</h4>
                   <div className="space-y-3">
                     {recentBills.map(bill => (
                       <AnimatedSection key={bill.id}>
-                        <div className="border rounded-lg p-3 bg-muted/50 flex flex-col gap-2">
-                          <div>
+                        <div className="border rounded-lg p-2 sm:p-3 bg-muted/50 flex flex-col gap-2 min-w-0 overflow-hidden">
+                          <div className="text-xs sm:text-sm break-words">
                             <span className="font-bold">{bill.identifier}</span>: {bill.title}
                           </div>
                           <Link
                             href={`/legislation/${bill.id}`}
-                            className="inline-block mt-2 px-4 py-2 bg-primary text-white rounded font-semibold shadow hover:bg-primary/90 transition-colors text-center"
+                            className="inline-block mt-1 sm:mt-2 px-3 sm:px-4 py-1 sm:py-2 bg-primary text-white rounded text-xs sm:text-sm font-semibold shadow hover:bg-primary/90 transition-colors text-center"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
@@ -641,11 +684,29 @@ export default async function RepresentativeDetailPage({
             }
             return (Array.isArray(partyHistory) && partyHistory.length > 0) ? (
               <AnimatedSection>
-                <section>
-                  <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                    <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Party History
+                <section className="min-w-0 overflow-hidden">
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center mb-2">
+                    <Info className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" /> Party History
                   </h3>
-                  <div className="overflow-x-auto rounded-lg bg-muted/50">
+                  {/* Mobile Card Layout */}
+                  <div className="block md:hidden space-y-2">
+                    {partyHistory.map((party: any, idx: number) => (
+                      <div key={idx} className="bg-muted/50 rounded-lg p-3 border">
+                        <div className="space-y-1">
+                          <div className="font-semibold text-primary text-sm">
+                            {party.partyName || party.party || 'Unknown Party'}
+                          </div>
+                          <div className="text-xs space-y-1">
+                            <div><span className="font-medium">Start:</span> {party.startDate ? new Date(party.startDate).toLocaleDateString() : 'N/A'}</div>
+                            <div><span className="font-medium">End:</span> {party.endDate ? new Date(party.endDate).toLocaleDateString() : 'Current'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Desktop Table Layout */}
+                  <div className="hidden md:block overflow-x-auto rounded-lg bg-muted/50">
                     <table className="min-w-full text-sm border">
                       <thead>
                         <tr className="bg-muted">
@@ -672,13 +733,13 @@ export default async function RepresentativeDetailPage({
 
           {(rep as any).birthYear && (
             <AnimatedSection>
-              <section>
-                <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                  <Info className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Personal Information
+              <section className="min-w-0 overflow-hidden">
+                <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center mb-2">
+                  <Info className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" /> Personal Information
                 </h3>
-                <div className="text-sm">
-                  <div className="flex items-center">
-                    <span className="font-medium text-muted-foreground w-20">Birth Year:</span>
+                <div className="text-xs sm:text-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                    <span className="font-medium text-muted-foreground sm:w-20 sm:flex-shrink-0">Birth Year:</span>
                     <span className="text-foreground">{(rep as any).birthYear}</span>
                   </div>
                 </div>
@@ -687,16 +748,16 @@ export default async function RepresentativeDetailPage({
           )}
 
           <AnimatedSection>
-            <section>
-              <h3 className="text-lg font-semibold text-foreground flex items-center mb-2">
-                <Tag className="mr-2 h-5 w-5 text-primary flex-shrink-0" /> Top Topics
+            <section className="min-w-0 overflow-hidden">
+              <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center mb-2">
+                <Tag className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" /> Top Topics
               </h3>
               {topTopics.length === 0 ? (
                 <div className="text-sm text-muted-foreground">No topics found for sponsored bills.</div>
               ) : (
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-1 sm:gap-2 flex-wrap">
                   {topTopics.map(topic => (
-                    <Badge key={topic} variant="default" className="text-xs break-words">{topic}</Badge>
+                    <Badge key={topic} variant="default" className="text-xs break-words max-w-full truncate">{topic}</Badge>
                   ))}
                 </div>
               )}

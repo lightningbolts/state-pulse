@@ -44,28 +44,28 @@ export const VotingRecordCard: React.FC<VotingRecordCardProps> = ({ record }) =>
   };
 
   return (
-    <Card className="w-full hover:shadow-md transition-shadow">
-      <CardContent className="pt-6">
-        <div className="space-y-4">
+    <Card className="w-full hover:shadow-md transition-shadow min-w-0 overflow-hidden">
+      <CardContent className="p-3 sm:pt-6 sm:p-6">
+        <div className="space-y-3 sm:space-y-4 min-w-0">
           {/* Header */}
-          <div className="flex justify-between items-start gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="whitespace-nowrap">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4 min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
+                <Badge variant="outline" className="text-xs whitespace-nowrap">
                   {record.chamber === 'US House' ? 'House' : 'Senate'} Vote #{record.rollCallNumber}
                 </Badge>
                 {record.legislationType && record.legislationNumber && (
-                  <Badge variant="secondary" className="whitespace-nowrap">
+                  <Badge variant="secondary" className="text-xs whitespace-nowrap">
                     {record.legislationType.toUpperCase()} {record.legislationNumber}
                   </Badge>
                 )}
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {formatDate(record.date)}
+                <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">{formatDate(record.date)}</span>
                 </div>
               </div>
               
-              <h3 className="font-medium text-foreground line-clamp-2 leading-relaxed">
+              <h3 className="font-medium text-foreground text-sm sm:text-base leading-relaxed break-words">
                 {record.voteQuestion || 
                   (record.legislationType && record.legislationNumber 
                     ? `Vote on ${record.legislationType.toUpperCase()} ${record.legislationNumber}` 
@@ -76,9 +76,9 @@ export const VotingRecordCard: React.FC<VotingRecordCardProps> = ({ record }) =>
             </div>
 
             {/* Representative's Vote */}
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex sm:flex-col items-center sm:items-end gap-2">
               <Badge 
-                className={`px-3 py-1 font-medium border ${getVotePositionColor(record.representativeVote.voteCast)}`}
+                className={`px-2 sm:px-3 py-1 font-medium border text-xs sm:text-sm ${getVotePositionColor(record.representativeVote.voteCast)}`}
               >
                 {record.representativeVote.voteCast}
               </Badge>
@@ -91,37 +91,37 @@ export const VotingRecordCard: React.FC<VotingRecordCardProps> = ({ record }) =>
           </div>
 
           {/* Vote Breakdown */}
-          <div className="bg-muted/50 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Vote Breakdown</span>
+          <div className="bg-muted/50 rounded-lg p-2 sm:p-3">
+            <div className="flex items-center gap-1 sm:gap-2 mb-2">
+              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium">Vote Breakdown</span>
               <span className="text-xs text-muted-foreground">
-                ({record.totalVotes} total votes)
+                ({record.totalVotes} total)
               </span>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-green-700 dark:text-green-300">Yea:</span>
-                <span className="font-medium">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 text-xs min-w-0">
+              <div className="flex justify-between min-w-0">
+                <span className="text-green-700 dark:text-green-300 truncate">Yea:</span>
+                <span className="font-medium ml-1 flex-shrink-0">
                   {formatVoteCount(record.voteBreakdown.Yea, record.totalVotes)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-red-700 dark:text-red-300">Nay:</span>
-                <span className="font-medium">
+              <div className="flex justify-between min-w-0">
+                <span className="text-red-700 dark:text-red-300 truncate">Nay:</span>
+                <span className="font-medium ml-1 flex-shrink-0">
                   {formatVoteCount(record.voteBreakdown.Nay, record.totalVotes)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700 dark:text-gray-300">Not Voting:</span>
-                <span className="font-medium">
+              <div className="flex justify-between min-w-0">
+                <span className="text-gray-700 dark:text-gray-300 truncate">Not Voting:</span>
+                <span className="font-medium ml-1 flex-shrink-0">
                   {formatVoteCount(record.voteBreakdown['Not Voting'], record.totalVotes)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-blue-700 dark:text-blue-300">Present:</span>
-                <span className="font-medium">
+              <div className="flex justify-between min-w-0">
+                <span className="text-blue-700 dark:text-blue-300 truncate">Present:</span>
+                <span className="font-medium ml-1 flex-shrink-0">
                   {formatVoteCount(record.voteBreakdown.Present, record.totalVotes)}
                 </span>
               </div>
@@ -129,18 +129,19 @@ export const VotingRecordCard: React.FC<VotingRecordCardProps> = ({ record }) =>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-between items-center pt-2 border-t">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-2 border-t min-w-0">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Gavel className="h-3 w-3" />
-              Congress {record.congress}, Session {record.session}
+              <Gavel className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">Congress {record.congress}, Session {record.session}</span>
             </div>
             
             <div className="flex gap-2">
               {record.bill_id && getBillUrl(record.bill_id) && (
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="outline" size="sm" className="text-xs px-2 sm:px-3">
                   <Link href={getBillUrl(record.bill_id)!} target="_blank" rel="noopener noreferrer">
-                    <FileText className="h-4 w-4 mr-1" />
-                    View Bill
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    <span className="hidden sm:inline">View Bill</span>
+                    <span className="sm:hidden">Bill</span>
                   </Link>
                 </Button>
               )}

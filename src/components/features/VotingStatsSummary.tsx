@@ -127,13 +127,13 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
     trend?: 'up' | 'down' | 'neutral';
     color?: string;
   }) => (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <div className="flex items-center gap-2">
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
+    <Card className="min-w-0 overflow-hidden">
+      <CardContent className="p-3 sm:pt-6 sm:p-6">
+        <div className="flex items-center justify-between min-w-0">
+          <div className="space-y-1 min-w-0 overflow-hidden">
+            <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
+            <div className="flex items-center gap-2 min-w-0">
+              <p className={`text-lg sm:text-2xl font-bold ${color} truncate`}>{value}</p>
               {/*{trend && (*/}
               {/*  <div className={`flex items-center ${*/}
               {/*    trend === 'up' ? 'text-green-600' : */}
@@ -146,7 +146,7 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
               {/*)}*/}
             </div>
             {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
+              <p className="text-xs text-muted-foreground break-words">{description}</p>
             )}
           </div>
           {/* <Icon className={`h-8 w-8 ${color} opacity-60`} /> */}
@@ -160,9 +160,9 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
       {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
         <StatCard
           title="Total Votes"
           value={stats.totalVotes}
@@ -199,63 +199,63 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
       </div>
 
       {/* Detailed Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 min-w-0">
         {/* Vote Position Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Vote Positions
+        <Card className="min-w-0 overflow-hidden">
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+              <span className="truncate">Vote Positions</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-sm font-medium">Yea/Yes</span>
+          <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex justify-between items-center min-w-0">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                  <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm font-medium truncate">Yea/Yes</span>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold">{stats.byPosition.Yea}</div>
+                <div className="text-right flex-shrink-0">
+                  <div className="font-semibold text-sm sm:text-base">{stats.byPosition.Yea}</div>
                   <div className="text-xs text-muted-foreground">
                     {formatVoteCount(stats.byPosition.Yea, stats.totalVotes).split(' ')[1]}
                   </div>
                 </div>
               </div>
               
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span className="text-sm font-medium">Nay/No</span>
+              <div className="flex justify-between items-center min-w-0">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                  <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm font-medium truncate">Nay/No</span>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold">{stats.byPosition.Nay}</div>
+                <div className="text-right flex-shrink-0">
+                  <div className="font-semibold text-sm sm:text-base">{stats.byPosition.Nay}</div>
                   <div className="text-xs text-muted-foreground">
                     {formatVoteCount(stats.byPosition.Nay, stats.totalVotes).split(' ')[1]}
                   </div>
                 </div>
               </div>
               
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                  <span className="text-sm font-medium">Not Voting</span>
+              <div className="flex justify-between items-center min-w-0">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                  <div className="w-3 h-3 bg-gray-400 rounded-full flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm font-medium truncate">Not Voting</span>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold">{stats.byPosition['Not Voting']}</div>
+                <div className="text-right flex-shrink-0">
+                  <div className="font-semibold text-sm sm:text-base">{stats.byPosition['Not Voting']}</div>
                   <div className="text-xs text-muted-foreground">
                     {formatVoteCount(stats.byPosition['Not Voting'], stats.totalVotes).split(' ')[1]}
                   </div>
                 </div>
               </div>
               
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="text-sm font-medium">Present</span>
+              <div className="flex justify-between items-center min-w-0">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm font-medium truncate">Present</span>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold">{stats.byPosition.Present}</div>
+                <div className="text-right flex-shrink-0">
+                  <div className="font-semibold text-sm sm:text-base">{stats.byPosition.Present}</div>
                   <div className="text-xs text-muted-foreground">
                     {formatVoteCount(stats.byPosition.Present, stats.totalVotes).split(' ')[1]}
                   </div>
@@ -266,45 +266,45 @@ export const VotingStatsSummary: React.FC<VotingStatsSummaryProps> = ({ records 
         </Card>
 
         {/* Chamber Breakdown & Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5 text-primary" />
-              Chamber & Activity
+        <Card className="min-w-0 overflow-hidden">
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Building className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+              <span className="truncate">Chamber & Activity</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+            <div className="space-y-3 sm:space-y-4">
               {/* Chamber breakdown */}
-              <div>
-                <h4 className="text-sm font-medium mb-2">By Chamber</h4>
+              <div className="min-w-0">
+                <h4 className="text-xs sm:text-sm font-medium mb-2 truncate">By Chamber</h4>
                 <div className="space-y-2">
                   {stats.byChamber['US House'] > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">House</span>
-                      <Badge variant="secondary">{stats.byChamber['US House']} votes</Badge>
+                    <div className="flex justify-between items-center min-w-0">
+                      <span className="text-xs sm:text-sm truncate">House</span>
+                      <Badge variant="secondary" className="text-xs flex-shrink-0">{stats.byChamber['US House']} votes</Badge>
                     </div>
                   )}
                   {stats.byChamber['US Senate'] > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Senate</span>
-                      <Badge variant="secondary">{stats.byChamber['US Senate']} votes</Badge>
+                    <div className="flex justify-between items-center min-w-0">
+                      <span className="text-xs sm:text-sm truncate">Senate</span>
+                      <Badge variant="secondary" className="text-xs flex-shrink-0">{stats.byChamber['US Senate']} votes</Badge>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Recent activity */}
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium mb-2">Recent Activity</h4>
+              <div className="border-t pt-3 sm:pt-4 min-w-0">
+                <h4 className="text-xs sm:text-sm font-medium mb-2 truncate">Recent Activity</h4>
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Last 30 days</span>
-                    <Badge variant="outline">{stats.recentActivity.last30Days} votes</Badge>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-xs sm:text-sm truncate">Last 30 days</span>
+                    <Badge variant="outline" className="text-xs flex-shrink-0">{stats.recentActivity.last30Days} votes</Badge>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Last 90 days</span>
-                    <Badge variant="outline">{stats.recentActivity.last90Days} votes</Badge>
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="text-xs sm:text-sm truncate">Last 90 days</span>
+                    <Badge variant="outline" className="text-xs flex-shrink-0">{stats.recentActivity.last90Days} votes</Badge>
                   </div>
                 </div>
               </div>

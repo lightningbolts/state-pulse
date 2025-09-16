@@ -234,12 +234,12 @@ export default function RepVotingRecord({ representativeId, representativeName }
   }
 
   return (
-    <div key={renderKey} className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Voting Record for {representativeName}
+    <div key={renderKey} className="space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">
+          Voting Record{representativeName ? ` for ${representativeName}` : ''}
         </h2>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
           {filteredRecords.length} record{filteredRecords.length !== 1 ? 's' : ''} found
         </div>
       </div>
@@ -249,19 +249,19 @@ export default function RepVotingRecord({ representativeId, representativeName }
       )}
 
       {/* Search and Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
+      <div className="flex flex-col gap-3 sm:gap-4 min-w-0">
+        <div className="flex-1 min-w-0">
           <Input
             type="text"
-            placeholder="Search by bill number or vote question..."
+            placeholder="Search by bill or vote..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
+            className="w-full text-sm"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col xs:flex-row gap-2 min-w-0">
           <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'date' | 'bill_number')}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-full xs:w-28 sm:w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -270,7 +270,7 @@ export default function RepVotingRecord({ representativeId, representativeName }
             </SelectContent>
           </Select>
           <Select value={filterByVote} onValueChange={setFilterByVote}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-full xs:w-28 sm:w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -316,20 +316,21 @@ export default function RepVotingRecord({ representativeId, representativeName }
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
+          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
             Showing {startIndex + 1}-{Math.min(startIndex + recordsPerPage, filteredRecords.length)} of {filteredRecords.length} records
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
+              className="text-xs sm:text-sm px-2 sm:px-3"
             >
               Previous
             </Button>
-            <span className="flex items-center px-3 text-sm text-gray-600 dark:text-gray-400">
+            <span className="flex items-center px-2 sm:px-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
               {currentPage} of {totalPages}
             </span>
             <Button
@@ -337,6 +338,7 @@ export default function RepVotingRecord({ representativeId, representativeName }
               size="sm"
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
+              className="text-xs sm:text-sm px-2 sm:px-3"
             >
               Next
             </Button>

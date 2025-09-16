@@ -10,7 +10,7 @@ export function StatePulseHeader() {
         <SidebarTrigger />
         <div className="flex items-center gap-2 min-w-0">
           <Gavel className="h-6 w-6 text-primary" />
-          <h1 className="text-xl font-semibold font-headline truncate">StatePulse</h1>
+          <h1 className="text-xl font-semibold font-headline truncate hidden sm:block">StatePulse</h1>
         </div>
       </div>
 
