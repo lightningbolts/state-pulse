@@ -858,7 +858,7 @@ export async function getBillPdfLinksFromPagePuppeteer(url: string): Promise<str
           .map(a => a.href)
           .filter(href => href && 
             href.toLowerCase().includes('pdf') && 
-            href.toLowerCase().includes('bill')
+            (href.toLowerCase().includes('bill') || href.toLowerCase().includes('legislation'))
           );
         
         // Also check for any links in data attributes or other sources
