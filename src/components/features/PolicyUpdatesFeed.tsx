@@ -174,31 +174,121 @@ const CLASSIFICATIONS = [
 
 let cardNumber = 20;
 
+// Function to fetch bookmarked legislation
 async function fetchBookmarkedUpdates({
     limit = cardNumber,
     offset = 0,
+    search = "",
+    subject = "",
+    classification = "",
+    jurisdictionName = "",
+    showCongress = false,
+    showOnlyEnacted = false,
+    sortField = "createdAt",
+    sortDir = "desc"
 }: {
     limit?: number;
     offset?: number;
+    search?: string;
+    subject?: string;
+    classification?: string;
+    jurisdictionName?: string;
+    showCongress?: boolean;
+    showOnlyEnacted?: boolean;
+    sortField?: string;
+    sortDir?: string;
 }) {
-    const res = await fetch(`/api/bookmarks?includeLegislation=true&limit=${limit}&offset=${offset}&sortBy=createdAt&sortOrder=desc`);
+    // Fetch ALL bookmarked items first (we'll filter client-side)
+    const res = await fetch(`/api/bookmarks?includeLegislation=true&limit=1000&offset=0&sortBy=createdAt&sortOrder=desc`);
     if (!res.ok) throw new Error("Failed to fetch bookmarked updates");
     
     const responseData = await res.json();
     
     // Extract the legislation from bookmarksWithLegislation
+    let allBookmarkedLegislation: PolicyUpdate[] = [];
     if (responseData.bookmarksWithLegislation) {
-        return {
-            data: responseData.bookmarksWithLegislation.map((item: any) => item.legislation),
-            hasMore: responseData.hasMore || false,
-            totalCount: responseData.totalCount || 0
-        };
+        allBookmarkedLegislation = responseData.bookmarksWithLegislation.map((item: any) => item.legislation);
     }
     
+    // Apply client-side filtering
+    let filteredData = allBookmarkedLegislation.filter((item: PolicyUpdate) => {
+        // Search filter
+        if (search && search.trim()) {
+            const searchLower = search.toLowerCase();
+            const matchesSearch = 
+                item.title?.toLowerCase().includes(searchLower) ||
+                item.identifier?.toLowerCase().includes(searchLower) ||
+                item.summary?.toLowerCase().includes(searchLower) ||
+                item.sponsors?.some(sponsor => sponsor.name?.toLowerCase().includes(searchLower));
+            if (!matchesSearch) return false;
+        }
+        
+        // Subject filter
+        if (subject && subject.trim()) {
+            const hasSubject = 
+                item.subjects?.some(s => s.toLowerCase().includes(subject.toLowerCase())) ||
+                item.topicClassification?.broadTopics?.some(topic => topic.toLowerCase().includes(subject.toLowerCase()));
+            if (!hasSubject) return false;
+        }
+        
+        // Classification filter
+        if (classification && classification.trim()) {
+            const hasClassification = item.classification?.some(c => c.toLowerCase().includes(classification.toLowerCase()));
+            if (!hasClassification) return false;
+        }
+        
+        // Jurisdiction filter
+        if (showCongress) {
+            if (item.jurisdictionName !== "United States Congress") return false;
+        } else if (jurisdictionName && jurisdictionName.trim()) {
+            if (item.jurisdictionName !== jurisdictionName) return false;
+        }
+        
+        // Enacted filter
+        if (showOnlyEnacted) {
+            if (!isLegislationEnacted(item)) return false;
+        }
+        
+        return true;
+    });
+    
+    // Apply sorting
+    filteredData.sort((a, b) => {
+        let aValue: any, bValue: any;
+        
+        switch (sortField) {
+            case 'title':
+                aValue = a.title || '';
+                bValue = b.title || '';
+                break;
+            case 'lastActionAt':
+                aValue = a.lastActionAt ? new Date(a.lastActionAt).getTime() : 0;
+                bValue = b.lastActionAt ? new Date(b.lastActionAt).getTime() : 0;
+                break;
+            case 'createdAt':
+            default:
+                aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                break;
+        }
+        
+        if (sortDir === 'asc') {
+            return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        } else {
+            return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        }
+    });
+    
+    // Apply pagination
+    const startIndex = offset;
+    const endIndex = offset + limit;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+    const hasMore = endIndex < filteredData.length;
+    
     return {
-        data: [],
-        hasMore: false,
-        totalCount: 0
+        data: paginatedData,
+        hasMore,
+        totalCount: filteredData.length
     };
 }
 
@@ -412,7 +502,15 @@ export function PolicyUpdatesFeed() {
                 // Fetch more bookmarked items
                 const bookmarkedResult = await fetchBookmarkedUpdates({
                     limit,
-                    offset: currentSkip
+                    offset: currentSkip,
+                    search,
+                    subject,
+                    classification,
+                    jurisdictionName,
+                    showCongress,
+                    showOnlyEnacted,
+                    sortField: sort.field,
+                    sortDir: sort.dir
                 });
                 
                 if (bookmarkedResult.data.length > 0) {
@@ -486,7 +584,15 @@ export function PolicyUpdatesFeed() {
                 // Fetch bookmarked legislation directly
                 const bookmarkedResult = await fetchBookmarkedUpdates({
                     limit,
-                    offset: 0
+                    offset: 0,
+                    search,
+                    subject,
+                    classification,
+                    jurisdictionName,
+                    showCongress,
+                    showOnlyEnacted,
+                    sortField: sort.field,
+                    sortDir: sort.dir
                 });
                 setUpdates(bookmarkedResult.data);
                 skipRef.current = bookmarkedResult.data.length;
@@ -552,6 +658,7 @@ export function PolicyUpdatesFeed() {
                 setJurisdictionName(state.jurisdictionName || "");
                 setShowCongress(state.showCongress || false);
                 setShowOnlyEnacted(state.showOnlyEnacted || false);
+                setShowOnlyBookmarked(state.showOnlyBookmarked || false);
                 setCompactView(state.compactView || false);
                 setSort(state.sort || { field: 'createdAt', dir: 'desc' });
                 setSkip(state.skip || 0);
@@ -610,7 +717,15 @@ export function PolicyUpdatesFeed() {
                     // Fetch bookmarked legislation directly
                     const bookmarkedResult = await fetchBookmarkedUpdates({
                         limit,
-                        offset: 0
+                        offset: 0,
+                        search,
+                        subject,
+                        classification,
+                        jurisdictionName,
+                        showCongress,
+                        showOnlyEnacted,
+                        sortField: sort.field,
+                        sortDir: sort.dir
                     });
                     if (!isMounted) return;
                     
@@ -716,6 +831,7 @@ export function PolicyUpdatesFeed() {
                 jurisdictionName,
                 showCongress,
                 showOnlyEnacted,
+                showOnlyBookmarked,
                 compactView,
                 updates
             }));
@@ -725,13 +841,13 @@ export function PolicyUpdatesFeed() {
             try {
                 sessionStorage.removeItem('policyUpdatesFeedState');
                 sessionStorage.setItem('policyUpdatesFeedState', JSON.stringify({
-                    search, subject, classification, sort, showCongress, showOnlyEnacted, compactView
+                    search, subject, classification, sort, showCongress, showOnlyEnacted, showOnlyBookmarked, compactView
                 }));
             } catch (retryError) {
                 console.error('Failed to save even minimal state:', retryError);
             }
         }
-    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, showOnlyEnacted, compactView, updates]);
+    }, [search, subject, classification, sort, skip, searchInput, hasMore, jurisdictionName, showCongress, showOnlyEnacted, showOnlyBookmarked, compactView, updates]);
 
     // Save compact view preference to localStorage separately for persistence
     useEffect(() => {
