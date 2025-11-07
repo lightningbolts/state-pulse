@@ -802,97 +802,134 @@ export async function getBillPdfLinksFromPage(url: string): Promise<string[]> {
 }
 
 /**
+ * Timeout wrapper for Puppeteer operations to prevent hanging
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  let timeoutHandle: NodeJS.Timeout;
+  
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+  
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timeoutHandle!);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutHandle!);
+    throw error;
+  }
+}
+
+/**
  * Uses Puppeteer to extract all bill PDF links from a page after JS rendering.
  * Returns all links that contain both 'pdf' and 'bill' in the URL (case-insensitive, deduped).
  * Includes graceful fallback handling for missing system dependencies.
+ * IMPORTANT: Has a 60-second timeout to prevent hanging on problematic pages.
  */
 export async function getBillPdfLinksFromPagePuppeteer(url: string): Promise<string[]> {
   try {
-    const puppeteer = await import('puppeteer');
-    
-    // Comprehensive browser launch options for better Linux compatibility
-    const launchOptions = {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process', // <- This is important for environments with limited resources
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
-      ],
-      timeout: 60000, // Increase timeout for slower environments
-      handleSIGINT: false,
-      handleSIGTERM: false,
-      handleSIGHUP: false
-    };
-
-    console.log('[Puppeteer] Attempting to launch browser with enhanced compatibility options...');
-    const browser = await puppeteer.default.launch(launchOptions);
-    
-    try {
-      const page = await browser.newPage();
-      
-      // Set a user agent to avoid blocking
-      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-      
-      // Navigate and wait for network to settle
-      await page.goto(url, { 
-        waitUntil: 'networkidle2',
-        timeout: 30000 
-      });
-      
-      // Wait a bit more for any lazy-loaded content
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const pdfLinks: string[] = await page.evaluate(() => {
-        const anchors = Array.from(document.querySelectorAll('a'));
-        const allLinks = anchors
-          .map(a => a.href)
-          .filter(href => href && 
-            href.toLowerCase().includes('pdf') && 
-            (href.toLowerCase().includes('bill') || href.toLowerCase().includes('legislation'))
-          );
+    // Wrap the entire Puppeteer operation in a 60-second timeout
+    return await withTimeout(
+      (async () => {
+        const puppeteer = await import('puppeteer');
         
-        // Also check for any links in data attributes or other sources
-        const dataLinks: string[] = [];
-        document.querySelectorAll('[data-url], [data-href], [data-link]').forEach(el => {
-          const attrs = ['data-url', 'data-href', 'data-link'];
-          attrs.forEach(attr => {
-            const value = el.getAttribute(attr);
-            if (value && value.toLowerCase().includes('pdf') && value.toLowerCase().includes('bill')) {
-              dataLinks.push(value);
+        // Comprehensive browser launch options for better Linux compatibility
+        const launchOptions = {
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', // <- This is important for environments with limited resources
+            '--disable-gpu',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
+          ],
+          timeout: 30000, // Reduced timeout for browser launch
+          handleSIGINT: false,
+          handleSIGTERM: false,
+          handleSIGHUP: false
+        };
+
+        console.log('[Puppeteer] Attempting to launch browser with enhanced compatibility options...');
+        const browser = await puppeteer.default.launch(launchOptions);
+        
+        try {
+          const page = await browser.newPage();
+          
+          // Set a user agent to avoid blocking
+          await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+          
+          // Navigate and wait for network to settle (with timeout)
+          await page.goto(url, { 
+            waitUntil: 'networkidle2',
+            timeout: 25000 
+          });
+          
+          // Wait a bit more for any lazy-loaded content
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const pdfLinks: string[] = await page.evaluate(() => {
+            const anchors = Array.from(document.querySelectorAll('a'));
+            const allLinks = anchors
+              .map(a => a.href)
+              .filter(href => href && 
+                href.toLowerCase().includes('pdf') && 
+                (href.toLowerCase().includes('bill') || href.toLowerCase().includes('legislation'))
+              );
+            
+            // Also check for any links in data attributes or other sources
+            const dataLinks: string[] = [];
+            document.querySelectorAll('[data-url], [data-href], [data-link]').forEach(el => {
+              const attrs = ['data-url', 'data-href', 'data-link'];
+              attrs.forEach(attr => {
+                const value = el.getAttribute(attr);
+                if (value && value.toLowerCase().includes('pdf') && value.toLowerCase().includes('bill')) {
+                  dataLinks.push(value);
+                }
+              });
+            });
+            
+            return [...allLinks, ...dataLinks];
+          });
+          
+          await browser.close();
+          console.log('[Puppeteer] Successfully extracted PDF links:', pdfLinks.length);
+          
+          // Deduplicate and filter out invalid URLs
+          return Array.from(new Set(pdfLinks)).filter(link => {
+            try {
+              new URL(link);
+              return true;
+            } catch {
+              return false;
             }
           });
-        });
-        
-        return [...allLinks, ...dataLinks];
-      });
-      
-      await browser.close();
-      console.log('[Puppeteer] Successfully extracted PDF links:', pdfLinks.length);
-      
-      // Deduplicate and filter out invalid URLs
-      return Array.from(new Set(pdfLinks)).filter(link => {
-        try {
-          new URL(link);
-          return true;
-        } catch {
-          return false;
+        } catch (error) {
+          await browser.close();
+          throw error;
         }
-      });
-    } catch (error) {
-      await browser.close();
-      throw error;
-    }
+      })(),
+      60000, // 60 second timeout for entire operation
+      '[Puppeteer] Operation timed out after 60 seconds'
+    );
   } catch (error: any) {
+    // Check if this is a timeout error
+    if (error.message.includes('timed out')) {
+      console.error('[Puppeteer] Timeout reached:', error.message);
+      console.log('[Puppeteer] Falling back to regular fetch-based PDF extraction...');
+      return [];
+    }
+    
     console.error('[Puppeteer] Browser launch failed:', error.message);
     
     // Check for specific missing library errors and provide helpful guidance
