@@ -130,13 +130,26 @@ export const useInteractiveMap = () => {
         setLoading(true);
         setError(null);
         try {
+            console.log('[useInteractiveMap] Fetching map data...');
             const response = await fetch('/api/dashboard/map-data');
-            if (!response.ok) console.error('Failed to fetch map data');
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[useInteractiveMap] Failed to fetch map data:', response.status, errorText);
+                throw new Error(`Failed to fetch map data: ${response.status}`);
+            }
+            
             const result = await response.json();
-            if (result.success) setStateStats(result.data);
-            else console.error(result.error || 'Unknown error');
+            console.log('[useInteractiveMap] Map data received:', result.success ? 'success' : 'failed');
+            
+            if (result.success) {
+                setStateStats(result.data);
+            } else {
+                console.error('[useInteractiveMap] API returned error:', result.error);
+                throw new Error(result.error || 'Unknown error');
+            }
         } catch (error) {
-            console.error('Error fetching map data:', error);
+            console.error('[useInteractiveMap] Error fetching map data:', error);
             setError('Failed to load map data. Please try again.');
             setStateStats({});
         } finally {

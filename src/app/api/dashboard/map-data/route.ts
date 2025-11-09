@@ -5,12 +5,15 @@ import { StateData } from '@/types/jurisdictions';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Map Data API] Request received');
+    
     const legislationCollection = await getCollection('legislation');
+    console.log('[Map Data API] Collection obtained');
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    console.log('Starting map data aggregation...');
+    console.log('[Map Data API] Starting aggregation...');
     const startTime = Date.now();
 
     const pipeline = [
@@ -110,11 +113,11 @@ export async function GET(request: NextRequest) {
     ];
 
     const results = await legislationCollection.aggregate(pipeline, {
-      maxTimeMS: 10000,
+      maxTimeMS: 30000, // Increased to 30 seconds
       allowDiskUse: true
     }).toArray();
 
-    console.log(`Aggregation completed in ${Date.now() - startTime}ms`);
+    console.log(`[Map Data API] Aggregation completed in ${Date.now() - startTime}ms, ${results.length} results`);
 
     const stateStats: Record<string, StateData> = {};
 
@@ -208,7 +211,7 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    console.log(`Map data processed for ${Object.keys(stateStats).length} states`);
+    console.log(`[Map Data API] Map data processed for ${Object.keys(stateStats).length} states`);
 
     return NextResponse.json({
       success: true,
@@ -218,12 +221,21 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching map data:', error);
+    console.error('[Map Data API] Error fetching map data:', error);
+    
+    // Log more detailed error information
+    if (error instanceof Error) {
+      console.error('[Map Data API] Error name:', error.name);
+      console.error('[Map Data API] Error message:', error.message);
+      console.error('[Map Data API] Error stack:', error.stack);
+    }
+    
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to fetch map data',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.name : typeof error
       },
       { status: 500 }
     );

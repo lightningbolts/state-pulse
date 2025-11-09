@@ -35,18 +35,26 @@ export default function MapShowcase() {
         setLoading(true);
         setError(null);
         try {
+            console.log('[MapShowcase] Fetching map data...');
             const response = await fetch('/api/dashboard/map-data');
+            
             if (!response.ok) {
-                console.error('Failed to fetch map data');
+                const errorText = await response.text();
+                console.error('[MapShowcase] Failed to fetch map data:', response.status, errorText);
+                throw new Error(`Failed to fetch map data: ${response.status}`);
             }
+            
             const result = await response.json();
+            console.log('[MapShowcase] Map data received:', result.success ? 'success' : 'failed');
+            
             if (result.success) {
                 setStateStats(result.data);
             } else {
-                console.error(result.error || 'Unknown error');
+                console.error('[MapShowcase] API returned error:', result.error);
+                throw new Error(result.error || 'Unknown error');
             }
         } catch (error) {
-            console.error('Error fetching map data:', error);
+            console.error('[MapShowcase] Error fetching map data:', error);
             setError('Failed to load map data. Please try again.');
             setStateStats({});
         } finally {
