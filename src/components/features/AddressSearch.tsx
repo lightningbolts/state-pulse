@@ -23,7 +23,7 @@ export function AddressSearch({
 
     const inputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
-    const debounceRef = useRef<NodeJS.Timeout>();
+    const debounceRef = useRef<NodeJS.Timeout>(undefined);
 
     // Debounced search function
     const debouncedSearch = async (searchQuery: string) => {
