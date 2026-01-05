@@ -1032,9 +1032,8 @@ async function fetchCongressBills(updatedSince: string) {
   console.log(`Fetching Congress bills updated since ${updatedSince}`);
 
   while (hasMore) {
-    // Get current Congress number (119th Congress for 2025-2026)
-    const currentCongress = 119;
-    const url = `${CONGRESS_API_BASE_URL}/bill/${currentCongress}?api_key=${CONGRESS_API_KEY}&format=json&offset=${offset}&limit=${limit}&sort=updateDate+desc`;
+    // Use the /bill endpoint to get all bills, sorted by update date
+    const url = `${CONGRESS_API_BASE_URL}/bill?api_key=${CONGRESS_API_KEY}&format=json&offset=${offset}&limit=${limit}&sort=updateDate+desc`;
 
     console.log(`Fetching Congress bills offset ${offset} from: ${url.replace(CONGRESS_API_KEY as string, 'REDACTED_KEY')}`);
 
@@ -1061,8 +1060,11 @@ async function fetchCongressBills(updatedSince: string) {
               break;
             }
 
+            // Use the bill's congress number instead of hardcoded one
+            const billCongress = bill.congress;
+
             // Fetch detailed bill information
-            const detailUrl = `${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}?api_key=${CONGRESS_API_KEY}&format=json`;
+            const detailUrl = `${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}?api_key=${CONGRESS_API_KEY}&format=json`;
             const detailResponse = await fetch(detailUrl);
 
             if (!detailResponse.ok) {
@@ -1075,9 +1077,9 @@ async function fetchCongressBills(updatedSince: string) {
 
             // Also fetch actions, text versions, and summaries
             const [actionsResponse, textResponse, summariesResponse] = await Promise.all([
-              fetch(`${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}/actions?api_key=${CONGRESS_API_KEY}&format=json`),
-              fetch(`${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}/text?api_key=${CONGRESS_API_KEY}&format=json`),
-              fetch(`${CONGRESS_API_BASE_URL}/bill/${currentCongress}/${bill.type.toLowerCase()}/${bill.number}/summaries?api_key=${CONGRESS_API_KEY}&format=json`)
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/actions?api_key=${CONGRESS_API_KEY}&format=json`),
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/text?api_key=${CONGRESS_API_KEY}&format=json`),
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/summaries?api_key=${CONGRESS_API_KEY}&format=json`)
             ]);
 
             if (actionsResponse.ok) {
