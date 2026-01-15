@@ -612,7 +612,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
   }
 
   // 4. Special handling for states that prefer abstracts only
-  const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Vermont', 'Arizona', 'Nebraska', 'Colorado'];
+  const abstractOnlyStates = ['Iowa', 'Nevada', 'Illinois', 'Vermont', 'Arizona', 'Nebraska', 'Colorado', 'Kansas'];
   const isAbstractOnlyState = abstractOnlyStates.includes(bill.jurisdictionName || '')
 
   if (isAbstractOnlyState) {

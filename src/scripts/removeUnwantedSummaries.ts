@@ -19,7 +19,9 @@ const TARGET_PHRASES = [
     'Senate Journal',
     'House Journal',
     'Colorado General Assembly',
-    'Minnesota House of Representatives'
+    'Minnesota House of Representatives',
+    'This document outlines the legislative process in Kansas',
+    'Kansas Legislature'
 ];
 
 async function removeUnwantedSummaries() {
