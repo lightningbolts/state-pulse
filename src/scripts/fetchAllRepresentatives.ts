@@ -190,33 +190,33 @@ async function main() {
   const db = client.db(DB_NAME);
   const collection = db.collection(COLLECTION_NAME);
 
-  // for (const jurisdiction of JURISDICTIONS) {
-  //   console.log(`Fetching representatives for ${jurisdiction}...`);
-  //   const reps = await fetchRepresentativesForState(jurisdiction);
-  //   if (reps.length > 0) {
-  //     await collection.deleteMany({
-  //       jurisdiction: { $regex: new RegExp(jurisdiction, 'i') }
-  //     });
-  //     await collection.insertMany(reps);
-  //     console.log(`Stored ${reps.length} representatives for ${jurisdiction}`);
-  //   } else {
-  //     console.log(`No representatives found for ${jurisdiction}`);
-  //   }
-  // }
-
-  for (const chamber of ['house', 'senate'] as const) {
-    console.log(`Fetching US Congress ${chamber} members...`);
-    let reps = await fetchCongressMembers(chamber);
-    const jurisdictionLabel = chamber === 'house' ? 'US House' : 'US Senate';
-    reps = reps.map(rep => ({ ...rep, jurisdiction: jurisdictionLabel }));
+  for (const jurisdiction of JURISDICTIONS) {
+    console.log(`Fetching representatives for ${jurisdiction}...`);
+    const reps = await fetchRepresentativesForState(jurisdiction);
     if (reps.length > 0) {
-      await collection.deleteMany({ jurisdiction: jurisdictionLabel });
+      await collection.deleteMany({
+        jurisdiction: { $regex: new RegExp(jurisdiction, 'i') }
+      });
       await collection.insertMany(reps);
-      console.log(`Stored ${reps.length} US Congress ${chamber} members.`);
+      console.log(`Stored ${reps.length} representatives for ${jurisdiction}`);
     } else {
-      console.log(`No US Congress ${chamber} members found.`);
+      console.log(`No representatives found for ${jurisdiction}`);
     }
   }
+
+  // for (const chamber of ['house', 'senate'] as const) {
+  //   console.log(`Fetching US Congress ${chamber} members...`);
+  //   let reps = await fetchCongressMembers(chamber);
+  //   const jurisdictionLabel = chamber === 'house' ? 'US House' : 'US Senate';
+  //   reps = reps.map(rep => ({ ...rep, jurisdiction: jurisdictionLabel }));
+  //   if (reps.length > 0) {
+  //     await collection.deleteMany({ jurisdiction: jurisdictionLabel });
+  //     await collection.insertMany(reps);
+  //     console.log(`Stored ${reps.length} US Congress ${chamber} members.`);
+  //   } else {
+  //     console.log(`No US Congress ${chamber} members found.`);
+  //   }
+  // }
   await client.close();
   console.log('Done fetching all representatives.');
 }
