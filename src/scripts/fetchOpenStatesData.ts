@@ -1,11 +1,68 @@
 import {getLegislationById, upsertLegislationSelective} from '@/services/legislationService';
 import {config} from 'dotenv';
 import fetch from 'node-fetch';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import {generateGeminiSummary, summarizeLegislationOptimized} from '@/services/aiSummaryUtil';
 import {classifyLegislationForFetch} from '@/services/classifyLegislationService';
 import {enactedPatterns} from "@/types/legislation";
 
 config({ path: '../../.env' });
+
+// Single-instance lock: avoid overlapping runs (e.g. from cron). Stale PIDs are cleared so
+// a new run can start after a crash or kill. Uses a separate lock file from run_script.sh.
+const LOCK_DIR = process.env.FETCH_OPENSTATES_LOCK_DIR || os.tmpdir();
+const LOCK_FILE = path.join(LOCK_DIR, 'fetchOpenStatesData.pid');
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquireLock(): { acquired: boolean; existingPid?: number } {
+  if (fs.existsSync(LOCK_FILE)) {
+    try {
+      const content = fs.readFileSync(LOCK_FILE, 'utf8').trim();
+      const pid = parseInt(content, 10);
+      if (!Number.isNaN(pid)) {
+        if (isProcessAlive(pid)) {
+          return { acquired: false, existingPid: pid };
+        }
+        fs.unlinkSync(LOCK_FILE);
+      }
+    } catch {
+      try {
+        fs.unlinkSync(LOCK_FILE);
+      } catch {
+        // ignore
+      }
+    }
+  }
+  try {
+    fs.writeFileSync(LOCK_FILE, String(process.pid), 'utf8');
+    return { acquired: true };
+  } catch {
+    return { acquired: false };
+  }
+}
+
+function releaseLock(): void {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      const content = fs.readFileSync(LOCK_FILE, 'utf8').trim();
+      if (content === String(process.pid)) {
+        fs.unlinkSync(LOCK_FILE);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
 
 // Gemini 2.0 Flash rate limiting: 10 RPM, 1,000,000 TPM, 200 RPD
 class GeminiRateLimiter {
@@ -875,6 +932,23 @@ Examples:
 
 
 async function main() {
+  const lock = acquireLock();
+  if (!lock.acquired) {
+    console.log(
+      `[${new Date().toISOString()}] Script fetchOpenStatesData.ts already running (PID ${lock.existingPid ?? 'unknown'}), exiting.`
+    );
+    process.exit(0);
+  }
+  process.on('exit', releaseLock);
+  process.on('SIGINT', () => {
+    releaseLock();
+    process.exit(130);
+  });
+  process.on('SIGTERM', () => {
+    releaseLock();
+    process.exit(143);
+  });
+
   const { enableOpenStates, enableCongress } = parseArguments();
   await runUpdateCycle(enableOpenStates, enableCongress);
   console.log("Execution completed. Exiting.");
@@ -883,6 +957,7 @@ async function main() {
 
 main().catch(err => {
   console.error("Unhandled error in main execution:", err);
+  releaseLock();
   process.exit(1);
 });
 
