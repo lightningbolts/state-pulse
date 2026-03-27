@@ -3,66 +3,11 @@ import {config} from 'dotenv';
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import {generateGeminiSummary, summarizeLegislationOptimized} from '@/services/aiSummaryUtil';
 import {classifyLegislationForFetch} from '@/services/classifyLegislationService';
 import {enactedPatterns} from "@/types/legislation";
 
 config({ path: '../../.env' });
-
-// Single-instance lock: avoid overlapping runs (e.g. from cron). Stale PIDs are cleared so
-// a new run can start after a crash or kill. Uses a separate lock file from run_script.sh.
-const LOCK_DIR = process.env.FETCH_OPENSTATES_LOCK_DIR || os.tmpdir();
-const LOCK_FILE = path.join(LOCK_DIR, 'fetchOpenStatesData.pid');
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function acquireLock(): { acquired: boolean; existingPid?: number } {
-  if (fs.existsSync(LOCK_FILE)) {
-    try {
-      const content = fs.readFileSync(LOCK_FILE, 'utf8').trim();
-      const pid = parseInt(content, 10);
-      if (!Number.isNaN(pid)) {
-        if (isProcessAlive(pid)) {
-          return { acquired: false, existingPid: pid };
-        }
-        fs.unlinkSync(LOCK_FILE);
-      }
-    } catch {
-      try {
-        fs.unlinkSync(LOCK_FILE);
-      } catch {
-        // ignore
-      }
-    }
-  }
-  try {
-    fs.writeFileSync(LOCK_FILE, String(process.pid), 'utf8');
-    return { acquired: true };
-  } catch {
-    return { acquired: false };
-  }
-}
-
-function releaseLock(): void {
-  try {
-    if (fs.existsSync(LOCK_FILE)) {
-      const content = fs.readFileSync(LOCK_FILE, 'utf8').trim();
-      if (content === String(process.pid)) {
-        fs.unlinkSync(LOCK_FILE);
-      }
-    }
-  } catch {
-    // ignore
-  }
-}
 
 // Gemini 2.0 Flash rate limiting: 10 RPM, 1,000,000 TPM, 200 RPD
 class GeminiRateLimiter {
@@ -518,7 +463,7 @@ async function fetchSessionsForJurisdiction(ocdId: string): Promise<OpenStatesSe
   const url = `${OPENSTATES_API_BASE_URL}/jurisdictions/${ocdId}?apikey=${OPENSTATES_API_KEY}&include=legislative_sessions`;
   console.log(`Fetching sessions from: ${url.replace(OPENSTATES_API_KEY as string, 'REDACTED_KEY')}`);
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!response.ok) {
       console.error(`Error fetching sessions for ${ocdId}: ${response.status} ${await response.text()}`);
       return [];
@@ -565,7 +510,7 @@ async function fetchAndStoreUpdatedBills(
     const testUrl = `${OPENSTATES_API_BASE_URL}/bills?jurisdiction=${ocdId}&session=${sessionIdentifier}&page=1&per_page=20&apikey=${OPENSTATES_API_KEY}&sort=updated_desc&updated_since=${updatedSince}`;
 
     try {
-      const testResponse = await fetch(testUrl);
+      const testResponse = await fetch(testUrl, { signal: AbortSignal.timeout(30000) });
       if (testResponse.ok) {
         const testData = await testResponse.json();
         // @ts-ignore
@@ -602,7 +547,7 @@ async function fetchAndStoreUpdatedBills(
 
     console.log(`Fetching page ${page} from: ${url.replace(OPENSTATES_API_KEY as string, 'REDACTED_KEY')}`);
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
       if (!response.ok) {
         if (response.status === 404) {
           const errorText = await response.text();
@@ -932,23 +877,6 @@ Examples:
 
 
 async function main() {
-  const lock = acquireLock();
-  if (!lock.acquired) {
-    console.log(
-      `[${new Date().toISOString()}] Script fetchOpenStatesData.ts already running (PID ${lock.existingPid ?? 'unknown'}), exiting.`
-    );
-    process.exit(0);
-  }
-  process.on('exit', releaseLock);
-  process.on('SIGINT', () => {
-    releaseLock();
-    process.exit(130);
-  });
-  process.on('SIGTERM', () => {
-    releaseLock();
-    process.exit(143);
-  });
-
   const { enableOpenStates, enableCongress } = parseArguments();
   await runUpdateCycle(enableOpenStates, enableCongress);
   console.log("Execution completed. Exiting.");
@@ -957,7 +885,6 @@ async function main() {
 
 main().catch(err => {
   console.error("Unhandled error in main execution:", err);
-  releaseLock();
   process.exit(1);
 });
 
@@ -1113,7 +1040,7 @@ async function fetchCongressBills(updatedSince: string) {
     console.log(`Fetching Congress bills offset ${offset} from: ${url.replace(CONGRESS_API_KEY as string, 'REDACTED_KEY')}`);
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
       if (!response.ok) {
         console.error(`Error fetching Congress bills offset ${offset}: ${response.status} ${await response.text()}`);
         hasMore = false;
@@ -1140,7 +1067,7 @@ async function fetchCongressBills(updatedSince: string) {
 
             // Fetch detailed bill information
             const detailUrl = `${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}?api_key=${CONGRESS_API_KEY}&format=json`;
-            const detailResponse = await fetch(detailUrl);
+            const detailResponse = await fetch(detailUrl, { signal: AbortSignal.timeout(30000) });
 
             if (!detailResponse.ok) {
               console.error(`Error fetching bill details for ${bill.type} ${bill.number}: ${detailResponse.status}`);
@@ -1151,10 +1078,11 @@ async function fetchCongressBills(updatedSince: string) {
             const congressBill = detailData.bill;
 
             // Also fetch actions, text versions, and summaries
+            const fetchOpts = { signal: AbortSignal.timeout(30000) } as const;
             const [actionsResponse, textResponse, summariesResponse] = await Promise.all([
-              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/actions?api_key=${CONGRESS_API_KEY}&format=json`),
-              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/text?api_key=${CONGRESS_API_KEY}&format=json`),
-              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/summaries?api_key=${CONGRESS_API_KEY}&format=json`)
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/actions?api_key=${CONGRESS_API_KEY}&format=json`, fetchOpts),
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/text?api_key=${CONGRESS_API_KEY}&format=json`, fetchOpts),
+              fetch(`${CONGRESS_API_BASE_URL}/bill/${billCongress}/${bill.type.toLowerCase()}/${bill.number}/summaries?api_key=${CONGRESS_API_KEY}&format=json`, fetchOpts)
             ]);
 
             if (actionsResponse.ok) {
