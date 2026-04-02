@@ -11,6 +11,7 @@ config({ path: '../../.env' });
 
 // Gemini 2.0 Flash rate limiting: 10 RPM, 1,000,000 TPM, 200 RPD
 class GeminiRateLimiter {
+  dailyLimitReached = false;
   private requestsPerMinute: number[] = [];
   private requestsPerDay: number[] = [];
   private tokensPerMinute: number[] = [];
@@ -18,7 +19,9 @@ class GeminiRateLimiter {
   private readonly MAX_TPM = 2000000;
   private readonly MAX_RPD = 2000;
 
-  async waitForRateLimit(estimatedTokens: number = 2000): Promise<void> {
+  async waitForRateLimit(estimatedTokens: number = 2000): Promise<boolean> {
+    if (this.dailyLimitReached) return false;
+
     const now = Date.now();
 
     // Clean old entries
@@ -28,11 +31,9 @@ class GeminiRateLimiter {
 
     // Check daily limit
     if (this.requestsPerDay.length >= this.MAX_RPD) {
-      const oldestRequest = Math.min(...this.requestsPerDay);
-      const waitTime = 86400000 - (now - oldestRequest);
-      console.log(`Daily request limit reached. Waiting ${Math.ceil(waitTime / 1000 / 60)} minutes...`);
-      await this.sleep(waitTime);
-      return this.waitForRateLimit(estimatedTokens);
+      this.dailyLimitReached = true;
+      console.log('Daily limit reached. Skipping Gemini summaries for remaining bills.');
+      return false;
     }
 
     // Check requests per minute
@@ -58,6 +59,7 @@ class GeminiRateLimiter {
     this.requestsPerMinute.push(now);
     this.requestsPerDay.push(now);
     this.tokensPerMinute.push(now);
+    return true;
   }
 
   private sleep(ms: number): Promise<void> {
@@ -85,7 +87,11 @@ async function generateGeminiSummaryWithRateLimit(text: string): Promise<string>
   // Estimate tokens (rough approximation: 4 chars per token)
   const estimatedTokens = Math.ceil(text.length / 4) + 100; // +100 for response
 
-  await geminiRateLimiter.waitForRateLimit(estimatedTokens);
+  const canProceed = await geminiRateLimiter.waitForRateLimit(estimatedTokens);
+  if (!canProceed) {
+    console.log('Skipping summary (daily limit reached)');
+    return '';
+  }
   const stats = geminiRateLimiter.getStats();
   console.log(`Calling Gemini API. Current usage - RPM: ${stats.rpm}, RPD: ${stats.rpd}, TPM: ${stats.tpm}`);
 
@@ -613,12 +619,25 @@ async function fetchAndStoreUpdatedBills(
             }
             // Only summarize if geminiSummary is missing or less than 100 chars
             if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
-              const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
-              legislationToStore.geminiSummary = summary;
-              legislationToStore.geminiSummarySource = sourceType;
-              
-              console.log(`  Generated brief summary for ${legislationToStore.identifier} (source: ${sourceType})`);
-              console.log(`  Brief summary: ${summary.length} chars`);
+              const canSummarize = await geminiRateLimiter.waitForRateLimit(2000);
+              if (canSummarize) {
+                try {
+                  const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
+                  legislationToStore.geminiSummary = summary;
+                  legislationToStore.geminiSummarySource = sourceType;
+
+                  console.log(`  Generated brief summary for ${legislationToStore.identifier} (source: ${sourceType})`);
+                  console.log(`  Brief summary: ${summary.length} chars`);
+                } catch (summarizeError) {
+                  const msg = summarizeError instanceof Error ? summarizeError.message : String(summarizeError);
+                  if (msg.includes('429') || msg.toLowerCase().includes('quota')) {
+                    geminiRateLimiter.dailyLimitReached = true;
+                  }
+                  console.error(`  Error summarizing ${legislationToStore.identifier}:`, summarizeError);
+                }
+              } else {
+                console.log('Skipping summary (daily limit reached)');
+              }
             }
 
             // Classify the legislation after summary generation
@@ -1121,12 +1140,25 @@ async function fetchCongressBills(updatedSince: string) {
             }
             // Only summarize if geminiSummary is missing or less than 100 chars
             if (!legislationToStore.geminiSummary || legislationToStore.geminiSummary.length < 100) {
-              const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
-              legislationToStore.geminiSummary = summary;
-              legislationToStore.geminiSummarySource = sourceType;
-              
-              console.log(`  Generated brief summary for ${legislationToStore.identifier} (source: ${sourceType})`);
-              console.log(`  Brief summary: ${summary.length} chars`);
+              const canSummarize = await geminiRateLimiter.waitForRateLimit(2000);
+              if (canSummarize) {
+                try {
+                  const { summary, longSummary, sourceType } = await summarizeLegislationOptimized(legislationToStore);
+                  legislationToStore.geminiSummary = summary;
+                  legislationToStore.geminiSummarySource = sourceType;
+
+                  console.log(`  Generated brief summary for ${legislationToStore.identifier} (source: ${sourceType})`);
+                  console.log(`  Brief summary: ${summary.length} chars`);
+                } catch (summarizeError) {
+                  const msg = summarizeError instanceof Error ? summarizeError.message : String(summarizeError);
+                  if (msg.includes('429') || msg.toLowerCase().includes('quota')) {
+                    geminiRateLimiter.dailyLimitReached = true;
+                  }
+                  console.error(`  Error summarizing ${legislationToStore.identifier}:`, summarizeError);
+                }
+              } else {
+                console.log('Skipping summary (daily limit reached)');
+              }
             }
 
             // Classify the legislation after summary generation
