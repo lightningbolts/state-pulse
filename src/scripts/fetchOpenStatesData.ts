@@ -1,6 +1,5 @@
 import {getLegislationById, upsertLegislationSelective} from '@/services/legislationService';
 import {config} from 'dotenv';
-import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import {generateGeminiSummary, summarizeLegislationOptimized} from '@/services/aiSummaryUtil';
@@ -896,6 +895,13 @@ Examples:
 
 
 async function main() {
+  // Fallback global timeout: force exit after 12 hours to prevent cron blocking
+  const MAX_RUNTIME_MS = 12 * 60 * 60 * 1000;
+  setTimeout(() => {
+    console.error(`[Global Timeout] Script exceeded maximum runtime of 12 hours. Force killing to free up the lock.`);
+    process.exit(1);
+  }, MAX_RUNTIME_MS).unref();
+
   const { enableOpenStates, enableCongress } = parseArguments();
   await runUpdateCycle(enableOpenStates, enableCongress);
   console.log("Execution completed. Exiting.");
