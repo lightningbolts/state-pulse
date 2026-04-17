@@ -3,6 +3,14 @@ import { ObjectId } from 'mongodb';
 import type { Legislation } from '@/types/legislation';
 import type { LegislationMongoDbDocument } from '@/types/legislation';
 
+/** Excluded on list/feed queries to shrink MongoDB payloads (cards do not need these). */
+const LEGISLATION_FEED_HEAVY_FIELDS: Record<string, 0> = {
+  fullText: 0,
+  longGeminiSummary: 0,
+  rawHtml: 0,
+  detailedAnalysis: 0,
+};
+
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
   const cleanData = { ...data };
   const arrayFields = ['subjects', 'classification', 'sources', 'versions', 'abstracts', 'sponsors', 'history'];
@@ -433,12 +441,15 @@ export async function getAllLegislationWithFiltering({
     }
 
     // Get legislation using the improved search approach
+    const excludeHeavyFields = context === 'policy-updates-feed';
+
     let legislations = await getAllLegislation({
       limit: limit + 50, // Get more results to allow for proper sorting
       skip,
       sort,
       filter: finalFilter,
-      showCongress: isCongress
+      showCongress: isCongress,
+      excludeHeavyFields,
     });
 
     // Apply context-aware consistent sorting
@@ -498,7 +509,8 @@ export async function getAllLegislationWithFiltering({
         skip: 0,
         sort,
         filter: fuzzyFilter,
-        showCongress: isCongress
+        showCongress: isCongress,
+        excludeHeavyFields,
       });
       if (allCandidates.length > 0) {
         const Fuse = (await import('fuse.js')).default;
@@ -586,16 +598,21 @@ export async function getAllLegislation({
   skip = 0,
   sort = { updatedAt: -1 },
   filter = {},
-  showCongress = false
+  showCongress = false,
+  excludeHeavyFields = false,
 }: {
   limit?: number;
   skip?: number;
   sort?: Record<string, 1 | -1>;
   filter?: Record<string, any>;
   showCongress?: boolean;
+  excludeHeavyFields?: boolean;
 }): Promise<Legislation[]> {
   try {
     const legislationCollection = await getCollection('legislation');
+
+    const applyProjection = (cursor: ReturnType<typeof legislationCollection.find>) =>
+      excludeHeavyFields ? cursor.project(LEGISLATION_FEED_HEAVY_FIELDS) : cursor;
 
     // If showCongress is true, use robust query to match all Congress bills
     if (showCongress) {
@@ -626,8 +643,7 @@ export async function getAllLegislation({
       const mergedFilter = filter && Object.keys(filter).length > 0
         ? { $and: [congressQuery, filter] }
         : congressQuery;
-      const results = await legislationCollection
-        .find(mergedFilter)
+      const results = await applyProjection(legislationCollection.find(mergedFilter))
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -639,8 +655,7 @@ export async function getAllLegislation({
     }
 
     // Default behavior for all other queries (non-congress)
-    const results = await legislationCollection
-      .find(filter)
+    const results = await applyProjection(legislationCollection.find(filter))
       .sort(sort)
       .skip(skip)
       .limit(limit)

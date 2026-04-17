@@ -1,12 +1,116 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
-import {FIPS_TO_ABBR, STATE_MAP} from '@/types/geo';
+import { FIPS_TO_ABBR, STATE_MAP, STATE_NAMES } from '@/types/geo';
 import { validStates } from '@/types/geo';
 import { getStateAbbrFromString } from "@/lib/locationUtils";
 
+/**
+ * Build Mongo $or clauses so geospatial hits resolve to representatives.
+ * US House was missing because many members have no `map_boundary`, or GEOID/GEOIDFQ
+ * on the shapefile does not exactly match `map_boundary.district` typing.
+ */
+function appendDistrictRepMatchers(district: any, repOrs: any[]) {
+  const props = district.properties || {};
+  const boundaryType = district.type;
+  if (!boundaryType) return;
 
-let stateAbbr: string | null = null;
+  const geoIds = new Set<string>();
+  if (props.GEOID != null && String(props.GEOID).trim() !== '') geoIds.add(String(props.GEOID));
+  if (props.GEOIDFQ != null && String(props.GEOIDFQ).trim() !== '') geoIds.add(String(props.GEOIDFQ));
+
+  for (const gid of geoIds) {
+    const mapMatch: any[] = [
+      { 'map_boundary.district': gid },
+      { 'map_boundary.geoidfq': gid },
+    ];
+    const asNum = Number(gid);
+    if (!Number.isNaN(asNum) && /^[0-9]+$/.test(String(gid).replace(/\s/g, ''))) {
+      mapMatch.push({ 'map_boundary.district': asNum });
+    }
+    repOrs.push({
+      $and: [{ 'map_boundary.type': boundaryType }, { $or: mapMatch }],
+    });
+  }
+
+  if (boundaryType !== 'congressional') return;
+
+  const stateFp =
+    props.STATEFP != null && props.STATEFP !== ''
+      ? String(props.STATEFP).padStart(2, '0')
+      : '';
+  const stateAbbr = stateFp ? FIPS_TO_ABBR[stateFp] : '';
+  const cdRaw =
+    props.CD119FP ??
+    props.CD118FP ??
+    props.CD117FP ??
+    props.CD116FP ??
+    props.CD115FP ??
+    props.CD114FP;
+
+  if (!stateAbbr || cdRaw === undefined || cdRaw === null || String(cdRaw).trim() === '') {
+    return;
+  }
+
+  const cdString = String(cdRaw).trim();
+  const cdParsed = String(parseInt(cdString, 10));
+  const cdPadded2 = cdString.padStart(2, '0');
+  const fullStateName = STATE_NAMES[stateAbbr];
+
+  const districtValues = new Set<string>([cdString, cdParsed, cdPadded2]);
+  if (cdParsed === '0' || cdString === '00') {
+    districtValues.add('At-Large');
+    districtValues.add('at-large');
+  }
+
+  const districtOrs: any[] = [];
+  for (const v of districtValues) {
+    districtOrs.push({ district: v }, { 'current_role.district': v });
+    const n = Number(v);
+    if (!Number.isNaN(n) && v !== 'At-Large' && v !== 'at-large') {
+      districtOrs.push({ district: n }, { 'current_role.district': n });
+    }
+  }
+  districtOrs.push(
+    { 'terms.district': cdString },
+    { 'terms.district': cdPadded2 },
+    { 'terms.district': cdParsed },
+  );
+
+  const stateLower = stateAbbr.toLowerCase();
+  districtOrs.push(
+    { 'current_role.division_id': new RegExp(`/state:${stateLower}/cd:${cdParsed}($|[^0-9])`, 'i') },
+    { 'current_role.division_id': new RegExp(`/state:${stateLower}/cd:${cdPadded2}($|[^0-9])`, 'i') },
+    { 'current_role.division_id': new RegExp(`/state:${stateLower}/cd:${cdString}($|[^0-9])`, 'i') },
+  );
+
+  const stateOrs: any[] = [
+    { state: new RegExp(`^${stateAbbr}$`, 'i') },
+    { 'terms.stateCode': stateAbbr },
+    { 'terms.stateCode': stateAbbr.toUpperCase() },
+    { 'terms.item.stateCode': stateAbbr },
+    { 'terms.item.stateCode': stateAbbr.toUpperCase() },
+  ];
+  if (fullStateName) {
+    stateOrs.push({ state: new RegExp(`^${fullStateName.replace(/\s+/g, '\\s+')}$`, 'i') });
+  }
+
+  repOrs.push({
+    $and: [
+      {
+        $or: [
+          { jurisdiction: 'US House' },
+          { jurisdiction: /^US\s*House$/i },
+          { chamber: /^House of Representatives$/i },
+          { chamber: /^House$/i },
+          { 'jurisdiction.name': /^House of Representatives$/i },
+        ],
+      },
+      { $or: stateOrs },
+      { $or: districtOrs },
+    ],
+  });
+}
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get('lat');
@@ -50,16 +154,14 @@ export async function GET(request: NextRequest) {
         }
       }).toArray();
 
-      // Fallback: try to get state code from the first found district's properties
-      // stateAbbr is already declared above, do not redeclare
+      let resolvedStateAbbr: string | null = null;
       if (foundDistricts.length && foundDistricts[0].properties) {
-        // Try to get state abbreviation from properties
-        if (foundDistricts[0].properties.STATE) {
-          stateAbbr = foundDistricts[0].properties.STATE;
-        } else if (foundDistricts[0].properties.STATEFP) {
-          // Map FIPS to abbreviation
-          const fipsToAbbr: Record<string, string> = FIPS_TO_ABBR;
-          stateAbbr = fipsToAbbr[String(foundDistricts[0].properties.STATEFP) as keyof typeof fipsToAbbr];
+        const p0 = foundDistricts[0].properties;
+        if (p0.STATE) {
+          resolvedStateAbbr = String(p0.STATE).toUpperCase();
+        } else if (p0.STATEFP != null && p0.STATEFP !== '') {
+          const fp = String(p0.STATEFP).padStart(2, '0');
+          resolvedStateAbbr = FIPS_TO_ABBR[fp] || null;
         }
       }
 
@@ -70,27 +172,30 @@ export async function GET(request: NextRequest) {
       }
 
       // Build queries to find representatives for each district
-      const repOrs = [];
-      let stateCodeForSenators = null;
+      const repOrs: any[] = [];
+      let stateCodeForSenators: string | null = null;
       for (const district of foundDistricts) {
-        if (district.properties && district.properties.GEOID) {
-          repOrs.push({ 'map_boundary.district': district.properties.GEOID, 'map_boundary.type': district.type });
+        appendDistrictRepMatchers(district, repOrs);
+        if (!stateCodeForSenators && district.properties?.STATEFP != null && district.properties.STATEFP !== '') {
+          stateCodeForSenators = String(district.properties.STATEFP).padStart(2, '0');
         }
-        // Try to extract state code from district properties (should be present in GEOID or properties)
-        if (!stateCodeForSenators && district.properties && district.properties.STATEFP) {
-          stateCodeForSenators = district.properties.STATEFP;
-        }
-        if (!stateCodeForSenators && district.properties && district.properties.STATE) {
-          stateCodeForSenators = district.properties.STATE;
+        if (!stateCodeForSenators && district.properties?.STATE) {
+          stateCodeForSenators = String(district.properties.STATE);
         }
       }
 
-      // Always include at-large House rep for at-large states (AK, WY, VT, ND, SD, DE, MT)
+      // At-large US House states: boundary CD is "00" — match reps with null / missing district
       const atLargeStates = ['AK', 'WY', 'VT', 'ND', 'SD', 'DE', 'MT'];
-      const abbr = (stateAbbr || '').toUpperCase();
+      const abbr = (resolvedStateAbbr || '').toUpperCase();
       if (atLargeStates.includes(abbr)) {
         const stateFullNameMap: Record<string, string> = {
-          'AK': 'Alaska', 'WY': 'Wyoming', 'VT': 'Vermont', 'ND': 'North Dakota', 'SD': 'South Dakota', 'DE': 'Delaware', 'MT': 'Montana'
+          AK: 'Alaska',
+          WY: 'Wyoming',
+          VT: 'Vermont',
+          ND: 'North Dakota',
+          SD: 'South Dakota',
+          DE: 'Delaware',
+          MT: 'Montana',
         };
         const fullName = stateFullNameMap[abbr] || abbr;
         repOrs.push({
@@ -98,8 +203,10 @@ export async function GET(request: NextRequest) {
             {
               $or: [
                 { state: { $regex: new RegExp(`^${abbr}$`, 'i') } },
-                { state: { $regex: new RegExp(`^${fullName}$`, 'i') } }
-              ]
+                { state: { $regex: new RegExp(`^${fullName}$`, 'i') } },
+                { 'terms.stateCode': abbr },
+                { 'terms.item.stateCode': abbr },
+              ],
             },
             {
               $or: [
@@ -107,36 +214,14 @@ export async function GET(request: NextRequest) {
                 { role: { $regex: /representative/i } },
                 { 'terms.item.chamber': { $regex: /house/i } },
                 { jurisdiction: { $regex: /house/i } },
-                { jurisdiction: { $regex: /us house/i } }
-              ]
+                { jurisdiction: { $regex: /us house/i } },
+                { jurisdiction: 'US House' },
+              ],
             },
             {
-              $or: [
-                { district: null },
-                { district: { $exists: false } }
-              ]
-            }
-          ]
-        });
-      } else if (foundDistricts.length === 1 && stateAbbr) {
-        // For non-at-large states, keep the original logic
-        repOrs.push({
-          $and: [
-            { state: { $regex: new RegExp(`^${stateAbbr}$`, 'i') } },
-            {
-              $or: [
-                { chamber: { $regex: /house/i } },
-                { role: { $regex: /representative/i } },
-                { 'terms.item.chamber': { $regex: /house/i } }
-              ]
+              $or: [{ district: null }, { district: { $exists: false } }, { district: 'At-Large' }, { district: /at.?large/i }],
             },
-            {
-              $or: [
-                { district: null },
-                { district: { $exists: false } }
-              ]
-            }
-          ]
+          ],
         });
       }
 
@@ -146,8 +231,8 @@ export async function GET(request: NextRequest) {
         senatorState = STATE_MAP[stateName];
       } else if (state && true && state.length === 2) {
         senatorState = state.toUpperCase();
-      } else if (stateAbbr) {
-        senatorState = stateAbbr;
+      } else if (resolvedStateAbbr) {
+        senatorState = resolvedStateAbbr;
       }
       if (senatorState) {
         const fullStateName = Object.keys(STATE_MAP).find(name => STATE_MAP[name] === senatorState.toUpperCase()) || senatorState;

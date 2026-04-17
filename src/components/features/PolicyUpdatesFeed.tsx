@@ -1,12 +1,12 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bookmark, MapPin, Plus, Search, X, Grid3X3, List } from "lucide-react";
+import { Bookmark, Loader2, MapPin, Plus, Search, X, Grid3X3, List } from "lucide-react";
 import { BookmarksContext } from "@/components/features/BookmarkButton";
-import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -25,6 +25,45 @@ import { AnimatedSection } from "@/components/ui/AnimatedSection";
 
 
 let compactViewCardNumber = 100;
+
+function PolicyCardSkeleton({ compact }: { compact: boolean }) {
+    if (compact) {
+        return (
+            <div className="block p-3 border rounded-md bg-background h-full min-h-[120px] flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-3 w-2/3" />
+                    </div>
+                    <Skeleton className="h-5 w-14 shrink-0 rounded" />
+                </div>
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-3 w-3/4" />
+                <div className="mt-auto flex flex-wrap gap-1 pt-2">
+                    <Skeleton className="h-5 w-14 rounded" />
+                    <Skeleton className="h-5 w-14 rounded" />
+                </div>
+            </div>
+        );
+    }
+    return (
+        <div className="mb-4 p-4 border rounded-lg bg-background h-full min-h-[280px] flex flex-col gap-3">
+            <Skeleton className="h-6 w-[90%]" />
+            <Skeleton className="h-4 w-[45%]" />
+            <div className="flex flex-wrap gap-2">
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-[70%]" />
+            <Skeleton className="h-4 w-[55%]" />
+            <Skeleton className="h-20 w-full" />
+            <div className="mt-auto flex gap-2 pt-2">
+                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-10 w-20" />
+            </div>
+        </div>
+    );
+}
 
 // Compact Policy Update Card Component
 const PolicyUpdateCardCompact: React.FC<{
@@ -133,7 +172,7 @@ const PolicyUpdateCardCompact: React.FC<{
     );
 };
 
-interface PolicyUpdate {
+export interface PolicyUpdate {
     id: string;
     title?: string;
     jurisdictionName?: string;
@@ -367,11 +406,20 @@ async function fetchUpdatesFeed({
     }
 }
 
-export function PolicyUpdatesFeed() {
-    const [updates, setUpdates] = useState<PolicyUpdate[]>([]);
+export type PolicyUpdatesFeedProps = {
+    initialData?: PolicyUpdate[];
+};
+
+export function PolicyUpdatesFeed({ initialData }: PolicyUpdatesFeedProps) {
+    const initialLen = initialData?.length ?? 0;
+    const [updates, setUpdates] = useState<PolicyUpdate[]>(() => initialData ?? []);
     const [loading, setLoading] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
-    const [skip, setSkip] = useState(0);
+    const [hasMore, setHasMore] = useState(() => {
+        if (initialData === undefined) return true;
+        if (initialData.length === 0) return false;
+        return initialData.length === 20;
+    });
+    const [skip, setSkip] = useState(initialLen);
     const [search, setSearch] = useState("");
     const [subject, setSubject] = useState("");
     const [classification, setClassification] = useState("");
@@ -381,7 +429,6 @@ export function PolicyUpdatesFeed() {
     const [repFilter, setRepFilter] = useState<string>("");
     const [sponsorId, setSponsorId] = useState<string>("");
     const router = useRouter();
-    const [showLoadingText, setShowLoadingText] = useState(true);
     const [searchInput, setSearchInput] = useState("");
     const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false);
     const [customTags, setCustomTags] = useState<string[]>([]);
@@ -390,7 +437,7 @@ export function PolicyUpdatesFeed() {
     const [showOnlyEnacted, setShowOnlyEnacted] = useState(false);
     const [compactView, setCompactView] = useState(false);
     const loader = useRef<HTMLDivElement | null>(null);
-    const skipRef = useRef(0);
+    const skipRef = useRef(initialLen);
     const loadingRef = useRef(false); // Ref to prevent concurrent loads
     const hasRestored = useRef(false);
     const prevDeps = useRef<{
@@ -419,6 +466,15 @@ export function PolicyUpdatesFeed() {
 
     // URL parameter handling for state filtering, congress, and rep filtering
     const searchParams = useSearchParams();
+
+    const urlDrivesLegislationFeed = useMemo(() => {
+        const stateParam = searchParams.get('state');
+        const stateAbbrParam = searchParams.get('stateAbbr');
+        const congressParam = searchParams.get('congress');
+        const repParam = searchParams.get('rep');
+        const sponsorIdParam = searchParams.get('sponsorId');
+        return !!(stateParam || stateAbbrParam || congressParam === 'true' || repParam || sponsorIdParam);
+    }, [searchParams]);
 
     // Handle URL parameters for state filtering
     useEffect(() => {
@@ -643,13 +699,8 @@ export function PolicyUpdatesFeed() {
             console.log('[FEED] Cleared session storage due to page reload');
         }
 
-        // Check for URL parameters first - these should take precedence
-        const stateParam = searchParams.get('state');
-        const stateAbbrParam = searchParams.get('stateAbbr');
-        const hasUrlParams = stateParam || stateAbbrParam;
-
         const saved = sessionStorage.getItem('policyUpdatesFeedState');
-        if (saved && !hasUrlParams) { // Only restore from sessionStorage if no URL params
+        if (saved && !urlDrivesLegislationFeed) { // Only restore from sessionStorage if URL is not driving the feed
             try {
                 const state = JSON.parse(saved);
                 setSearch(state.search || "");
@@ -678,8 +729,8 @@ export function PolicyUpdatesFeed() {
                 skipRef.current = 0;
                 setSkip(0);
             }
-        } else if (hasUrlParams) {
-            // Clear any existing state when URL params are present
+        } else if (urlDrivesLegislationFeed) {
+            // Clear any existing state when URL params are present (state, congress, rep, sponsorId, etc.)
             setUpdates([]);
             skipRef.current = 0;
             setSkip(0);
@@ -694,19 +745,20 @@ export function PolicyUpdatesFeed() {
 
         // Restore scroll position *before* paint for seamlessness
         const scrollY = sessionStorage.getItem('policyUpdatesFeedScrollY');
-        if (scrollY && !hasUrlParams) { // Only restore scroll if not coming from URL navigation
+        if (scrollY && !urlDrivesLegislationFeed) { // Only restore scroll if not coming from URL navigation
             window.scrollTo(0, parseInt(scrollY, 10));
         }
 
         didRestore.current = true;
         hasRestored.current = true;
         prevDeps.current = { search, subject, classification, sort, jurisdictionName };
-    }, [searchParams]);
+    }, [searchParams, urlDrivesLegislationFeed]);
 
     // Block the initial fetch until after restore, and only fetch if updates are empty
     useEffect(() => {
         if (!didRestore.current) return;
-        if (updates.length > 0) return; // Don't fetch if updates already restored
+        if (updates.length > 0) return; // Don't fetch if updates already restored (includes server `initialData`)
+
         let isMounted = true;
         const fetchAndSet = async () => {
             setLoading(true);
@@ -768,7 +820,7 @@ export function PolicyUpdatesFeed() {
         return () => {
             isMounted = false;
         };
-    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView, didRestore.current]);
+    }, [search, subject, classification, sort, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView]);
 
 
     // Intersection Observer for infinite scroll
@@ -793,29 +845,6 @@ export function PolicyUpdatesFeed() {
             }
         };
     }, [loadMore, hasMore]); // Simplified dependencies
-
-    // Hide loading text if no more data and not loading
-    useEffect(() => {
-        if (!hasMore && !loading) {
-            setShowLoadingText(false);
-        }
-    }, [hasMore, loading]);
-
-    useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-        if (loading) {
-            setShowLoadingText(true);
-            timer = setInterval(() => {
-                setShowLoadingText(prev => !prev);
-            }, 1000);
-        } else {
-            setShowLoadingText(false);
-        }
-        return () => {
-            if (timer) clearInterval(timer);
-        };
-    }, [loading]);
-
 
     // Save state to sessionStorage on change (excluding large updates array)
     useEffect(() => {
@@ -1327,35 +1356,41 @@ export function PolicyUpdatesFeed() {
                 ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 items-stretch" 
                 : "grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch"
             }>
-                {updates.map((update, idx) => (
-                    compactView ? (
-                        <PolicyUpdateCardCompact
-                            key={update.id || idx}
-                            update={update}
-                            idx={idx}
-                        />
-                    ) : (
-                        <PolicyUpdateCard
-                            key={update.id || idx}
-                            update={update}
-                            idx={idx}
-                            updates={updates}
-                            classification={classification}
-                            subject={subject}
-                            setClassification={setClassification}
-                            setSubject={setSubject}
-                            setUpdates={setUpdates}
-                            setSkip={setSkip}
-                            skipRef={skipRef}
-                            setHasMore={setHasMore}
-                            setLoading={setLoading}
-                        />
-                    )
-                ))}
+                {loading && updates.length === 0
+                    ? Array.from({ length: compactView ? 12 : 6 }, (_, i) => (
+                        <PolicyCardSkeleton key={`policy-skeleton-${i}`} compact={compactView} />
+                    ))
+                    : updates.map((update, idx) => (
+                        compactView ? (
+                            <PolicyUpdateCardCompact
+                                key={update.id || idx}
+                                update={update}
+                                idx={idx}
+                            />
+                        ) : (
+                            <PolicyUpdateCard
+                                key={update.id || idx}
+                                update={update}
+                                idx={idx}
+                                updates={updates}
+                                classification={classification}
+                                subject={subject}
+                                setClassification={setClassification}
+                                setSubject={setSubject}
+                                setUpdates={setUpdates}
+                                setSkip={setSkip}
+                                skipRef={skipRef}
+                                setHasMore={setHasMore}
+                                setLoading={setLoading}
+                            />
+                        )
+                    ))}
             </div>
             <div ref={loader} />
-            {showLoadingText && loading && updates.length > 0 && (
-                <LoadingOverlay text="Loading more updates..." smallText="Loading..." />
+            {loading && updates.length > 0 && (
+                <div className="mt-6 flex justify-center py-6" role="status" aria-live="polite">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
+                </div>
             )}
             {!hasMore && !loading && <p className="mt-6 text-center text-muted-foreground">No more updates.</p>}
         </>

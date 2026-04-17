@@ -289,8 +289,10 @@ export const useInteractiveMap = () => {
             const result = await cachedFetch(url, 300000);
             if (result.representatives) {
                 const mapping: Record<string, string> = {};
-                const expectedChamber = chamber === 'us_house' ? 'House of Representatives' : chamber === 'state_upper' ? 'State Senate' : chamber === 'state_lower' ? 'State House' : '';
-                const filteredReps = result.representatives.filter((rep: any) => rep.chamber === expectedChamber);
+                // The API already scopes results by `chamber` (us_house / state_upper / state_lower). A strict
+                // `rep.chamber === 'House of Representatives'` filter dropped most House rows because Mongo/OpenStates
+                // often store values like "House", "lower", or "US House". Using the full API list fixes the map.
+                const filteredReps = result.representatives;
                 filteredReps.forEach((rep: any) => {
                     const normalizedParty = normalizePartyName(rep.party || 'Unknown');
                     const districtIds = new Set<string>();

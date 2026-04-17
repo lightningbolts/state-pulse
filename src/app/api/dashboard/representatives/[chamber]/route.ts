@@ -233,27 +233,10 @@ export async function GET(
           ]
         };
       } else if (chamber === 'us_house') {
-        query = {
-          $and: [
-            baseQuery,
-            {
-              $or: [
-                { 'map_boundary.type': 'congressional' },
-                {
-                  $and: [
-                    { 'jurisdiction': 'US House' },
-                    {
-                      $or: [
-                        { 'district': null },
-                        { 'district': { $exists: false } }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        };
+        // `baseQuery` already matches current House members (chamber, jurisdiction, terms, map_boundary, etc.).
+        // Do not additionally require `map_boundary.type === 'congressional'` or missing `district`; that
+        // incorrectly excluded most representatives who have a district number but no map_boundary row yet.
+        query = baseQuery;
       } else {
         query = baseQuery;
       }
