@@ -1,29 +1,52 @@
 import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
+import type Transporter from 'nodemailer/lib/mailer';
 
-dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
+let transporter: Transporter | null = null;
 
-const smtpUser = process.env.SMTP_USER;
-const smtpPass = process.env.SMTP_PASS;
-const smtpFrom = process.env.SMTP_FROM;
-const smtpHost = process.env.SMTP_HOST;
-const smtpPort = Number(process.env.SMTP_PORT) || 587;
+function getTransporter(): Transporter {
+  if (transporter) return transporter;
 
-if (!smtpUser || !smtpPass || !smtpFrom || !smtpHost || !smtpPort) {
-    throw new Error('Missing SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_HOST, or SMTP_PORT in environment variables');
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM;
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = Number(process.env.SMTP_PORT) || 587;
+
+  if (!smtpUser || !smtpPass || !smtpFrom || !smtpHost || !smtpPort) {
+    throw new Error(
+      'Missing SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_HOST, or SMTP_PORT in environment variables',
+    );
+  }
+
+  transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+
+  return transporter;
 }
 
-const transporter = nodemailer.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpPort === 465, // true for 465, false for 587
-  auth: {
-    user: smtpUser,
-    pass: smtpPass,
-  },
-});
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}) {
+  const smtpFrom = process.env.SMTP_FROM;
+  if (!smtpFrom) {
+    throw new Error('Missing SMTP_FROM in environment variables');
+  }
 
-export async function sendEmail({ to, subject, html, text }: { to: string; subject: string; html: string; text?: string }) {
   const mailOptions = {
     from: smtpFrom,
     to,
@@ -31,5 +54,6 @@ export async function sendEmail({ to, subject, html, text }: { to: string; subje
     html,
     text,
   };
-  return transporter.sendMail(mailOptions);
+
+  return getTransporter().sendMail(mailOptions);
 }

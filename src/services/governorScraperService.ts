@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
-import pdf from 'pdf-parse';
+import { parsePdfBuffer } from '@/lib/pdfParse';
 import { GovernorScrapedOrder, ExecutiveOrder } from '@/types/executiveOrder';
 import { upsertExecutiveOrder } from '@/services/executiveOrderService';
 import { getCurrentGovernorName } from './governorInfoService';
@@ -531,7 +531,7 @@ async function extractPdfText(pdfUrl: string): Promise<string | null> {
     if (!response.ok) return null;
 
     const buffer = await response.arrayBuffer();
-    const data = await pdf(Buffer.from(buffer));
+    const data = await parsePdfBuffer(Buffer.from(buffer));
     return data.text;
   } catch (error) {
     console.error(`PDF extraction failed for ${pdfUrl}:`, error);

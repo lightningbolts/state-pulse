@@ -10,17 +10,6 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        sharp$: false,
-        'onnxruntime-node$': false,
-      };
-      config.experiments = { ...config.experiments, asyncWebAssembly: true };
-    }
-    return config;
-  },
   images: {
     remotePatterns: [
       {
