@@ -25,6 +25,7 @@ const NAV_GROUPS: Array<
     items: [
       { href: "/dashboard", label: "Dashboard" },
       { href: "/legislation", label: "Legislation" },
+      { href: "/summaries", label: "Compare States" },
       { href: "/executive-orders", label: "Executive Orders" },
       { href: "/tracker", label: "Tracker" },
     ],

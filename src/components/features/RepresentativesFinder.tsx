@@ -13,6 +13,7 @@ import {MessageGenerator} from "./MessageGenerator";
 import {RepresentativesResults} from "./RepresentativesResults";
 import {ApiResponse, Representative} from "@/types/representative";
 import {AddressSuggestion, STATE_COORDINATES, STATE_MAP} from "@/types/geo";
+import { setStoredUserState, resolveStateName } from "@/lib/userStateStorage";
 import {getStateAbbrFromString, getStateAbbreviation} from "@/lib/locationUtils";
 
 // Dynamically import the map component to avoid SSR issues
@@ -243,6 +244,8 @@ export function RepresentativesFinder() {
 
     const handleAddressSelect = (suggestion: AddressSuggestion) => {
         setUserLocation(suggestion);
+        const stateName = resolveStateName(suggestion.address?.state);
+        if (stateName) setStoredUserState(stateName);
         void fetchRepresentatives(suggestion);
     };
 
@@ -263,6 +266,8 @@ export function RepresentativesFinder() {
         };
 
         setUserLocation(manualLocation);
+        const stateName = resolveStateName(state || manualLocation.address?.state);
+        if (stateName) setStoredUserState(stateName);
         setShowMap(false); // Don't show map for manual searches without coordinates
         void fetchRepresentatives(manualLocation);
     };
@@ -351,6 +356,8 @@ export function RepresentativesFinder() {
                 };
 
                 setUserLocation(stateLocation);
+                const resolved = resolveStateName(stateName || stateAbbr);
+                if (resolved) setStoredUserState(resolved);
                 setShowMap(false); // Don't show map for state-only searches
                 void fetchRepresentatives(stateLocation);
             }

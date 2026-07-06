@@ -65,6 +65,10 @@ export interface Legislation {
   // Performance optimization field
   enactedAt?: Date | null; // Date when the legislation was enacted (null if not enacted)
   enactedFieldUpdatedAt?: Date; // When the enactedAt field was last computed
+  // Browser semantic search embeddings (built offline via build-legislation-embeddings.ts)
+  embedding?: number[];
+  embeddingModel?: string;
+  embeddingTextHash?: string;
 }
 
 // Bookmark/SavedLegislation Types

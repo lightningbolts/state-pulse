@@ -37,6 +37,12 @@ async function createLegislationIndexes() {
     await legislationCollection.createIndex({ jurisdictionName: 1, updatedAt: 1 });
     console.log('Created compound index on jurisdictionName + updatedAt');
 
+    await legislationCollection.createIndex({ embedding: 1, jurisdictionName: 1, latestActionAt: -1 });
+    console.log('Created compound index on embedding + jurisdictionName + latestActionAt');
+
+    await legislationCollection.createIndex({ 'topicClassification.broadTopics': 1, embedding: 1 });
+    console.log('Created compound index on topicClassification.broadTopics + embedding');
+
     console.log('All indexes created successfully');
 
     // List all indexes to verify

@@ -116,9 +116,9 @@ export const pageMetadata = {
   }),
 
   summaries: generateMetadata({
-    title: 'AI Summaries - Simplified Policy Analysis',
-    description: 'AI-powered summaries of complex legislation and policy documents, making government information accessible and understandable.',
-    keywords: ['AI summaries', 'policy analysis', 'legislation summaries', 'government documents'],
+    title: 'Compare States - Cross-State Legislation Search',
+    description: 'Search a policy issue and compare how states approach it with browser-side semantic search. No API keys required.',
+    keywords: ['state comparison', 'policy comparison', 'legislation search', 'semantic search', 'state bills'],
     url: '/summaries',
   }),
 

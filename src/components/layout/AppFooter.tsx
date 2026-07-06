@@ -8,7 +8,7 @@ const NAV_LINKS = [
   { href: "/executive-orders", label: "Executive Orders" },
   { href: "/tracker", label: "Track Policies" },
   { href: "/representatives", label: "Representatives" },
-  { href: "/summaries", label: "AI Summaries" },
+  { href: "/summaries", label: "Compare States" },
   { href: "/civic", label: "Civic Tools" },
 ];
 
