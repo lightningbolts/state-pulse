@@ -1,19 +1,30 @@
-import HomePageClient from './HomePageClient';
+import { Suspense } from 'react';
+import { Panel, PanelBody } from '@/components/layout/Panel';
 import { pageMetadata } from '@/lib/metadata';
-import { fetchHomepageExamples, fetchHomepageStats } from '@/lib/homepage';
+import { HomeExamplesSection } from './HomeExamplesSection';
+import { HomeFeatures } from './HomeFeatures';
+import { HomeHero } from './HomeHero';
+import { HomeStats } from './HomeStats';
+import { HomeStatsSkeleton } from './HomeStatsSkeleton';
 
 export const metadata = pageMetadata.home;
 
-export default async function HomePage() {
-  const [initialStats, initialExamples] = await Promise.all([
-    fetchHomepageStats(),
-    fetchHomepageExamples(),
-  ]);
-
+export default function HomePage() {
   return (
-    <HomePageClient
-      initialStats={initialStats}
-      initialExamples={initialExamples}
-    />
+    <div className="animate-content-in space-y-8">
+      <HomeHero />
+
+      <Suspense fallback={<HomeStatsSkeleton />}>
+        <HomeStats />
+      </Suspense>
+
+      <HomeFeatures />
+
+      <Panel title="Spotlight">
+        <PanelBody>
+          <HomeExamplesSection initialExamples={{ legislation: null, representative: null }} />
+        </PanelBody>
+      </Panel>
+    </div>
   );
 }

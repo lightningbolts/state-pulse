@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createEmptyStateStats, chunkArray, MAP_STATE_ABBRS } from '@/lib/mapStateDefaults';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { StateData } from '@/types/jurisdictions';
@@ -78,9 +79,10 @@ export const useInteractiveMap = () => {
     const [selectedState, setSelectedState] = useState<string | null>(null);
     const [selectedStatePopupCoords, setSelectedStatePopupCoords] = useState<[number, number] | null>(null);
     const [mapMode, setMapMode] = useState<string>('legislation');
-    const [stateStats, setStateStats] = useState<Record<string, StateData>>({});
+    const [stateStats, setStateStats] = useState<Record<string, StateData>>(() => createEmptyStateStats());
     const [stateDetails, setStateDetails] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [mapDataProgress, setMapDataProgress] = useState(0);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
@@ -127,34 +129,35 @@ export const useInteractiveMap = () => {
     const [selectedChamber, setSelectedChamber] = useState<'house' | 'senate'>('house');
 
     const fetchMapData = async () => {
-        setLoading(true);
+        setStateStats(createEmptyStateStats());
+        setMapDataProgress(0);
         setError(null);
-        try {
-            console.log('[useInteractiveMap] Fetching map data...');
-            const response = await fetch('/api/dashboard/map-data');
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[useInteractiveMap] Failed to fetch map data:', response.status, errorText);
-                throw new Error(`Failed to fetch map data: ${response.status}`);
+
+        const batches = chunkArray(MAP_STATE_ABBRS, 3);
+        const totalBatches = batches.length + 1;
+        let completed = 0;
+
+        const loadBatch = async (states: string[]) => {
+            try {
+                const response = await fetch(`/api/dashboard/map-data?states=${states.join(',')}`);
+                if (!response.ok) throw new Error(`Failed: ${response.status}`);
+                const result = await response.json();
+                if (result.success) {
+                    setStateStats((prev) => ({ ...prev, ...result.data }));
+                }
+            } catch (error) {
+                console.error('[useInteractiveMap] Batch fetch failed:', error);
+                setError('Some map data failed to load. The map may be incomplete.');
+            } finally {
+                completed += 1;
+                setMapDataProgress(Math.round((completed / totalBatches) * 100));
             }
-            
-            const result = await response.json();
-            console.log('[useInteractiveMap] Map data received:', result.success ? 'success' : 'failed');
-            
-            if (result.success) {
-                setStateStats(result.data);
-            } else {
-                console.error('[useInteractiveMap] API returned error:', result.error);
-                throw new Error(result.error || 'Unknown error');
-            }
-        } catch (error) {
-            console.error('[useInteractiveMap] Error fetching map data:', error);
-            setError('Failed to load map data. Please try again.');
-            setStateStats({});
-        } finally {
-            setLoading(false);
+        };
+
+        for (const batch of batches) {
+            await loadBatch(batch);
         }
+        await loadBatch(['US']);
     };
 
     const fetchVotingPowerData = async (chamber: 'house' | 'senate') => {
@@ -492,6 +495,7 @@ export const useInteractiveMap = () => {
         stateStats,
         stateDetails,
         loading,
+        mapDataProgress,
         detailsLoading,
         error,
         router,

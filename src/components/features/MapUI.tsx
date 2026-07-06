@@ -182,6 +182,7 @@ export const MapUI = () => {
         stateStats,
         stateDetails,
         loading,
+        mapDataProgress,
         detailsLoading,
         error,
         router,
@@ -489,10 +490,18 @@ export const MapUI = () => {
                                 </MapLibreMap>
                             )}
                         </div>
-                        {(loading || districtLoading || mapModeTransitioning) && (
+                        {mapDataProgress < 100 && mapDataProgress > 0 && (
+                            <div className="absolute left-0 right-0 top-0 z-20 h-1 bg-border">
+                                <div
+                                    className="h-full bg-primary transition-all duration-300"
+                                    style={{ width: `${mapDataProgress}%` }}
+                                />
+                            </div>
+                        )}
+                        {(districtLoading || mapModeTransitioning) && (
                             <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-20">
                                 <div className="flex flex-col items-center space-y-3 p-4">
-                                    <div className="flex items-center space-x-3"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div><span className="text-sm sm:text-lg">{mapModeTransitioning ? 'Switching map mode...' : 'Loading map data...'}</span></div>
+                                    <div className="flex items-center space-x-3"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div><span className="text-sm sm:text-lg">{mapModeTransitioning ? 'Switching map mode...' : 'Loading districts...'}</span></div>
                                     {isMobile && (mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && (<div className="text-xs sm:text-sm text-muted-foreground text-center"><div>Mobile optimizations active</div>{memoryPressure && (<div className="text-amber-600">Memory optimization in progress</div>)}</div>)}
                                 </div>
                             </div>
@@ -703,7 +712,7 @@ export const MapUI = () => {
                                     </MapLibreMap>
                                 )}
                             </div>
-                            {(loading || districtLoading || mapModeTransitioning) && (<div className="absolute inset-0 bg-background/80 flex items-center justify-center"><div className="flex flex-col items-center space-y-2"><div className="flex items-center space-x-2"><div className="animate-spin rounded-full h-3 w-3 md:h-4 md:w-4 border-b-2 border-primary"></div><span className="text-xs md:text-sm">{mapModeTransitioning ? (<><span className="hidden sm:inline">Switching map mode...</span><span className="sm:hidden">Switching...</span></>) : (<><span className="hidden sm:inline">Updating map data...</span><span className="sm:hidden">Loading...</span></>)}</span></div>{(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (<div className="text-xs text-muted-foreground text-center"><div>Mobile optimizations active</div>{memoryPressure && (<div className="text-amber-600">Memory optimization in progress</div>)}</div>)}</div></div>)}
+                            {(districtLoading || mapModeTransitioning) && (<div className="absolute inset-0 bg-background/80 flex items-center justify-center"><div className="flex flex-col items-center space-y-2"><div className="flex items-center space-x-2"><div className="animate-spin rounded-full h-3 w-3 md:h-4 md:w-4 border-b-2 border-primary"></div><span className="text-xs md:text-sm">{mapModeTransitioning ? (<><span className="hidden sm:inline">Switching map mode...</span><span className="sm:hidden">Switching...</span></>) : (<><span className="hidden sm:inline">Loading districts...</span><span className="sm:hidden">Loading...</span></>)}</span></div>{(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (<div className="text-xs text-muted-foreground text-center"><div>Mobile optimizations active</div>{memoryPressure && (<div className="text-amber-600">Memory optimization in progress</div>)}</div>)}</div></div>)}
                             {districtError && (<div className="absolute inset-0 bg-background/80 flex items-center justify-center"><div className="text-center"><span className="text-xs text-red-500 block">{districtError}</span>{isMobile && (<span className="text-xs text-muted-foreground block mt-1">Try switching to a smaller district view</span>)}</div></div>)}
                             {selectedDistrict && (<div className="mt-4 bg-card text-foreground border border-border rounded-lg shadow-lg p-3 dark:!bg-zinc-900 dark:!text-white dark:!border-zinc-700"><h3 className="font-semibold text-base md:text-lg mb-2">{districtPopupLatLng ? ` (${districtPopupLatLng.lat.toFixed(5)}, ${districtPopupLatLng.lng.toFixed(5)})` : ''}<button className="ml-2 text-lg text-gray-400 hover:text-gray-700" onClick={() => { setSelectedDistrict(null); setDistrictPopupLatLng(null); if (isMobile) { setTimeout(forceGarbageCollection, 100); } }} aria-label="Close">×</button></h3>{(!districtLoading && Array.isArray(districtReps) && districtReps.length === 0 && districtPopupLatLng && (districtPopupLatLng.lat < 24 || districtPopupLatLng.lat > 49 || districtPopupLatLng.lng < -125 || districtPopupLatLng.lng > -66)) ? (<div className="text-sm text-muted-foreground mb-2">No representatives found for this location.</div>) : (<RepresentativesResults representatives={districtReps} closestReps={[]} loading={districtLoading} error={districtError} showMap={false} userLocation={null} dataSource={null} pagination={undefined} onPageChange={() => {}} districtType={selectedDistrict.properties.chamber || selectedDistrict.properties.CHAMBER || ''}/>)}</div>)}
                         </div>
