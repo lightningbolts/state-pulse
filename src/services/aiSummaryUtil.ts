@@ -1,6 +1,6 @@
 import {ai} from '@/ai/genkit';
 import fetch from 'node-fetch';
-import pdf from 'pdf-parse';
+import { parsePdfBuffer } from '@/lib/pdfParse';
 import * as cheerio from 'cheerio';
 import {Legislation} from '@/types/legislation';
 
@@ -353,7 +353,7 @@ export async function fetchPdfFromOpenStatesUrl(legUrl: string): Promise<{ text:
     }
     const buffer = await pdfRes.arrayBuffer();
     debug.push('PDF fetched, parsing...');
-    const data = await pdf(Buffer.from(buffer));
+    const data = await parsePdfBuffer(Buffer.from(buffer));
     debug.push('PDF parsed successfully.');
     return { text: data.text, debug };
   } catch (err) {
@@ -439,7 +439,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
         return null;
       }
       const buffer = await pdfRes.arrayBuffer();
-      const data = await pdf(Buffer.from(buffer));
+      const data = await parsePdfBuffer(Buffer.from(buffer));
       console.log('[DEBUG] PDF text length:', data.text?.length || 0);
 
       if (data.text && data.text.trim().length > 100) {
@@ -649,7 +649,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
 
             if (version.url.endsWith('.pdf')) {
               const buffer = await res.arrayBuffer();
-              const pdfText = await pdf(Buffer.from(buffer));
+              const pdfText = await parsePdfBuffer(Buffer.from(buffer));
               billText = pdfText.text;
               sourceType = 'pdf-extracted';
             } else {
@@ -680,7 +680,7 @@ export async function summarizeLegislationOptimized(bill: Legislation): Promise<
 
                 if (linkUrl.endsWith('.pdf')) {
                   const buffer = await res.arrayBuffer();
-                  const pdfText = await pdf(Buffer.from(buffer));
+                  const pdfText = await parsePdfBuffer(Buffer.from(buffer));
                   billText = pdfText.text;
                   sourceType = 'pdf-extracted';
                 } else {

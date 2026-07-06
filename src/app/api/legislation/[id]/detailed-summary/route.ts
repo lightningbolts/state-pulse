@@ -3,7 +3,7 @@ import { getLegislationById } from '@/services/legislationService';
 import { checkRateLimit } from '@/services/rateLimitService';
 import { getCollection } from '@/lib/mongodb';
 import { ai } from '@/ai/genkit';
-import pdf from 'pdf-parse';
+import { parsePdfBuffer } from '@/lib/pdfParse';
 import * as cheerio from 'cheerio';
 import type { Legislation } from '@/types/legislation';
 
@@ -103,7 +103,7 @@ async function generateDetailedSummaryFromBill(legislation: Legislation): Promis
       }
       const buffer = await pdfRes.arrayBuffer();
       
-      const data = await pdf(Buffer.from(buffer));
+      const data = await parsePdfBuffer(Buffer.from(buffer));
     //   console.log('[DEBUG] PDF text length:', data.text?.length || 0);
 
       if (data.text && data.text.trim().length > 500) {

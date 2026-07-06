@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { FederalRegisterDocument, ExecutiveOrder } from '@/types/executiveOrder';
 import { upsertExecutiveOrder } from '@/services/executiveOrderService';
-import pdf from 'pdf-parse';
+import { parsePdfBuffer } from '@/lib/pdfParse';
 
 export class FederalRegisterClient {
   private baseUrl = 'https://www.federalregister.gov/api/v1';
@@ -58,7 +58,7 @@ export class FederalRegisterClient {
       }
 
       const buffer = await response.arrayBuffer();
-      const data = await pdf(Buffer.from(buffer));
+      const data = await parsePdfBuffer(Buffer.from(buffer));
       return data.text;
     } catch (error) {
       console.error(`Error extracting PDF text from ${pdfUrl}:`, error);
