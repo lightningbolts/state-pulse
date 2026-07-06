@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
@@ -70,9 +71,31 @@ function NavDropdown({
   pathname: string;
 }) {
   const active = groupIsActive(pathname, items);
+  const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
 
   return (
-    <div className="group relative shrink-0">
+    <div
+      ref={containerRef}
+      className="relative shrink-0"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
         className={cn(
@@ -82,15 +105,21 @@ function NavDropdown({
             : "text-secondary hover:bg-hover hover:text-foreground",
         )}
         aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
       >
         {label}
-        <ChevronDown className="h-3 w-3 opacity-60 transition-transform group-hover:rotate-180" />
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 opacity-60 transition-transform",
+            open && "rotate-180",
+          )}
+        />
       </button>
       <div
         className={cn(
-          "invisible absolute left-0 top-full z-50 min-w-[11rem] border border-border bg-surface-elevated py-1 opacity-0 shadow-lg transition-all",
-          "group-hover:visible group-hover:opacity-100",
-          "group-focus-within:visible group-focus-within:opacity-100",
+          "absolute left-0 top-full z-50 min-w-[11rem] border border-border bg-surface-elevated py-1 shadow-lg transition-all",
+          open ? "visible opacity-100" : "pointer-events-none invisible opacity-0",
         )}
       >
         {items.map((item) => (
@@ -98,6 +127,7 @@ function NavDropdown({
             key={item.href}
             href={item.href}
             prefetch
+            onClick={() => setOpen(false)}
             className={cn(
               "block px-3 py-2 text-sm transition-colors hover:bg-hover",
               isActive(pathname, item.href)

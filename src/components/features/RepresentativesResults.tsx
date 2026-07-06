@@ -16,7 +16,8 @@ export function RepresentativesResults({
     pagination,
     onPageChange,
     districtType,
-}: Omit<RepresentativesResultsProps, 'showAllMode' | 'onShowAllToggle'> & { districtType?: string }) {
+    compact = false,
+}: Omit<RepresentativesResultsProps, 'showAllMode' | 'onShowAllToggle'> & { districtType?: string; compact?: boolean }) {
     const displayedReps = showMap ? closestReps : representatives;
     // Deduplicate by rep.id to avoid React key errors
     const uniqueReps = displayedReps.filter((rep, idx, arr) =>
@@ -30,11 +31,11 @@ export function RepresentativesResults({
     );
 
     return (
-        <div>
+        <div className={compact ? "min-w-0" : undefined}>
             {/* Results Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className={compact ? "mb-3 flex items-center justify-between" : "mb-4 flex items-center justify-between"}>
                 <h4 className="font-semibold">
-                    {'Your Representatives:'}
+                    Your Representatives:
                 </h4>
                 {dataSource && (
                     <div className="flex items-center text-xs text-muted-foreground">
@@ -80,7 +81,7 @@ export function RepresentativesResults({
             )}
 
             {/* Representatives List */}
-            <div className="space-y-4">
+            <div className={compact ? "space-y-3" : "space-y-4"}>
                 {uniqueReps.map((rep, index) => {
                   // Determine the district type for this representative
                   let repDistrictType: string | undefined = undefined;
@@ -101,6 +102,7 @@ export function RepresentativesResults({
                       href={`/representatives/${rep.id}`}
                       suppressDistance={!!suppressDistance}
                       districtType={repDistrictType}
+                      compact={compact}
                     />
                   );
                 })}

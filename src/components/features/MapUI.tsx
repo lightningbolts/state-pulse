@@ -7,12 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Calendar, FileText, MapPin, Maximize, Minimize, TrendingUp, Users, Scale } from 'lucide-react';
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
-import { DistrictMapGL } from './DistrictMapGL';
-import { StateMapGL } from './StateMapGL';
 import { RepresentativesResults } from "./RepresentativesResults";
 import { ChamberMakeup } from "./ChamberMakeup";
-import MapLibreMap, { Marker as MapLibreMarker, Popup as MapLibrePopup } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { DashboardMapCanvas } from './DashboardMapCanvas';
+import { DashboardFullscreenToolbar } from './DashboardFullscreenToolbar';
 import { useInteractiveMap } from '@/hooks/useInteractiveMap';
 import { MapMode } from '@/types/geo';
 
@@ -167,8 +165,6 @@ const getVotingPowerLegend = (
     return { labels, style };
 };
 
-const DEFAULT_POSITION: [number, number] = [39.8283, -98.5795];
-const DEFAULT_ZOOM = 4;
 
 export const MapUI = () => {
     const {
@@ -299,6 +295,29 @@ export const MapUI = () => {
         };
     }, [getRepHeatmapColor, maxRepScore]);
 
+    React.useEffect(() => {
+        const html = document.documentElement;
+        if (isFullScreen) {
+            html.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden';
+        } else {
+            html.style.overflow = '';
+            document.body.style.overflow = '';
+        }
+        return () => {
+            html.style.overflow = '';
+            document.body.style.overflow = '';
+        };
+    }, [isFullScreen]);
+
+    React.useEffect(() => {
+        const timer = window.setTimeout(() => {
+            mapRef.current?.getMap?.()?.resize();
+            window.dispatchEvent(new Event('resize'));
+        }, 150);
+        return () => window.clearTimeout(timer);
+    }, [isFullScreen, mapMode]);
+
     const getStateColor = React.useCallback((stateAbbr: string) => {
         const state = stateStats[stateAbbr];
         if (!state) return '#e0e0e0';
@@ -395,147 +414,99 @@ export const MapUI = () => {
         );
     }
 
+    const mapCanvas = (
+        <DashboardMapCanvas
+            mapMode={mapMode}
+            isFullScreen={isFullScreen}
+            isMobile={isMobile}
+            resolvedTheme={resolvedTheme}
+            mapRef={mapRef}
+            stateStats={stateStats}
+            memoizedMarkers={memoizedMarkers}
+            mapDataProgress={mapDataProgress}
+            districtLoading={districtLoading}
+            mapModeTransitioning={mapModeTransitioning}
+            memoryPressure={memoryPressure}
+            districtError={districtError}
+            getDistrictGeoJsonUrl={getDistrictGeoJsonUrl}
+            districtColors={DISTRICT_COLORS}
+            onDistrictClickGL={onDistrictClickGL}
+            showPartyAffiliation={showPartyAffiliation}
+            districtPartyMapping={districtPartyMapping}
+            partyColors={PARTY_COLORS}
+            showGerrymandering={showGerrymandering}
+            gerryScores={gerryScores}
+            getGerrymanderingColor={getGerrymanderingColor}
+            showTopicHeatmap={showTopicHeatmap}
+            topicScores={topicScores}
+            getTopicHeatmapColor={getTopicHeatmapColor}
+            showRepHeatmap={showRepHeatmap}
+            repScores={repScores}
+            repDetails={repDetails}
+            getRepHeatmapColor={getRepHeatmapColor}
+            showDistrictBorders={showDistrictBorders}
+            districtPopupLatLng={districtPopupLatLng}
+            setDistrictPopupLatLng={setDistrictPopupLatLng}
+            selectedDistrict={selectedDistrict}
+            setSelectedDistrict={setSelectedDistrict}
+            districtReps={districtReps}
+            forceGarbageCollection={forceGarbageCollection}
+            votingPowerData={votingPowerData}
+            selectedChamber={selectedChamber}
+            handleStateClick={handleStateClick}
+            selectedState={selectedState}
+            setSelectedState={setSelectedState}
+            selectedStatePopupCoords={selectedStatePopupCoords}
+            setSelectedStatePopupCoords={setSelectedStatePopupCoords}
+            detailsLoading={detailsLoading}
+            stateDetails={stateDetails}
+            getActivityLevel={getActivityLevel}
+            availableTopics={availableTopics}
+            selectedTopic={selectedTopic}
+            setSelectedTopic={setSelectedTopic}
+            topicDataLoading={topicDataLoading}
+            availableRepMetrics={availableRepMetrics}
+            selectedRepMetric={selectedRepMetric}
+            setSelectedRepMetric={setSelectedRepMetric}
+            repDataLoading={repDataLoading}
+            repHeatmapLegendLabels={repHeatmapLegendLabels}
+            repHeatmapLegendStyle={repHeatmapLegendStyle}
+            votingPowerLegendLabels={votingPowerLegendLabels}
+            votingPowerLegendStyle={votingPowerLegendStyle}
+            fullscreenToolbar={
+                isFullScreen ? (
+                    <DashboardFullscreenToolbar
+                        mapMode={mapMode}
+                        mapModes={mapModes}
+                        mapModeTransitioning={mapModeTransitioning}
+                        handleMapModeChange={handleMapModeChange}
+                        selectedChamber={selectedChamber}
+                        setSelectedChamber={setSelectedChamber}
+                        votingPowerLoading={votingPowerLoading}
+                        showPartyAffiliation={showPartyAffiliation}
+                        setShowPartyAffiliation={setShowPartyAffiliation}
+                        showGerrymandering={showGerrymandering}
+                        setShowGerrymandering={setShowGerrymandering}
+                        showTopicHeatmap={showTopicHeatmap}
+                        setShowTopicHeatmap={setShowTopicHeatmap}
+                        showRepHeatmap={showRepHeatmap}
+                        setShowRepHeatmap={setShowRepHeatmap}
+                        showDistrictBorders={showDistrictBorders}
+                        setShowDistrictBorders={setShowDistrictBorders}
+                        partyDataLoading={partyDataLoading}
+                        gerryDataLoading={gerryDataLoading}
+                        topicDataLoading={topicDataLoading}
+                        repDataLoading={repDataLoading}
+                        onExit={() => setIsFullScreen(false)}
+                    />
+                ) : undefined
+            }
+        />
+    );
+
     return (
         <AnimatedSection>
-            {isFullScreen && (
-                <div className="fixed inset-0 z-50 bg-background flex flex-col h-screen overflow-hidden">
-                    <div className="fixed top-0 left-0 right-0 flex-shrink-0 p-2 sm:p-4 border-b bg-background/95 backdrop-blur z-50">
-                        <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                            <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
-                                <div className="flex items-center space-x-2 lg:ml-72">
-                                    <span className="text-xs sm:text-sm text-muted-foreground">Mode:</span>
-                                    <select value={mapMode} onChange={(e) => handleMapModeChange(e.target.value)} className="text-xs sm:text-sm border rounded px-2 py-1 bg-background min-w-[120px] sm:min-w-[140px]" disabled={mapModeTransitioning}>
-                                        {mapModes.map((mode) => (<option key={mode.id} value={mode.id}>{mode.label}</option>))}
-                                    </select>
-                                </div>
-                                {mapMode === 'voting-power' && (
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-xs sm:text-sm text-muted-foreground">Chamber:</span>
-                                        <select 
-                                            value={selectedChamber} 
-                                            onChange={(e) => setSelectedChamber(e.target.value as 'house' | 'senate')} 
-                                            className="text-xs sm:text-sm border rounded px-2 py-1 bg-background min-w-[100px] sm:min-w-[120px]" 
-                                            disabled={votingPowerLoading}
-                                        >
-                                            <option value="house">House</option>
-                                            <option value="senate">Senate</option>
-                                        </select>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:space-x-2 lg:space-y-0">
-                                {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') && (
-                                    <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:space-x-3 sm:gap-0">
-                                        <div className="flex items-center space-x-1"><span className="text-xs text-muted-foreground">Party:</span><Switch checked={showPartyAffiliation} onCheckedChange={(checked) => { setShowPartyAffiliation(checked); if (checked) { setShowGerrymandering(false); setShowTopicHeatmap(false); setShowRepHeatmap(false); } }} disabled={partyDataLoading}/></div>
-                                        <div className="flex items-center space-x-1"><span className="text-xs text-muted-foreground">Gerry:</span><Switch checked={showGerrymandering} onCheckedChange={(checked) => { setShowGerrymandering(checked); if (checked) { setShowPartyAffiliation(false); setShowTopicHeatmap(false); setShowRepHeatmap(false); } }} disabled={gerryDataLoading}/></div>
-                                        <div className="flex items-center space-x-1"><span className="text-xs text-muted-foreground">Topic:</span><Switch checked={showTopicHeatmap} onCheckedChange={(checked) => { setShowTopicHeatmap(checked); if (checked) { setShowPartyAffiliation(false); setShowGerrymandering(false); setShowRepHeatmap(false); } }} disabled={topicDataLoading}/></div>
-                                        <div className="flex items-center space-x-1"><span className="text-xs text-muted-foreground">Rep:</span><Switch checked={showRepHeatmap} onCheckedChange={(checked) => { setShowRepHeatmap(checked); if (checked) { setShowPartyAffiliation(false); setShowGerrymandering(false); setShowTopicHeatmap(false); } }} disabled={repDataLoading}/></div>
-                                        <div className="flex items-center space-x-1"><span className="text-xs text-muted-foreground">Borders:</span><Switch checked={showDistrictBorders} onCheckedChange={setShowDistrictBorders}/></div>
-                                    </div>
-                                )}
-                                <div className="flex items-center space-x-2">
-                                    <Button variant="outline" size="sm" onClick={() => setIsFullScreen(false)} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3"><Minimize className="h-3 w-3 sm:h-4 sm:w-4" /><span className="hidden sm:inline">Exit Full Screen</span><span className="sm:hidden">Exit</span></Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="absolute top-0 left-0 w-full h-full statepulse-map-export-target">
-                        {(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (
-                            <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 xl:left-72 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 sm:p-3 text-xs text-amber-800">
-                                <div className="flex items-center space-x-2"><svg className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg><span className="text-xs">Loading districts with mobile optimizations.{memoryPressure && ' Memory optimization active.'}</span></div>
-                                <div className="mt-1 text-xs text-amber-700">Districts will load progressively to prevent crashes.</div>
-                            </div>
-                        )}
-                        <div className="h-full w-full">
-                            {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
-                                <DistrictMapGL geojsonUrl={getDistrictGeoJsonUrl(mapMode, isMobile)} color={DISTRICT_COLORS[mapMode]} onDistrictClick={onDistrictClickGL} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'} showPartyAffiliation={showPartyAffiliation} districtPartyMapping={districtPartyMapping} partyColors={PARTY_COLORS} showGerrymandering={showGerrymandering} gerryScores={gerryScores} getGerrymanderingColor={getGerrymanderingColor} showTopicHeatmap={showTopicHeatmap} topicScores={topicScores} getTopicHeatmapColor={getTopicHeatmapColor} showRepHeatmap={showRepHeatmap} repScores={repScores} repDetails={repDetails} getRepHeatmapColor={getRepHeatmapColor} showDistrictBorders={showDistrictBorders} popupMarker={districtPopupLatLng ? { lng: districtPopupLatLng.lng, lat: districtPopupLatLng.lat, iconHtml: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`, draggable: !isMobile, onDragEnd: !isMobile ? (lngLat) => { setDistrictPopupLatLng(lngLat); if (selectedDistrict) { onDistrictClickGL(selectedDistrict, lngLat); } } : undefined } : undefined}/>
-                            ) : mapMode === 'voting-power' ? (
-                                <StateMapGL 
-                                    votingPowerData={votingPowerData}
-                                    chamber={selectedChamber}
-                                    onStateClick={(stateAbbr, stateData) => {
-                                        // Get coordinates from stateStats for popup positioning
-                                        const state = stateStats[stateAbbr];
-                                        if (state && state.center) {
-                                            const coords: [number, number] = Array.isArray(state.center) 
-                                                ? [state.center[0], state.center[1]]
-                                                : [state.center.lat, state.center.lng];
-                                            handleStateClick(stateAbbr, coords);
-                                        }
-                                    }}
-                                    mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
-                                />
-                            ) : (
-                                <MapLibreMap ref={mapRef} initialViewState={{ longitude: DEFAULT_POSITION[1], latitude: DEFAULT_POSITION[0], zoom: DEFAULT_ZOOM }} style={{ height: '100%', width: '100%' }} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}>
-                                    {Object.entries(stateStats).map(([abbr, state]) => {
-                                        const { color, size } = memoizedMarkers[abbr] || { color: '#e0e0e0', size: 20 };
-                                        const coords: [number, number] = [(state.center as [number, number])[0], (state.center as [number, number])[1]];
-                                        return (
-                                            <MapLibreMarker key={abbr} longitude={coords[1]} latitude={coords[0]} anchor="center" onClick={() => handleStateClick(abbr, coords)}>
-                                                <div className="transition-transform duration-150 ease-in-out hover:scale-110" style={{ width: size, height: size, backgroundColor: color, border: '2px solid #fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', position: 'relative', overflow: 'hidden', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <div style={{ position: 'absolute', top: '50%', left: '50%', width: Math.max(8, size * 0.4), height: Math.max(8, size * 0.4), background: '#fff', borderRadius: '50%', transform: 'translate(-50%, -50%)' }}/>
-                                                </div>
-                                            </MapLibreMarker>
-                                        );
-                                    })}
-                                    {selectedState && selectedStatePopupCoords && (
-                                        <MapLibrePopup longitude={selectedStatePopupCoords[1]} latitude={selectedStatePopupCoords[0]} anchor="bottom" onClose={() => { setSelectedState(null); setSelectedStatePopupCoords(null); }} closeOnClick={false} maxWidth="260px">
-                                            {detailsLoading || !stateDetails ? (
-                                                <><div className="flex items-center justify-center min-h-[60px]"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div><span className="text-xs text-muted-foreground">Loading details...</span></div></>
-                                            ) : (
-                                                <><div className="flex items-center justify-between mb-2"><h3 className="font-semibold text-sm md:text-lg line-clamp-1">{stateStats[selectedState].name}</h3><div className="flex items-center space-x-1"><div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${getActivityLevel(selectedState) === 'High Activity' ? 'bg-primary' : getActivityLevel(selectedState) === 'Medium Activity' ? 'bg-primary/50' : getActivityLevel(selectedState) === 'Low Activity' ? 'bg-primary/20' : 'bg-gray-300'}`}></div><span className="text-xs text-muted-foreground hidden sm:inline">{getActivityLevel(selectedState)}</span></div></div><div className="space-y-1 md:space-y-2 text-xs md:text-sm"><div className="flex justify-between"><span>Bills:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].legislationCount}</Badge></div><div className="flex justify-between"><span>Reps:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].activeRepresentatives}</Badge></div><div className="flex justify-between"><span>Recent:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].recentActivity}</Badge></div><div className="pt-1 md:pt-2"><div className="text-xs text-muted-foreground mb-1"><span className="hidden sm:inline">Key Topics:</span><span className="sm:hidden">Topics:</span></div><div className="flex flex-wrap gap-1">{[...new Set(stateStats[selectedState].keyTopics)].slice(0, 3).map((topic, index) => (<Badge key={`${topic}-${index}`} variant="secondary" className="text-xs">{topic}</Badge>))}{stateStats[selectedState].keyTopics.length > 3 && (<Badge variant="outline" className="text-xs">+{stateStats[selectedState].keyTopics.length - 3}</Badge>)}</div></div></div></>
-                                            )}
-                                        </MapLibrePopup>
-                                    )}
-                                </MapLibreMap>
-                            )}
-                        </div>
-                        {mapDataProgress < 100 && mapDataProgress > 0 && (
-                            <div className="absolute left-0 right-0 top-0 z-20 h-1 bg-border">
-                                <div
-                                    className="h-full bg-primary transition-all duration-300"
-                                    style={{ width: `${mapDataProgress}%` }}
-                                />
-                            </div>
-                        )}
-                        {(districtLoading || mapModeTransitioning) && (
-                            <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-20">
-                                <div className="flex flex-col items-center space-y-3 p-4">
-                                    <div className="flex items-center space-x-3"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div><span className="text-sm sm:text-lg">{mapModeTransitioning ? 'Switching map mode...' : 'Loading districts...'}</span></div>
-                                    {isMobile && (mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && (<div className="text-xs sm:text-sm text-muted-foreground text-center"><div>Mobile optimizations active</div>{memoryPressure && (<div className="text-amber-600">Memory optimization in progress</div>)}</div>)}
-                                </div>
-                            </div>
-                        )}
-                        {showGerrymandering && !gerryDataLoading && Object.keys(gerryScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Compactness Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }}></div><span className="text-xs">Very Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#60e8fa' }}></div><span className="text-xs">Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f5ce0b' }}></div><span className="text-xs">Less Compact</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#d93706' }}></div><span className="text-xs">Irregular</span></div></div></div>)}
-                        {showTopicHeatmap && !topicDataLoading && Object.keys(topicScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Topic Activity Scale</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm"><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(25, 25, 112)' }}></div><span className="text-xs">High Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(99, 120, 171)' }}></div><span className="text-xs">Medium Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: 'rgb(173, 216, 230)' }}></div><span className="text-xs">Low Activity</span></div><div className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: '#f8f9fa' }}></div><span className="text-xs">No Data</span></div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Topic: {selectedTopic === 'all' ? 'All Topics' : selectedTopic}</div></div>)}
-                        {showRepHeatmap && !repDataLoading && Object.keys(repScores).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">{selectedRepMetric === 'sponsored_bills' ? 'Bills Sponsored Scale' : selectedRepMetric === 'recent_activity' ? 'Recent Activity Scale' : selectedRepMetric === 'voted_with_majority' ? 'Vote with Majority %' : selectedRepMetric === 'voted_against_party' ? 'Vote Against Party %' : 'Representative Scale'}</h5><div className="w-full"><div className="h-3 rounded-sm" style={repHeatmapLegendStyle}></div><div className="flex justify-between text-xs mt-1">{repHeatmapLegendLabels.map(label => <span key={label}>{label}{(selectedRepMetric === 'voted_with_majority' || selectedRepMetric === 'voted_against_party') ? '%' : ''}</span>)}</div></div><div className="mt-1 sm:mt-2 text-xs text-muted-foreground">Spectrum from white to dark purple represents absolute metric value.</div></div>)}
-                        {mapMode === 'voting-power' && !votingPowerLoading && votingPowerData && Object.keys(votingPowerData).length > 0 && (
-                            <div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg">
-                                <h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">
-                                    Voting Power Scale ({selectedChamber === 'house' ? 'House' : 'Senate'})
-                                </h5>
-                                <div className="w-full">
-                                    <div className="h-3 rounded-sm" style={votingPowerLegendStyle}></div>
-                                    <div className="flex justify-between text-xs mt-1">
-                                        {votingPowerLegendLabels.map((label, index) => (
-                                            <span key={index}>{label}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="mt-1 sm:mt-2 text-xs text-muted-foreground">
-                                    Voting power relative to Maryland (1.0×). Darker = higher per-capita influence.
-                                </div>
-                            </div>
-                        )}
-                        {!['congressional-districts', 'state-upper-districts', 'state-lower-districts', 'voting-power'].includes(mapMode) && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0 text-xs sm:text-sm"><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary"></div><span>High Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/50"></div><span>Medium Activity</span></div><div className="flex items-center space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-primary/20"></div><span>Low Activity</span></div></div></div>)}
-                        {showPartyAffiliation && !partyDataLoading && Object.keys(districtPartyMapping).length > 0 && (<div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><h5 className="font-medium text-xs sm:text-sm mb-1 sm:mb-2">Party Legend</h5><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 text-xs sm:text-sm">{Object.keys(PARTY_COLORS).map(party => (<div key={party} className="flex items-center space-x-1 sm:space-x-2"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: PARTY_COLORS[party] }}></div><span className="text-xs">{party}</span></div>))}</div></div>)}
-                        {showTopicHeatmap && availableTopics.length > 0 && (<div className="absolute top-16 sm:top-20 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-xs xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><label className="text-xs sm:text-sm font-medium block mb-1 sm:mb-2">Select Topic:</label><select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full text-xs sm:text-sm border rounded px-2 py-1 bg-background" disabled={topicDataLoading}><option value="all">All Topics</option>{availableTopics.map(topic => (<option key={topic} value={topic}>{topic}</option>))}</select></div>)}
-                        {showRepHeatmap && (<div className="absolute top-16 sm:top-20 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-xs xl:left-72 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg"><label className="text-xs sm:text-sm font-medium block mb-1 sm:mb-2">Select Metric:</label><select value={selectedRepMetric} onChange={(e) => setSelectedRepMetric(e.target.value)} className="w-full text-xs sm:text-sm border rounded px-2 py-1 bg-background" disabled={repDataLoading}>{availableRepMetrics.map(metric => (<option key={metric} value={metric}>{metric === 'sponsored_bills' ? 'Bills Sponsored' : metric === 'recent_activity' ? 'Recent Activity' : metric === 'enacted_bills' ? 'Enacted Bills Sponsored' : metric === 'enacted_recent_activity' ? 'Enacted Bills - Recent Activity' : metric === 'voted_with_majority' ? 'Voted with Majority' : metric === 'voted_against_party' ? 'Voted Against Party' : metric}</option>))}</select></div>)}
-                        <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 bg-background/95 backdrop-blur border rounded-lg p-2 sm:p-3 shadow-lg text-xs sm:text-sm text-muted-foreground"><div className="flex items-center space-x-2"><kbd className="px-1 py-0.5 sm:px-2 sm:py-1 text-xs bg-muted border rounded">ESC</kbd><span className="hidden sm:inline">Exit full screen</span><span className="sm:hidden">Exit</span></div></div>
-                        {selectedDistrict && (<div className="absolute top-2 right-2 sm:top-4 sm:right-4 w-[calc(100%-16px)] sm:w-auto sm:max-w-sm bg-background/95 backdrop-blur border rounded-lg shadow-lg p-3 sm:p-4"><div className="flex items-center justify-between mb-2 sm:mb-3"><h3 className="font-semibold text-sm sm:text-lg">District Info</h3><button className="text-lg sm:text-xl text-gray-400 hover:text-gray-700 ml-2" onClick={() => { setSelectedDistrict(null); setDistrictPopupLatLng(null); if (isMobile) { setTimeout(forceGarbageCollection, 100); } }} aria-label="Close">×</button></div>{(!districtLoading && Array.isArray(districtReps) && districtReps.length === 0 && districtPopupLatLng && (districtPopupLatLng.lat < 24 || districtPopupLatLng.lat > 49 || districtPopupLatLng.lng < -125 || districtPopupLatLng.lng > -66)) ? (<div className="text-xs sm:text-sm text-muted-foreground mb-2">No representatives found for this location.</div>) : (<RepresentativesResults representatives={districtReps} closestReps={[]} loading={districtLoading} error={districtError} showMap={false} userLocation={null} dataSource={null} pagination={undefined} onPageChange={() => {}} districtType={selectedDistrict.properties.chamber || selectedDistrict.properties.CHAMBER || ''}/>)}</div>)}
-                    </div>
-                </div>
-            )}
+            {!isFullScreen && (
             <div className="space-y-6">
                 <Card className="shadow-lg">
                     <CardHeader className="pb-3 md:pb-6">
@@ -666,59 +637,23 @@ export const MapUI = () => {
                                 <div className="flex items-center justify-between"><div className="space-y-1"><h4 className="font-semibold text-xs md:text-sm"><span className="hidden sm:inline">District Borders</span><span className="sm:hidden">Borders</span></h4><p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Show or hide district boundary lines</span><span className="sm:hidden">Show boundary lines</span></p></div><Switch checked={showDistrictBorders} onCheckedChange={setShowDistrictBorders}/></div>
                             </div>
                         )}
-                        <div className="relative statepulse-map-export-target">
-                            {(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (<div className="absolute top-2 left-2 right-2 z-10 bg-amber-50 border border-amber-200 rounded-md p-2 text-xs text-amber-800"><div className="flex items-center space-x-1"><svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg><span>Loading districts with mobile optimizations.{memoryPressure && ' Memory optimization active.'}</span></div><div className="mt-1 text-xs text-amber-700">Districts will load progressively to prevent crashes.</div></div>)}
-                            <div className="h-[300px] sm:h-[400px] md:h-[500px] w-full rounded-md overflow-hidden border">
-                                {(mapMode === 'congressional-districts' || mapMode === 'state-upper-districts' || mapMode === 'state-lower-districts') ? (
-                                    <DistrictMapGL geojsonUrl={getDistrictGeoJsonUrl(mapMode, isMobile)} color={DISTRICT_COLORS[mapMode]} onDistrictClick={onDistrictClickGL} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'} showPartyAffiliation={showPartyAffiliation} districtPartyMapping={districtPartyMapping} partyColors={PARTY_COLORS} showGerrymandering={showGerrymandering} gerryScores={gerryScores} getGerrymanderingColor={getGerrymanderingColor} showTopicHeatmap={showTopicHeatmap} topicScores={topicScores} getTopicHeatmapColor={getTopicHeatmapColor} showRepHeatmap={showRepHeatmap} repScores={repScores} repDetails={repDetails} getRepHeatmapColor={getRepHeatmapColor} showDistrictBorders={showDistrictBorders} popupMarker={districtPopupLatLng ? { lng: districtPopupLatLng.lng, lat: districtPopupLatLng.lat, iconHtml: `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' fill='none' stroke='#eb7725ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-map-pin' viewBox='0 0 24 24' style='display:block;'><path d='M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z'/><circle cx='12' cy='10' r='3'/></svg>`, draggable: !isMobile, onDragEnd: !isMobile ? (lngLat) => { setDistrictPopupLatLng(lngLat); if (selectedDistrict) { onDistrictClickGL(selectedDistrict, lngLat); } } : undefined } : undefined}/>
-                                ) : mapMode === 'voting-power' ? (
-                                    <StateMapGL 
-                                        votingPowerData={votingPowerData}
-                                        chamber={selectedChamber}
-                                        onStateClick={(stateAbbr, stateData) => {
-                                            // Get coordinates from stateStats for popup positioning
-                                            const state = stateStats[stateAbbr];
-                                            if (state && state.center) {
-                                                const coords: [number, number] = Array.isArray(state.center) 
-                                                    ? [state.center[0], state.center[1]]
-                                                    : [state.center.lat, state.center.lng];
-                                                handleStateClick(stateAbbr, coords);
-                                            }
-                                        }}
-                                        mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}
-                                    />
-                                ) : (
-                                    <MapLibreMap ref={mapRef} initialViewState={{ longitude: DEFAULT_POSITION[1], latitude: DEFAULT_POSITION[0], zoom: DEFAULT_ZOOM }} style={{ height: '100%', width: '100%' }} mapStyle={resolvedTheme === 'dark' ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json' : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'}>
-                                        {Object.entries(stateStats).map(([abbr, state]) => {
-                                            const { color, size } = memoizedMarkers[abbr] || { color: '#e0e0e0', size: 20 };
-                                            const coords: [number, number] = [(state.center as [number, number])[0], (state.center as [number, number])[1]];
-                                            return (
-                                                <MapLibreMarker key={abbr} longitude={coords[1]} latitude={coords[0]} anchor="center" onClick={() => handleStateClick(abbr, coords)}>
-                                                    <div className="transition-transform duration-150 ease-in-out hover:scale-110" style={{ width: size, height: size, backgroundColor: color, border: '2px solid #fff', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.3)', position: 'relative', overflow: 'hidden', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <div style={{ position: 'absolute', top: '50%', left: '50%', width: Math.max(8, size * 0.4), height: Math.max(8, size * 0.4), background: '#fff', borderRadius: '50%', transform: 'translate(-50%, -50%)' }}/>
-                                                    </div>
-                                                </MapLibreMarker>
-                                            );
-                                        })}
-                                        {selectedState && selectedStatePopupCoords && (
-                                            <MapLibrePopup longitude={selectedStatePopupCoords[1]} latitude={selectedStatePopupCoords[0]} anchor="bottom" onClose={() => { setSelectedState(null); setSelectedStatePopupCoords(null); }} closeOnClick={false} maxWidth="260px">
-                                                {detailsLoading || !stateDetails ? (
-                                                    <><div className="flex items-center justify-center min-h-[60px]"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div><span className="text-xs text-muted-foreground">Loading details...</span></div></>
-                                                ) : (
-                                                    <><div className="flex items-center justify-between mb-2"><h3 className="font-semibold text-sm md:text-lg line-clamp-1">{stateStats[selectedState].name}</h3><div className="flex items-center space-x-1"><div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${getActivityLevel(selectedState) === 'High Activity' ? 'bg-primary' : getActivityLevel(selectedState) === 'Medium Activity' ? 'bg-primary/50' : getActivityLevel(selectedState) === 'Low Activity' ? 'bg-primary/20' : 'bg-gray-300'}`}></div><span className="text-xs text-muted-foreground hidden sm:inline">{getActivityLevel(selectedState)}</span></div></div><div className="space-y-1 md:space-y-2 text-xs md:text-sm"><div className="flex justify-between"><span>Bills:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].legislationCount}</Badge></div><div className="flex justify-between"><span>Reps:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].activeRepresentatives}</Badge></div><div className="flex justify-between"><span>Recent:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].recentActivity}</Badge></div><div className="pt-1 md:pt-2"><div className="text-xs text-muted-foreground mb-1"><span className="hidden sm:inline">Key Topics:</span><span className="sm:hidden">Topics:</span></div><div className="flex flex-wrap gap-1">{[...new Set(stateStats[selectedState].keyTopics)].slice(0, 3).map((topic, index) => (<Badge key={`${topic}-${index}`} variant="secondary" className="text-xs">{topic}</Badge>))}{stateStats[selectedState].keyTopics.length > 3 && (<Badge variant="outline" className="text-xs">+{stateStats[selectedState].keyTopics.length - 3}</Badge>)}</div></div></div></>
-                                                )}
-                                            </MapLibrePopup>
-                                        )}
-                                    </MapLibreMap>
-                                )}
-                            </div>
-                            {(districtLoading || mapModeTransitioning) && (<div className="absolute inset-0 bg-background/80 flex items-center justify-center"><div className="flex flex-col items-center space-y-2"><div className="flex items-center space-x-2"><div className="animate-spin rounded-full h-3 w-3 md:h-4 md:w-4 border-b-2 border-primary"></div><span className="text-xs md:text-sm">{mapModeTransitioning ? (<><span className="hidden sm:inline">Switching map mode...</span><span className="sm:hidden">Switching...</span></>) : (<><span className="hidden sm:inline">Loading districts...</span><span className="sm:hidden">Loading...</span></>)}</span></div>{(mapMode === 'state-lower-districts' || mapMode === 'state-upper-districts' || mapMode === 'congressional-districts') && isMobile && (<div className="text-xs text-muted-foreground text-center"><div>Mobile optimizations active</div>{memoryPressure && (<div className="text-amber-600">Memory optimization in progress</div>)}</div>)}</div></div>)}
-                            {districtError && (<div className="absolute inset-0 bg-background/80 flex items-center justify-center"><div className="text-center"><span className="text-xs text-red-500 block">{districtError}</span>{isMobile && (<span className="text-xs text-muted-foreground block mt-1">Try switching to a smaller district view</span>)}</div></div>)}
-                            {selectedDistrict && (<div className="mt-4 bg-card text-foreground border border-border rounded-lg shadow-lg p-3 dark:!bg-zinc-900 dark:!text-white dark:!border-zinc-700"><h3 className="font-semibold text-base md:text-lg mb-2">{districtPopupLatLng ? ` (${districtPopupLatLng.lat.toFixed(5)}, ${districtPopupLatLng.lng.toFixed(5)})` : ''}<button className="ml-2 text-lg text-gray-400 hover:text-gray-700" onClick={() => { setSelectedDistrict(null); setDistrictPopupLatLng(null); if (isMobile) { setTimeout(forceGarbageCollection, 100); } }} aria-label="Close">×</button></h3>{(!districtLoading && Array.isArray(districtReps) && districtReps.length === 0 && districtPopupLatLng && (districtPopupLatLng.lat < 24 || districtPopupLatLng.lat > 49 || districtPopupLatLng.lng < -125 || districtPopupLatLng.lng > -66)) ? (<div className="text-sm text-muted-foreground mb-2">No representatives found for this location.</div>) : (<RepresentativesResults representatives={districtReps} closestReps={[]} loading={districtLoading} error={districtError} showMap={false} userLocation={null} dataSource={null} pagination={undefined} onPageChange={() => {}} districtType={selectedDistrict.properties.chamber || selectedDistrict.properties.CHAMBER || ''}/>)}</div>)}
-                        </div>
-                        {['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) ? (<div className="text-xs text-muted-foreground text-center w-full py-2"><div>{isMobile ? 'Tap anywhere on the map to see legislators' : 'Click anywhere on the map to see legislators representing that location.'}</div>{isMobile && mapMode === 'state-lower-districts' && (<div className="text-amber-600 mt-1">Large dataset - optimized for mobile performance</div>)}</div>) : (<div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0 text-xs text-muted-foreground"><div className="flex items-center space-x-2 md:space-x-4 overflow-x-auto"><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary"></div><span className="whitespace-nowrap">High Activity</span></div><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/50"></div><span className="whitespace-nowrap"><span className="hidden sm:inline">Medium Activity</span><span className="sm:hidden">Medium</span></span></div><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/20"></div><span className="whitespace-nowrap"><span className="hidden sm:inline">Low Activity</span><span className="sm:hidden">Low</span></span></div></div><div className="text-xs hidden md:block">Click markers for detailed state information</div><div className="text-xs md:hidden">Tap markers for details</div></div>)}
                     </CardContent>
                 </Card>
+            </div>
+            )}
+            {mapCanvas}
+            {!isFullScreen && (
+            <div className="space-y-6">
+                {selectedDistrict && (
+                    <div className="bg-card text-foreground border border-border rounded-lg shadow-lg p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                            <h3 className="font-semibold text-base md:text-lg">District Info</h3>
+                            <button type="button" className="ml-2 text-lg text-gray-400 hover:text-gray-700" onClick={() => { setSelectedDistrict(null); setDistrictPopupLatLng(null); if (isMobile) setTimeout(forceGarbageCollection, 100); }} aria-label="Close">×</button>
+                        </div>
+                        <RepresentativesResults representatives={districtReps} closestReps={[]} loading={districtLoading} error={districtError} showMap={false} userLocation={null} dataSource={null} pagination={undefined} onPageChange={() => {}} districtType={selectedDistrict.properties.chamber || selectedDistrict.properties.CHAMBER || ''} />
+                    </div>
+                )}
+                {['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) ? (<div className="text-xs text-muted-foreground text-center w-full py-2"><div>{isMobile ? 'Tap anywhere on the map to see legislators' : 'Click anywhere on the map to see legislators representing that location.'}</div>{isMobile && mapMode === 'state-lower-districts' && (<div className="text-amber-600 mt-1">Large dataset - optimized for mobile performance</div>)}</div>) : (<div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0 text-xs text-muted-foreground"><div className="flex items-center space-x-2 md:space-x-4 overflow-x-auto"><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary"></div><span className="whitespace-nowrap">High Activity</span></div><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/50"></div><span className="whitespace-nowrap"><span className="hidden sm:inline">Medium Activity</span><span className="sm:hidden">Medium</span></span></div><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/20"></div><span className="whitespace-nowrap"><span className="hidden sm:inline">Low Activity</span><span className="sm:hidden">Low</span></span></div></div><div className="text-xs hidden md:block">Click markers for detailed state information</div><div className="text-xs md:hidden">Tap markers for details</div></div>)}
                 {selectedState && stateStats[selectedState] && (
                     <Card className="shadow-lg">
                         <CardHeader className="pb-3 md:pb-6"><CardTitle className="flex items-center justify-between text-lg md:text-xl"><span className="line-clamp-1">{stateStats[selectedState].name} Details</span><Button variant="ghost" size="sm" onClick={() => setSelectedState(null)} className="flex-shrink-0">×</Button></CardTitle></CardHeader>
@@ -743,6 +678,7 @@ export const MapUI = () => {
                     </div>
                 </AnimatedSection>
             </div>
+            )}
         </AnimatedSection>
     );
 };

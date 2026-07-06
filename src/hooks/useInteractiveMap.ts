@@ -456,7 +456,6 @@ export const useInteractiveMap = () => {
 
     const onDistrictClickGL = async (feature: any, lngLat: { lng: number, lat: number }) => {
         const isDistrictMode = ['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode);
-        if (isFullScreen && isDistrictMode) return;
         try {
             setSelectedDistrict(feature);
             setDistrictPopupLatLng(lngLat);

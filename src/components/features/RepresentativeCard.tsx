@@ -7,6 +7,7 @@ import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { FollowButton } from "@/components/ui/FollowButton";
 import type { Representative } from "@/types/representative";
 import {ShareButton} from "@/components/ui/ShareButton";
+import { cn } from "@/lib/utils";
 
 
 type RepresentativeCardProps = {
@@ -17,10 +18,12 @@ type RepresentativeCardProps = {
   suppressDistance?: boolean;
   districtType?: string;
   isFollowed?: boolean;
+  compact?: boolean;
 };
 
 
-const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href, suppressDistance, districtType, isFollowed }) => {
+const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, showMap, href, suppressDistance, districtType, isFollowed, compact = false }) => {
+  const [imageError, setImageError] = React.useState(false);
 
   // --- Robust normalization for both Congress and state reps ---
   let name = rep.name || '';
@@ -146,7 +149,13 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
     }
   }
 
-  let image = rep.image || rep.photo || (rep as any).depiction?.imageUrl || 'https://via.placeholder.com/150';
+  let image = rep.image || rep.photo || (rep as any).depiction?.imageUrl || '';
+  const initials = (() => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase();
+  })();
 
   let jurisdiction = '';
   if (typeof rep.jurisdiction === 'string') {
@@ -233,34 +242,124 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
   else if (districtType === 'state-upper-districts') districtBg = 'bg-purple-50 dark:bg-purple-900/20';
   else if (districtType === 'state-lower-districts') districtBg = 'bg-green-50 dark:bg-green-900/20';
 
+  const avatar = (
+    image && !imageError ? (
+      <img
+        src={image}
+        alt=""
+        className={compact ? "h-10 w-10 shrink-0 rounded-full object-cover" : "mx-auto h-16 w-16 shrink-0 rounded-full object-cover md:mx-0"}
+        onError={() => setImageError(true)}
+      />
+    ) : (
+      <div
+        className={cn(
+          "flex shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground",
+          compact ? "h-10 w-10 text-xs" : "mx-auto h-16 w-16 text-sm md:mx-0",
+        )}
+        aria-hidden="true"
+      >
+        {initials}
+      </div>
+    )
+  );
+
+  const cardShell = (children: React.ReactNode) => (
+    <Card className={cn("border-l-4 border-l-primary shadow-lg transition-shadow", districtBg, !compact && "hover:shadow-lg")}>
+      <CardContent className={compact ? "p-3" : "p-4"}>{children}</CardContent>
+    </Card>
+  );
+
+  const navigateToProfile = (event: React.MouseEvent | React.KeyboardEvent) => {
+    if (!href) return;
+    if ("key" in event && event.key !== "Enter") return;
+    window.location.href = href;
+  };
+
+  const profileLinkProps = href
+    ? {
+        className: "block min-w-0 cursor-pointer",
+        onClick: (event: React.MouseEvent) => {
+          const target = event.target as HTMLElement;
+          if (target.closest?.("a")) return;
+          navigateToProfile(event);
+        },
+        onKeyDown: (event: React.KeyboardEvent) => navigateToProfile(event),
+        role: "link" as const,
+        tabIndex: 0,
+      }
+    : { className: "block min-w-0" };
+
+  if (compact) {
+    const content = (
+      <div className="flex min-w-0 gap-2.5">
+        {avatar}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{normalized.name}</p>
+              <p className="truncate text-xs font-medium text-primary">{roleDisplay}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {normalized.state || normalized.jurisdiction}
+              </p>
+            </div>
+            {normalized.party ? (
+              <Badge variant="outline" className="shrink-0 text-xs">
+                {normalized.party}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="mt-2 space-y-1">
+            {normalized.addresses?.[0]?.phone ? (
+              <a
+                href={`tel:${normalized.addresses[0].phone}`}
+                className="flex min-w-0 items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{normalized.addresses[0].phone}</span>
+              </a>
+            ) : null}
+            {normalized.email ? (
+              <a
+                href={`mailto:${normalized.email}`}
+                className="flex min-w-0 items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{normalized.email}</span>
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+
+    return (
+      <div key={normalized.id} className="min-w-0">
+        {cardShell(<div {...profileLinkProps}>{content}</div>)}
+      </div>
+    );
+  }
+
   return (
     <AnimatedSection key={normalized.id}>
-      <Card className={`border-l-4 border-l-primary hover:shadow-lg transition-shadow ${districtBg}`}>
-        <CardContent className="p-4">
-          {/* DEBUG: Show rep.id for troubleshooting */}
-          {/* <div className="mb-2 text-xs text-red-500">DEBUG: rep.id = {String(rep.id)}</div> */}
-          {href ? (
-            <div
-              className="cursor-pointer"
-              onClick={e => {
-                const target = e.target as HTMLElement;
-                if (target.closest && target.closest('a')) return;
-                window.location.href = href;
-              }}
-              role="link"
-              tabIndex={0}
-              onKeyDown={e => {
-                if (e.key === 'Enter') window.location.href = href;
-              }}
-            >
+      {cardShell(
+        href ? (
+          <div
+            className="cursor-pointer"
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.closest?.("a")) return;
+              window.location.href = href;
+            }}
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") window.location.href = href;
+            }}
+          >
               {/* Main card block */}
-              <div className="flex flex-col md:flex-row md:items-start gap-4">
-                <img
-                  src={normalized.image}
-                  alt={normalized.name}
-                  className="w-16 h-16 rounded-full object-cover flex-shrink-0 mx-auto md:mx-0"
-                />
-                <div className="flex-1 min-w-0">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                {avatar}
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h5 className="font-semibold text-lg break-words">{normalized.name}</h5>
@@ -315,12 +414,11 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                     </div>
                   )}
                   {normalized.email && (
-                    <div className="flex items-center w-full max-w-full md:col-span-2">
-                      <Mail className="mr-2 h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex min-w-0 items-center md:col-span-2">
+                      <Mail className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                       <a
                         href={`mailto:${normalized.email}`}
-                        className="text-primary hover:underline overflow-hidden whitespace-nowrap w-full max-w-full"
-                        style={{ display: 'inline-block' }}
+                        className="min-w-0 truncate text-primary hover:underline"
                       >
                         {normalized.email}
                       </a>
@@ -383,12 +481,11 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
               </div>
             </div>
           ) : (
-            <div className="flex flex-col md:flex-row md:items-start gap-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start">
               {/* ...blah blah blah... */}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ),
+      )}
     </AnimatedSection>
   );
 };
