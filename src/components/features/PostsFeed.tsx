@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect, useState} from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {useUser} from "@clerk/nextjs";
 import {useRouter} from "next/navigation";
 import {Card, CardContent, CardHeader} from "@/components/ui/card";
@@ -15,10 +16,10 @@ import {BillSearch} from "./BillSearch";
 import {SelectedBills} from "./SelectedBills";
 import {Post} from "@/types/media";
 import {AnimatedSection} from "@/components/ui/AnimatedSection";
-import { useToast } from "@/hooks/use-toast";
 import { PostCard } from "./PostCard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LinkPreview } from '@/components/ui/LinkPreview';
+import { useToast } from "@/hooks/use-toast";
 
 export function PostsFeed() {
     const [sortBy, setSortBy] = useState('newest');
@@ -32,8 +33,16 @@ export function PostsFeed() {
     const {user, isSignedIn} = useUser();
     const router = useRouter();
     const { toast } = useToast();
-    const [posts, setPosts] = useState<Post[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    const { data: posts = [], isLoading: loading } = useQuery({
+        queryKey: ['posts'],
+        queryFn: async () => {
+            const response = await fetch('/api/posts');
+            if (!response.ok) throw new Error('Failed to fetch posts');
+            const data = await response.json();
+            return (data.posts || []) as Post[];
+        },
+    });
     const [searchTerm, setSearchTerm] = useState("");
     const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -74,10 +83,6 @@ export function PostsFeed() {
     };
 
     useEffect(() => {
-        fetchPosts();
-    }, []);
-
-    useEffect(() => {
         let filtered = posts;
         if (selectedTag) {
             filtered = filtered.filter(post => post.tags.includes(selectedTag));
@@ -93,25 +98,6 @@ export function PostsFeed() {
         }
         setFilteredPosts(filtered);
     }, [posts, searchTerm, selectedTag]);
-
-    const fetchPosts = async () => {
-        try {
-            setLoading(true);
-            const response = await fetch('/api/posts');
-            if (response.ok) {
-                const data = await response.json();
-                setPosts(data.posts || []);
-            }
-        } catch (error) {
-            // Optionally log error
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
-        return <LoadingOverlay text="Loading posts..." smallText="Loading..." />;
-    }
 
     const handleCreatePost = async () => {
         if (!newTitle.trim() || !newContent.trim()) return;
@@ -136,17 +122,22 @@ export function PostsFeed() {
                 setNewTags([]);
                 setNewBills([]);
                 setShowBillSearch(false);
-                fetchPosts();
+                queryClient.invalidateQueries({ queryKey: ['posts'] });
             }
         } finally {
             setCreating(false);
         }
     };
 
-    // Update a post in the posts state after edit
     const handlePostUpdated = (updatedPost: Post) => {
-        setPosts(prevPosts => prevPosts.map(p => p._id === updatedPost._id ? updatedPost : p));
+        queryClient.setQueryData<Post[]>(['posts'], (prev) =>
+            (prev ?? []).map((p) => (p._id === updatedPost._id ? updatedPost : p)),
+        );
     };
+
+    if (loading) {
+        return <LoadingOverlay text="Loading posts..." smallText="Loading..." />;
+    }
 
     return (
         <div className="space-y-4 sm:space-y-6 px-2 sm:px-0 relative">

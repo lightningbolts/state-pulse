@@ -1,27 +1,44 @@
-import type {Metadata} from 'next';
+import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { SpeedInsights } from "@vercel/speed-insights/next"
-import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider, SignedIn } from '@clerk/nextjs';
-import { Geist, Geist_Mono } from 'next/font/google'
+import { DM_Sans, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
 import { UserSyncComponent } from '@/components/auth/UserSyncComponent';
 import { ThemeProvider } from '@/components/theme/theme-provider';
-import React from "react";
+import { QueryProvider } from '@/components/providers/QueryProvider';
+import { ScrollRestoration } from '@/components/providers/ScrollRestoration';
+import React, { Suspense } from "react";
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const dmSans = DM_Sans({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-dm-sans',
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const sourceSerif = Source_Serif_4({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-source-serif',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
   title: 'StatePulse',
   description: 'Stay informed on U.S. state-level developments.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -31,27 +48,33 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning={true}>
+      <html lang="en" suppressHydrationWarning>
         <head>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-          <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+            }}
+          />
         </head>
-        <body className={`${geistSans.variable} ${geistMono.variable} font-body antialiased min-h-screen w-full`}>
+        <body className={`${dmSans.variable} ${sourceSerif.variable} ${jetbrainsMono.variable} font-body antialiased min-h-dvh w-full`}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
-            <SignedIn>
-              <UserSyncComponent />
-            </SignedIn>
-            {children}
-            <Toaster />
-            <SpeedInsights />
-            <Analytics />
+            <QueryProvider>
+              <SignedIn>
+                <UserSyncComponent />
+              </SignedIn>
+              <Suspense fallback={null}>
+                <ScrollRestoration />
+              </Suspense>
+              {children}
+              <Toaster />
+              <SpeedInsights />
+              <Analytics />
+            </QueryProvider>
           </ThemeProvider>
         </body>
       </html>

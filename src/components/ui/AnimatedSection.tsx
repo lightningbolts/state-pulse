@@ -1,23 +1,18 @@
 "use client";
 
-import { motion } from "framer-motion";
 import React from "react";
+import { cn } from "@/lib/utils";
 
 interface AnimatedSectionProps {
   children: React.ReactNode;
   className?: string;
 }
 
+/** Fast CSS-only entrance — use on page/hero sections only, not list items. */
 export function AnimatedSection({ children, className }: AnimatedSectionProps) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.7, ease: "easeOut" }}
-      className={className}
-    >
+    <section className={cn("animate-content-in", className)}>
       {children}
-    </motion.section>
+    </section>
   );
 }

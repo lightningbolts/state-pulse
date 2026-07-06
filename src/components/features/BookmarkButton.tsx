@@ -82,6 +82,12 @@ export function BookmarkButton({legislationId, className = ''}: BookmarkButtonPr
 
         setIsLoading(true);
 
+        const previousBookmarks = bookmarks;
+        const optimisticBookmarks = isBookmarked
+            ? bookmarks.filter(id => id !== legislationId)
+            : [...bookmarks, legislationId];
+        updateBookmarks(optimisticBookmarks);
+
         try {
             let response;
 
@@ -147,10 +153,12 @@ export function BookmarkButton({legislationId, className = ''}: BookmarkButtonPr
                         description: "Bookmark was already removed or not found.",
                     });
                 } else {
+                    updateBookmarks(previousBookmarks);
                     console.error(error.error || 'Failed to update bookmark');
                 }
             }
         } catch (error) {
+            updateBookmarks(previousBookmarks);
             console.error('Error toggling bookmark:', error);
             toast({
                 title: "Error",

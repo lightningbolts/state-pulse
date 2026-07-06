@@ -408,9 +408,10 @@ async function fetchUpdatesFeed({
 
 export type PolicyUpdatesFeedProps = {
     initialData?: PolicyUpdate[];
+    enactedOnly?: boolean;
 };
 
-export function PolicyUpdatesFeed({ initialData }: PolicyUpdatesFeedProps) {
+export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUpdatesFeedProps) {
     const initialLen = initialData?.length ?? 0;
     const [updates, setUpdates] = useState<PolicyUpdate[]>(() => initialData ?? []);
     const [loading, setLoading] = useState(false);
@@ -434,7 +435,7 @@ export function PolicyUpdatesFeed({ initialData }: PolicyUpdatesFeedProps) {
     const [customTags, setCustomTags] = useState<string[]>([]);
     const [newTagInput, setNewTagInput] = useState("");
     const [showCustomTagInput, setShowCustomTagInput] = useState(false);
-    const [showOnlyEnacted, setShowOnlyEnacted] = useState(false);
+    const [showOnlyEnacted, setShowOnlyEnacted] = useState(enactedOnly);
     const [compactView, setCompactView] = useState(false);
     const loader = useRef<HTMLDivElement | null>(null);
     const skipRef = useRef(initialLen);
