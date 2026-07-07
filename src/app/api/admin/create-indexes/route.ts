@@ -45,13 +45,24 @@ async function createIndexes() {
       { background: true, name: 'jurisdiction_created_at_idx' }
     );
 
+    // Index for voting record bill lookups
+    const index6 = await db.collection('voting_records').createIndex(
+      { bill_id: 1, date: -1 },
+      { background: true, name: 'bill_id_date_idx' }
+    );
+
+    const index7 = await db.collection('voting_records').createIndex(
+      { congress: 1, legislationType: 1, legislationNumber: 1, date: -1 },
+      { background: true, name: 'congress_legislation_vote_idx' }
+    );
+
     // List all indexes to verify
     const indexes = await db.collection('legislation').listIndexes().toArray();
 
     return NextResponse.json({
       success: true,
       message: 'Indexes created successfully',
-      createdIndexes: [index1, index2, index3, index4, index5],
+      createdIndexes: [index1, index2, index3, index4, index5, index6, index7],
       allIndexes: indexes.map(idx => ({ name: idx.name, key: idx.key }))
     });
 

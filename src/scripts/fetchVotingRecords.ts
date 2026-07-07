@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
+import { buildCongressBillId } from '@/lib/congressBillId';
 import { upsertVotingRecord } from '../services/votingRecordService';
 import * as cheerio from 'cheerio';
 import { VotingRecord, MemberVote } from '../types/legislation';
@@ -197,7 +198,7 @@ async function processHouseVotes(): Promise<number> {
           rollCallNumber: vote.rollCallNumber,
           legislationType: vote.legislationType,
           legislationNumber: vote.legislationNumber,
-          bill_id: `congress-bill-${CONGRESS}-${vote.legislationType}-${vote.legislationNumber}`.toLowerCase(),
+          bill_id: buildCongressBillId(CONGRESS, vote.legislationType, vote.legislationNumber),
           voteQuestion: vote.voteQuestion,
           result: vote.result,
           date: vote.startDate,
@@ -268,7 +269,7 @@ async function processSenateVotes(): Promise<number> {
           if (measureMatch) {
             legislationType = measureMatch[1].replace(/\./g, '').trim();
             legislationNumber = measureMatch[2].trim();
-            bill_id = `congress-bill-${CONGRESS}-${legislationType.toLowerCase()}-${legislationNumber}`;
+            bill_id = buildCongressBillId(CONGRESS, legislationType, legislationNumber);
           }
         }
 

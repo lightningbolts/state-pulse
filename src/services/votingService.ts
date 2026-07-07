@@ -1,4 +1,42 @@
+import { getCongressBillVotingInfo } from '@/services/congressVotingRecordService';
 import { getCollection } from '@/lib/mongodb';
+import { isCongressBillId } from '@/lib/congressBillId';
+import type { VotingRecord } from '@/types/legislation';
+
+function formatBillVotingInfo(records: VotingRecord[]) {
+  if (!records.length) return null;
+
+  const mostRecentVotes: Record<string, VotingRecord> = {};
+  for (const record of records) {
+    const chamber = record.chamber || 'Unknown';
+    if (!mostRecentVotes[chamber]) {
+      mostRecentVotes[chamber] = record;
+    }
+  }
+
+  const latestVotingRecords = Object.values(mostRecentVotes).map((record) => ({
+    ...record,
+    memberVotes: record.memberVotes.map((vote) => ({
+      ...vote,
+      chamber: record.chamber,
+    })),
+  }));
+
+  const recordsByChamber = latestVotingRecords.reduce<Record<string, VotingRecord[]>>(
+    (acc, record) => {
+      const chamber = record.chamber || 'Unknown';
+      acc[chamber] = [record];
+      return acc;
+    },
+    {}
+  );
+
+  return {
+    votingRecords: latestVotingRecords,
+    recordsByChamber,
+    chambers: Object.keys(recordsByChamber),
+  };
+}
 
 export async function getBillVotingInfo(billId: string) {
   try {
@@ -6,64 +44,26 @@ export async function getBillVotingInfo(billId: string) {
       return null;
     }
 
-    const votingRecordsCollection = await getCollection('voting_records');
-    // Find all voting records for this bill, sorted by date descending
-    const votingRecords = await votingRecordsCollection.find({ bill_id: billId }).sort({ "date": -1 }).toArray();
+    if (isCongressBillId(billId)) {
+      return await getCongressBillVotingInfo(billId);
+    }
 
-    if (!votingRecords || votingRecords.length === 0) {
+    const votingRecordsCollection = await getCollection('voting_records');
+    const votingRecords = await votingRecordsCollection
+      .find({ bill_id: billId })
+      .sort({ date: -1 })
+      .toArray();
+
+    if (!votingRecords.length) {
       return null;
     }
 
-    // Get the most recent vote for each chamber
-    const mostRecentVotes: { [key: string]: any } = {};
-    votingRecords.forEach((record: any) => {
-      const chamber = record.chamber;
-      // Only keep the most recent vote for each chamber (first one due to date desc sort)
-      if (!mostRecentVotes[chamber]) {
-        mostRecentVotes[chamber] = record;
-      }
-    });
-    
-    // Convert to array and ensure we only have one record per chamber
-    const latestVotingRecords = Object.values(mostRecentVotes);
-
-    // Serialize the records to plain objects (remove MongoDB ObjectId and other non-serializable fields)
-    const serializedRecords = latestVotingRecords.map((record: any) => {
-      const serialized = JSON.parse(JSON.stringify(record));
-      return {
-        ...serialized,
-        memberVotes: serialized.memberVotes.map((vote: any) => ({
-          ...vote,
-          chamber: record.chamber
-        }))
-      };
+    const records = votingRecords.map((doc) => {
+      const { _id, ...record } = doc;
+      return record as VotingRecord;
     });
 
-    // Group records by chamber (should be one record per chamber at this point)
-    const recordsByChamber = serializedRecords.reduce((acc: any, record: any) => {
-      const chamber = record.chamber || 'Unknown';
-      if (!acc[chamber]) {
-        acc[chamber] = [];
-      }
-      acc[chamber].push(record);
-      return acc;
-    }, {});
-
-    // Verify we have only one record per chamber
-    Object.keys(recordsByChamber).forEach(chamber => {
-      if (recordsByChamber[chamber].length > 1) {
-        console.warn(`Warning: Multiple records found for chamber ${chamber}, this should not happen`);
-        // Keep only the first (most recent) record
-        recordsByChamber[chamber] = [recordsByChamber[chamber][0]];
-      }
-    });
-
-    // Return the same structure as the API
-    return {
-      votingRecords: serializedRecords,
-      recordsByChamber,
-      chambers: Object.keys(recordsByChamber)
-    };
+    return formatBillVotingInfo(records);
   } catch (error) {
     console.error('Error fetching bill voting info:', error);
     return null;

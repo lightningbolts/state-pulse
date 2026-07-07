@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { upsertVotingRecord } from '@/services/votingRecordService';
 import * as cheerio from 'cheerio';
+import { buildCongressBillId } from '@/lib/congressBillId';
 import { VotingRecord, MemberVote } from '@/types/legislation';
 import { parseStringPromise } from 'xml2js';
 import {config} from 'dotenv';
@@ -146,7 +147,7 @@ async function fetchAndUpsertHouseVotes() {
         rollCallNumber: vote.rollCallNumber,
         legislationType: vote.legislationType,
         legislationNumber: vote.legislationNumber,
-        bill_id: `congress-bill-${CONGRESS}-${vote.legislationType}-${vote.legislationNumber}`.toLowerCase(),
+        bill_id: buildCongressBillId(CONGRESS, vote.legislationType, vote.legislationNumber),
         voteQuestion: vote.voteQuestion,
         result: vote.result,
         date: vote.startDate,
@@ -205,7 +206,7 @@ async function fetchAndUpsertSenateVotes() {
         if (measureMatch) {
           legislationType = measureMatch[1].replace(/\./g, '').trim();
           legislationNumber = measureMatch[2].trim();
-          bill_id = `congress-bill-${CONGRESS}-${legislationType.toLowerCase()}-${legislationNumber}`;
+          bill_id = buildCongressBillId(CONGRESS, legislationType, legislationNumber);
         }
       }
 
