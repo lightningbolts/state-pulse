@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "fetch-voting-records": "tsx src/scripts/fetchVotingRecords.ts",
     "build-embeddings": "tsx src/scripts/build-legislation-embeddings.ts",
+    "build-embeddings:fast": "tsx src/scripts/build-legislation-embeddings.ts --fast",
     "postinstall": "patch-package"
   },
   "dependencies": {
