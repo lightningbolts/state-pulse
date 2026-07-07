@@ -246,13 +246,16 @@ export const predictVotingOutcome = ai.defineFlow(
     `;
 
     const response = await ai.generate({
-      model: 'googleai/gemini-2.0-flash',
       prompt,
       output: {
         schema: PredictVotingOutcomeOutputSchema,
       },
     });
 
-    return response.output!;
+    if (!response.output) {
+      throw new Error('AI model returned no prediction output');
+    }
+
+    return response.output;
   }
 );

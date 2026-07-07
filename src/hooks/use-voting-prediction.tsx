@@ -23,6 +23,12 @@ interface UseVotingPredictionReturn {
 
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute in milliseconds
 
+function isValidPrediction(data: unknown): data is VotingPrediction {
+  if (!data || typeof data !== 'object') return false;
+  const prediction = (data as VotingPrediction).prediction;
+  return !!prediction?.outcome && typeof prediction.confidence === 'number';
+}
+
 export function useVotingPrediction({
   legislationId,
   politicalContext,
@@ -102,10 +108,18 @@ export function useVotingPrediction({
       }
 
       if (!response.ok) {
-        console.error(`Failed to fetch prediction: ${response.statusText}`);
+        const errorData = await response.json().catch(() => null);
+        setPrediction(null);
+        setError(errorData?.message || errorData?.error || `Failed to fetch prediction (${response.status})`);
+        return;
       }
 
       const data = await response.json();
+      if (!isValidPrediction(data)) {
+        setPrediction(null);
+        setError('Received an invalid prediction response from the server');
+        return;
+      }
       setPrediction(data);
 
       // Update last refresh time only for force refresh requests
@@ -151,10 +165,18 @@ export function useVotingPrediction({
       }
 
       if (!response.ok) {
-        console.error(`Failed to generate prediction: ${response.statusText}`);
+        const errorData = await response.json().catch(() => null);
+        setPrediction(null);
+        setError(errorData?.message || errorData?.error || `Failed to generate prediction (${response.status})`);
+        return;
       }
 
       const data = await response.json();
+      if (!isValidPrediction(data)) {
+        setPrediction(null);
+        setError('Received an invalid prediction response from the server');
+        return;
+      }
       setPrediction(data);
       setLastRefreshTime(Date.now());
     } catch (err) {

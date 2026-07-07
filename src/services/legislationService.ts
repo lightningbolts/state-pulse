@@ -9,6 +9,9 @@ const LEGISLATION_FEED_HEAVY_FIELDS: Record<string, 0> = {
   longGeminiSummary: 0,
   rawHtml: 0,
   detailedAnalysis: 0,
+  history: 0,
+  versions: 0,
+  embeddings: 0,
 };
 
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
@@ -444,7 +447,7 @@ export async function getAllLegislationWithFiltering({
     const excludeHeavyFields = context === 'policy-updates-feed';
 
     let legislations = await getAllLegislation({
-      limit: limit + 50, // Get more results to allow for proper sorting
+      limit,
       skip,
       sort,
       filter: finalFilter,
@@ -452,8 +455,10 @@ export async function getAllLegislationWithFiltering({
       excludeHeavyFields,
     });
 
-    // Apply context-aware consistent sorting
-    legislations.sort((a, b) => {
+    // Only re-sort client-side when feed sorting depends on nested history dates
+    // (history is excluded from feed payloads, so MongoDB sort is authoritative there)
+    if (!excludeHeavyFields) {
+      legislations.sort((a, b) => {
       // Helper function to get the appropriate date based on context and sort field
       const getComparisonDate = (bill: any) => {
         if (context === 'policy-updates-feed') {
@@ -493,10 +498,8 @@ export async function getAllLegislationWithFiltering({
       const dateB = getComparisonDate(b);
       
       return sortDir === 'asc' ? dateA - dateB : dateB - dateA;
-    });
-
-    // Trim back to requested limit
-    legislations = legislations.slice(0, limit);
+      });
+    }
 
     // Fuzzy search fallback: only if no results and a search term is present
     if (search && legislations.length === 0) {

@@ -193,8 +193,8 @@ export function VotingPredictionSection({ legislationId }: VotingPredictionSecti
         </Card>
       )}
 
-      {showPrediction && (prediction || isLoading) && (
-        <VotingPredictionCard prediction={prediction!} isLoading={isLoading} />
+      {showPrediction && (isLoading || prediction) && (
+        <VotingPredictionCard prediction={prediction} isLoading={isLoading} />
       )}
 
       {showPrediction && prediction && (

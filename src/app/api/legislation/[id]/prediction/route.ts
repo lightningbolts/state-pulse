@@ -33,7 +33,7 @@ export async function GET(
     if (forceRefresh) {
       const clientId = getClientIdentifier(request);
       const rateLimitKey = `prediction_${id}_${clientId}`;
-      const rateLimit = checkRateLimit(rateLimitKey);
+      const rateLimit = await checkRateLimit(rateLimitKey);
 
       if (!rateLimit.allowed) {
         return NextResponse.json(
@@ -73,9 +73,11 @@ export async function GET(
     return NextResponse.json(prediction);
   } catch (error) {
     console.error('Error generating voting prediction:', error);
+    const message = error instanceof Error ? error.message : 'Failed to generate voting prediction';
+    const status = message.includes('429') || message.toLowerCase().includes('quota') ? 429 : 500;
     return NextResponse.json(
-      { error: 'Failed to generate voting prediction' },
-      { status: 500 }
+      { error: 'Failed to generate voting prediction', message },
+      { status }
     );
   }
 }
@@ -90,7 +92,7 @@ export async function POST(
     // Apply rate limiting for POST requests (always force refresh)
     const clientId = getClientIdentifier(request);
     const rateLimitKey = `prediction_${id}_${clientId}`;
-    const rateLimit = checkRateLimit(rateLimitKey);
+    const rateLimit = await checkRateLimit(rateLimitKey);
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -124,9 +126,11 @@ export async function POST(
     return NextResponse.json(prediction);
   } catch (error) {
     console.error('Error generating voting prediction:', error);
+    const message = error instanceof Error ? error.message : 'Failed to generate voting prediction';
+    const status = message.includes('429') || message.toLowerCase().includes('quota') ? 429 : 500;
     return NextResponse.json(
-      { error: 'Failed to generate voting prediction' },
-      { status: 500 }
+      { error: 'Failed to generate voting prediction', message },
+      { status }
     );
   }
 }

@@ -16,12 +16,12 @@ import {
 import { VotingPrediction } from '@/services/votingPredictionService';
 
 interface VotingPredictionCardProps {
-  prediction: VotingPrediction;
+  prediction?: VotingPrediction | null;
   isLoading?: boolean;
 }
 
 export function VotingPredictionCard({ prediction, isLoading = false }: VotingPredictionCardProps) {
-  if (isLoading) {
+  if (isLoading || !prediction) {
     return (
       <Card className="animate-pulse">
         <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">

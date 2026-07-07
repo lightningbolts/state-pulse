@@ -33,13 +33,25 @@ async function createIndexes() {
       { background: true, name: 'latest_action_idx' }
     );
 
+    // Index for createdAt (default feed sort)
+    const index4 = await db.collection('legislation').createIndex(
+      { createdAt: -1 },
+      { background: true, name: 'created_at_idx' }
+    );
+
+    // Compound index for feed pagination with jurisdiction filter
+    const index5 = await db.collection('legislation').createIndex(
+      { jurisdictionName: 1, createdAt: -1 },
+      { background: true, name: 'jurisdiction_created_at_idx' }
+    );
+
     // List all indexes to verify
     const indexes = await db.collection('legislation').listIndexes().toArray();
 
     return NextResponse.json({
       success: true,
       message: 'Indexes created successfully',
-      createdIndexes: [index1, index2, index3],
+      createdIndexes: [index1, index2, index3, index4, index5],
       allIndexes: indexes.map(idx => ({ name: idx.name, key: idx.key }))
     });
 
