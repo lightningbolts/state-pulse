@@ -112,23 +112,6 @@ export const WAVE2_ADAPTER_CONFIGS: ChamberHtmlAdapterConfig[] = [
     chamber: 'lower',
     organization: 'House',
   },
-  {
-    stateAbbr: 'WA',
-    jurisdictionOcdId: ocd('wa'),
-    adapterName: 'wa-html',
-    voteIndexUrl: 'https://app.leg.wa.gov/billsummary/Home/Votes',
-    chamber: 'lower',
-    organization: 'House',
-  },
-  {
-    stateAbbr: 'MO',
-    jurisdictionOcdId: ocd('mo'),
-    adapterName: 'mo-html',
-    voteIndexUrl: 'https://house.mo.gov/BillActions.aspx?filter=votes',
-    linkPattern: /vote|bill/i,
-    chamber: 'lower',
-    organization: 'House',
-  },
 ];
 
 export function createWave2Adapters(): ChamberHtmlVoteAdapter[] {

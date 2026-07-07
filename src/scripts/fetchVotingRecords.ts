@@ -382,6 +382,18 @@ async function fetchMemberVotes(voteNumber: number, session: number): Promise<Me
   }
 }
 
+function buildBillIdIfPresent(
+  congress: number,
+  type?: string,
+  number?: string | number
+): string | undefined {
+  if (!type || number === undefined || number === null || String(number).trim() === '') {
+    return undefined;
+  }
+
+  return buildCongressBillId(congress, type, number);
+}
+
 async function processHouseVotes(since: Date): Promise<number> {
   let processedCount = 0;
   
@@ -393,12 +405,15 @@ async function processHouseVotes(since: Date): Promise<number> {
         const voteSession = Number(vote.session ?? vote.sessionNumber ?? SESSION);
         const memberVotes = await fetchMemberVotes(vote.rollCallNumber, voteSession);
         
+        const legislationType = vote.legislationType ?? '';
+        const legislationNumber = vote.legislationNumber != null ? String(vote.legislationNumber) : '';
+
         const votingRecord: VotingRecord = {
           identifier: vote.identifier,
           rollCallNumber: vote.rollCallNumber,
-          legislationType: vote.legislationType,
-          legislationNumber: vote.legislationNumber,
-          bill_id: buildCongressBillId(CONGRESS, vote.legislationType, vote.legislationNumber),
+          legislationType,
+          legislationNumber,
+          bill_id: buildBillIdIfPresent(CONGRESS, legislationType, legislationNumber),
           voteQuestion: vote.voteQuestion,
           result: vote.result,
           date: vote.startDate,

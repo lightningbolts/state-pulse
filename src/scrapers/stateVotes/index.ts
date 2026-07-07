@@ -12,6 +12,7 @@ import { IndianaVoteAdapter } from './adapters/in';
 import { MarylandVoteAdapter } from './adapters/md';
 import { MichiganVoteAdapter } from './adapters/mi';
 import { MinnesotaVoteAdapter } from './adapters/mn';
+import { MissouriVoteAdapter } from './adapters/mo';
 import { OhioVoteAdapter } from './adapters/oh';
 import { NewYorkVoteAdapter } from './adapters/ny';
 import { NorthCarolinaVoteAdapter } from './adapters/nc';
@@ -19,6 +20,7 @@ import { PennsylvaniaVoteAdapter } from './adapters/pa';
 import { createTableIndexAdapters } from './adapters/tableIndex';
 import { TennesseeVoteAdapter } from './adapters/tn';
 import { VirginiaVoteAdapter } from './adapters/va';
+import { WashingtonVoteAdapter } from './adapters/wa';
 import { WisconsinVoteAdapter } from './adapters/wi';
 
 export class StateAdapterRegistry {
@@ -58,9 +60,11 @@ export function createDefaultRegistry(): StateAdapterRegistry {
   registry.register(new ColoradoVoteAdapter());
   registry.register(new OhioVoteAdapter());
   registry.register(new MichiganVoteAdapter());
+  registry.register(new MissouriVoteAdapter());
   registry.register(new VirginiaVoteAdapter());
   registry.register(new IndianaVoteAdapter());
   registry.register(new TennesseeVoteAdapter());
+  registry.register(new WashingtonVoteAdapter());
   for (const adapter of createWave2Adapters()) {
     registry.register(adapter);
   }
@@ -83,10 +87,12 @@ export { IndianaVoteAdapter } from './adapters/in';
 export { MarylandVoteAdapter } from './adapters/md';
 export { MichiganVoteAdapter } from './adapters/mi';
 export { MinnesotaVoteAdapter } from './adapters/mn';
+export { MissouriVoteAdapter } from './adapters/mo';
 export { NewYorkVoteAdapter } from './adapters/ny';
 export { OhioVoteAdapter } from './adapters/oh';
 export { NorthCarolinaVoteAdapter } from './adapters/nc';
 export { PennsylvaniaVoteAdapter } from './adapters/pa';
 export { TennesseeVoteAdapter } from './adapters/tn';
 export { VirginiaVoteAdapter } from './adapters/va';
+export { WashingtonVoteAdapter } from './adapters/wa';
 export { WisconsinVoteAdapter } from './adapters/wi';
