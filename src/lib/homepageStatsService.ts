@@ -65,9 +65,13 @@ async function fetchHomepageStatsFromDb(): Promise<HomepageStats> {
         { $project: { subject: '$_id', count: 1, _id: 0 } },
       ])
       .toArray(),
-    legislationCollection.distinct('jurisdictionName', {
-      jurisdictionName: { $exists: true, $nin: [null, ''] },
-    }),
+    legislationCollection
+      .aggregate([
+        { $match: { jurisdictionName: { $exists: true, $nin: [null, ''] } } },
+        { $group: { _id: '$jurisdictionName' } },
+      ])
+      .toArray()
+      .then((rows) => rows.map((r) => r._id as string)),
     representativesCollection.estimatedDocumentCount(),
     representativesCollection.countDocuments({
       $or: [
@@ -109,7 +113,7 @@ async function fetchHomepageStatsFromDb(): Promise<HomepageStats> {
       recent: recentPosts,
       active: activePosts,
     },
-    jurisdictions: normalizeJurisdictionCount(jurisdictionNames as string[]),
+    jurisdictions: normalizeJurisdictionCount(jurisdictionNames),
     lastUpdated: new Date().toISOString(),
   };
 }

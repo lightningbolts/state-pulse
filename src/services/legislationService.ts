@@ -1,11 +1,8 @@
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { isCongressBillId } from '@/lib/congressBillId';
-import {
-  parseLegislationCursor,
-  type LegislationPaginationCursor,
-} from '@/lib/legislationPagination';
 import type { Legislation } from '@/types/legislation';
 import type { LegislationMongoDbDocument } from '@/types/legislation';
 
@@ -26,29 +23,6 @@ const LEGISLATION_FEED_HEAVY_FIELDS: Record<string, 0> = {
   documents: 0,
   geminiSummarySource: 0,
 };
-
-/** @deprecated Import from @/lib/legislationPagination */
-export type { LegislationPaginationCursor } from '@/lib/legislationPagination';
-export { encodeLegislationCursor, parseLegislationCursor } from '@/lib/legislationPagination';
-
-function buildKeysetFilter(
-  sort: Record<string, 1 | -1>,
-  cursor: LegislationPaginationCursor,
-): Record<string, unknown> {
-  const primaryDir = sort[cursor.sortField] ?? -1;
-  const cmpOp = primaryDir === -1 ? '$lt' : '$gt';
-  const sortValue =
-    cursor.sortField.endsWith('At') || cursor.sortField === 'enactedAt'
-      ? new Date(cursor.sortValue)
-      : cursor.sortValue;
-
-  return {
-    $or: [
-      { [cursor.sortField]: { [cmpOp]: sortValue } },
-      { [cursor.sortField]: sortValue, id: { [cmpOp]: cursor.id } },
-    ],
-  };
-}
 
 /** Excluded on bill detail pages — large blobs loaded on demand elsewhere. */
 const LEGISLATION_DETAIL_HEAVY_FIELDS: Record<string, 0> = {
@@ -353,7 +327,6 @@ export async function getAllLegislationWithFiltering({
   search,
   limit = 100,
   skip = 0,
-  after,
   sortBy,
   sortDir = 'desc',
   showCongress = false,
@@ -381,8 +354,6 @@ export async function getAllLegislationWithFiltering({
   search?: string;
   limit?: number;
   skip?: number;
-  /** Base64url keyset cursor — preferred over skip for feed pagination. */
-  after?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   showCongress?: boolean;
@@ -446,18 +417,16 @@ export async function getAllLegislationWithFiltering({
     } else if (context === 'policy-updates-feed') {
       // PolicyUpdatesFeed respects user-selected sorting but defaults to createdAt for "Most Recent"
       if (sortBy === 'lastActionAt' || sortBy === 'latestActionAt') {
-        // User explicitly selected "Latest Action" - sort by legislative activity
         if (sortDir === 'asc') {
-          sort = { latestActionAt: 1, updatedAt: 1 };
+          sort = { latestActionAt: 1, id: 1 };
         } else {
-          sort = { latestActionAt: -1, updatedAt: -1 };
+          sort = { latestActionAt: -1, id: -1 };
         }
       } else if (sortBy === 'createdAt' || !sortBy) {
-        // User selected "Most Recent" or default - sort by creation date
         if (sortDir === 'asc') {
-          sort = { createdAt: 1, updatedAt: 1 };
+          sort = { createdAt: 1, id: 1 };
         } else {
-          sort = { createdAt: -1, updatedAt: -1 };
+          sort = { createdAt: -1, id: -1 };
         }
       } else {
         // Other sorting options (title, etc.)
@@ -565,13 +534,9 @@ export async function getAllLegislationWithFiltering({
     // Get legislation using the improved search approach
     const excludeHeavyFields = context === 'policy-updates-feed';
 
-    const paginationCursor = after ? parseLegislationCursor(after) : null;
-    const useKeysetPagination = Boolean(paginationCursor);
-
     let legislations = await getAllLegislation({
       limit,
-      skip: useKeysetPagination ? 0 : skip,
-      after: paginationCursor ?? undefined,
+      skip,
       sort,
       filter: finalFilter,
       excludeHeavyFields,
@@ -699,14 +664,12 @@ export async function getAllLegislationWithFiltering({
 export async function getAllLegislation({
   limit = 100,
   skip = 0,
-  after,
   sort = { updatedAt: -1 },
   filter = {},
   excludeHeavyFields = false,
 }: {
   limit?: number;
   skip?: number;
-  after?: LegislationPaginationCursor;
   sort?: Record<string, 1 | -1>;
   filter?: Record<string, any>;
   excludeHeavyFields?: boolean;
@@ -717,18 +680,9 @@ export async function getAllLegislation({
     const applyProjection = (cursor: ReturnType<typeof legislationCollection.find>) =>
       excludeHeavyFields ? cursor.project(LEGISLATION_FEED_HEAVY_FIELDS) : cursor;
 
-    let queryFilter = filter;
-    if (after) {
-      const keysetFilter = buildKeysetFilter(sort, after);
-      queryFilter =
-        filter && Object.keys(filter).length > 0
-          ? { $and: [filter, keysetFilter] }
-          : keysetFilter;
-    }
-
-    const results = await applyProjection(legislationCollection.find(queryFilter))
+    const results = await applyProjection(legislationCollection.find(filter))
       .sort(sort)
-      .skip(after ? 0 : skip)
+      .skip(skip)
       .limit(limit)
       .toArray();
 
@@ -741,8 +695,6 @@ export async function getAllLegislation({
     throw new Error('Failed to fetch legislation.');
   }
 }
-
-export { buildLegislationCursorFromItem } from '@/lib/legislationPagination';
 
 export async function testLegislationCollectionService(): Promise<void> {
   try {
@@ -1023,5 +975,46 @@ export async function deleteLegislation(id: string): Promise<boolean> {
     console.error(`Error deleting legislation document with id ${id}: `, error);
     throw new Error('Failed to delete legislation.');
   }
+}
+
+/** Cached default feed page for SSR and unfiltered API requests. */
+export const getCachedPolicyFeedPage = unstable_cache(
+  async (limit: number, skip: number, sortBy?: string, sortDir: 'asc' | 'desc' = 'desc') => {
+    const results = await getAllLegislationWithFiltering({
+      limit,
+      skip,
+      sortBy,
+      sortDir,
+      context: 'policy-updates-feed',
+    });
+    return JSON.parse(JSON.stringify(results)) as Legislation[];
+  },
+  ['policy-feed'],
+  { revalidate: 60 },
+);
+
+export function isUnfilteredPolicyFeedRequest(params: {
+  search?: string;
+  skip: number;
+  context?: string;
+  showCongress?: boolean;
+  sponsorId?: string;
+  showOnlyEnacted?: string;
+  jurisdictionName?: string;
+  subject?: string;
+  classification?: string;
+  chamber?: string;
+}): boolean {
+  return (
+    params.context === 'policy-updates-feed' &&
+    !params.search &&
+    !params.showCongress &&
+    !params.sponsorId &&
+    !params.showOnlyEnacted &&
+    !params.jurisdictionName &&
+    !params.subject &&
+    !params.classification &&
+    !params.chamber
+  );
 }
 

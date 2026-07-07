@@ -22,10 +22,9 @@ import { BROAD_TOPIC_KEYWORDS } from "@/types/legislation";
 import Link from "next/link";
 import { isLegislationEnacted } from '@/utils/enacted-legislation';
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
-import { buildLegislationCursorFromItem, resolveApiSortField } from "@/lib/legislationPagination";
 
-
-let compactViewCardNumber = 100;
+const PAGE_SIZE = 20;
+const COMPACT_PAGE_SIZE = 100;
 
 function PolicyCardSkeleton({ compact }: { compact: boolean }) {
     if (compact) {
@@ -212,7 +211,7 @@ const CLASSIFICATIONS = [
     { label: "Proclamation", value: "proclamation" },
 ];
 
-let cardNumber = 20;
+let cardNumber = PAGE_SIZE;
 
 // Function to fetch bookmarked legislation
 async function fetchBookmarkedUpdates({
@@ -334,7 +333,6 @@ async function fetchBookmarkedUpdates({
 
 async function fetchUpdatesFeed({
     skip = 0,
-    after,
     limit = cardNumber,
     search = "",
     subject = "",
@@ -348,7 +346,6 @@ async function fetchUpdatesFeed({
     showOnlyEnacted = false
 }: {
     skip?: number;
-    after?: string;
     limit?: number;
     search?: string;
     subject?: string;
@@ -361,12 +358,7 @@ async function fetchUpdatesFeed({
     sponsorId?: string;
     showOnlyEnacted?: boolean;
 }) {
-    const params = new URLSearchParams({ limit: String(limit) });
-    if (after) {
-        params.append("after", after);
-    } else {
-        params.append("skip", String(skip));
-    }
+    const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
     if (search) params.append("search", search);
     if (subject) params.append("subject", subject);
 
@@ -426,7 +418,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
     const [hasMore, setHasMore] = useState(() => {
         if (initialData === undefined) return true;
         if (initialData.length === 0) return false;
-        return initialData.length === 20;
+        return initialData.length >= PAGE_SIZE;
     });
     const [skip, setSkip] = useState(initialLen);
     const [search, setSearch] = useState("");
@@ -560,8 +552,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
         loadingRef.current = true;
         setLoading(true);
         try {
-            const limit = compactView ? compactViewCardNumber : 20;
-            const apiSortField = resolveApiSortField(sort.field);
+            const limit = compactView ? COMPACT_PAGE_SIZE : PAGE_SIZE;
             
             if (showOnlyBookmarked) {
                 const currentSkip = skipRef.current;
@@ -590,14 +581,9 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                 setSkip(skipRef.current);
                 setHasMore(bookmarkedResult.hasMore);
             } else {
-                const lastItem = updates[updates.length - 1];
-                const after = lastItem
-                    ? buildLegislationCursorFromItem(lastItem as unknown as Record<string, unknown>, apiSortField) ?? undefined
-                    : undefined;
-
+                const currentSkip = skipRef.current;
                 const newUpdates = await fetchUpdatesFeed({
-                    after,
-                    skip: after ? undefined : skipRef.current,
+                    skip: currentSkip,
                     limit,
                     search,
                     subject,
@@ -617,19 +603,18 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                         return [...prev, ...newUniqueUpdates];
                     });
                 }
-                skipRef.current = skipRef.current + newUpdates.length;
+                skipRef.current = currentSkip + newUpdates.length;
                 setSkip(skipRef.current);
-                const expectedLength = compactView ? compactViewCardNumber : 20;
-                setHasMore(newUpdates.length === expectedLength);
+                setHasMore(newUpdates.length >= limit);
             }
         } catch (e) {
             console.error('[FEED] loadMore error', e);
-            setHasMore(false);
+            // Keep hasMore true on transient errors so the user can retry
         } finally {
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView, updates]);
+    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
@@ -649,7 +634,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
         setHasMore(true);
         setLoading(true);
         try {
-            const limit = compactView ? compactViewCardNumber : 20;
+            const limit = compactView ? COMPACT_PAGE_SIZE : PAGE_SIZE;
             
             if (showOnlyBookmarked) {
                 // Fetch bookmarked legislation directly
@@ -687,8 +672,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                 setUpdates(newUpdates);
                 skipRef.current = newUpdates.length;
                 setSkip(newUpdates.length);
-                const expectedLength = compactView ? compactViewCardNumber : 20;
-                setHasMore(newUpdates.length === expectedLength);
+                setHasMore(newUpdates.length >= limit);
             }
         } catch (e) {
             console.error('[FEED] refresh error', e);
@@ -715,7 +699,8 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
         }
 
         const saved = sessionStorage.getItem('policyUpdatesFeedState');
-        if (saved && !urlDrivesLegislationFeed) { // Only restore from sessionStorage if URL is not driving the feed
+        const hasServerInitialData = Boolean(initialData && initialData.length > 0);
+        if (saved && !urlDrivesLegislationFeed && !hasServerInitialData) {
             try {
                 const state = JSON.parse(saved);
                 setSearch(state.search || "");
@@ -732,17 +717,33 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                 setSearchInput(state.searchInput || "");
                 if (state.updates && Array.isArray(state.updates)) {
                     setUpdates(state.updates);
-                    // Crucial fix: set skipRef to actual length of updates
                     skipRef.current = state.updates.length;
+                    const restoredPageSize = state.compactView ? COMPACT_PAGE_SIZE : PAGE_SIZE;
+                    setHasMore(state.updates.length >= restoredPageSize);
                 } else {
                     setUpdates([]);
                 }
-                setHasMore(state.hasMore !== undefined ? state.hasMore : true);
             } catch (e) {
                 console.error('Error parsing feed state:', e);
                 setUpdates([]);
                 skipRef.current = 0;
                 setSkip(0);
+            }
+        } else if (saved && !urlDrivesLegislationFeed && hasServerInitialData) {
+            try {
+                const state = JSON.parse(saved);
+                setSearch(state.search || "");
+                setSubject(state.subject || "");
+                setClassification(state.classification || "");
+                setJurisdictionName(state.jurisdictionName || "");
+                setShowCongress(state.showCongress || false);
+                setShowOnlyEnacted(state.showOnlyEnacted || false);
+                setShowOnlyBookmarked(state.showOnlyBookmarked || false);
+                setCompactView(state.compactView || false);
+                setSort(state.sort || { field: 'createdAt', dir: 'desc' });
+                setSearchInput(state.searchInput || "");
+            } catch (e) {
+                console.error('Error parsing feed filters from session:', e);
             }
         } else if (urlDrivesLegislationFeed) {
             // Clear any existing state when URL params are present (state, congress, rep, sponsorId, etc.)
@@ -767,7 +768,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
         didRestore.current = true;
         hasRestored.current = true;
         prevDeps.current = { search, subject, classification, sort, jurisdictionName };
-    }, [searchParams, urlDrivesLegislationFeed]);
+    }, [searchParams, urlDrivesLegislationFeed, initialData]);
 
     // Block the initial fetch until after restore, and only fetch if updates are empty
     useEffect(() => {
@@ -778,7 +779,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
         const fetchAndSet = async () => {
             setLoading(true);
             try {
-                const limit = compactView ? compactViewCardNumber : 20;
+                const limit = compactView ? COMPACT_PAGE_SIZE : PAGE_SIZE;
                 
                 if (showOnlyBookmarked) {
                     // Fetch bookmarked legislation directly
@@ -820,8 +821,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                     setUpdates(newUpdates);
                     skipRef.current = newUpdates.length;
                     setSkip(newUpdates.length);
-                    const expectedLength = compactView ? compactViewCardNumber : 20;
-                    setHasMore(newUpdates.length === expectedLength);
+                    setHasMore(newUpdates.length >= limit);
                 }
             } catch {
                 if (!isMounted) return;
