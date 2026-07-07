@@ -5,9 +5,18 @@ import { StateDetailData } from "@/types/jurisdictions";
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, MapPin, TrendingUp, Users, X } from "lucide-react";
+import { ArrowLeft, FileText, MapPin, TrendingUp, Users, X, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
+import {
+  BillRow,
+  formatDashboardDate,
+  SectionHeader,
+  SponsorRow,
+  StatCard,
+  TopicBar,
+} from "./dashboard/DashboardDetailParts";
 
 interface StateDashboardProps {
     stateData: StateDetailData | null;
@@ -21,6 +30,7 @@ interface StateDashboardProps {
 
 export function StateDashboard({ stateData, loading, error, isCongressDashboard, stateParam, stateAbbrParam, clearStateFilter }: StateDashboardProps) {
     const router = useRouter();
+    const jurisdictionLabel = isCongressDashboard ? "U.S. Congress" : (stateParam || stateAbbrParam || "State");
 
     if (loading) {
         return (
@@ -54,192 +64,246 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
     }
 
     if (!stateData) {
-        return null; // Or some other placeholder for no data
+        return null;
     }
+
+    const maxTopicRecent = Math.max(...stateData.trendingTopics.map((t) => t.recentCount), 1);
+    const recentShare = stateData.statistics.totalLegislation > 0
+        ? Math.round((stateData.statistics.recentActivity / stateData.statistics.totalLegislation) * 100)
+        : 0;
+    const activeSponsorShare = stateData.statistics.totalLegislation > 0
+        ? Math.round((stateData.statistics.activeSponsors / stateData.statistics.totalLegislation) * 100)
+        : 0;
+
+    const legislationUrl = isCongressDashboard
+        ? "/legislation?congress=true"
+        : `/legislation?state=${encodeURIComponent(stateData.state || stateParam || stateAbbrParam || "")}&stateAbbr=${stateAbbrParam || ""}`;
+
+    const representativesUrl = isCongressDashboard
+        ? "/representatives?congress=true"
+        : `/representatives?state=${encodeURIComponent(stateParam || stateAbbrParam || "")}&stateAbbr=${stateAbbrParam || ""}`;
 
     return (
         <AnimatedSection>
-            <div className="space-y-4 md:space-y-6">
-                <AnimatedSection>
-                    <Card className="shadow-lg">
-                        <CardContent className="p-3 md:p-4">
-                            <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center md:justify-between">
-                                <div className="flex flex-col space-y-2">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <Button variant="ghost" size="sm" onClick={clearStateFilter} className="flex items-center gap-2">
-                                            <ArrowLeft className="h-4 w-4" />
-                                            <span className="hidden sm:inline">{isCongressDashboard ? "Back to All Jurisdictions" : "Back to All States"}</span>
-                                            <span className="sm:hidden">Back</span>
-                                        </Button>
-                                        <Button variant="outline" size="sm" onClick={clearStateFilter} className="md:hidden flex items-center gap-2">
-                                            <X className="h-4 w-4" />
-                                            <span className="hidden sm:inline">Clear Filter</span>
-                                            <span className="sm:hidden">Clear</span>
-                                        </Button>
-                                    </div>
-                                    <div className="flex flex-col space-y-1 md:space-y-0 md:flex-row md:items-center md:gap-2">
-                                        {isCongressDashboard ? (
-                                            <>
-                                                <Badge variant="default" className="bg-blue-600 self-start">
-                                                    <span className="hidden sm:inline">U.S. Congress Dashboard</span>
-                                                    <span className="sm:hidden">U.S. Congress</span>
-                                                </Badge>
-                                                <span className="text-xs md:text-sm text-muted-foreground">
-                                                    <span className="hidden sm:inline">Showing federal legislation only</span>
-                                                    <span className="sm:hidden">Federal data only</span>
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Badge variant="default" className="bg-primary self-start">
-                                                    <span className="hidden sm:inline">State Dashboard: {stateParam || stateAbbrParam}</span>
-                                                    <span className="sm:hidden">{stateParam || stateAbbrParam}</span>
-                                                </Badge>
-                                                <span className="text-xs md:text-sm text-muted-foreground">
-                                                    <span className="hidden sm:inline">Showing data for {stateParam || stateAbbrParam} only</span>
-                                                    <span className="sm:hidden">State data only</span>
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                <Button variant="outline" size="sm" onClick={clearStateFilter} className="hidden md:flex items-center gap-2">
-                                    <X className="h-4 w-4" />
-                                    Clear Filter
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </AnimatedSection>
-
-                <AnimatedSection>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                        <Card>
-                            <CardContent className="p-3 md:p-4">
-                                <div className="flex items-center space-x-2">
-                                    <FileText className="h-4 w-4 md:h-5 md:w-5 text-blue-500 flex-shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Total Legislation</span><span className="sm:hidden">Total Bills</span></p>
-                                        <p className="text-lg md:text-2xl font-bold">{stateData.statistics.totalLegislation.toLocaleString()}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-3 md:p-4">
-                                <div className="flex items-center space-x-2">
-                                    <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-green-500 flex-shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Recent Activity</span><span className="sm:hidden">Recent</span></p>
-                                        <p className="text-lg md:text-2xl font-bold">{stateData.statistics.recentActivity.toLocaleString()}</p>
-                                        <p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Last 30 days</span><span className="sm:hidden">30d</span></p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-3 md:p-4">
-                                <div className="flex items-center space-x-2">
-                                    <Users className="h-4 w-4 md:h-5 md:w-5 text-orange-500 flex-shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Active Sponsors</span><span className="sm:hidden">Sponsors</span></p>
-                                        <p className="text-lg md:text-2xl font-bold">{stateData.statistics.activeSponsors.toLocaleString()}</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-3 md:p-4">
-                                <div className="flex items-center space-x-2">
-                                    <MapPin className="h-4 w-4 md:h-5 md:w-5 text-purple-500 flex-shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Avg. Bill Age</span><span className="sm:hidden">Avg. Age</span></p>
-                                        <p className="text-lg md:text-2xl font-bold">{stateData.statistics.averageBillAge}</p>
-                                        <p className="text-xs text-muted-foreground">days</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </AnimatedSection>
-
-                <AnimatedSection>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-                        <Card className="shadow-lg">
-                            <CardHeader className="pb-3 md:pb-6">
-                                <CardTitle className="font-headline flex items-center gap-2 text-lg md:text-xl"><FileText className="h-4 w-4 md:h-5 md:w-5" /><span className="hidden sm:inline">Recent Legislation</span><span className="sm:hidden">Recent Bills</span></CardTitle>
-                                <CardDescription className="text-xs md:text-sm"><span className="hidden sm:inline">Latest legislative activity {isCongressDashboard ? "in U.S. Congress" : `in ${stateParam || stateAbbrParam}`}</span><span className="sm:hidden">Latest activity</span></CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                                <div className="space-y-3 md:space-y-4">
-                                    {stateData.recentLegislation.slice(0, 5).map((bill) => (
-                                        <AnimatedSection key={bill.id}>
-                                            <div className="border-l-4 border-primary/20 pl-3 md:pl-4 py-2">
-                                                <div className="font-medium text-sm md:text-base line-clamp-2">{bill.identifier} - {bill.title}</div>
-                                                <div className="text-xs text-muted-foreground mt-1 line-clamp-2"><span className="font-medium">Last Action:</span> {bill.lastAction}</div>
-                                                <div className="text-xs text-muted-foreground line-clamp-1"><span className="font-medium">Sponsor:</span> {bill.primarySponsor}</div>
-                                                <div className="flex flex-wrap gap-1 mt-2">
-                                                    {bill.subjects.slice(0, 2).map((subject, index) => (<Badge key={index} variant="secondary" className="text-xs">{subject}</Badge>))}
-                                                    {bill.subjects.length > 2 && (<Badge variant="outline" className="text-xs">+{bill.subjects.length - 2}</Badge>)}
-                                                </div>
-                                            </div>
-                                        </AnimatedSection>
-                                    ))}
-                                </div>
-                                <div className="mt-4 pt-4 border-t">
-                                    <Button variant="outline" size="sm" onClick={() => { if (isCongressDashboard) { router.push("/legislation?congress=true"); } else { const stateName = stateData?.state || stateParam || stateAbbrParam || ""; const stateAbbr = stateAbbrParam || ""; router.push(`/legislation?state=${encodeURIComponent(stateName)}&stateAbbr=${stateAbbr}`); } }} className="w-full">
-                                        <span className="hidden sm:inline">View All Legislation</span><span className="sm:hidden">View All Bills</span>
+            <div className="space-y-6 md:space-y-8">
+                <Card className="shadow-lg">
+                    <CardContent className="p-4 md:p-6">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div className="space-y-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button variant="ghost" size="sm" onClick={clearStateFilter} className="gap-2">
+                                        <ArrowLeft className="h-4 w-4" />
+                                        Back to map
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={clearStateFilter} className="md:hidden gap-2">
+                                        <X className="h-4 w-4" />
+                                        Close
                                     </Button>
                                 </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="shadow-lg">
-                            <CardHeader className="pb-3 md:pb-6">
-                                <CardTitle className="font-headline flex items-center gap-2 text-lg md:text-xl"><TrendingUp className="h-4 w-4 md:h-5 md:w-5" />Trending Topics</CardTitle>
-                                <CardDescription className="text-xs md:text-sm"><span className="hidden sm:inline">Most active policy areas {isCongressDashboard ? "in U.S. Congress" : `in ${stateParam || stateAbbrParam}`}</span><span className="sm:hidden">Active policy areas</span></CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                                <div className="space-y-2 md:space-y-3">
-                                    {stateData.trendingTopics.slice(0, 8).map((topic, index) => (
-                                        <AnimatedSection key={topic.name}>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-2 min-w-0 flex-1"><span className="text-xs md:text-sm font-medium flex-shrink-0">#{index + 1}</span><span className="text-xs md:text-sm truncate">{topic.name}</span></div>
-                                                <div className="flex items-center gap-1 md:gap-2 flex-shrink-0"><Badge variant="secondary" className="text-xs"><span className="hidden sm:inline">{topic.recentCount} recent</span><span className="sm:hidden">{topic.recentCount}</span></Badge><span className="text-xs text-muted-foreground hidden sm:inline">{topic.totalCount} total</span></div>
-                                            </div>
-                                        </AnimatedSection>
-                                    ))}
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Full jurisdiction dashboard
+                                    </p>
+                                    <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{jurisdictionLabel}</h1>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Combined legislative activity, policy trends, sponsors, and recent bill movement.
+                                    </p>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </AnimatedSection>
+                            </div>
+                            <Badge variant="default" className="w-fit self-start">
+                                {isCongressDashboard ? "Federal" : "State"} overview
+                            </Badge>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                <AnimatedSection>
-                    <Card className="shadow-lg">
-                        <CardHeader className="pb-3 md:pb-6">
-                            <CardTitle className="font-headline flex items-center gap-2 text-lg md:text-xl"><Users className="h-4 w-4 md:h-5 md:w-5" />Most Active Sponsors</CardTitle>
-                            <CardDescription className="text-xs md:text-sm"><span className="hidden sm:inline">{isCongressDashboard ? "Members of Congress with the most recent activity" : `Legislators with the most recent activity in ${stateParam || stateAbbrParam}`}</span><span className="sm:hidden">Most active legislators</span></CardDescription>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatCard label="Total legislation" value={stateData.statistics.totalLegislation} hint="All tracked bills" />
+                    <StatCard label="Recent activity" value={stateData.statistics.recentActivity} hint="Actions in last 30 days" />
+                    <StatCard label="Active sponsors" value={stateData.statistics.activeSponsors} hint="Legislators with bills" />
+                    <StatCard label="Average bill age" value={`${stateData.statistics.averageBillAge} days`} hint="Since introduction" />
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <Card className="shadow-sm lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="text-base">Activity snapshot</CardTitle>
+                            <CardDescription>How active this jurisdiction is right now.</CardDescription>
                         </CardHeader>
-                        <CardContent className="pt-0">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                                {stateData.topSponsors.slice(0, 6).map((sponsor) => (
-                                    <AnimatedSection key={sponsor.name}>
-                                        <div className="p-3 border rounded-lg">
-                                            <div className="font-medium text-sm line-clamp-1">{sponsor.name}</div>
-                                            <div className="text-xs text-muted-foreground mt-1"><span className="hidden sm:inline">{sponsor.recentBills} recent bills • {sponsor.totalBills} total bills</span><span className="sm:hidden">{sponsor.recentBills} recent • {sponsor.totalBills} total</span></div>
-                                            <Badge variant={sponsor.activity === "active" ? "default" : "secondary"} className="text-xs mt-2">{sponsor.activity}</Badge>
-                                        </div>
-                                    </AnimatedSection>
-                                ))}
-                            </div>
-                            <div className="mt-4 pt-4 border-t">
-                                <Button variant="outline" size="sm" onClick={() => { if (isCongressDashboard) { router.push("/representatives?congress=true"); } else { router.push(`/representatives?state=${encodeURIComponent(stateParam || stateAbbrParam || "")}&stateAbbr=${stateAbbrParam || ""}`); } }} className="w-full">
-                                    <span className="hidden sm:inline">View All Representatives</span><span className="sm:hidden">View Representatives</span>
-                                </Button>
-                            </div>
+                        <CardContent className="grid gap-3 sm:grid-cols-3">
+                            <StatCard label="Recent share" value={`${recentShare}%`} hint="Of all bills had action in 30d" />
+                            <StatCard label="Policy topics" value={stateData.trendingTopics.length} hint="Distinct subject areas tracked" />
+                            <StatCard label="Top sponsors" value={stateData.topSponsors.length} hint="Ranked by bill activity" />
                         </CardContent>
                     </Card>
-                </AnimatedSection>
+                    <Card className="shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-base">Quick links</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-2">
+                            <Button variant="default" size="sm" onClick={() => router.push(legislationUrl)}>
+                                Browse all legislation
+                                <ChevronRight className="ml-1 h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => router.push(representativesUrl)}>
+                                View representatives
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                    <Card className="shadow-lg">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <FileText className="h-5 w-5" />
+                                Recent legislation
+                            </CardTitle>
+                            <CardDescription>
+                                All recent bill movement in {jurisdictionLabel} ({stateData.recentLegislation.length} bills).
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {stateData.recentLegislation.map((bill) => (
+                                <BillRow
+                                    key={bill.id}
+                                    identifier={bill.identifier}
+                                    title={bill.title}
+                                    meta={`${formatDashboardDate(bill.lastActionDate)}${bill.chamber ? ` · ${bill.chamber}` : ""}`}
+                                    sponsor={bill.primarySponsor}
+                                    action={bill.lastAction}
+                                    subjects={bill.subjects}
+                                />
+                            ))}
+                            {stateData.recentLegislation.length === 0 && (
+                                <p className="text-sm text-muted-foreground">No recent legislative activity in the last 30 days.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="shadow-lg">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <TrendingUp className="h-5 w-5" />
+                                Trending policy areas
+                            </CardTitle>
+                            <CardDescription>
+                                Subject areas ranked by recent and total legislative volume.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {stateData.trendingTopics.map((topic, index) => (
+                                <TopicBar
+                                    key={topic.name}
+                                    rank={index + 1}
+                                    name={topic.name}
+                                    recent={topic.recentCount}
+                                    total={topic.totalCount}
+                                    maxRecent={maxTopicRecent}
+                                />
+                            ))}
+                            {stateData.trendingTopics.length === 0 && (
+                                <p className="text-sm text-muted-foreground">No topic data available.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <Card className="shadow-lg">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Users className="h-5 w-5" />
+                            Legislator activity leaderboard
+                        </CardTitle>
+                        <CardDescription>
+                            {isCongressDashboard
+                                ? "Members of Congress ranked by sponsorship activity."
+                                : `State legislators ranked by sponsorship activity in ${jurisdictionLabel}.`}
+                            {activeSponsorShare > 0 && (
+                                <span className="mt-1 block text-xs">
+                                    {stateData.statistics.activeSponsors} sponsors across {stateData.statistics.totalLegislation.toLocaleString()} total bills.
+                                </span>
+                            )}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="divide-y rounded-lg border">
+                            {stateData.topSponsors.map((sponsor, index) => (
+                                <SponsorRow
+                                    key={sponsor.name}
+                                    rank={index + 1}
+                                    name={sponsor.name}
+                                    totalBills={sponsor.totalBills}
+                                    recentBills={sponsor.recentBills}
+                                    activity={sponsor.activity}
+                                />
+                            ))}
+                        </div>
+                        {stateData.topSponsors.length === 0 && (
+                            <p className="text-sm text-muted-foreground">No sponsor activity recorded.</p>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="shadow-lg">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <MapPin className="h-5 w-5" />
+                            Cross-cutting insights
+                        </CardTitle>
+                        <CardDescription>Patterns across bills, topics, and sponsors.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div className="rounded-lg border bg-muted/20 p-4">
+                                <SectionHeader
+                                    title="Hottest topics this month"
+                                    description="Policy areas with recent bill actions."
+                                />
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {stateData.trendingTopics
+                                        .filter((t) => t.recentCount > 0)
+                                        .slice(0, 8)
+                                        .map((topic) => (
+                                            <Badge key={topic.name} variant="secondary">
+                                                {topic.name}
+                                                <span className="ml-1.5 text-muted-foreground">({topic.recentCount})</span>
+                                            </Badge>
+                                        ))}
+                                </div>
+                            </div>
+                            <div className="rounded-lg border bg-muted/20 p-4">
+                                <SectionHeader
+                                    title="Chambers in recent activity"
+                                    description="Where recent bill movement is concentrated."
+                                />
+                                <div className="mt-3 space-y-2">
+                                    {Object.entries(
+                                        stateData.recentLegislation.reduce<Record<string, number>>((acc, bill) => {
+                                            const chamber = bill.chamber || "Unknown";
+                                            acc[chamber] = (acc[chamber] || 0) + 1;
+                                            return acc;
+                                        }, {}),
+                                    ).map(([chamber, count]) => (
+                                        <div key={chamber} className="flex items-center justify-between text-sm">
+                                            <span>{chamber}</span>
+                                            <Badge variant="outline">{count} bills</Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <Separator />
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button onClick={() => router.push(legislationUrl)} className="sm:flex-1">
+                                Explore all {jurisdictionLabel} legislation
+                            </Button>
+                            <Button variant="outline" onClick={() => router.push(representativesUrl)} className="sm:flex-1">
+                                Find representatives
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </AnimatedSection>
     );

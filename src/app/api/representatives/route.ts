@@ -3,6 +3,12 @@ import { getCollection } from '@/lib/mongodb';
 import { OpenStatesPerson, Representative } from "@/types/representative";
 import Fuse from 'fuse.js';
 import { STATE_MAP } from '@/types/geo';
+import {
+  attachActivityMetrics,
+  getSponsorActivityMap,
+  isActivitySortField,
+  sortRepresentatives,
+} from '@/lib/representativeActivity';
 
 // US State mapping and validation
 export const validStates = Object.values(STATE_MAP);
@@ -119,21 +125,29 @@ export async function GET(request: NextRequest) {
         filter.$and = andFilters;
       }
       // Sorting
-      const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction', 'lastName', 'firstName', 'state'];
-      let sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
-      let sortObj: Record<string, 1 | -1>;
-      if (sortField === 'state') {
-        sortObj = { 'jurisdiction': sortDir, 'state': sortDir };
-      } else {
-        sortObj = { [sortField]: sortDir };
+      const validSortFields = ['name', 'party', 'office', 'district', 'jurisdiction', 'lastName', 'firstName', 'state', 'sponsored', 'cosponsored', 'activity', 'recentActivity'];
+      const sortField = validSortFields.includes(sortBy) ? sortBy : 'name';
+      const useActivitySort = isActivitySortField(sortField);
+      let sortObj: Record<string, 1 | -1> | null = null;
+      if (!useActivitySort) {
+        if (sortField === 'state') {
+          sortObj = { jurisdiction: sortDir, state: sortDir };
+        } else {
+          sortObj = { [sortField]: sortDir };
+        }
       }
       // Pagination
       const skip = (pageParam - 1) * pageSize;
       const total = await representativesCollection.countDocuments(filter);
+      const activityMap = await getSponsorActivityMap();
       let reps = await representativesCollection
         .find(filter)
-        .sort(sortObj)
+        .sort(sortObj ?? { name: 1 })
         .toArray();
+
+      if (useActivitySort) {
+        reps = sortRepresentatives(reps, sortField, sortDir, activityMap);
+      }
       // Fuzzy search with Fuse.js if search is present
       if (fuseSearch) {
         const normalizeName = (name: string) => {
@@ -193,6 +207,7 @@ export async function GET(request: NextRequest) {
       const paginatedReps = reps.slice(skip, skip + pageSize);
       // Normalize results for frontend compatibility
       const normalizedReps = paginatedReps.map((rep: any) => {
+        let normalized: Record<string, unknown>;
         // CongressPerson normalization
         if ('terms' in rep && Array.isArray(rep.terms)) {
           const latestTerm = rep.terms[rep.terms.length - 1] || {};
@@ -210,7 +225,7 @@ export async function GET(request: NextRequest) {
               latestTerm.startYear || ''
             ].filter(Boolean).join('-');
           }
-          return {
+          normalized = {
             ...rep,
             id,
             office: latestTerm.memberType || '',
@@ -220,7 +235,7 @@ export async function GET(request: NextRequest) {
             jurisdiction: 'state' in rep ? rep.state : (latestTerm.stateName || ''),
             name: rep.directOrderName || ('name' in rep ? rep.name : '') || ('firstName' in rep ? rep.firstName : '') + ' ' + ('lastName' in rep ? rep.lastName : ''),
           };
-        }
+        } else {
         // Representative normalization (already matches frontend)
         // Defensive: always set id
         let id = rep.id || '';
@@ -232,10 +247,12 @@ export async function GET(request: NextRequest) {
         if ((!id || (!isBioguideId && id.length < 8)) && firstName && lastName) {
           id = [firstName, lastName, stateVal].join('-');
         }
-        return {
-          ...rep,
-          id,
-        };
+          normalized = {
+            ...rep,
+            id,
+          };
+        }
+        return attachActivityMetrics(normalized, activityMap);
       });
       return NextResponse.json({
         representatives: normalizedReps,

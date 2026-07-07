@@ -6,6 +6,7 @@ export interface StateData {
     legislationCount: number;
     activeRepresentatives: number;
     recentActivity: number;
+    topicDiversity: number;
     keyTopics: string[];
     center: LatLngExpression;
     color: string;

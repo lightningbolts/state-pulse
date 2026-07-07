@@ -70,6 +70,10 @@ export interface Representative {
   lastUpdated?: Date;
   // Field for bills sponsored this year count
   recentBillsCount?: number;
+  sponsoredCount?: number;
+  cosponsoredCount?: number;
+  recentActivityCount?: number;
+  totalActivityCount?: number;
 }
 
 // CongressPerson type matches congress.gov API response example

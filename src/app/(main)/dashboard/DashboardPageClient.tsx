@@ -27,19 +27,22 @@ export default function DashboardPageClient() {
         clearStateFilter,
     } = useDashboardData();
 
-    if (isDetailedView) {
-        return (
-            <StateDashboard
-                stateData={stateData}
-                loading={loading}
-                error={error}
-                isCongressDashboard={isCongressDashboard}
-                stateParam={stateParam}
-                stateAbbrParam={stateAbbrParam}
-                clearStateFilter={clearStateFilter}
-            />
-        );
-    }
-
-    return <InteractiveMap />;
+    return (
+        <>
+            <div className={isDetailedView ? "hidden" : undefined}>
+                <InteractiveMap />
+            </div>
+            {isDetailedView && (
+                <StateDashboard
+                    stateData={stateData}
+                    loading={loading}
+                    error={error}
+                    isCongressDashboard={isCongressDashboard}
+                    stateParam={stateParam}
+                    stateAbbrParam={stateAbbrParam}
+                    clearStateFilter={clearStateFilter}
+                />
+            )}
+        </>
+    );
 }

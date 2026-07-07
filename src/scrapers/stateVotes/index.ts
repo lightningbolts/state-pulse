@@ -10,7 +10,9 @@ import {
 import { FloridaVoteAdapter } from './adapters/fl';
 import { IndianaVoteAdapter } from './adapters/in';
 import { MarylandVoteAdapter } from './adapters/md';
+import { MichiganVoteAdapter } from './adapters/mi';
 import { MinnesotaVoteAdapter } from './adapters/mn';
+import { OhioVoteAdapter } from './adapters/oh';
 import { NewYorkVoteAdapter } from './adapters/ny';
 import { NorthCarolinaVoteAdapter } from './adapters/nc';
 import { PennsylvaniaVoteAdapter } from './adapters/pa';
@@ -54,6 +56,8 @@ export function createDefaultRegistry(): StateAdapterRegistry {
   registry.register(new MinnesotaVoteAdapter());
   registry.register(new MarylandVoteAdapter());
   registry.register(new ColoradoVoteAdapter());
+  registry.register(new OhioVoteAdapter());
+  registry.register(new MichiganVoteAdapter());
   registry.register(new VirginiaVoteAdapter());
   registry.register(new IndianaVoteAdapter());
   registry.register(new TennesseeVoteAdapter());
@@ -77,8 +81,10 @@ export { ChamberHtmlVoteAdapter, createWave2Adapters } from './adapters/chamberH
 export { FloridaVoteAdapter } from './adapters/fl';
 export { IndianaVoteAdapter } from './adapters/in';
 export { MarylandVoteAdapter } from './adapters/md';
+export { MichiganVoteAdapter } from './adapters/mi';
 export { MinnesotaVoteAdapter } from './adapters/mn';
 export { NewYorkVoteAdapter } from './adapters/ny';
+export { OhioVoteAdapter } from './adapters/oh';
 export { NorthCarolinaVoteAdapter } from './adapters/nc';
 export { PennsylvaniaVoteAdapter } from './adapters/pa';
 export { TennesseeVoteAdapter } from './adapters/tn';

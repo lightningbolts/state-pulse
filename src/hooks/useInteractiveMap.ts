@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createEmptyStateStats, chunkArray, MAP_STATE_ABBRS } from '@/lib/mapStateDefaults';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { StateData } from '@/types/jurisdictions';
+import type { StateDetailData } from '@/types/jurisdictions';
 import { FIPS_TO_ABBR } from '@/types/geo';
 
 // Mobile detection utility
@@ -75,16 +77,59 @@ const cachedFetch = async (url: string, ttl: number = 300000): Promise<any> => {
 
 export const useInteractiveMap = () => {
     const { resolvedTheme } = useTheme ? useTheme() : { resolvedTheme: 'light' };
+    const queryClient = useQueryClient();
     const [isClient, setIsClient] = useState(false);
     const [selectedState, setSelectedState] = useState<string | null>(null);
     const [selectedStatePopupCoords, setSelectedStatePopupCoords] = useState<[number, number] | null>(null);
     const [mapMode, setMapMode] = useState<string>('legislation');
-    const [stateStats, setStateStats] = useState<Record<string, StateData>>(() => createEmptyStateStats());
+    const [mapDataProgress, setMapDataProgress] = useState(0);
+    const [partialMapData, setPartialMapData] = useState<Record<string, StateData> | null>(null);
+    const {
+        data: mapData,
+        isLoading: mapDataLoading,
+        isFetching: mapDataFetching,
+        error: mapDataError,
+    } = useQuery({
+        queryKey: ['dashboard-map-data'],
+        queryFn: async () => {
+            const batches = [...chunkArray(MAP_STATE_ABBRS, 8), ['US']];
+            const merged: Record<string, StateData> = { ...createEmptyStateStats() };
+            let completed = 0;
+
+            setMapDataProgress(8);
+            setPartialMapData({ ...merged });
+
+            await Promise.all(
+                batches.map(async (states) => {
+                    try {
+                        const response = await fetch(`/api/dashboard/map-data?states=${states.join(',')}`);
+                        if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
+                        const result = await response.json();
+                        if (!result.success) throw new Error(result.error || 'Failed to load map data');
+                        Object.assign(merged, result.data);
+                        setPartialMapData({ ...merged });
+                    } finally {
+                        completed += 1;
+                        setMapDataProgress(Math.round((completed / batches.length) * 100));
+                    }
+                }),
+            );
+
+            return merged;
+        },
+        staleTime: 10 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+    });
+    const stateStats = mapData ?? partialMapData ?? createEmptyStateStats();
     const [stateDetails, setStateDetails] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    const [mapDataProgress, setMapDataProgress] = useState(0);
+    const isMapLoading = mapDataLoading || mapDataFetching;
+    const effectiveMapProgress = mapData && !mapDataLoading
+        ? 100
+        : mapDataFetching && mapData
+            ? Math.max(mapDataProgress, 90)
+            : mapDataProgress;
     const [detailsLoading, setDetailsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const router = useRouter();
     const [districtGeoJson, setDistrictGeoJson] = useState<any>(null);
     const [districtLoading, setDistrictLoading] = useState(false);
@@ -128,37 +173,11 @@ export const useInteractiveMap = () => {
     const [votingPowerError, setVotingPowerError] = useState<string | null>(null);
     const [selectedChamber, setSelectedChamber] = useState<'house' | 'senate'>('house');
 
-    const fetchMapData = async () => {
-        setStateStats(createEmptyStateStats());
-        setMapDataProgress(0);
-        setError(null);
-
-        const batches = chunkArray(MAP_STATE_ABBRS, 3);
-        const totalBatches = batches.length + 1;
-        let completed = 0;
-
-        const loadBatch = async (states: string[]) => {
-            try {
-                const response = await fetch(`/api/dashboard/map-data?states=${states.join(',')}`);
-                if (!response.ok) throw new Error(`Failed: ${response.status}`);
-                const result = await response.json();
-                if (result.success) {
-                    setStateStats((prev) => ({ ...prev, ...result.data }));
-                }
-            } catch (error) {
-                console.error('[useInteractiveMap] Batch fetch failed:', error);
-                setError('Some map data failed to load. The map may be incomplete.');
-            } finally {
-                completed += 1;
-                setMapDataProgress(Math.round((completed / totalBatches) * 100));
-            }
-        };
-
-        for (const batch of batches) {
-            await loadBatch(batch);
-        }
-        await loadBatch(['US']);
-    };
+    const error = mapDataError instanceof Error
+        ? mapDataError.message
+        : mapDataError
+            ? 'Some map data failed to load. The map may be incomplete.'
+            : null;
 
     const fetchVotingPowerData = async (chamber: 'house' | 'senate') => {
         setVotingPowerLoading(true);
@@ -186,7 +205,6 @@ export const useInteractiveMap = () => {
 
     useEffect(() => {
         setIsClient(true);
-        fetchMapData();
         const checkMobileAndMemory = () => {
             const mobile = isMobileDevice();
             setIsMobile(mobile);
@@ -201,6 +219,15 @@ export const useInteractiveMap = () => {
             memoryMonitorInterval = setInterval(checkMobileAndMemory, 5000);
         }
         window.addEventListener('resize', checkMobileAndMemory);
+        return () => {
+            window.removeEventListener('resize', checkMobileAndMemory);
+            if (memoryMonitorInterval) {
+                clearInterval(memoryMonitorInterval);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape' && isFullScreen) {
                 setIsFullScreen(false);
@@ -208,11 +235,7 @@ export const useInteractiveMap = () => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => {
-            window.removeEventListener('resize', checkMobileAndMemory);
             window.removeEventListener('keydown', handleKeyDown);
-            if (memoryMonitorInterval) {
-                clearInterval(memoryMonitorInterval);
-            }
         };
     }, [isFullScreen]);
 
@@ -251,13 +274,27 @@ export const useInteractiveMap = () => {
     }, [isMobile, mapMode]);
 
     const fetchStateDetails = async (stateAbbr: string) => {
+        const cached = queryClient.getQueryData<StateDetailData>(['dashboard-detail', 'state', stateAbbr]);
+        if (cached) {
+            setStateDetails(cached);
+            setDetailsLoading(false);
+            return;
+        }
+
         setDetailsLoading(true);
         try {
-            const response = await fetch(`/api/dashboard/state/${stateAbbr}`);
-            if (!response.ok) console.error('Failed to fetch state details');
-            const result = await response.json();
-            if (result.success) setStateDetails(result.data);
-            else console.error(result.error || 'Unknown error');
+            const data = await queryClient.fetchQuery({
+                queryKey: ['dashboard-detail', 'state', stateAbbr],
+                queryFn: async () => {
+                    const response = await fetch(`/api/dashboard/state/${stateAbbr}`);
+                    if (!response.ok) throw new Error('Failed to fetch state details');
+                    const result = await response.json();
+                    if (!result.success) throw new Error(result.error || 'Unknown error');
+                    return result.data as StateDetailData;
+                },
+                staleTime: 10 * 60 * 1000,
+            });
+            setStateDetails(data);
         } catch (error) {
             console.error('Error fetching state details:', error);
             setStateDetails(null);
@@ -365,9 +402,13 @@ export const useInteractiveMap = () => {
         } else {
             setSelectedStatePopupCoords(null);
         }
-        setDetailsLoading(true);
-        setStateDetails(null);
-        fetchStateDetails(stateAbbr);
+
+        const cached = queryClient.getQueryData<StateDetailData>(['dashboard-detail', 'state', stateAbbr]);
+        setStateDetails(cached ?? null);
+        setDetailsLoading(!cached);
+        if (!cached) {
+            fetchStateDetails(stateAbbr);
+        }
     };
 
     const fetchTopicHeatmapData = async (districtType: string, selectedTopic: string, enactedOnly: boolean = false) => {
@@ -494,7 +535,7 @@ export const useInteractiveMap = () => {
         stateStats,
         stateDetails,
         loading,
-        mapDataProgress,
+        mapDataProgress: effectiveMapProgress,
         detailsLoading,
         error,
         router,

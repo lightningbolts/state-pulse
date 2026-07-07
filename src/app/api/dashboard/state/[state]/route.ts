@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { STATE_NAMES } from '@/types/geo';
+import { unstable_cache } from 'next/cache';
 
-
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ state: string }> }
-) {
-  try {
-    const resolvedParams = await params;
-    const stateParam = resolvedParams.state.toUpperCase();
+async function fetchStateDetailData(stateParam: string) {
     const stateName = STATE_NAMES[stateParam];
     if (!stateName) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid state parameter' },
-        { status: 400 }
-      );
+        return null;
     }
 
     const jurisdictionRegex = new RegExp(stateName, 'i');
@@ -25,13 +15,13 @@ export async function GET(
 
     const legislationCollection = await getCollection('legislation');
 
-    const recentLegislation = await legislationCollection
+    const recentLegislationPromise = legislationCollection
       .find({
         jurisdictionName: { $regex: jurisdictionRegex },
         latestActionAt: { $gte: thirtyDaysAgo }
       })
       .sort({ latestActionAt: -1 })
-      .limit(10)
+      .limit(20)
       .project({
         identifier: 1,
         title: 1,
@@ -43,7 +33,7 @@ export async function GET(
       })
       .toArray();
 
-    const topicsAggregation = await legislationCollection
+    const topicsAggregationPromise = legislationCollection
       .aggregate([
         {
           $match: {
@@ -69,11 +59,11 @@ export async function GET(
         },
         { $match: { _id: { $nin: [null, ''] } } },
         { $sort: { recentCount: -1, count: -1 } },
-        { $limit: 10 }
+        { $limit: 20 }
       ])
       .toArray();
 
-    const sponsorActivity = await legislationCollection
+    const sponsorActivityPromise = legislationCollection
       .aggregate([
         {
           $match: {
@@ -99,11 +89,11 @@ export async function GET(
         },
         { $match: { _id: { $nin: [null, ''] } } },
         { $sort: { recentBills: -1, totalBills: -1 } },
-        { $limit: 10 }
+        { $limit: 20 }
       ])
       .toArray();
 
-    const overallStats = await legislationCollection
+    const overallStatsPromise = legislationCollection
       .aggregate([
         { $match: { jurisdictionName: { $regex: jurisdictionRegex } } },
         {
@@ -132,47 +122,90 @@ export async function GET(
       ])
       .toArray();
 
+    const [
+      recentLegislation,
+      topicsAggregation,
+      sponsorActivity,
+      overallStats,
+    ] = await Promise.all([
+      recentLegislationPromise,
+      topicsAggregationPromise,
+      sponsorActivityPromise,
+      overallStatsPromise,
+    ]);
+
     const stats = overallStats[0] || {
       totalBills: 0,
       recentBills: 0,
       averageAge: 0
     };
 
+    return {
+      state: stateParam,
+      statistics: {
+        totalLegislation: stats.totalBills,
+        recentActivity: stats.recentBills,
+        activeSponsors: sponsorActivity.length,
+        averageBillAge: Math.round(stats.averageAge || 0)
+      },
+      recentLegislation: recentLegislation.map(bill => ({
+        id: bill._id,
+        identifier: bill.identifier,
+        title: bill.title,
+        lastAction: bill.latestActionDescription,
+        lastActionDate: bill.latestActionAt,
+        subjects: bill.subjects || [],
+        primarySponsor: bill.sponsors && bill.sponsors.length > 0
+          ? bill.sponsors.find((s: any) => s.primary)?.name || bill.sponsors[0].name
+          : 'Unknown',
+        chamber: bill.chamber
+      })),
+      trendingTopics: topicsAggregation.map(topic => ({
+        name: topic._id,
+        totalCount: topic.count,
+        recentCount: topic.recentCount,
+        trend: topic.recentCount > 0 ? 'up' : 'stable'
+      })),
+      topSponsors: sponsorActivity.map(sponsor => ({
+        name: sponsor._id,
+        totalBills: sponsor.totalBills,
+        recentBills: sponsor.recentBills,
+        activity: sponsor.recentBills > 0 ? 'active' : 'inactive'
+      }))
+    };
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ state: string }> }
+) {
+  try {
+    const resolvedParams = await params;
+    const stateParam = resolvedParams.state.toUpperCase();
+    if (!STATE_NAMES[stateParam]) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid state parameter' },
+        { status: 400 }
+      );
+    }
+
+    const cachedFetch = unstable_cache(
+      () => fetchStateDetailData(stateParam),
+      ['dashboard-state-detail', stateParam],
+      { revalidate: 600 },
+    );
+    const data = await cachedFetch();
+
+    if (!data) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid state parameter' },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      data: {
-        state: stateParam,
-        statistics: {
-          totalLegislation: stats.totalBills,
-          recentActivity: stats.recentBills,
-          activeSponsors: sponsorActivity.length,
-          averageBillAge: Math.round(stats.averageAge || 0)
-        },
-        recentLegislation: recentLegislation.map(bill => ({
-          id: bill._id,
-          identifier: bill.identifier,
-          title: bill.title,
-          lastAction: bill.latestActionDescription,
-          lastActionDate: bill.latestActionAt,
-          subjects: bill.subjects || [],
-          primarySponsor: bill.sponsors && bill.sponsors.length > 0
-            ? bill.sponsors.find((s: any) => s.primary)?.name || bill.sponsors[0].name
-            : 'Unknown',
-          chamber: bill.chamber
-        })),
-        trendingTopics: topicsAggregation.map(topic => ({
-          name: topic._id,
-          totalCount: topic.count,
-          recentCount: topic.recentCount,
-          trend: topic.recentCount > 0 ? 'up' : 'stable'
-        })),
-        topSponsors: sponsorActivity.map(sponsor => ({
-          name: sponsor._id,
-          totalBills: sponsor.totalBills,
-          recentBills: sponsor.recentBills,
-          activity: sponsor.recentBills > 0 ? 'active' : 'inactive'
-        }))
-      }
+      data,
     });
 
   } catch (error) {

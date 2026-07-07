@@ -2,13 +2,13 @@
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
-import { Badge } from '@/components/ui/badge';
 import MapLibreMap, { Marker as MapLibreMarker, Popup as MapLibrePopup } from 'react-map-gl/maplibre';
 import { DistrictMapGL } from './DistrictMapGL';
 import { StateMapGL } from './StateMapGL';
 import { RepresentativesResults } from './RepresentativesResults';
 import { DashboardMapLegendDock } from './DashboardMapLegendDock';
-import type { StateData } from '@/types/jurisdictions';
+import type { StateData, StateDetailData } from '@/types/jurisdictions';
+import { StateMapTooltip } from './StateMapTooltip';
 
 const DEFAULT_POSITION: [number, number] = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
@@ -59,7 +59,7 @@ export type DashboardMapCanvasProps = {
   selectedStatePopupCoords: [number, number] | null;
   setSelectedStatePopupCoords: (coords: [number, number] | null) => void;
   detailsLoading: boolean;
-  stateDetails: any;
+  stateDetails: StateDetailData | null;
   getActivityLevel: (stateAbbr: string) => string;
   availableTopics: string[];
   selectedTopic: string;
@@ -198,7 +198,15 @@ function MapSurface({
             style={{ height: '100%', width: '100%' }}
             mapStyle={mapStyle}
           >
-            {Object.entries(stateStats).map(([abbr, state]) => {
+            {Object.entries(stateStats)
+              .filter(([, state]) =>
+                mapDataProgress >= 100 ||
+                state.legislationCount > 0 ||
+                state.recentActivity > 0 ||
+                state.activeRepresentatives > 0 ||
+                state.topicDiversity > 0,
+              )
+              .map(([abbr, state]) => {
               const { color, size } = memoizedMarkers[abbr] || { color: '#e0e0e0', size: 20 };
               const coords: [number, number] = [(state.center as [number, number])[0], (state.center as [number, number])[1]];
               return (
@@ -227,25 +235,13 @@ function MapSurface({
                   setSelectedStatePopupCoords(null);
                 }}
                 closeOnClick={false}
-                maxWidth="260px"
+                maxWidth="160px"
               >
-                {detailsLoading || !stateDetails ? (
-                  <div className="flex min-h-[60px] items-center justify-center">
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-primary" />
-                    <span className="text-xs text-muted-foreground">Loading details...</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="line-clamp-1 text-sm font-semibold md:text-lg">{stateStats[selectedState].name}</h3>
-                    </div>
-                    <div className="space-y-1 text-xs md:text-sm">
-                      <div className="flex justify-between"><span>Bills:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].legislationCount}</Badge></div>
-                      <div className="flex justify-between"><span>Reps:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].activeRepresentatives}</Badge></div>
-                      <div className="flex justify-between"><span>Recent:</span><Badge variant="secondary" className="text-xs">{stateStats[selectedState].recentActivity}</Badge></div>
-                    </div>
-                  </>
-                )}
+                <StateMapTooltip
+                  mapMode={mapMode}
+                  state={stateStats[selectedState]}
+                  activityLevel={getActivityLevel(selectedState)}
+                />
               </MapLibrePopup>
             )}
           </MapLibreMap>
@@ -255,6 +251,12 @@ function MapSurface({
       {mapDataProgress < 100 && mapDataProgress > 0 && (
         <div className="absolute left-0 right-0 top-0 z-20 h-1 bg-border">
           <div className="h-full bg-primary transition-all duration-300" style={{ width: `${mapDataProgress}%` }} />
+        </div>
+      )}
+
+      {mapDataProgress < 100 && mapDataProgress === 0 && (
+        <div className="absolute left-0 right-0 top-0 z-20 h-1 bg-border">
+          <div className="h-full w-[8%] animate-pulse bg-primary" />
         </div>
       )}
 

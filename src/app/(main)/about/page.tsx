@@ -41,7 +41,7 @@ export default function AboutPage() {
             The platform is designed to empower citizens by providing them with the tools they need to stay informed about the laws that govern their communities.
           </p>
           <p>
-            Kairui is a current freshman at the University of Washington - Seattle, majoring in Computer Science. In his free time, Kairui enjoys reading science fiction, coding, hiking Washington trails, running, and practicing the Alto Saxophone.
+            Kairui is a rising sophomore at the University of Washington - Seattle, majoring in Computer Science. In his free time, Kairui enjoys watching baseball, coding, hiking Washington trails, running, and practicing the Alto Saxophone.
           </p>
         </AboutSection>
 

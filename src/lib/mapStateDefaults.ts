@@ -11,6 +11,7 @@ export function createEmptyStateStats(): Record<string, StateData> {
       legislationCount: 0,
       activeRepresentatives: 0,
       recentActivity: 0,
+      topicDiversity: 0,
       keyTopics: [],
       center: STATE_COORDINATES[abbr],
       color: '#d4d0c8',

@@ -29,8 +29,10 @@ function buildStateStatsFromResults(
     recentBills?: number;
     sampleSubjects?: string[];
     uniqueSponsors?: number;
+    uniqueTopics?: number;
     topSubjects?: string[];
   }>,
+  representativeCounts: Record<string, number> = {},
 ): Record<string, StateData> {
   const stateStats: Record<string, StateData> = {};
 
@@ -81,8 +83,9 @@ function buildStateStatsFromResults(
         name: STATE_NAMES[stateAbbr],
         abbreviation: stateAbbr,
         legislationCount: result.totalBills || 0,
-        activeRepresentatives: result.uniqueSponsors || 0,
+        activeRepresentatives: representativeCounts[stateAbbr] ?? result.uniqueSponsors ?? 0,
         recentActivity: result.recentBills || 0,
+        topicDiversity: result.uniqueTopics || 0,
         keyTopics: topSubjects.length > 0 ? topSubjects : ['General'],
         center: STATE_COORDINATES[stateAbbr],
         color: `hsl(${240 - hue}, 70%, 50%)`,
@@ -92,6 +95,74 @@ function buildStateStatsFromResults(
 
   return stateStats;
 }
+
+async function fetchStateLegislatorCounts(): Promise<Record<string, number>> {
+  const repsCollection = await getCollection('representatives');
+  const results = await repsCollection
+    .aggregate(
+      [
+        {
+          $match: {
+            $or: [
+              { 'map_boundary.type': { $in: ['state_leg_upper', 'state_leg_lower', 'state_leg'] } },
+              { 'jurisdiction.classification': 'state' },
+              { 'current_role.org_classification': { $in: ['upper', 'lower', 'legislature'] } },
+            ],
+          },
+        },
+        {
+          $project: {
+            stateAbbr: {
+              $cond: {
+                if: { $eq: [{ $strLenCP: { $ifNull: ['$state', ''] } }, 2] },
+                then: { $toUpper: '$state' },
+                else: null,
+              },
+            },
+            stateName: '$jurisdiction.name',
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $cond: {
+                if: { $ne: ['$stateAbbr', null] },
+                then: '$stateAbbr',
+                else: '$stateName',
+              },
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ],
+      { maxTimeMS: 15000, allowDiskUse: true },
+    )
+    .toArray();
+
+  const counts: Record<string, number> = {};
+  for (const row of results) {
+    const key = row._id;
+    if (!key) continue;
+    if (typeof key === 'string' && key.length === 2) {
+      counts[key.toUpperCase()] = row.count;
+      continue;
+    }
+    for (const [abbr, name] of Object.entries(STATE_NAMES)) {
+      if (abbr === 'US') continue;
+      if (typeof key === 'string' && key.toLowerCase() === name.toLowerCase()) {
+        counts[abbr] = row.count;
+        break;
+      }
+    }
+  }
+  return counts;
+}
+
+const getCachedRepresentativeCounts = unstable_cache(
+  () => fetchStateLegislatorCounts(),
+  ['map-data-rep-counts'],
+  { revalidate: 600 },
+);
 
 async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Record<string, StateData>> {
   const legislationCollection = await getCollection('legislation');
@@ -130,6 +201,7 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
           },
         },
         sampleSubjects: { $push: { $arrayElemAt: ['$subjects', 0] } },
+        topicSubjects: { $addToSet: { $arrayElemAt: ['$subjects', 0] } },
         sponsorCount: { $addToSet: { $arrayElemAt: ['$sponsors.name', 0] } },
       },
     },
@@ -149,18 +221,31 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
             3,
           ],
         },
+        uniqueTopics: {
+          $size: {
+            $filter: {
+              input: '$topicSubjects',
+              cond: { $and: [{ $ne: ['$$this', null] }, { $ne: ['$$this', ''] }] },
+            },
+          },
+        },
         uniqueSponsors: { $size: '$sponsorCount' },
       },
     },
     { $sort: { totalBills: -1 } },
   );
 
-  const results = await legislationCollection
+  const fetchLegislation = legislationCollection
     .aggregate(pipeline, {
-      maxTimeMS: requestedAbbrs ? 8000 : 25000,
+      maxTimeMS: requestedAbbrs ? 12000 : 25000,
       allowDiskUse: true,
     })
     .toArray();
+
+  const [results, representativeCounts] = await Promise.all([
+    fetchLegislation,
+    getCachedRepresentativeCounts(),
+  ]);
 
   const stateStats = buildStateStatsFromResults(
     results as Array<{
@@ -169,8 +254,10 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
       recentBills?: number;
       sampleSubjects?: string[];
       uniqueSponsors?: number;
+      uniqueTopics?: number;
       topSubjects?: string[];
     }>,
+    representativeCounts,
   );
 
   if (!requestedAbbrs) {
@@ -181,8 +268,9 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
           name,
           abbreviation: abbr,
           legislationCount: 0,
-          activeRepresentatives: 0,
+          activeRepresentatives: representativeCounts[abbr] || 0,
           recentActivity: 0,
+          topicDiversity: 0,
           keyTopics: ['No Data'],
           center: STATE_COORDINATES[abbr],
           color: '#e0e0e0',

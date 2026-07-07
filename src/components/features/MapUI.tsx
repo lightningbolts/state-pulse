@@ -11,6 +11,7 @@ import { RepresentativesResults } from "./RepresentativesResults";
 import { ChamberMakeup } from "./ChamberMakeup";
 import { DashboardMapCanvas } from './DashboardMapCanvas';
 import { DashboardFullscreenToolbar } from './DashboardFullscreenToolbar';
+import { StateModeDetailPanel } from './StateModeDetailPanel';
 import { useInteractiveMap } from '@/hooks/useInteractiveMap';
 import { MapMode } from '@/types/geo';
 
@@ -40,6 +41,31 @@ const DISTRICT_COLORS: Record<string, string> = {
     'congressional-districts': '#2563eb',
     'state-upper-districts': '#a21caf',
     'state-lower-districts': '#16a34a',
+};
+
+type BubbleMapMode = 'legislation' | 'representatives' | 'trends' | 'recent';
+
+const getModeMetric = (state: { legislationCount: number; activeRepresentatives: number; recentActivity: number; topicDiversity: number }, mode: string): number => {
+    switch (mode) {
+        case 'legislation': return state.legislationCount || 0;
+        case 'representatives': return state.activeRepresentatives || 0;
+        case 'trends': return state.topicDiversity || 0;
+        case 'recent': return state.recentActivity || 0;
+        default: return 0;
+    }
+};
+
+const scaleBubbleSize = (value: number, maxValue: number): number => {
+    const minSize = 5;
+    const maxSize = 28;
+    if (value < 1 || maxValue < 1) return minSize;
+    const normalized = Math.sqrt(value / maxValue);
+    return Math.max(minSize, minSize + normalized * (maxSize - minSize));
+};
+
+const getActivityIntensity = (value: number, maxValue: number): number => {
+    if (maxValue < 1) return 0;
+    return Math.min(value / maxValue, 1);
 };
 
 const PARTY_COLORS: Record<string, string> = {
@@ -318,25 +344,25 @@ export const MapUI = () => {
         return () => window.clearTimeout(timer);
     }, [isFullScreen, mapMode]);
 
+    const modeMaxMetric = React.useMemo(() => {
+        if (!['legislation', 'representatives', 'trends', 'recent'].includes(mapMode)) return 1;
+        const values = Object.values(stateStats).map((state) => getModeMetric(state, mapMode));
+        return Math.max(...values, 1);
+    }, [stateStats, mapMode]);
+
     const getStateColor = React.useCallback((stateAbbr: string) => {
         const state = stateStats[stateAbbr];
         if (!state) return '#e0e0e0';
         switch (mapMode) {
             case 'legislation':
-                const intensity = Math.min(state.legislationCount / 3000, 1);
+            case 'representatives':
+            case 'trends':
+            case 'recent': {
+                const intensity = getActivityIntensity(getModeMetric(state, mapMode), modeMaxMetric);
                 if (intensity >= 0.7) return 'hsl(var(--primary))';
                 if (intensity >= 0.3) return 'hsl(var(--primary) / 0.5)';
                 return 'hsl(var(--primary) / 0.2)';
-            case 'representatives':
-                const repIntensity = Math.min(state.activeRepresentatives / 250, 1);
-                if (repIntensity >= 0.7) return 'hsl(var(--primary))';
-                if (repIntensity >= 0.3) return 'hsl(var(--primary) / 0.5)';
-                return 'hsl(var(--primary) / 0.2)';
-            case 'recent':
-                const recentIntensity = Math.min(state.recentActivity / 200, 1);
-                if (recentIntensity >= 0.7) return 'hsl(var(--primary))';
-                if (recentIntensity >= 0.3) return 'hsl(var(--primary) / 0.5)';
-                return 'hsl(var(--primary) / 0.2)';
+            }
             case 'voting-power':
                 const votingData = votingPowerData[stateAbbr];
                 if (!votingData) return '#e0e0e0';
@@ -344,47 +370,35 @@ export const MapUI = () => {
             default:
                 return state.color;
         }
-    }, [mapMode, stateStats, votingPowerData]);
+    }, [mapMode, stateStats, votingPowerData, modeMaxMetric]);
 
     const memoizedMarkers = React.useMemo(() => {
         const markers: Record<string, { color: string, size: number }> = {};
+        const bubbleModes: BubbleMapMode[] = ['legislation', 'representatives', 'trends', 'recent'];
         Object.entries(stateStats).forEach(([abbr, state]) => {
             const color = getStateColor(abbr);
             let size = 20;
-            if (mapMode === 'legislation') {
-                const minSize = 5;
-                const count = state.legislationCount || 0;
-                const k = 0.63;
-                if (count < 1) {
-                    size = minSize;
-                } else {
-                    size = Math.max(minSize, k * Math.sqrt(count));
-                }
+            if (bubbleModes.includes(mapMode as BubbleMapMode)) {
+                size = scaleBubbleSize(getModeMetric(state, mapMode), modeMaxMetric);
             }
             markers[abbr] = { color, size };
         });
         return markers;
-    }, [getStateColor, stateStats, mapMode]);
+    }, [getStateColor, stateStats, mapMode, modeMaxMetric]);
 
     const getActivityLevel = (stateAbbr: string) => {
         const state = stateStats[stateAbbr];
         if (!state) return 'No Data';
         switch (mapMode) {
             case 'legislation':
-                const intensity = Math.min(state.legislationCount / 3000, 1);
+            case 'representatives':
+            case 'trends':
+            case 'recent': {
+                const intensity = getActivityIntensity(getModeMetric(state, mapMode), modeMaxMetric);
                 if (intensity >= 0.7) return 'High Activity';
                 if (intensity >= 0.3) return 'Medium Activity';
                 return 'Low Activity';
-            case 'representatives':
-                const repIntensity = Math.min(state.activeRepresentatives / 250, 1);
-                if (repIntensity >= 0.7) return 'High Activity';
-                if (repIntensity >= 0.3) return 'Medium Activity';
-                return 'Low Activity';
-            case 'recent':
-                const recentIntensity = Math.min(state.recentActivity / 200, 1);
-                if (recentIntensity >= 0.7) return 'High Activity';
-                if (recentIntensity >= 0.3) return 'Medium Activity';
-                return 'Low Activity';
+            }
             case 'voting-power':
                 const votingData = votingPowerData[stateAbbr];
                 if (!votingData) return 'No Data';
@@ -655,24 +669,29 @@ export const MapUI = () => {
                 )}
                 {['congressional-districts', 'state-upper-districts', 'state-lower-districts'].includes(mapMode) ? (<div className="text-xs text-muted-foreground text-center w-full py-2"><div>{isMobile ? 'Tap anywhere on the map to see legislators' : 'Click anywhere on the map to see legislators representing that location.'}</div>{isMobile && mapMode === 'state-lower-districts' && (<div className="text-amber-600 mt-1">Large dataset - optimized for mobile performance</div>)}</div>) : (<div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0 text-xs text-muted-foreground"><div className="flex items-center space-x-2 md:space-x-4 overflow-x-auto"><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary"></div><span className="whitespace-nowrap">High Activity</span></div><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/50"></div><span className="whitespace-nowrap"><span className="hidden sm:inline">Medium Activity</span><span className="sm:hidden">Medium</span></span></div><div className="flex items-center space-x-1 flex-shrink-0"><div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-primary/20"></div><span className="whitespace-nowrap"><span className="hidden sm:inline">Low Activity</span><span className="sm:hidden">Low</span></span></div></div><div className="text-xs hidden md:block">Click markers for detailed state information</div><div className="text-xs md:hidden">Tap markers for details</div></div>)}
                 {selectedState && stateStats[selectedState] && (
-                    <Card className="shadow-lg">
-                        <CardHeader className="pb-3 md:pb-6"><CardTitle className="flex items-center justify-between text-lg md:text-xl"><span className="line-clamp-1">{stateStats[selectedState].name} Details</span><Button variant="ghost" size="sm" onClick={() => setSelectedState(null)} className="flex-shrink-0">×</Button></CardTitle></CardHeader>
-                        <CardContent className="pt-0">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                                <div className="space-y-1 md:space-y-2"><div className="flex items-center space-x-2"><FileText className="h-3 w-3 md:h-4 md:w-4 text-blue-500 flex-shrink-0"/><span className="font-medium text-sm md:text-base"><span className="hidden sm:inline">Legislative Activity</span><span className="sm:hidden">Bills</span></span></div><p className="text-xl md:text-2xl font-bold">{stateStats[selectedState].legislationCount}</p><p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Active bills and resolutions</span><span className="sm:hidden">Active bills</span></p></div>
-                                <div className="space-y-1 md:space-y-2"><div className="flex items-center space-x-2"><Users className="h-3 w-3 md:h-4 md:w-4 text-green-500 flex-shrink-0"/><span className="font-medium text-sm md:text-base"><span className="hidden sm:inline">Representatives</span><span className="sm:hidden">Reps</span></span></div><p className="text-xl md:text-2xl font-bold">{stateStats[selectedState].activeRepresentatives}</p><p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Active state legislators</span><span className="sm:hidden">Legislators</span></p></div>
-                                <div className="space-y-1 md:space-y-2"><div className="flex items-center space-x-2"><TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-orange-500 flex-shrink-0"/><span className="font-medium text-sm md:text-base">Recent Activity</span></div><p className="text-xl md:text-2xl font-bold">{stateStats[selectedState].recentActivity}</p><p className="text-xs text-muted-foreground"><span className="hidden sm:inline">Actions in the last 30 days</span><span className="sm:hidden">Last 30 days</span></p></div>
+                    <Card className="shadow-lg overflow-hidden">
+                        <CardContent className="p-4 md:p-6">
+                            <StateModeDetailPanel
+                                mapMode={mapMode}
+                                stateAbbr={selectedState}
+                                state={stateStats[selectedState]}
+                                stateDetails={stateDetails}
+                                detailsLoading={detailsLoading}
+                                activityLevel={getActivityLevel(selectedState)}
+                                onViewDashboard={() => router.push(`/dashboard?stateAbbr=${selectedState}`)}
+                                onViewLegislation={() => router.push(`/legislation?state=${encodeURIComponent(stateStats[selectedState].name)}&stateAbbr=${selectedState}`)}
+                            />
+                            <div className="mt-4 flex justify-end">
+                                <Button variant="ghost" size="sm" onClick={() => setSelectedState(null)}>Close</Button>
                             </div>
-                            <div className="mt-4 md:mt-6"><h4 className="font-medium mb-2 text-sm md:text-base"><span className="hidden sm:inline">Key Policy Areas</span><span className="sm:hidden">Policy Areas</span></h4><div className="flex flex-wrap gap-1 md:gap-2">{[...new Set(stateStats[selectedState].keyTopics)].map((topic, index) => (<Badge key={`${topic}-${index}`} variant="secondary" className="text-xs">{topic}</Badge>))}</div></div>
-                            <div className="mt-4 md:mt-6 pt-3 md:pt-4 border-t"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3"><Button variant="outline" size="sm" onClick={() => router.push(`/dashboard?stateAbbr=${selectedState}`)} className="w-full"><span className="hidden sm:inline">View Full Dashboard</span><span className="sm:hidden">Full Dashboard</span></Button><Button variant="outline" size="sm" onClick={() => router.push(`/legislation?state=${encodeURIComponent(stateStats[selectedState].name)}&stateAbbr=${selectedState}`)} className="w-full"><span className="hidden sm:inline">View Legislation</span><span className="sm:hidden">View Bills</span></Button></div></div>
                         </CardContent>
                     </Card>
                 )}
-                {selectedState && stateStats[selectedState] && (<ChamberMakeup state={selectedState} />)}
+                {selectedState && stateStats[selectedState] && mapMode === 'representatives' && (<ChamberMakeup state={selectedState} />)}
                 <AnimatedSection>
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-4">
                         <Card><CardContent className="p-3 md:p-4"><div className="flex items-center space-x-2"><FileText className="h-4 w-4 md:h-5 md:w-5 text-blue-500 flex-shrink-0"/><div className="min-w-0"><p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Total Legislation</span><span className="sm:hidden">Total Bills</span></p><p className="text-lg md:text-2xl font-bold">{Object.values(stateStats).reduce((sum, state) => sum + state.legislationCount, 0).toLocaleString()}</p></div></div></CardContent></Card>
-                        <Card><CardContent className="p-3 md:p-4"><div className="flex items-center space-x-2"><Users className="h-4 w-4 md:h-5 md:w-5 text-green-500 flex-shrink-0"/><div className="min-w-0"><p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Active Sponsors</span><span className="sm:hidden">Active Reps</span></p><p className="text-lg md:text-2xl font-bold">{Object.values(stateStats).reduce((sum, state) => sum + state.activeRepresentatives, 0).toLocaleString()}</p></div></div></CardContent></Card>
+                        <Card><CardContent className="p-3 md:p-4"><div className="flex items-center space-x-2"><Users className="h-4 w-4 md:h-5 md:w-5 text-green-500 flex-shrink-0"/><div className="min-w-0"><p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">State Legislators</span><span className="sm:hidden">Legislators</span></p><p className="text-lg md:text-2xl font-bold">{Object.values(stateStats).reduce((sum, state) => sum + state.activeRepresentatives, 0).toLocaleString()}</p></div></div></CardContent></Card>
                         <Card><CardContent className="p-3 md:p-4"><div className="flex items-center space-x-2"><TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-orange-500 flex-shrink-0"/><div className="min-w-0"><p className="text-xs md:text-sm font-medium truncate">Recent Activity</p><p className="text-lg md:text-2xl font-bold">{Object.values(stateStats).reduce((sum, state) => sum + state.recentActivity, 0).toLocaleString()}</p></div></div></CardContent></Card>
                         <Card><CardContent className="p-3 md:p-4"><div className="flex items-center space-x-2"><MapPin className="h-4 w-4 md:h-5 md:w-5 text-purple-500 flex-shrink-0"/><div className="min-w-0"><p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Jurisdictions Tracked</span><span className="sm:hidden">Jurisdictions</span></p><p className="text-lg md:text-2xl font-bold">{Object.keys(stateStats).length}</p></div></div></CardContent></Card>
                     </div>

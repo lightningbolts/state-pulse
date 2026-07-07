@@ -400,6 +400,25 @@ const RepresentativeCard: React.FC<RepresentativeCardProps> = ({ rep, index, sho
                   <p className="text-xs text-muted-foreground mb-3">
                     {normalized.state || normalized.jurisdiction}
                   </p>
+                  {(rep.sponsoredCount || rep.cosponsoredCount || rep.recentActivityCount) ? (
+                    <div className="mb-3 flex flex-wrap gap-1.5">
+                      {(rep.sponsoredCount ?? 0) > 0 && (
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          {rep.sponsoredCount} sponsored
+                        </Badge>
+                      )}
+                      {(rep.cosponsoredCount ?? 0) > 0 && (
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          {rep.cosponsoredCount} cosponsored
+                        </Badge>
+                      )}
+                      {(rep.recentActivityCount ?? 0) > 0 && (
+                        <Badge variant="outline" className="text-[10px] font-normal">
+                          {rep.recentActivityCount} recent
+                        </Badge>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               {/* Contact info visually inside card, but not part of navigation */}

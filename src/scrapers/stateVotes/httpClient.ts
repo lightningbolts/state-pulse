@@ -1,4 +1,5 @@
 import type { HttpClient } from '@/types/voteRecord';
+import { Agent, fetch as undiciFetch } from 'undici';
 
 const USER_AGENTS = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -8,6 +9,18 @@ const USER_AGENTS = [
 
 function randomUserAgent(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+const INSECURE_TLS_HOSTS = new Set(['www.legislature.ohio.gov']);
+const insecureTlsAgent = new Agent({ connect: { rejectUnauthorized: false } });
+
+function fetchDispatcher(url: string): Agent | undefined {
+  try {
+    const host = new URL(url).hostname;
+    return INSECURE_TLS_HOSTS.has(host) ? insecureTlsAgent : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -64,9 +77,10 @@ export class FetchHttpClient implements HttpClient {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-        const response = await fetch(url, {
+        const response = await undiciFetch(url, {
           ...options,
           signal: controller.signal,
+          dispatcher: fetchDispatcher(url),
           headers: {
             'User-Agent': randomUserAgent(),
             Accept: 'text/html,application/json,*/*',

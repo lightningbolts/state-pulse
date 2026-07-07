@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { buildCongressBillId } from '@/lib/congressBillId';
 import { upsertVotingRecord } from '../services/votingRecordService';
-import * as cheerio from 'cheerio';
 import { VotingRecord, MemberVote } from '../types/legislation';
 import { config } from 'dotenv';
 const yaml = require('js-yaml');
@@ -14,11 +13,138 @@ config({ path: require('path').resolve(__dirname, '../../.env') });
 const API_KEY = process.env.US_CONGRESS_API_KEY || '';
 const BASE_URL = 'https://api.congress.gov/v3';
 const CONGRESS = 119;
-const SESSION = 1;
+const SESSION = getCurrentCongressSession(CONGRESS);
 
-if (!API_KEY) {
-  console.error('US_CONGRESS_API_KEY environment variable is required');
+function getCongressFirstYear(congress: number): number {
+  return (congress - 1) * 2 + 1789;
+}
+
+function getCurrentCongressSession(congress: number): number {
+  const firstYear = getCongressFirstYear(congress);
+  const currentYear = new Date().getFullYear();
+  return Math.min(Math.max(currentYear - firstYear + 1, 1), 2);
+}
+
+function getSessionsInRange(congress: number, since: Date): number[] {
+  const firstYear = getCongressFirstYear(congress);
+  const sinceSession = Math.min(Math.max(since.getFullYear() - firstYear + 1, 1), 2);
+  const currentSession = getCurrentCongressSession(congress);
+  const sessions: number[] = [];
+
+  for (let session = sinceSession; session <= currentSession; session++) {
+    sessions.push(session);
+  }
+
+  return sessions.length > 0 ? sessions : [currentSession];
+}
+
+const SENATE_MONTHS: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+function parseSenateMenuDate(dateText: string, congressYear: number): Date | null {
+  const shortMatch = dateText.match(/^(\d{1,2})-([A-Za-z]{3})$/);
+  if (shortMatch) {
+    const month = SENATE_MONTHS[shortMatch[2]];
+    if (month === undefined) return null;
+    return new Date(congressYear, month, Number(shortMatch[1]));
+  }
+
+  const parsed = new Date(dateText);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+interface SenateVoteLink {
+  url: string;
+  voteNumber: string;
+  voteDate: Date;
+  session: number;
+}
+
+interface FetchOptions {
+  since: Date;
+  chamber: 'house' | 'senate' | 'both';
+  isBackfill: boolean;
+}
+
+function parseCliArgs(): FetchOptions {
+  const args = process.argv.slice(2);
+  let since: Date | null = null;
+  let chamber: FetchOptions['chamber'] = 'both';
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--since' && args[i + 1]) {
+      since = parseSinceArg(args[++i]);
+    } else if (arg === '--chamber' && args[i + 1]) {
+      chamber = parseChamberArg(args[++i]);
+    } else if (arg === '--help' || arg === '-h') {
+      printUsage();
+      process.exit(0);
+    } else {
+      console.error(`Unknown argument: ${arg}`);
+      printUsage();
+      process.exit(1);
+    }
+  }
+
+  if (!since) {
+    return { since: getDefaultSince(), chamber: 'both', isBackfill: false };
+  }
+
+  return { since, chamber, isBackfill: true };
+}
+
+function parseSinceArg(value: string): Date {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    console.error(`Invalid --since date: ${value}. Use YYYY-MM-DD.`);
+    process.exit(1);
+  }
+
+  return startOfDay(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+}
+
+function parseChamberArg(value: string): FetchOptions['chamber'] {
+  const normalized = value.toLowerCase();
+  if (normalized === 'house' || normalized === 'senate' || normalized === 'both') {
+    return normalized;
+  }
+
+  console.error(`Invalid --chamber value: ${value}. Use house, senate, or both.`);
   process.exit(1);
+}
+
+function printUsage() {
+  console.log(`Usage: npx tsx fetchVotingRecords.ts [options]
+
+Options:
+  --since YYYY-MM-DD   Backfill votes on or after this date (default: yesterday)
+  --chamber CHAMBER    house, senate, or both (default: both)
+  -h, --help           Show this help message
+
+Examples:
+  npx tsx fetchVotingRecords.ts
+  npx tsx fetchVotingRecords.ts --since 2025-12-01
+  npx tsx fetchVotingRecords.ts --since 2026-01-01 --chamber senate`);
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function getDefaultSince(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return startOfDay(date);
+}
+
+function requireApiKey(chamber: FetchOptions['chamber']) {
+  if (chamber !== 'senate' && !API_KEY) {
+    console.error('US_CONGRESS_API_KEY environment variable is required for House votes');
+    process.exit(1);
+  }
 }
 
 function log(message: string) {
@@ -26,14 +152,9 @@ function log(message: string) {
   console.log(`[${timestamp}] ${message}`);
 }
 
-function isWithinLastDay(dateString: string): boolean {
+function isOnOrAfter(dateString: string, since: Date): boolean {
   if (!dateString) return false;
-  
-  const voteDate = new Date(dateString);
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-  
-  return voteDate >= oneDayAgo;
+  return startOfDay(new Date(dateString)) >= startOfDay(since);
 }
 
 function formatDateForAPI(date: Date): string {
@@ -73,53 +194,133 @@ function buildSenateBioguideIdMap(yamlPath: string): Map<string, string> {
   }
 }
 
-async function fetchSenateRollCallVoteLinks(): Promise<{url: string, voteNumber: string}[]> {
+async function fetchSenateRollCallVoteLinks(since: Date): Promise<SenateVoteLink[]> {
   try {
-    log('Fetching Senate roll call votes...');
-    const res = await fetch(`https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${CONGRESS}_${SESSION}.htm`);
-    
-    if (!res.ok) {
-      log(`Failed to fetch Senate HTML menu: ${res.status}`);
-      return [];
-    }
-    
-    const html = await res.text();
-    const $ = cheerio.load(html);
-    const links: {url: string, voteNumber: string}[] = [];
-    
-    $('a').each((_: number, el: any) => {
-      const href = $(el).attr('href');
-      const text = $(el).text();
-      if (href && href.includes(`/legislative/LIS/roll_call_votes/vote${CONGRESS}${SESSION}/vote_${CONGRESS}_${SESSION}_`)) {
-        const match = text.match(/(\d+)/);
-        if (match) {
-          links.push({ 
-            url: 'https://www.senate.gov' + href, 
-            voteNumber: match[1] 
-          });
-        }
+    const sessions = getSessionsInRange(CONGRESS, since);
+    log(`Fetching Senate roll call votes for session(s) ${sessions.join(', ')}...`);
+
+    const links: SenateVoteLink[] = [];
+
+    for (const session of sessions) {
+      const menuUrl = `https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_${CONGRESS}_${session}.xml`;
+      const res = await fetch(menuUrl);
+
+      if (!res.ok) {
+        log(`Failed to fetch Senate vote menu XML for session ${session}: ${res.status}`);
+        continue;
       }
-    });
-    
-    log(`Found ${links.length} Senate roll call vote links`);
-    return links;
+
+      const xml = await res.text();
+      const congressYearMatch = xml.match(/<congress_year>(\d+)<\/congress_year>/);
+      const congressYear = congressYearMatch
+        ? Number(congressYearMatch[1])
+        : getCongressFirstYear(CONGRESS) + session - 1;
+
+      const voteBlocks = xml.match(/<vote>[\s\S]*?<\/vote>/g) ?? [];
+      for (const block of voteBlocks) {
+        const voteNumberMatch = block.match(/<vote_number>(\d+)<\/vote_number>/);
+        const voteDateMatch = block.match(/<vote_date>(.*?)<\/vote_date>/);
+        if (!voteNumberMatch || !voteDateMatch) continue;
+
+        const voteNumber = String(Number(voteNumberMatch[1]));
+        const voteDate = parseSenateMenuDate(voteDateMatch[1].trim(), congressYear);
+        if (!voteDate) continue;
+
+        const paddedVoteNumber = voteNumberMatch[1].padStart(5, '0');
+        links.push({
+          voteNumber,
+          voteDate,
+          session,
+          url: `https://www.senate.gov/legislative/LIS/roll_call_votes/vote${CONGRESS}${session}/vote_${CONGRESS}_${session}_${paddedVoteNumber}.xml`,
+        });
+      }
+    }
+
+    links.sort((a, b) => b.voteDate.getTime() - a.voteDate.getTime());
+    const recentLinks = links.filter((link) => startOfDay(link.voteDate) >= startOfDay(since));
+    log(`Found ${recentLinks.length} Senate roll call votes since ${formatDateForAPI(since)} (${links.length} total in menu)`);
+    return recentLinks;
   } catch (error) {
     log(`Error fetching Senate vote links: ${error}`);
     return [];
   }
 }
 
-async function fetchHouseRollCallVotes(): Promise<any[]> {
+function parseSenateVoteXml(
+  xml: string,
+  bioguideMap: Map<string, string>,
+  session: number,
+  voteNumber: string
+): VotingRecord | null {
+  const voteDateMatch = xml.match(/<vote_date>(.*?)<\/vote_date>/);
+  const voteQuestionMatch =
+    xml.match(/<vote_question_text>(.*?)<\/vote_question_text>/) ??
+    xml.match(/<question>(.*?)<\/question>/);
+  const resultMatch = xml.match(/<vote_result>(.*?)<\/vote_result>/);
+  const documentTypeMatch = xml.match(/<document_type>(.*?)<\/document_type>/);
+  const documentNumberMatch = xml.match(/<document_number>(.*?)<\/document_number>/);
+
+  const dateText = voteDateMatch?.[1]?.trim() ?? '';
+  const date = dateText ? new Date(dateText).toISOString() : '';
+  const voteQuestion = voteQuestionMatch?.[1]?.replace(/\s+/g, ' ').trim() ?? '';
+  const result = resultMatch?.[1]?.replace(/\s+/g, ' ').trim() ?? '';
+
+  let legislationNumber = '';
+  let legislationType = '';
+  let bill_id: string | undefined;
+
+  const documentType = documentTypeMatch?.[1]?.trim() ?? '';
+  const documentNumber = documentNumberMatch?.[1]?.trim() ?? '';
+  if (documentType && documentNumber && /^\d+$/.test(documentNumber)) {
+    legislationType = documentType.replace(/\./g, '').trim();
+    legislationNumber = documentNumber;
+    bill_id = buildCongressBillId(CONGRESS, legislationType, legislationNumber);
+  }
+
+  const memberVotes: MemberVote[] = [];
+  const memberBlocks = xml.match(/<member>[\s\S]*?<\/member>/g) ?? [];
+  for (const block of memberBlocks) {
+    const firstName = block.match(/<first_name>(.*?)<\/first_name>/)?.[1]?.trim() ?? '';
+    const lastName = block.match(/<last_name>(.*?)<\/last_name>/)?.[1]?.trim() ?? '';
+    const party = block.match(/<party>(.*?)<\/party>/)?.[1]?.trim() ?? '';
+    const state = block.match(/<state>(.*?)<\/state>/)?.[1]?.trim() ?? '';
+    const voteCast = block.match(/<vote_cast>(.*?)<\/vote_cast>/)?.[1]?.trim() ?? '';
+    if (!lastName || !voteCast) continue;
+
+    const key = `${normalizeName(lastName.toLowerCase())}|${state}`;
+    memberVotes.push({
+      bioguideId: bioguideMap.get(key) || '',
+      firstName,
+      lastName,
+      voteCast,
+      voteParty: party,
+      voteState: state,
+    });
+  }
+
+  return {
+    identifier: `senate-${CONGRESS}-${voteNumber}`,
+    rollCallNumber: Number(voteNumber),
+    legislationType,
+    legislationNumber,
+    bill_id,
+    voteQuestion,
+    result,
+    date,
+    memberVotes,
+    congress: CONGRESS,
+    session,
+    chamber: 'US Senate',
+  };
+}
+
+async function fetchHouseRollCallVotes(since: Date): Promise<any[]> {
   try {
     let votes: any[] = [];
     let offset = 0;
     const limit = 100;
     let hasMore = true;
-    
-    // Add date filtering for last day
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-    const fromDate = formatDateForAPI(oneDayAgo);
+    const fromDate = formatDateForAPI(since);
     
     log(`Fetching House roll call votes from ${fromDate}...`);
     
@@ -134,16 +335,14 @@ async function fetchHouseRollCallVotes(): Promise<any[]> {
       
       const data: any = await res.json();
       if (data.houseRollCallVotes && data.houseRollCallVotes.length > 0) {
-        // Filter votes to only include those from the last day
-        const recentVotes = data.houseRollCallVotes.filter((vote: any) => 
-          isWithinLastDay(vote.startDate)
+        const recentVotes = data.houseRollCallVotes.filter((vote: any) =>
+          isOnOrAfter(vote.startDate, since)
         );
         
         votes.push(...recentVotes);
         offset += limit;
         hasMore = data.houseRollCallVotes.length === limit;
         
-        // If we're getting older votes, we can stop
         if (recentVotes.length === 0 && data.houseRollCallVotes.length > 0) {
           hasMore = false;
         }
@@ -152,7 +351,7 @@ async function fetchHouseRollCallVotes(): Promise<any[]> {
       }
     }
     
-    log(`Fetched ${votes.length} House roll call votes from last day`);
+    log(`Fetched ${votes.length} House roll call votes since ${fromDate}`);
     return votes;
   } catch (error) {
     log(`Error fetching House votes: ${error}`);
@@ -160,9 +359,9 @@ async function fetchHouseRollCallVotes(): Promise<any[]> {
   }
 }
 
-async function fetchMemberVotes(voteNumber: number): Promise<MemberVote[]> {
+async function fetchMemberVotes(voteNumber: number, session: number): Promise<MemberVote[]> {
   try {
-    const url = `${BASE_URL}/house-vote/${CONGRESS}/${SESSION}/${voteNumber}/members?api_key=${API_KEY}`;
+    const url = `${BASE_URL}/house-vote/${CONGRESS}/${session}/${voteNumber}/members?api_key=${API_KEY}`;
     const res = await fetch(url);
     
     if (!res.ok) return [];
@@ -183,15 +382,16 @@ async function fetchMemberVotes(voteNumber: number): Promise<MemberVote[]> {
   }
 }
 
-async function processHouseVotes(): Promise<number> {
+async function processHouseVotes(since: Date): Promise<number> {
   let processedCount = 0;
   
   try {
-    const votes = await fetchHouseRollCallVotes();
+    const votes = await fetchHouseRollCallVotes(since);
     
     for (const vote of votes) {
       try {
-        const memberVotes = await fetchMemberVotes(vote.rollCallNumber);
+        const voteSession = Number(vote.session ?? vote.sessionNumber ?? SESSION);
+        const memberVotes = await fetchMemberVotes(vote.rollCallNumber, voteSession);
         
         const votingRecord: VotingRecord = {
           identifier: vote.identifier,
@@ -204,12 +404,16 @@ async function processHouseVotes(): Promise<number> {
           date: vote.startDate,
           memberVotes,
           congress: CONGRESS,
-          session: SESSION,
+          session: voteSession,
           chamber: 'US House',
         };
         
         await upsertVotingRecord(votingRecord);
         processedCount++;
+
+        if (processedCount % 25 === 0) {
+          log(`House backfill progress: ${processedCount}/${votes.length}`);
+        }
       } catch (error) {
         log(`Error processing House vote ${vote.rollCallNumber}: ${error}`);
       }
@@ -222,115 +426,50 @@ async function processHouseVotes(): Promise<number> {
   return processedCount;
 }
 
-async function processSenateVotes(): Promise<number> {
+async function processSenateVotes(since: Date): Promise<number> {
   let processedCount = 0;
-  let filteredCount = 0;
+  let skippedCount = 0;
   
   try {
     const yamlPath = path.resolve(__dirname, 'legislators-current.yaml');
     const bioguideMap = buildSenateBioguideIdMap(yamlPath);
-    const senateVoteLinks = await fetchSenateRollCallVoteLinks();
+    const senateVoteLinks = await fetchSenateRollCallVoteLinks(since);
 
     log(`Processing ${senateVoteLinks.length} Senate vote links...`);
 
     for (const link of senateVoteLinks) {
       try {
         const res = await fetch(link.url);
-        if (!res.ok) continue;
-        
-        const html = await res.text();
-        const $ = cheerio.load(html);
-        const summaryText = $('.contenttext').first().text().replace(/\s+/g, ' ').trim();
-
-        // Extract metadata
-        const voteQuestionMatch = summaryText.match(/Question: (.*?)(?= Vote Number:| Vote Date:| Required For Majority:| Vote Result:| Measure Number:| Measure Title:|$)/);
-        const resultMatch = summaryText.match(/(?:Vote Result|Result): (.*?)(?= Measure Number:| Measure Title:|$)/);
-        const dateMatch = summaryText.match(/Vote Date: (.*?)(?= Required For Majority:| Vote Result:|$)/);
-        const measureMatch = summaryText.match(/(?:Measure Number|Bill Number): (.*?)(?= Measure Title:|$)/);
-
-        const voteQuestion = voteQuestionMatch ? voteQuestionMatch[1].trim() : '';
-        const result = resultMatch ? resultMatch[1].trim() : '';
-        const dateText = dateMatch ? dateMatch[1].trim() : '';
-        const date = dateText ? new Date(dateText).toISOString() : '';
-        const measureText = measureMatch ? measureMatch[1].trim() : '';
-
-        // Skip votes that are not from the last day
-        if (!isWithinLastDay(date)) {
-          filteredCount++;
+        if (!res.ok) {
+          log(`Failed to fetch Senate vote ${link.voteNumber}: ${res.status}`);
           continue;
         }
 
-        let legislationNumber = '';
-        let legislationType = '';
-        let bill_id: string | undefined = undefined;
+        const votingRecord = parseSenateVoteXml(
+          await res.text(),
+          bioguideMap,
+          link.session,
+          link.voteNumber
+        );
+        if (!votingRecord) continue;
 
-        if (measureText) {
-          const measureMatch = measureText.match(/([A-Za-z\.]+)\s*(\d+)/);
-          if (measureMatch) {
-            legislationType = measureMatch[1].replace(/\./g, '').trim();
-            legislationNumber = measureMatch[2].trim();
-            bill_id = buildCongressBillId(CONGRESS, legislationType, legislationNumber);
-          }
+        if (!isOnOrAfter(votingRecord.date, since)) {
+          skippedCount++;
+          continue;
         }
 
-        // Parse member votes
-        let memberVotes: MemberVote[] = [];
-        const bodyText = $('body').text();
-        const groupedByStateSectionMatch = bodyText.match(/Grouped by Home State\s+([\s\S]*?)(Vote Summary|$)/);
-        
-        if (groupedByStateSectionMatch) {
-          const votesText = groupedByStateSectionMatch[1];
-          const lines = votesText.trim().split('\n');
-          
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || /^[A-Za-z ]+:$/.test(trimmedLine)) continue;
-
-            const m = trimmedLine.match(/^(.*?) \((\w)-(\w{2})\), (Yea|Nay|Not Voting|Present|Absent|Paired|Excused|No|Yes)$/);
-            if (!m) continue;
-            
-            const name = m[1].trim();
-            const party = m[2];
-            const state = m[3];
-            const voteCast = m[4];
-            const [lastName, firstName = ''] = name.split(',').map(s => s.trim());
-            const key = `${normalizeName(lastName.toLowerCase())}|${state}`;
-            const bioguideId = bioguideMap.get(key) || '';
-            
-            memberVotes.push({
-              bioguideId,
-              firstName,
-              lastName,
-              voteCast,
-              voteParty: party,
-              voteState: state,
-            });
-          }
-        }
-
-        const votingRecord: VotingRecord = {
-          identifier: `senate-${CONGRESS}-${link.voteNumber}`,
-          rollCallNumber: Number(link.voteNumber),
-          legislationType,
-          legislationNumber,
-          bill_id,
-          voteQuestion,
-          result,
-          date,
-          memberVotes,
-          congress: CONGRESS,
-          session: SESSION,
-          chamber: 'US Senate',
-        };
-        
         await upsertVotingRecord(votingRecord);
         processedCount++;
+
+        if (processedCount % 25 === 0) {
+          log(`Senate backfill progress: ${processedCount}/${senateVoteLinks.length}`);
+        }
       } catch (error) {
         log(`Error processing Senate vote ${link.voteNumber}: ${error}`);
       }
     }
     
-    log(`Senate votes processed: ${processedCount}, filtered (too old): ${filteredCount}`);
+    log(`Senate votes processed: ${processedCount}, skipped (before since): ${skippedCount}`);
   } catch (error) {
     log(`Error in processSenateVotes: ${error}`);
   }
@@ -338,19 +477,25 @@ async function processSenateVotes(): Promise<number> {
   return processedCount;
 }
 
-async function fetchVotingRecords() {
+async function fetchVotingRecords(options?: FetchOptions) {
   const startTime = Date.now();
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  const { since, chamber, isBackfill } = options ?? parseCliArgs();
   
-  log('Starting daily voting records fetch...');
-  log(`Fetching voting records from ${formatDateForAPI(oneDayAgo)} onwards`);
+  log(isBackfill ? 'Starting voting records backfill...' : 'Starting daily voting records fetch...');
+  log(`Fetching ${chamber} voting records from ${formatDateForAPI(since)} onwards`);
   
   try {
-    const [houseCount, senateCount] = await Promise.all([
-      processHouseVotes(),
-      processSenateVotes()
-    ]);
+    const tasks: Promise<number>[] = [];
+    if (chamber === 'house' || chamber === 'both') {
+      tasks.push(processHouseVotes(since));
+    }
+    if (chamber === 'senate' || chamber === 'both') {
+      tasks.push(processSenateVotes(since));
+    }
+
+    const counts = await Promise.all(tasks);
+    const houseCount = chamber === 'senate' ? 0 : counts[0] ?? 0;
+    const senateCount = chamber === 'both' ? counts[1] ?? 0 : chamber === 'senate' ? counts[0] ?? 0 : 0;
     
     const duration = Math.round((Date.now() - startTime) / 1000);
     const totalProcessed = houseCount + senateCount;
@@ -367,13 +512,15 @@ async function fetchVotingRecords() {
 
 // Main execution
 async function main() {
-  const result = await fetchVotingRecords();
+  const options = parseCliArgs();
+  requireApiKey(options.chamber);
+  const result = await fetchVotingRecords(options);
   
   if (result.success) {
-    log('Daily voting records fetch completed successfully');
+    log(options.isBackfill ? 'Voting records backfill completed successfully' : 'Daily voting records fetch completed successfully');
     process.exit(0);
   } else {
-    log('Daily voting records fetch failed');
+    log('Voting records fetch failed');
     process.exit(1);
   }
 }
@@ -383,4 +530,4 @@ if (require.main === module) {
   main();
 }
 
-export { fetchVotingRecords };
+export { fetchVotingRecords, type FetchOptions };

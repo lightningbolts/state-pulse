@@ -6,10 +6,31 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRad
 import { STATE_MAP } from '@/types/geo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Search, ArrowUpDown } from 'lucide-react';
 import RepresentativeCard from '@/components/features/RepresentativeCard';
 import { useFollowedRepresentatives } from '@/hooks/use-follow-representative';
 import type { Representative } from '@/types/representative';
+
+type SortOption = {
+  label: string;
+  field: string;
+  dir: 'asc' | 'desc';
+};
+
+const sortOptions: SortOption[] = [
+  { label: 'Name (A-Z)', field: 'name', dir: 'asc' },
+  { label: 'Name (Z-A)', field: 'name', dir: 'desc' },
+  { label: 'State (A-Z)', field: 'state', dir: 'asc' },
+  { label: 'State (Z-A)', field: 'state', dir: 'desc' },
+  { label: 'Most bills sponsored', field: 'sponsored', dir: 'desc' },
+  { label: 'Least bills sponsored', field: 'sponsored', dir: 'asc' },
+  { label: 'Most bills cosponsored', field: 'cosponsored', dir: 'desc' },
+  { label: 'Least bills cosponsored', field: 'cosponsored', dir: 'asc' },
+  { label: 'Most legislative activity', field: 'activity', dir: 'desc' },
+  { label: 'Least legislative activity', field: 'activity', dir: 'asc' },
+  { label: 'Most recent activity', field: 'recentActivity', dir: 'desc' },
+  { label: 'Least recent activity', field: 'recentActivity', dir: 'asc' },
+];
 
 export default function RepresentativesFeed() {
   const [reps, setReps] = useState<Representative[]>([]);
@@ -18,28 +39,23 @@ export default function RepresentativesFeed() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'name', dir: 'asc' });
-  const sortOptions = [
-    { label: 'Name (A-Z)', field: 'name', dir: 'asc' },
-    { label: 'Name (Z-A)', field: 'name', dir: 'desc' },
-    { label: 'State (A-Z)', field: 'state', dir: 'asc' },
-    { label: 'State (Z-A)', field: 'state', dir: 'desc' },
-  ];
+  const [sort, setSort] = useState<SortOption>(sortOptions[0]);
   const [jurisdictionName, setJurisdictionName] = useState<string>("");
   const [congressChamber, setCongressChamber] = useState<"" | "us-house" | "us-senate">("");
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const loader = useRef<HTMLDivElement | null>(null);
+  const pageRef = useRef(1);
 
-  // Get followed representatives once for the entire feed
   const { followedReps } = useFollowedRepresentatives();
   const followedRepIds = new Set(followedReps.map(rep => rep.id));
 
   const fetchReps = useCallback(async (reset = false) => {
     setLoading(true);
     setError(null);
+    const pageToFetch = reset ? 1 : pageRef.current;
     try {
       const params = new URLSearchParams();
-      params.set('page', String(reset ? 1 : page));
+      params.set('page', String(pageToFetch));
       params.set('pageSize', '20');
       params.set('sortBy', sort.field);
       params.set('sortDir', sort.dir);
@@ -51,39 +67,44 @@ export default function RepresentativesFeed() {
         params.set('chamber', congressChamber === 'us-house' ? 'House of Representatives' : 'Senate');
         params.delete('filterState');
       } else if (jurisdictionName) {
-        // Convert state name to abbreviation if possible
         const abbr = STATE_MAP[jurisdictionName] || jurisdictionName;
         params.set('filterState', abbr);
       }
       const res = await fetch(`/api/representatives?${params.toString()}`);
-      if (!res.ok) console.error('Failed to fetch representatives');
+      if (!res.ok) throw new Error('Failed to fetch representatives');
       const data = await res.json();
       const newReps: Representative[] = data.representatives || [];
       setReps(reset ? newReps : prev => [...prev, ...newReps]);
       setHasMore(data.pagination?.hasNext ?? false);
-      setPage(reset ? 2 : page + 1);
+      const nextPage = pageToFetch + 1;
+      pageRef.current = nextPage;
+      setPage(nextPage);
       if (data.pagination && typeof data.pagination.total === 'number') {
         setTotalCount(data.pagination.total);
       } else if (reset) {
         setTotalCount(newReps.length);
       }
-    } catch (err: any) {
-      setError(err.message || 'Unknown error');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [search, page, sort, jurisdictionName, congressChamber]);
+  }, [search, sort, jurisdictionName, congressChamber]);
 
   useEffect(() => {
-    fetchReps(true);
-  }, []);
+    pageRef.current = 1;
+    setPage(1);
+    setHasMore(true);
+    setReps([]);
+    void fetchReps(true);
+  }, [sort.field, sort.dir, jurisdictionName, congressChamber, fetchReps]);
 
   useEffect(() => {
     if (!loader.current) return;
     const observer = new window.IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loading) {
-          fetchReps();
+          void fetchReps();
         }
       },
       { threshold: 0, rootMargin: '400px' }
@@ -96,9 +117,16 @@ export default function RepresentativesFeed() {
   }, [hasMore, loading, fetchReps]);
 
   const handleSearch = useCallback(() => {
+    pageRef.current = 1;
     setPage(1);
-    fetchReps(true);
+    setHasMore(true);
+    setReps([]);
+    void fetchReps(true);
   }, [fetchReps]);
+
+  const currentSortLabel = sortOptions.find(
+    (opt) => opt.field === sort.field && opt.dir === sort.dir,
+  )?.label ?? 'Sort';
 
   return (
     <div className="px-0 sm:px-0">
@@ -116,23 +144,23 @@ export default function RepresentativesFeed() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto">
-              Sort: {sort.field === 'name' && sort.dir === 'asc' ? 'A-Z' : 'Z-A'}
+            <Button variant="outline" className="w-full sm:w-auto gap-2">
+              <ArrowUpDown className="h-4 w-4" />
+              <span className="truncate max-w-[12rem]">{currentSortLabel}</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
             <DropdownMenuRadioGroup
               value={`${sort.field}:${sort.dir}`}
               onValueChange={val => {
-                const [field, dir] = val.split(":");
-                setSort({ field, dir: dir as 'asc' | 'desc' });
-                setReps([]);
-                setPage(1);
-                setHasMore(true);
+                const option = sortOptions.find((opt) => `${opt.field}:${opt.dir}` === val);
+                if (option) setSort(option);
               }}
             >
               {sortOptions.map(opt => (
-                <DropdownMenuRadioItem key={`${opt.field}:${opt.dir}`} value={`${opt.field}:${opt.dir}`}>{opt.label}</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem key={`${opt.field}:${opt.dir}`} value={`${opt.field}:${opt.dir}`}>
+                  {opt.label}
+                </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
@@ -145,7 +173,7 @@ export default function RepresentativesFeed() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto">
             <DropdownMenuRadioGroup
-              value={congressChamber ? congressChamber : jurisdictionName}
+              value={congressChamber ? congressChamber : jurisdictionName || "all"}
               onValueChange={value => {
                 if (value === "us-house" || value === "us-senate") {
                   setCongressChamber(value);
@@ -157,9 +185,6 @@ export default function RepresentativesFeed() {
                   setCongressChamber("");
                   setJurisdictionName(value);
                 }
-                setReps([]);
-                setPage(1);
-                setHasMore(true);
               }}
             >
               <DropdownMenuRadioItem value="all">All States</DropdownMenuRadioItem>

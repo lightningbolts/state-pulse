@@ -105,22 +105,6 @@ function ocd(state: string): string {
 
 export const WAVE2_ADAPTER_CONFIGS: ChamberHtmlAdapterConfig[] = [
   {
-    stateAbbr: 'OH',
-    jurisdictionOcdId: ocd('oh'),
-    adapterName: 'oh-html',
-    voteIndexUrl: 'https://www.legislature.ohio.gov/legislation/votes',
-    chamber: 'lower',
-    organization: 'House',
-  },
-  {
-    stateAbbr: 'MI',
-    jurisdictionOcdId: ocd('mi'),
-    adapterName: 'mi-html',
-    voteIndexUrl: 'https://www.legislature.mi.gov/Home/VoteSearch',
-    chamber: 'lower',
-    organization: 'House',
-  },
-  {
     stateAbbr: 'GA',
     jurisdictionOcdId: ocd('ga'),
     adapterName: 'ga-html',
