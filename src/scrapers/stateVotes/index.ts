@@ -1,15 +1,18 @@
 import type { StateVoteAdapter } from '@/types/voteRecord';
 import { REMAINING_STATE_CONFIGS } from './adapters/allStateConfigs';
+import { ArizonaVoteAdapter } from './adapters/az';
 import { CaliforniaVoteAdapter } from './adapters/ca';
 import {
   ChamberHtmlVoteAdapter,
   createWave2Adapters,
 } from './adapters/chamberHtml';
 import { FloridaVoteAdapter } from './adapters/fl';
+import { MinnesotaVoteAdapter } from './adapters/mn';
 import { NewYorkVoteAdapter } from './adapters/ny';
 import { NorthCarolinaVoteAdapter } from './adapters/nc';
 import { PennsylvaniaVoteAdapter } from './adapters/pa';
 import { createTableIndexAdapters } from './adapters/tableIndex';
+import { TennesseeVoteAdapter } from './adapters/tn';
 import { WisconsinVoteAdapter } from './adapters/wi';
 
 export class StateAdapterRegistry {
@@ -43,6 +46,9 @@ export function createDefaultRegistry(): StateAdapterRegistry {
   registry.register(new NorthCarolinaVoteAdapter());
   registry.register(new PennsylvaniaVoteAdapter());
   registry.register(new WisconsinVoteAdapter());
+  registry.register(new ArizonaVoteAdapter());
+  registry.register(new MinnesotaVoteAdapter());
+  registry.register(new TennesseeVoteAdapter());
   for (const adapter of createWave2Adapters()) {
     registry.register(adapter);
   }
@@ -56,10 +62,13 @@ export function createDefaultRegistry(): StateAdapterRegistry {
 }
 
 export { ALL_US_STATE_ABBRS, REMAINING_STATE_CONFIGS } from './adapters/allStateConfigs';
+export { ArizonaVoteAdapter } from './adapters/az';
 export { CaliforniaVoteAdapter } from './adapters/ca';
 export { ChamberHtmlVoteAdapter, createWave2Adapters } from './adapters/chamberHtml';
 export { FloridaVoteAdapter } from './adapters/fl';
+export { MinnesotaVoteAdapter } from './adapters/mn';
 export { NewYorkVoteAdapter } from './adapters/ny';
 export { NorthCarolinaVoteAdapter } from './adapters/nc';
 export { PennsylvaniaVoteAdapter } from './adapters/pa';
+export { TennesseeVoteAdapter } from './adapters/tn';
 export { WisconsinVoteAdapter } from './adapters/wi';

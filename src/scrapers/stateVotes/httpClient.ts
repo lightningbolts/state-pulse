@@ -29,6 +29,19 @@ export class FetchHttpClient implements HttpClient {
     return this.fetchWithRetry(url, options);
   }
 
+  async post(url: string, body: string, options: RequestInit = {}): Promise<string> {
+    const buffer = await this.fetchWithRetry(url, {
+      ...options,
+      method: 'POST',
+      body,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        ...(options.headers as Record<string, string>),
+      },
+    });
+    return buffer.toString('utf-8');
+  }
+
   private async fetchWithRetry(
     url: string,
     options: RequestInit

@@ -105,15 +105,6 @@ function ocd(state: string): string {
 
 export const WAVE2_ADAPTER_CONFIGS: ChamberHtmlAdapterConfig[] = [
   {
-    stateAbbr: 'MN',
-    jurisdictionOcdId: ocd('mn'),
-    adapterName: 'mn-html',
-    voteIndexUrl: 'https://www.house.mn.gov/votes/',
-    linkPattern: /\/Votes\/Summary\/\d+/i,
-    chamber: 'lower',
-    organization: 'House',
-  },
-  {
     stateAbbr: 'OH',
     jurisdictionOcdId: ocd('oh'),
     adapterName: 'oh-html',
@@ -162,26 +153,11 @@ export const WAVE2_ADAPTER_CONFIGS: ChamberHtmlAdapterConfig[] = [
     organization: 'House',
   },
   {
-    stateAbbr: 'AZ',
-    jurisdictionOcdId: ocd('az'),
-    adapterName: 'az-html',
-    voteIndexUrl: 'https://apps.azleg.gov/BillStatusVote/',
-    chamber: 'lower',
-    organization: 'House',
-  },
-  {
-    stateAbbr: 'AZ',
+    stateAbbr: 'MO',
     jurisdictionOcdId: ocd('mo'),
     adapterName: 'mo-html',
     voteIndexUrl: 'https://house.mo.gov/BillActions.aspx?filter=votes',
-    chamber: 'lower',
-    organization: 'House',
-  },
-  {
-    stateAbbr: 'TN',
-    jurisdictionOcdId: ocd('tn'),
-    adapterName: 'tn-html',
-    voteIndexUrl: 'https://wapp.capitol.tn.gov/apps/votehistory/',
+    linkPattern: /vote|bill/i,
     chamber: 'lower',
     organization: 'House',
   },
