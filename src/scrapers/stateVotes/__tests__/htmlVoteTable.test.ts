@@ -56,7 +56,10 @@ describe('htmlVoteTable', () => {
   it('throws ParseError when required selector missing', () => {
     const html = '<html><body><p>No table</p></body></html>';
     expect(() =>
-      parseHtmlVotePage(html, { memberTableSelector: '#missing-table' })
+      parseHtmlVotePage(html, {
+        memberTableSelector: '#missing-table',
+        requireMemberTable: true,
+      })
     ).toThrow(ParseError);
   });
 

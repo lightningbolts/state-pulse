@@ -37,6 +37,8 @@ export interface HtmlVoteParserConfig {
   organizationType?: OrganizationType;
   chamber?: VoteChamber;
   organization?: string;
+  /** When true, throw ParseError if the member table selector matches nothing */
+  requireMemberTable?: boolean;
 }
 
 function parseTallyText(text: string): VoteCount[] {
@@ -87,7 +89,7 @@ export function parseHtmlVotePage(
     config.memberTableSelector ?? 'table.vote-table, table#vote-table, table';
 
   const tables = $(tableSelector);
-  if (!tables.length && config.memberTableSelector) {
+  if (!tables.length && config.requireMemberTable && config.memberTableSelector) {
     throw new ParseError(
       `No member table found with selector: ${config.memberTableSelector}`,
       config.memberTableSelector
@@ -180,7 +182,6 @@ export function parseGenericChamberVoteDetail(
   organization: string
 ): HtmlVoteParseResult {
   return parseHtmlVotePage(html, {
-    memberTableSelector: 'table',
     chamber,
     organization,
     organizationType: /committee/i.test(html) ? 'committee' : 'chamber',

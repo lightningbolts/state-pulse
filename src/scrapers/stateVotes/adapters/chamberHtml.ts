@@ -114,14 +114,6 @@ export const WAVE2_ADAPTER_CONFIGS: ChamberHtmlAdapterConfig[] = [
     organization: 'House',
   },
   {
-    stateAbbr: 'NC',
-    jurisdictionOcdId: ocd('nc'),
-    adapterName: 'nc-html',
-    voteIndexUrl: 'https://www.ncleg.gov/Legislation/Votes',
-    chamber: 'lower',
-    organization: 'House',
-  },
-  {
     stateAbbr: 'PA',
     jurisdictionOcdId: ocd('pa'),
     adapterName: 'pa-html',
