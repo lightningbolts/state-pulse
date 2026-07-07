@@ -2,6 +2,10 @@ import { cache } from 'react';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { isCongressBillId } from '@/lib/congressBillId';
+import {
+  parseLegislationCursor,
+  type LegislationPaginationCursor,
+} from '@/lib/legislationPagination';
 import type { Legislation } from '@/types/legislation';
 import type { LegislationMongoDbDocument } from '@/types/legislation';
 
@@ -14,7 +18,37 @@ const LEGISLATION_FEED_HEAVY_FIELDS: Record<string, 0> = {
   history: 0,
   versions: 0,
   embeddings: 0,
+  embedding: 0,
+  embeddingModel: 0,
+  embeddingTextHash: 0,
+  extras: 0,
+  abstracts: 0,
+  documents: 0,
+  geminiSummarySource: 0,
 };
+
+/** @deprecated Import from @/lib/legislationPagination */
+export type { LegislationPaginationCursor } from '@/lib/legislationPagination';
+export { encodeLegislationCursor, parseLegislationCursor } from '@/lib/legislationPagination';
+
+function buildKeysetFilter(
+  sort: Record<string, 1 | -1>,
+  cursor: LegislationPaginationCursor,
+): Record<string, unknown> {
+  const primaryDir = sort[cursor.sortField] ?? -1;
+  const cmpOp = primaryDir === -1 ? '$lt' : '$gt';
+  const sortValue =
+    cursor.sortField.endsWith('At') || cursor.sortField === 'enactedAt'
+      ? new Date(cursor.sortValue)
+      : cursor.sortValue;
+
+  return {
+    $or: [
+      { [cursor.sortField]: { [cmpOp]: sortValue } },
+      { [cursor.sortField]: sortValue, id: { [cmpOp]: cursor.id } },
+    ],
+  };
+}
 
 /** Excluded on bill detail pages — large blobs loaded on demand elsewhere. */
 const LEGISLATION_DETAIL_HEAVY_FIELDS: Record<string, 0> = {
@@ -319,6 +353,7 @@ export async function getAllLegislationWithFiltering({
   search,
   limit = 100,
   skip = 0,
+  after,
   sortBy,
   sortDir = 'desc',
   showCongress = false,
@@ -346,6 +381,8 @@ export async function getAllLegislationWithFiltering({
   search?: string;
   limit?: number;
   skip?: number;
+  /** Base64url keyset cursor — preferred over skip for feed pagination. */
+  after?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   showCongress?: boolean;
@@ -528,12 +565,15 @@ export async function getAllLegislationWithFiltering({
     // Get legislation using the improved search approach
     const excludeHeavyFields = context === 'policy-updates-feed';
 
+    const paginationCursor = after ? parseLegislationCursor(after) : null;
+    const useKeysetPagination = Boolean(paginationCursor);
+
     let legislations = await getAllLegislation({
       limit,
-      skip,
+      skip: useKeysetPagination ? 0 : skip,
+      after: paginationCursor ?? undefined,
       sort,
       filter: finalFilter,
-      showCongress: isCongress,
       excludeHeavyFields,
     });
 
@@ -543,36 +583,15 @@ export async function getAllLegislationWithFiltering({
       legislations.sort((a, b) => {
       // Helper function to get the appropriate date based on context and sort field
       const getComparisonDate = (bill: any) => {
-        if (context === 'policy-updates-feed') {
-          // For PolicyUpdatesFeed, respect the user's sorting choice
-          if (sortBy === 'lastActionAt' || sortBy === 'latestActionAt') {
-            // User chose "Latest Action"
-            if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
-            if (bill.history && bill.history.length > 0) {
-              const historyDates = bill.history
-                .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
-                .filter((date: number) => date > 0);
-              if (historyDates.length > 0) return Math.max(...historyDates);
-            }
-            if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
-            if (bill.createdAt) return new Date(bill.createdAt).getTime();
-          } else if (sortBy === 'createdAt' || !sortBy) {
-            // User chose "Most Recent" (creation date)
-            if (bill.createdAt) return new Date(bill.createdAt).getTime();
-            if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
-          }
-        } else {
-          // For PolicyTracker, email script, and other contexts - always use latest legislative activity
-          if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
-          if (bill.history && bill.history.length > 0) {
-            const historyDates = bill.history
-              .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
-              .filter((date: number) => date > 0);
-            if (historyDates.length > 0) return Math.max(...historyDates);
-          }
-          if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
-          if (bill.createdAt) return new Date(bill.createdAt).getTime();
+        if (bill.latestActionAt) return new Date(bill.latestActionAt).getTime();
+        if (bill.history && bill.history.length > 0) {
+          const historyDates = bill.history
+            .map((h: any) => h.date ? new Date(h.date).getTime() : 0)
+            .filter((date: number) => date > 0);
+          if (historyDates.length > 0) return Math.max(...historyDates);
         }
+        if (bill.updatedAt) return new Date(bill.updatedAt).getTime();
+        if (bill.createdAt) return new Date(bill.createdAt).getTime();
         return 0;
       };
 
@@ -594,7 +613,6 @@ export async function getAllLegislationWithFiltering({
         skip: 0,
         sort,
         filter: fuzzyFilter,
-        showCongress: isCongress,
         excludeHeavyFields,
       });
       if (allCandidates.length > 0) {
@@ -681,16 +699,16 @@ export async function getAllLegislationWithFiltering({
 export async function getAllLegislation({
   limit = 100,
   skip = 0,
+  after,
   sort = { updatedAt: -1 },
   filter = {},
-  showCongress = false,
   excludeHeavyFields = false,
 }: {
   limit?: number;
   skip?: number;
+  after?: LegislationPaginationCursor;
   sort?: Record<string, 1 | -1>;
   filter?: Record<string, any>;
-  showCongress?: boolean;
   excludeHeavyFields?: boolean;
 }): Promise<Legislation[]> {
   try {
@@ -699,52 +717,21 @@ export async function getAllLegislation({
     const applyProjection = (cursor: ReturnType<typeof legislationCollection.find>) =>
       excludeHeavyFields ? cursor.project(LEGISLATION_FEED_HEAVY_FIELDS) : cursor;
 
-    // If showCongress is true, use robust query to match all Congress bills
-    if (showCongress) {
-      console.log('[Service] Using robust query for Congress bills');
-      const congressQuery = {
-        $or: [
-          {
-            jurisdictionName: {
-              $regex: "United States|US|USA|Federal|Congress",
-              $options: "i"
-            }
-          },
-          {
-            $and: [
-              {
-                $or: [
-                  { jurisdictionName: { $exists: false } },
-                  { jurisdictionName: null },
-                  { jurisdictionName: "" }
-                ]
-              },
-              { session: { $regex: "Congress", $options: "i" } }
-            ]
-          }
-        ]
-      };
-      // Merge with any additional filters (e.g., search, classification, chamber)
-      const mergedFilter = filter && Object.keys(filter).length > 0
-        ? { $and: [congressQuery, filter] }
-        : congressQuery;
-      const results = await applyProjection(legislationCollection.find(mergedFilter))
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .toArray();
-      return results.map(doc => {
-        const { _id, ...rest } = doc;
-        return rest as Legislation;
-      });
+    let queryFilter = filter;
+    if (after) {
+      const keysetFilter = buildKeysetFilter(sort, after);
+      queryFilter =
+        filter && Object.keys(filter).length > 0
+          ? { $and: [filter, keysetFilter] }
+          : keysetFilter;
     }
 
-    // Default behavior for all other queries (non-congress)
-    const results = await applyProjection(legislationCollection.find(filter))
+    const results = await applyProjection(legislationCollection.find(queryFilter))
       .sort(sort)
-      .skip(skip)
+      .skip(after ? 0 : skip)
       .limit(limit)
       .toArray();
+
     return results.map(doc => {
       const { _id, ...rest } = doc;
       return rest as Legislation;
@@ -754,6 +741,8 @@ export async function getAllLegislation({
     throw new Error('Failed to fetch legislation.');
   }
 }
+
+export { buildLegislationCursorFromItem } from '@/lib/legislationPagination';
 
 export async function testLegislationCollectionService(): Promise<void> {
   try {
@@ -911,7 +900,6 @@ export async function searchLegislationByTopic(
       skip,
       sort,
       filter: finalFilter,
-      showCongress: showCongress || detectedFederal.length > 0
     });
 
     // Fuzzy search fallback: only if no results and a search term is present
@@ -928,7 +916,6 @@ export async function searchLegislationByTopic(
         skip: 0,
         sort,
         filter: fuzzyFilter,
-        showCongress: showCongress || detectedFederal.length > 0
       });
 
       if (allCandidates.length > 0) {

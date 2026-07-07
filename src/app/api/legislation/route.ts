@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       search: searchParams.get('search') || undefined,
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit') || '100', 10) : 100,
       skip: searchParams.get('skip') ? parseInt(searchParams.get('skip') || '0', 10) : 0,
+      after: searchParams.get('after') || undefined,
       sortBy: searchParams.get('sortBy') || undefined,
       sortDir: (searchParams.get('sortDir') as 'asc' | 'desc') || 'desc',
       showCongress: searchParams.get('showCongress') === 'true',

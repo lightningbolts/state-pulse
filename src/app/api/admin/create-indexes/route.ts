@@ -45,6 +45,48 @@ async function createIndexes() {
       { background: true, name: 'jurisdiction_created_at_idx' }
     );
 
+    // Keyset pagination indexes (sort field + id tiebreaker)
+    const index5b = await db.collection('legislation').createIndex(
+      { createdAt: -1, id: -1 },
+      { background: true, name: 'created_at_id_idx' }
+    );
+
+    const index5c = await db.collection('legislation').createIndex(
+      { latestActionAt: -1, id: -1 },
+      { background: true, name: 'latest_action_id_idx' }
+    );
+
+    const index5d = await db.collection('legislation').createIndex(
+      { updatedAt: -1, id: -1 },
+      { background: true, name: 'updated_at_id_idx' }
+    );
+
+    // Active bills count + feed filters
+    const index5e = await db.collection('legislation').createIndex(
+      { status: 1 },
+      { background: true, name: 'status_idx' }
+    );
+
+    const index5f = await db.collection('legislation').createIndex(
+      { 'sponsors.id': 1, createdAt: -1 },
+      { background: true, name: 'sponsors_id_created_at_idx' }
+    );
+
+    const index5g = await db.collection('legislation').createIndex(
+      { enactedAt: -1, latestActionAt: -1, id: -1 },
+      {
+        background: true,
+        name: 'enacted_at_latest_action_id_idx',
+        partialFilterExpression: { enactedAt: { $exists: true, $type: 'date' } },
+      }
+    );
+
+    // Index for updatedAt (policy tracker sort)
+    const index5h = await db.collection('legislation').createIndex(
+      { updatedAt: -1 },
+      { background: true, name: 'updated_at_idx' }
+    );
+
     // Index for voting record bill lookups
     const index6 = await db.collection('voting_records').createIndex(
       { bill_id: 1, date: -1 },
@@ -62,7 +104,7 @@ async function createIndexes() {
     return NextResponse.json({
       success: true,
       message: 'Indexes created successfully',
-      createdIndexes: [index1, index2, index3, index4, index5, index6, index7],
+      createdIndexes: [index1, index2, index3, index4, index5, index5b, index5c, index5d, index5e, index5f, index5g, index5h, index6, index7],
       allIndexes: indexes.map(idx => ({ name: idx.name, key: idx.key }))
     });
 

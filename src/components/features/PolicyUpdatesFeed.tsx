@@ -22,6 +22,7 @@ import { BROAD_TOPIC_KEYWORDS } from "@/types/legislation";
 import Link from "next/link";
 import { isLegislationEnacted } from '@/utils/enacted-legislation';
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
+import { buildLegislationCursorFromItem, resolveApiSortField } from "@/lib/legislationPagination";
 
 
 let compactViewCardNumber = 100;
@@ -333,6 +334,7 @@ async function fetchBookmarkedUpdates({
 
 async function fetchUpdatesFeed({
     skip = 0,
+    after,
     limit = cardNumber,
     search = "",
     subject = "",
@@ -346,6 +348,7 @@ async function fetchUpdatesFeed({
     showOnlyEnacted = false
 }: {
     skip?: number;
+    after?: string;
     limit?: number;
     search?: string;
     subject?: string;
@@ -358,7 +361,12 @@ async function fetchUpdatesFeed({
     sponsorId?: string;
     showOnlyEnacted?: boolean;
 }) {
-    const params = new URLSearchParams({ limit: String(limit), skip: String(skip) });
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (after) {
+        params.append("after", after);
+    } else {
+        params.append("skip", String(skip));
+    }
     if (search) params.append("search", search);
     if (subject) params.append("subject", subject);
 
@@ -552,10 +560,11 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
         loadingRef.current = true;
         setLoading(true);
         try {
-            const currentSkip = skipRef.current;
-            const limit = compactView ? compactViewCardNumber : 20; // Load more items in compact mode
+            const limit = compactView ? compactViewCardNumber : 20;
+            const apiSortField = resolveApiSortField(sort.field);
             
             if (showOnlyBookmarked) {
+                const currentSkip = skipRef.current;
                 // Fetch more bookmarked items
                 const bookmarkedResult = await fetchBookmarkedUpdates({
                     limit,
@@ -581,9 +590,14 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                 setSkip(skipRef.current);
                 setHasMore(bookmarkedResult.hasMore);
             } else {
-                // Regular feed load more
+                const lastItem = updates[updates.length - 1];
+                const after = lastItem
+                    ? buildLegislationCursorFromItem(lastItem as unknown as Record<string, unknown>, apiSortField) ?? undefined
+                    : undefined;
+
                 const newUpdates = await fetchUpdatesFeed({
-                    skip: currentSkip,
+                    after,
+                    skip: after ? undefined : skipRef.current,
                     limit,
                     search,
                     subject,
@@ -592,7 +606,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                     classification,
                     jurisdictionName,
                     showCongress,
-                    sponsorId: sponsorId, // Only send sponsorId, not sponsor name
+                    sponsorId: sponsorId,
                     showOnlyEnacted
                 });
                 
@@ -603,7 +617,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                         return [...prev, ...newUniqueUpdates];
                     });
                 }
-                skipRef.current = currentSkip + newUpdates.length;
+                skipRef.current = skipRef.current + newUpdates.length;
                 setSkip(skipRef.current);
                 const expectedLength = compactView ? compactViewCardNumber : 20;
                 setHasMore(newUpdates.length === expectedLength);
@@ -615,7 +629,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
             loadingRef.current = false;
             setLoading(false);
         }
-    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView]);
+    }, [hasMore, search, subject, sort, classification, jurisdictionName, showCongress, showOnlyBookmarked, bookmarks, sponsorId, showOnlyEnacted, compactView, updates]);
 
     // Search handler for button/enter
     const handleSearch = useCallback(() => {
