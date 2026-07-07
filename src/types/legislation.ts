@@ -7,6 +7,9 @@ export interface MemberVote {
   voteCast: string;
   voteParty: string;
   voteState: string;
+  /** Open States person ID for state legislators */
+  personId?: string;
+  name?: string;
 }
 
 export interface VotingRecord {
@@ -21,7 +24,11 @@ export interface VotingRecord {
   memberVotes: MemberVote[];
   congress: number;
   session: number;
-  chamber: 'US House' | 'US Senate';
+  chamber: 'US House' | 'US Senate' | string;
+  jurisdiction?: string;
+  organization?: string;
+  organizationType?: 'chamber' | 'committee';
+  pendingBillLink?: string;
 }
 
 export interface Legislation {

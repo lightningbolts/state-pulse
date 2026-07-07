@@ -1,0 +1,20 @@
+{
+  "voteType": "Floor Vote: On passage",
+  "voteDate": "2024-03-15",
+  "result": "PASSED",
+  "bill": {
+    "printNo": "S1234",
+    "sessionYear": 2024
+  },
+  "yesCount": 42,
+  "noCount": 20,
+  "absentCount": 1,
+  "excusedCount": 0,
+  "memberVotes": {
+    "memberVotes": [
+      { "fullName": "Smith, John", "vote": "Aye", "memberId": 101 },
+      { "fullName": "Jones, Jane", "vote": "Nay", "memberId": 102 },
+      { "fullName": "Williams, Bob", "vote": "Aye", "memberId": 103 }
+    ]
+  }
+}

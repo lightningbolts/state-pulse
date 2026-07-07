@@ -27,7 +27,10 @@ export async function GET(
 
     // Build aggregation pipeline to find voting records where the representative voted
     const matchStage: any = {
-      'memberVotes.bioguideId': id
+      $or: [
+        { 'memberVotes.bioguideId': id },
+        { 'memberVotes.personId': id },
+      ],
     };
 
     // Always filter to only bill-related voting records (exclude nominations and non-bill types)
@@ -63,7 +66,12 @@ export async function GET(
               {
                 $filter: {
                   input: '$memberVotes',
-                  cond: { $eq: ['$$this.bioguideId', id] }
+                  cond: {
+                    $or: [
+                      { $eq: ['$$this.bioguideId', id] },
+                      { $eq: ['$$this.personId', id] },
+                    ],
+                  },
                 }
               },
               0
