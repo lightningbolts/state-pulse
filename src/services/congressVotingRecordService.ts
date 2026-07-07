@@ -349,14 +349,19 @@ function formatBillVotingInfo(records: VotingRecord[]): BillVotingInfo | null {
   };
 }
 
-export async function getCongressBillVotingInfo(billId: string): Promise<BillVotingInfo | null> {
+export async function getCongressBillVotingInfo(
+  billId: string,
+  options: { syncIfMissing?: boolean } = {}
+): Promise<BillVotingInfo | null> {
+  const { syncIfMissing = false } = options;
+
   if (!isCongressBillId(billId)) {
     return null;
   }
 
   let records = await findVotingRecordsForBill(billId);
 
-  if (records.length === 0 && API_KEY) {
+  if (records.length === 0 && syncIfMissing && API_KEY) {
     await syncCongressBillVotingRecords(billId);
     records = await findVotingRecordsForBill(billId);
   }

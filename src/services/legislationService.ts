@@ -1,5 +1,7 @@
+import { cache } from 'react';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { isCongressBillId } from '@/lib/congressBillId';
 import type { Legislation } from '@/types/legislation';
 import type { LegislationMongoDbDocument } from '@/types/legislation';
 
@@ -12,6 +14,33 @@ const LEGISLATION_FEED_HEAVY_FIELDS: Record<string, 0> = {
   history: 0,
   versions: 0,
   embeddings: 0,
+};
+
+/** Excluded on bill detail pages — large blobs loaded on demand elsewhere. */
+const LEGISLATION_DETAIL_HEAVY_FIELDS: Record<string, 0> = {
+  fullText: 0,
+  longGeminiSummary: 0,
+  rawHtml: 0,
+  detailedAnalysis: 0,
+  embedding: 0,
+  embeddingModel: 0,
+  embeddingTextHash: 0,
+  documents: 0,
+  summary: 0,
+};
+
+/** Congress bills store full bill text in abstracts — skip on initial page load. */
+const LEGISLATION_CONGRESS_DETAIL_FIELDS: Record<string, 0> = {
+  ...LEGISLATION_DETAIL_HEAVY_FIELDS,
+  abstracts: 0,
+};
+
+const LEGISLATION_METADATA_FIELDS: Record<string, 1> = {
+  id: 1,
+  title: 1,
+  identifier: 1,
+  jurisdictionName: 1,
+  geminiSummary: 1,
 };
 
 function cleanupDataForMongoDB<T extends Record<string, any>>(data: T): T {
@@ -210,6 +239,59 @@ export async function getLegislationById(id: string): Promise<Legislation | null
     return null;
   }
 }
+
+/** Lean bill fetch for detail pages — skips multi‑MB text blobs. */
+export const getLegislationDetailById = cache(async (id: string): Promise<Legislation | null> => {
+  if (!id) {
+    return null;
+  }
+
+  try {
+    const legislationCollection = await getCollection('legislation');
+    const projection = isCongressBillId(id)
+      ? LEGISLATION_CONGRESS_DETAIL_FIELDS
+      : LEGISLATION_DETAIL_HEAVY_FIELDS;
+    const document = await legislationCollection.findOne(
+      { id },
+      { projection }
+    );
+
+    if (!document) {
+      return null;
+    }
+
+    const { _id, ...restOfDoc } = document;
+    return restOfDoc as Legislation;
+  } catch (error) {
+    console.error(`Error fetching legislation detail for id ${id}: `, error);
+    return null;
+  }
+});
+
+/** Minimal fields for generateMetadata — avoids loading the full bill document twice. */
+export const getLegislationMetadataById = cache(async (id: string): Promise<Legislation | null> => {
+  if (!id) {
+    return null;
+  }
+
+  try {
+    const legislationCollection = await getCollection('legislation');
+    const document = await legislationCollection.findOne(
+      { id },
+      { projection: LEGISLATION_METADATA_FIELDS }
+    );
+
+    if (!document) {
+      return null;
+    }
+
+    const { _id, ...restOfDoc } = document;
+    return restOfDoc as Legislation;
+  } catch (error) {
+    console.error(`Error fetching legislation metadata for id ${id}: `, error);
+    return null;
+  }
+});
 
 export async function getLegislationsByIds(ids: string[]): Promise<Legislation[]> {
   if (!ids || ids.length === 0) {

@@ -1,4 +1,4 @@
-import { getLegislationById } from '@/services/legislationService';
+import { getLegislationDetailById } from '@/services/legislationService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CalendarDays, FileText, Tag, Info } from 'lucide-react';
@@ -11,8 +11,7 @@ import { ShareButton } from '@/components/ui/ShareButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
 import { RelatedBillsWrapper } from '@/components/features/RelatedBillsWrapper';
 import { RelatedBillsLoading } from '@/components/features/RelatedBillsLoading';
-import { VotingBillPositionsWrapper } from '@/components/features/VotingBillPositionsWrapper';
-import { VotingBillPositionsLoading } from '@/components/features/VotingBillPositionsLoading';
+import { VotingBillPositionsLoader } from '@/components/features/VotingBillPositionsLoader';
 import { DetailedAISummarySection } from '@/components/features/DetailedAISummarySection';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
@@ -27,7 +26,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const { id } = await params;
 
   try {
-    const legislation = await getLegislationById(id);
+    const legislation = await getLegislationDetailById(id);
     if (!legislation) {
       return {
         title: 'Legislation Not Found | StatePulse',
@@ -82,7 +81,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
   // console.log(params, "Params in LegislationDetailPage");
 
   // Load legislation first, then related bills for better performance
-  const legislation = await getLegislationById(id);
+  const legislation = await getLegislationDetailById(id);
 
   if (!legislation) {
     return (
@@ -273,9 +272,7 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
           <AnimatedSection><CollapsibleSponsors sponsors={sponsors} /></AnimatedSection>
 
           <AnimatedSection>
-            <Suspense fallback={<VotingBillPositionsLoading />}>
-              <VotingBillPositionsWrapper billId={id} />
-            </Suspense>
+            <VotingBillPositionsLoader billId={id} />
           </AnimatedSection>
 
           {abstracts && abstracts.length > 0 && (

@@ -76,6 +76,19 @@ export function useDetailedAISummary({
     setError(null);
 
     try {
+      if (!forceRefresh) {
+        const cachedResponse = await fetch(
+          `/api/legislation/${legislationId}/detailed-summary`
+        );
+        if (cachedResponse.ok) {
+          const cachedData = await cachedResponse.json();
+          if (cachedData.summary) {
+            setSummary(cachedData.summary);
+            return;
+          }
+        }
+      }
+
       const params = new URLSearchParams();
       if (forceRefresh) params.set('refresh', 'true');
 

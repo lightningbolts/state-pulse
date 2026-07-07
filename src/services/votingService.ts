@@ -38,14 +38,17 @@ function formatBillVotingInfo(records: VotingRecord[]) {
   };
 }
 
-export async function getBillVotingInfo(billId: string) {
+export async function getBillVotingInfo(
+  billId: string,
+  options: { syncIfMissing?: boolean } = {}
+) {
   try {
     if (!billId) {
       return null;
     }
 
     if (isCongressBillId(billId)) {
-      return await getCongressBillVotingInfo(billId);
+      return await getCongressBillVotingInfo(billId, options);
     }
 
     const votingRecordsCollection = await getCollection('voting_records');

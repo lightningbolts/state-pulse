@@ -11,7 +11,8 @@ export async function GET(
       return NextResponse.json({ error: 'Bill ID is required' }, { status: 400 });
     }
 
-    const votingData = await getBillVotingInfo(id);
+    const syncIfMissing = new URL(request.url).searchParams.get('sync') === 'true';
+    const votingData = await getBillVotingInfo(id, { syncIfMissing });
 
     if (!votingData || votingData.votingRecords.length === 0) {
       return NextResponse.json(
