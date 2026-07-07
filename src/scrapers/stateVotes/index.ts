@@ -1,9 +1,14 @@
 import type { StateVoteAdapter } from '@/types/voteRecord';
+import { REMAINING_STATE_CONFIGS } from './adapters/allStateConfigs';
 import { CaliforniaVoteAdapter } from './adapters/ca';
-import { ChamberHtmlVoteAdapter, createWave2Adapters } from './adapters/chamberHtml';
+import {
+  ChamberHtmlVoteAdapter,
+  createWave2Adapters,
+} from './adapters/chamberHtml';
 import { FloridaVoteAdapter } from './adapters/fl';
 import { NewYorkVoteAdapter } from './adapters/ny';
 import { NorthCarolinaVoteAdapter } from './adapters/nc';
+import { createTableIndexAdapters } from './adapters/tableIndex';
 
 export class StateAdapterRegistry {
   private adapters = new Map<string, StateVoteAdapter>();
@@ -37,14 +42,19 @@ export function createDefaultRegistry(): StateAdapterRegistry {
   for (const adapter of createWave2Adapters()) {
     registry.register(adapter);
   }
+  for (const adapter of createTableIndexAdapters()) {
+    registry.register(adapter);
+  }
+  for (const config of REMAINING_STATE_CONFIGS) {
+    registry.register(new ChamberHtmlVoteAdapter(config));
+  }
   return registry;
 }
 
-export {
-  CaliforniaVoteAdapter,
-  ChamberHtmlVoteAdapter,
-  FloridaVoteAdapter,
-  NewYorkVoteAdapter,
-  NorthCarolinaVoteAdapter,
-  createWave2Adapters,
-};
+export { ALL_US_STATE_ABBRS, REMAINING_STATE_CONFIGS } from './adapters/allStateConfigs';
+export { CaliforniaVoteAdapter } from './adapters/ca';
+export { ChamberHtmlVoteAdapter, createWave2Adapters } from './adapters/chamberHtml';
+export { FloridaVoteAdapter } from './adapters/fl';
+export { NewYorkVoteAdapter } from './adapters/ny';
+export { NorthCarolinaVoteAdapter } from './adapters/nc';
+export { createTableIndexAdapters } from './adapters/tableIndex';

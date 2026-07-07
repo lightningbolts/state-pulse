@@ -55,6 +55,33 @@ describe('PersonResolver', () => {
     expect(unresolved).toBe(1);
   });
 
+  it('resolves using party hint for ambiguous last names', async () => {
+    await resolver.loadJurisdiction('ocd-jurisdiction/country:us/state:nc/government');
+    resolver.mergePeople('ocd-jurisdiction/country:us/state:nc/government', [
+      {
+        id: 'nc-leg/H/1',
+        name: 'Tom Adams',
+        family_name: 'Adams',
+        party: 'Republican',
+        current_role: { org_classification: 'lower' },
+      },
+      {
+        id: 'nc-leg/H/2',
+        name: 'Sue Adams',
+        family_name: 'Adams',
+        party: 'Democratic',
+        current_role: { org_classification: 'lower' },
+      },
+    ]);
+    const person = resolver.resolve(
+      'Adams',
+      'ocd-jurisdiction/country:us/state:nc/government',
+      'lower',
+      'Republican'
+    );
+    expect(person?.id).toBe('nc-leg/H/1');
+  });
+
   it('resolves member votes in batch', async () => {
     const { resolved, unresolved } = await resolver.resolveMemberVotes(
       [

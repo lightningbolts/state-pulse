@@ -1,0 +1,53 @@
+{
+  "printNo": "S11",
+  "session": 2025,
+  "votes": [
+    {
+      "voteType": "COMMITTEE",
+      "voteDate": "2025-02-04",
+      "sequenceNo": 1,
+      "committee": {
+        "chamber": "SENATE",
+        "name": "Health"
+      },
+      "memberVotes": {
+        "items": {
+          "AYE": {
+            "items": [
+              {
+                "memberId": 1522,
+                "fullName": "Jane Smith",
+                "shortName": "SMITH"
+              },
+              {
+                "memberId": 1500,
+                "fullName": "Samra Brouk",
+                "shortName": "BROUK"
+              }
+            ]
+          },
+          "NAY": {
+            "items": [
+              {
+                "memberId": 999,
+                "fullName": "John Doe",
+                "shortName": "DOE"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "voteType": "FLOOR",
+      "voteDate": "2025-03-01",
+      "sequenceNo": 2,
+      "committee": {
+        "chamber": "SENATE"
+      },
+      "memberVotes": {
+        "items": {}
+      }
+    }
+  ]
+}

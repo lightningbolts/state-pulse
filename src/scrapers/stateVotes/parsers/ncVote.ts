@@ -86,13 +86,19 @@ export function parseNcRollCallTranscript(html: string): RawMemberVote[] {
   const memberVotes: RawMemberVote[] = [];
   const seen = new Set<string>();
 
-  const addVotes = (names: string[], option: string) => {
+  const addVotes = (names: string[], option: string, party?: string) => {
     for (const name of names) {
-      const key = `${name}|${option}`;
+      const key = `${name}|${option}|${party ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      memberVotes.push({ name, option });
+      memberVotes.push({ name, option, party });
     }
+  };
+
+  const partyFromLabel = (label: string): string | undefined => {
+    if (/Democrat/i.test(label)) return 'Democratic';
+    if (/Republican/i.test(label)) return 'Republican';
+    return undefined;
   };
 
   $('.row.ncga-row-no-gutters .row.ncga-row-no-gutters').each((_, row) => {
@@ -102,17 +108,18 @@ export function parseNcRollCallTranscript(html: string): RawMemberVote[] {
     const label = cols.first().find('.font-weight-bold').text().trim();
     const namesText = cols.last().text().trim();
     if (!label || !namesText || /^none$/i.test(namesText)) return;
+    const party = partyFromLabel(label);
 
     if (/^Ayes?\b/i.test(label)) {
-      addVotes(parseNameList(namesText), 'Yea');
+      addVotes(parseNameList(namesText), 'Yea', party);
     } else if (/^Noes?\b/i.test(label)) {
-      addVotes(parseNameList(namesText), 'Nay');
+      addVotes(parseNameList(namesText), 'Nay', party);
     } else if (/^Excused Absence/i.test(label)) {
-      addVotes(parseNameList(namesText), 'Absent');
+      addVotes(parseNameList(namesText), 'Absent', party);
     } else if (/^Not Voting/i.test(label)) {
-      addVotes(parseNameList(namesText), 'NV');
+      addVotes(parseNameList(namesText), 'NV', party);
     } else if (/^Excused Vote/i.test(label)) {
-      addVotes(parseNameList(namesText), 'Present');
+      addVotes(parseNameList(namesText), 'Present', party);
     }
   });
 

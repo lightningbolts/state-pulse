@@ -18,6 +18,9 @@ import type {
 } from '@/types/voteRecord';
 import { dedupeVoteRecords } from '@/types/voteRecord';
 import { FetchHttpClient, SimpleRateLimiter } from './httpClient';
+import { fetchNcLegislators } from './rosters/ncLegislators';
+
+const NC_JURISDICTION = 'ocd-jurisdiction/country:us/state:nc/government';
 
 export interface OrchestratorOptions {
   registry: StateAdapterRegistry;
@@ -83,6 +86,16 @@ export class VoteIngestionOrchestrator {
     const batch: CanonicalVoteRecord[] = [];
 
     try {
+      if (adapter.stateAbbr === 'NC') {
+        try {
+          const ncPeople = await fetchNcLegislators((url) => ctx.httpClient.get(url));
+          personResolver.mergePeople(NC_JURISDICTION, ncPeople);
+          this.log(`Loaded ${ncPeople.length} NC legislators for name resolution`);
+        } catch (error) {
+          this.log(`Warning: could not load NC legislator roster: ${error}`);
+        }
+      }
+
       for await (const discovered of adapter.discoverVotes(ctx)) {
         stats.discovered++;
         try {
@@ -142,6 +155,12 @@ export class VoteIngestionOrchestrator {
         lastVoteCount: stats.ingested,
         updatedAt: new Date().toISOString(),
       });
+
+      if (stats.discovered === 0) {
+        this.log(
+          `${adapter.stateAbbr}: no votes discovered since ${since.toISOString().split('T')[0]} (check session year or adapter URL)`
+        );
+      }
 
       const health = await checkScrapeHealth(adapter.stateAbbr, stats.ingested);
       if (!health.healthy) {

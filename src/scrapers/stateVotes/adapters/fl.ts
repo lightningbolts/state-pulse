@@ -12,7 +12,7 @@ import {
 
 const JURISDICTION = 'ocd-jurisdiction/country:us/state:fl/government';
 const VOTE_INDEX_URL =
-  'https://www.flhouse.gov/Sections/Bills/billsvote.aspx';
+  'https://www.myfloridahouse.gov/Sections/Bills/billsvote.aspx';
 
 export class FloridaVoteAdapter implements StateVoteAdapter {
   stateAbbr = 'FL';

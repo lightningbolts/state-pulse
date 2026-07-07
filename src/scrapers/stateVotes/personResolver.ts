@@ -32,6 +32,21 @@ function parseNameParts(name: string): { first: string; last: string } {
   return { first: parts[0], last: parts[parts.length - 1] };
 }
 
+function normalizeParty(party?: string): string {
+  if (!party) return '';
+  const p = party.toLowerCase();
+  if (p.startsWith('dem') || p === 'd') return 'democratic';
+  if (p.startsWith('rep') || p === 'r') return 'republican';
+  if (p.startsWith('ind') || p === 'i') return 'independent';
+  return p;
+}
+
+function partyMatches(a?: string, b?: string): boolean {
+  const na = normalizeParty(a);
+  const nb = normalizeParty(b);
+  return Boolean(na && nb && na === nb);
+}
+
 function namesMatch(a: string, b: string): boolean {
   const na = normalizeName(a);
   const nb = normalizeName(b);
@@ -44,6 +59,10 @@ function namesMatch(a: string, b: string): boolean {
     if (pa.first === pb.first) return true;
   }
   return false;
+}
+
+function legislatorLastName(person: PersonRecord): string {
+  return person.family_name ?? parseNameParts(person.name).last;
 }
 
 export class PersonResolver {
@@ -62,16 +81,27 @@ export class PersonResolver {
     }
   }
 
+  mergePeople(jurisdiction: string, people: PersonRecord[]): void {
+    const existing = this.cache.get(jurisdiction) ?? [];
+    const byId = new Map(existing.map((p) => [p.id, p]));
+    for (const person of people) {
+      byId.set(person.id, person);
+    }
+    this.cache.set(jurisdiction, Array.from(byId.values()));
+  }
+
   resolve(
     name: string,
     jurisdiction: string,
-    chamber?: string
+    chamber?: string,
+    party?: string
   ): PersonRecord | null {
     const people = this.cache.get(jurisdiction) ?? [];
     const normalized = normalizeName(name);
-    const { last } = parseNameParts(name);
+    const { last, first } = parseNameParts(name);
+    const isLastNameOnly = !name.includes(' ') && !name.includes(',');
 
-    const chamberFiltered = chamber
+    let candidates = chamber
       ? people.filter((p) => {
           const org = p.current_role?.org_classification?.toLowerCase() ?? '';
           if (chamber === 'upper') return org.includes('upper') || org.includes('senate');
@@ -80,16 +110,36 @@ export class PersonResolver {
         })
       : people;
 
-    const exact = chamberFiltered.filter((p) => namesMatch(p.name, name));
+    if (party) {
+      const partyFiltered = candidates.filter((p) => partyMatches(p.party, party));
+      if (partyFiltered.length) candidates = partyFiltered;
+    }
+
+    const exact = candidates.filter((p) => namesMatch(p.name, name));
     if (exact.length === 1) return exact[0];
 
-    const byLast = chamberFiltered.filter((p) => {
-      const pl = parseNameParts(p.name).last;
-      return pl && normalizeName(pl) === normalizeName(last);
-    });
-    if (byLast.length === 1) return byLast[0];
+    if (isLastNameOnly) {
+      const byLast = candidates.filter(
+        (p) => normalizeName(legislatorLastName(p)) === normalizeName(last)
+      );
+      if (byLast.length === 1) return byLast[0];
 
-    const fuzzy = chamberFiltered.filter(
+      if (first) {
+        const byInitial = byLast.filter((p) => {
+          const given = p.given_name ?? parseNameParts(p.name).first;
+          return given && given[0].toLowerCase() === first[0].toLowerCase();
+        });
+        if (byInitial.length === 1) return byInitial[0];
+      }
+    } else {
+      const byLast = candidates.filter((p) => {
+        const pl = legislatorLastName(p);
+        return pl && normalizeName(pl) === normalizeName(last);
+      });
+      if (byLast.length === 1) return byLast[0];
+    }
+
+    const fuzzy = candidates.filter(
       (p) =>
         normalizeName(p.name).includes(normalized) ||
         normalized.includes(normalizeName(p.name))
@@ -108,7 +158,7 @@ export class PersonResolver {
     let unresolved = 0;
     const resolved = memberVotes.map((mv) => {
       if (mv.personId) return mv;
-      const person = this.resolve(mv.name, jurisdiction, chamber);
+      const person = this.resolve(mv.name, jurisdiction, chamber, mv.party);
       if (person) {
         return {
           ...mv,
