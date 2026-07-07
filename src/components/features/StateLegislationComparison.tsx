@@ -112,10 +112,14 @@ export function StateLegislationComparison() {
     <div className="space-y-6">
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Compare State Legislation</CardTitle>
+          <CardTitle className="font-headline text-2xl flex flex-wrap items-center gap-2">
+            Compare State Legislation
+            <Badge variant="secondary">Beta</Badge>
+          </CardTitle>
           <CardDescription>
             Search a policy issue and see how each state&apos;s most relevant bill compares. Semantic
-            search runs in your browser — no API keys required.
+            search runs in your browser — no API keys required. This feature is early and results
+            may be slow or inaccurate.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -224,6 +228,9 @@ export function StateLegislationComparison() {
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
                     Generate Comparison
+                    <Badge variant="secondary" className="ml-2 font-normal">
+                      Beta
+                    </Badge>
                   </>
                 )}
               </Button>
@@ -231,9 +238,14 @@ export function StateLegislationComparison() {
             <CardContent className="space-y-3">
               {(synthesis || synthState === "loading") && (
                 <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Browser-generated comparison
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Browser-generated comparison
+                    </p>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      Beta
+                    </Badge>
+                  </div>
                   {synthState === "loading" ? (
                     <p className="text-sm text-muted-foreground">
                       Generating comparison in your browser (~30 MB model, one-time download)…
