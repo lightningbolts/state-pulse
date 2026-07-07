@@ -169,14 +169,6 @@ export const WAVE2_ADAPTER_CONFIGS: ChamberHtmlAdapterConfig[] = [
     chamber: 'lower',
     organization: 'House',
   },
-  {
-    stateAbbr: 'MD',
-    jurisdictionOcdId: ocd('md'),
-    adapterName: 'md-html',
-    voteIndexUrl: 'https://mgaleg.maryland.gov/mgawebsite/Votes/House',
-    chamber: 'lower',
-    organization: 'House',
-  },
 ];
 
 export function createWave2Adapters(): ChamberHtmlVoteAdapter[] {

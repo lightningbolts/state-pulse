@@ -106,6 +106,7 @@ export interface HttpClient {
   get(url: string, options?: RequestInit): Promise<string>;
   getBuffer?(url: string, options?: RequestInit): Promise<Buffer>;
   post?(url: string, body: string, options?: RequestInit): Promise<string>;
+  postForm?(url: string, body: string, options?: RequestInit): Promise<string>;
 }
 
 export interface RateLimiter {
