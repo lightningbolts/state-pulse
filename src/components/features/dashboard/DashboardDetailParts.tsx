@@ -23,9 +23,9 @@ export function StatCard({
 }) {
   return (
     <div className={cn("rounded-lg border bg-card p-3 shadow-sm", className)}>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-foreground/70">{label}</p>
       <p className="mt-1 text-xl font-bold tabular-nums">{typeof value === "number" ? value.toLocaleString() : value}</p>
-      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="mt-0.5 text-xs text-foreground/65">{hint}</p>}
     </div>
   );
 }
@@ -34,7 +34,7 @@ export function SectionHeader({ title, description }: { title: string; descripti
   return (
     <div className="space-y-0.5">
       <h4 className="text-sm font-semibold">{title}</h4>
-      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      {description && <p className="text-xs text-foreground/70">{description}</p>}
     </div>
   );
 }
@@ -66,14 +66,14 @@ export function BillRow({
   sponsor?: string;
 }) {
   return (
-    <div className="rounded-md border bg-muted/20 px-3 py-2.5">
+    <div className="rounded-md border bg-card px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs font-semibold text-primary">{identifier}</span>
-        {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
+        {meta && <span className="text-xs text-foreground/70">{meta}</span>}
       </div>
       {!compact && <p className="mt-1 text-sm leading-snug text-foreground">{title}</p>}
-      {sponsor && <p className="mt-1 text-xs text-muted-foreground">Sponsor: {sponsor}</p>}
-      {action && <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{action}</p>}
+      {sponsor && <p className="mt-1 text-xs text-foreground/70">Sponsor: {sponsor}</p>}
+      {action && <p className="mt-1 text-xs text-foreground/70 line-clamp-2">{action}</p>}
       {subjects && subjects.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {subjects.slice(0, compact ? 2 : 6).map((subject) => (
@@ -105,10 +105,10 @@ export function TopicBar({
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-3 text-xs">
         <span className="truncate font-medium">
-          {rank != null && <span className="mr-1.5 text-muted-foreground">#{rank}</span>}
+          {rank != null && <span className="mr-1.5 text-foreground/60">#{rank}</span>}
           {name}
         </span>
-        <span className="shrink-0 tabular-nums text-muted-foreground">
+        <span className="shrink-0 tabular-nums text-foreground/70">
           {recent} recent · {total} total
         </span>
       </div>
@@ -134,12 +134,12 @@ export function SponsorRow({
 }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground/80">
         {rank}
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{name}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground/70">
           {totalBills} bills sponsored · {recentBills} with recent action
         </p>
       </div>

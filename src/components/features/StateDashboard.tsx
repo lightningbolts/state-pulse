@@ -101,11 +101,11 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                     </Button>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-foreground/70">
                                         Full jurisdiction dashboard
                                     </p>
                                     <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{jurisdictionLabel}</h1>
-                                    <p className="mt-1 text-sm text-muted-foreground">
+                                    <p className="mt-1 text-sm text-foreground/70">
                                         Combined legislative activity, policy trends, sponsors, and recent bill movement.
                                     </p>
                                 </div>
@@ -128,7 +128,7 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                     <Card className="shadow-sm lg:col-span-2">
                         <CardHeader>
                             <CardTitle className="text-base">Activity snapshot</CardTitle>
-                            <CardDescription>How active this jurisdiction is right now.</CardDescription>
+                            <CardDescription className="text-foreground/70">How active this jurisdiction is right now.</CardDescription>
                         </CardHeader>
                         <CardContent className="grid gap-3 sm:grid-cols-3">
                             <StatCard label="Recent share" value={`${recentShare}%`} hint="Of all bills had action in 30d" />
@@ -159,7 +159,7 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                 <FileText className="h-5 w-5" />
                                 Recent legislation
                             </CardTitle>
-                            <CardDescription>
+                            <CardDescription className="text-foreground/70">
                                 All recent bill movement in {jurisdictionLabel} ({stateData.recentLegislation.length} bills).
                             </CardDescription>
                         </CardHeader>
@@ -187,7 +187,7 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                 <TrendingUp className="h-5 w-5" />
                                 Trending policy areas
                             </CardTitle>
-                            <CardDescription>
+                            <CardDescription className="text-foreground/70">
                                 Subject areas ranked by recent and total legislative volume.
                             </CardDescription>
                         </CardHeader>
@@ -215,12 +215,12 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                             <Users className="h-5 w-5" />
                             Legislator activity leaderboard
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-foreground/70">
                             {isCongressDashboard
                                 ? "Members of Congress ranked by sponsorship activity."
                                 : `State legislators ranked by sponsorship activity in ${jurisdictionLabel}.`}
                             {activeSponsorShare > 0 && (
-                                <span className="mt-1 block text-xs">
+                                <span className="mt-1 block text-xs text-foreground/65">
                                     {stateData.statistics.activeSponsors} sponsors across {stateData.statistics.totalLegislation.toLocaleString()} total bills.
                                 </span>
                             )}
@@ -251,11 +251,11 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                             <MapPin className="h-5 w-5" />
                             Cross-cutting insights
                         </CardTitle>
-                        <CardDescription>Patterns across bills, topics, and sponsors.</CardDescription>
+                        <CardDescription className="text-foreground/70">Patterns across bills, topics, and sponsors.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-lg border bg-muted/20 p-4">
+                            <div className="rounded-lg border bg-card p-4">
                                 <SectionHeader
                                     title="Hottest topics this month"
                                     description="Policy areas with recent bill actions."
@@ -267,12 +267,12 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                         .map((topic) => (
                                             <Badge key={topic.name} variant="secondary">
                                                 {topic.name}
-                                                <span className="ml-1.5 text-muted-foreground">({topic.recentCount})</span>
+                                                <span className="ml-1.5 opacity-80">({topic.recentCount})</span>
                                             </Badge>
                                         ))}
                                 </div>
                             </div>
-                            <div className="rounded-lg border bg-muted/20 p-4">
+                            <div className="rounded-lg border bg-card p-4">
                                 <SectionHeader
                                     title="Chambers in recent activity"
                                     description="Where recent bill movement is concentrated."
@@ -287,7 +287,7 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                     ).map(([chamber, count]) => (
                                         <div key={chamber} className="flex items-center justify-between text-sm">
                                             <span>{chamber}</span>
-                                            <Badge variant="outline">{count} bills</Badge>
+                                            <Badge variant="outline" className="border-border">{count} bills</Badge>
                                         </div>
                                     ))}
                                 </div>
