@@ -19,6 +19,8 @@ import type {
 import { dedupeVoteRecords } from '@/types/voteRecord';
 import { FetchHttpClient, SimpleRateLimiter } from './httpClient';
 import { fetchNcLegislators } from './rosters/ncLegislators';
+import { fetchNyLegislators, NY_JURISDICTION } from './rosters/nyLegislators';
+import { fetchPaLegislators, PA_JURISDICTION } from './rosters/paLegislators';
 
 const NC_JURISDICTION = 'ocd-jurisdiction/country:us/state:nc/government';
 
@@ -86,6 +88,23 @@ export class VoteIngestionOrchestrator {
     const batch: CanonicalVoteRecord[] = [];
 
     try {
+      if (this.options.openStatesApiKey) {
+        try {
+          const loaded = await personResolver.loadJurisdiction(
+            adapter.jurisdictionOcdId
+          );
+          if (loaded) {
+            this.log(
+              `Loaded ${loaded} legislators from Open States for ${adapter.stateAbbr}`
+            );
+          }
+        } catch (error) {
+          this.log(
+            `Warning: could not load Open States roster for ${adapter.stateAbbr}: ${error}`
+          );
+        }
+      }
+
       if (adapter.stateAbbr === 'NC') {
         try {
           const ncPeople = await fetchNcLegislators((url) => ctx.httpClient.get(url));
@@ -93,6 +112,30 @@ export class VoteIngestionOrchestrator {
           this.log(`Loaded ${ncPeople.length} NC legislators for name resolution`);
         } catch (error) {
           this.log(`Warning: could not load NC legislator roster: ${error}`);
+        }
+      }
+
+      if (adapter.stateAbbr === 'PA') {
+        try {
+          const paPeople = await fetchPaLegislators((url) =>
+            ctx.httpClient.get(url)
+          );
+          personResolver.mergePeople(PA_JURISDICTION, paPeople);
+          this.log(`Loaded ${paPeople.length} PA legislators for name resolution`);
+        } catch (error) {
+          this.log(`Warning: could not load PA legislator roster: ${error}`);
+        }
+      }
+
+      if (adapter.stateAbbr === 'NY') {
+        try {
+          const nyPeople = await fetchNyLegislators((url) =>
+            ctx.httpClient.get(url)
+          );
+          personResolver.mergePeople(NY_JURISDICTION, nyPeople);
+          this.log(`Loaded ${nyPeople.length} NY legislators for name resolution`);
+        } catch (error) {
+          this.log(`Warning: could not load NY legislator roster: ${error}`);
         }
       }
 

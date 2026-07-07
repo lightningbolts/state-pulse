@@ -8,7 +8,9 @@ import {
 import { FloridaVoteAdapter } from './adapters/fl';
 import { NewYorkVoteAdapter } from './adapters/ny';
 import { NorthCarolinaVoteAdapter } from './adapters/nc';
+import { PennsylvaniaVoteAdapter } from './adapters/pa';
 import { createTableIndexAdapters } from './adapters/tableIndex';
+import { WisconsinVoteAdapter } from './adapters/wi';
 
 export class StateAdapterRegistry {
   private adapters = new Map<string, StateVoteAdapter>();
@@ -39,6 +41,8 @@ export function createDefaultRegistry(): StateAdapterRegistry {
   registry.register(new FloridaVoteAdapter());
   registry.register(new NewYorkVoteAdapter());
   registry.register(new NorthCarolinaVoteAdapter());
+  registry.register(new PennsylvaniaVoteAdapter());
+  registry.register(new WisconsinVoteAdapter());
   for (const adapter of createWave2Adapters()) {
     registry.register(adapter);
   }
@@ -57,4 +61,5 @@ export { ChamberHtmlVoteAdapter, createWave2Adapters } from './adapters/chamberH
 export { FloridaVoteAdapter } from './adapters/fl';
 export { NewYorkVoteAdapter } from './adapters/ny';
 export { NorthCarolinaVoteAdapter } from './adapters/nc';
-export { createTableIndexAdapters } from './adapters/tableIndex';
+export { PennsylvaniaVoteAdapter } from './adapters/pa';
+export { WisconsinVoteAdapter } from './adapters/wi';

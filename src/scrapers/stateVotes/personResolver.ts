@@ -74,11 +74,12 @@ export class PersonResolver {
     ) => Promise<PersonRecord[]>
   ) {}
 
-  async loadJurisdiction(jurisdiction: string): Promise<void> {
+  async loadJurisdiction(jurisdiction: string): Promise<number> {
     if (!this.cache.has(jurisdiction)) {
       const people = await this.fetchPeople(jurisdiction);
       this.cache.set(jurisdiction, people);
     }
+    return this.cache.get(jurisdiction)?.length ?? 0;
   }
 
   mergePeople(jurisdiction: string, people: PersonRecord[]): void {
@@ -179,13 +180,13 @@ export async function fetchOpenStatesPeople(
   jurisdiction: string,
   apiKey: string
 ): Promise<PersonRecord[]> {
-  const url = `https://v3.openstates.org/people?jurisdiction=${encodeURIComponent(jurisdiction)}&per_page=200&apikey=${apiKey}`;
+  const baseUrl = `https://v3.openstates.org/people?jurisdiction=${encodeURIComponent(jurisdiction)}&per_page=50&apikey=${apiKey}`;
   const all: PersonRecord[] = [];
   let page = 1;
   let hasMore = true;
 
   while (hasMore) {
-    const response = await fetch(`${url}&page=${page}`);
+    const response = await fetch(`${baseUrl}&page=${page}`);
     if (response.status === 429) {
       await new Promise((r) => setTimeout(r, 2000));
       continue;
