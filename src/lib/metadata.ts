@@ -117,7 +117,7 @@ export const pageMetadata = {
 
   summaries: generateMetadata({
     title: 'Compare States - Cross-State Legislation Search',
-    description: 'Search a policy issue and compare how states approach it with browser-side semantic search. No API keys required.',
+    description: 'Search a policy issue and compare how states approach it with server-side semantic search and AI summaries.',
     keywords: ['state comparison', 'policy comparison', 'legislation search', 'semantic search', 'state bills'],
     url: '/summaries',
   }),

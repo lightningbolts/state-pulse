@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q') || '';
     const enactedOnly = searchParams.get('enactedOnly') === 'true';
     const showCongress = searchParams.get('showCongress') === 'true';
+    const userState = searchParams.get('userState') || undefined;
 
     if (!q.trim()) {
       return NextResponse.json(
@@ -52,13 +53,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const cacheKey = `${q}|${enactedOnly}|${showCongress}`;
+    const cacheKey = `${q}|${enactedOnly}|${showCongress}|${userState || ''}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return NextResponse.json(cached.data, { status: 200 });
     }
 
-    const result = await getComparisonCandidates(q, { enactedOnly, showCongress });
+    const result = await getComparisonCandidates(q, { enactedOnly, showCongress, userState });
     cache.set(cacheKey, { data: result, timestamp: Date.now() });
 
     return NextResponse.json(result, { status: 200 });

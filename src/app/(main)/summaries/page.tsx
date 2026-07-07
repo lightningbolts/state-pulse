@@ -10,7 +10,7 @@ export default function SummariesPage() {
     <div className="animate-content-in space-y-6">
       <PageHeader
         title="Compare States"
-        subtitle="Experimental — search and AI comparison run in your browser. Results can be slow and may not be accurate yet."
+        subtitle="Experimental — search and AI comparison run on the server. Results can be slow and may not be accurate yet."
         badge={<Badge variant="secondary">Beta</Badge>}
       />
       <StateLegislationComparison />
