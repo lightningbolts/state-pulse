@@ -76,7 +76,10 @@ export function VotingPredictionSection({ legislationId }: VotingPredictionSecti
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h3 className="text-xl font-semibold text-foreground">Voting Outcome Prediction (Beta)</h3>
+        <h3 className="text-xl font-semibold text-foreground flex items-center">
+          <Target className="mr-2 h-6 w-6 text-primary flex-shrink-0" />
+          Voting Outcome Prediction (Beta)
+        </h3>
         {showPrediction && (
           <div className="flex flex-col sm:flex-row gap-2">
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
