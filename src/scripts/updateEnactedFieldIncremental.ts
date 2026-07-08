@@ -1,52 +1,15 @@
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
-import { enactedPatterns } from "@/types/legislation";
-
+import { findEnactedDate } from '@/utils/enacted-legislation';
 
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.MONGODB_DB_NAME || 'statepulse-data';
-
-
-function findEnactedDate(doc: any): Date | null {
-  // Check latest action description first
-  if (doc.latestActionDescription) {
-    for (const pattern of enactedPatterns) {
-      if (pattern.test(doc.latestActionDescription)) {
-        // If latest action indicates enactment, use latestActionAt date
-        return doc.latestActionAt ? new Date(doc.latestActionAt) : null;
-      }
-    }
-  }
-
-  // Check history for enacted actions (search in reverse chronological order)
-  if (doc.history && Array.isArray(doc.history)) {
-    // Sort by date in descending order to find the most recent enacted action
-    const sortedHistory = [...doc.history].sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA;
-    });
-
-    for (const historyItem of sortedHistory) {
-      if (historyItem.action) {
-        for (const pattern of enactedPatterns) {
-          if (pattern.test(historyItem.action)) {
-            // Return the date of the enacted action
-            return historyItem.date ? new Date(historyItem.date) : null;
-          }
-        }
-      }
-    }
-  }
-
-  return null;
-}
+const BATCH_SIZE = 1000;
 
 /**
- * Continuous background job to keep enactedAt field updated
- * This ensures new legislation automatically gets the enactedAt field computed
+ * Continuous background job to keep enactedAt field updated.
  */
 async function updateEnactedFieldIncrementally() {
   console.log(`Connecting to MongoDB: ${MONGO_URI}`);
@@ -60,20 +23,29 @@ async function updateEnactedFieldIncrementally() {
 
     const db = client.db(DB_NAME);
     const legislationCollection = db.collection('legislation');
-
-    // Find documents that don't have the enactedAt field or haven't been updated in the last week
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     const documentsToUpdate = await legislationCollection.find({
       $or: [
         { enactedAt: { $exists: false } },
+        { enactedAt: null },
         { enactedFieldUpdatedAt: { $exists: false } },
         { enactedFieldUpdatedAt: { $lt: oneWeekAgo } },
-        { updatedAt: { $gt: '$enactedFieldUpdatedAt' } } // Document was updated after enactedAt field
-      ]
+      ],
     }, {
-      projection: { _id: 1, id: 1, latestActionDescription: 1, latestActionAt: 1, history: 1, enactedAt: 1 }
-    }).limit(1000).toArray(); // Process in batches of 1000
+      projection: {
+        _id: 1,
+        id: 1,
+        isEnacted: 1,
+        latestActionDescription: 1,
+        latestActionAt: 1,
+        latestPassageAt: 1,
+        history: 1,
+        enactedAt: 1,
+        updatedAt: 1,
+        createdAt: 1,
+      },
+    }).limit(BATCH_SIZE).toArray();
 
     if (documentsToUpdate.length === 0) {
       console.log('No documents need enactedAt field updates');
@@ -87,8 +59,6 @@ async function updateEnactedFieldIncrementally() {
 
     for (const doc of documentsToUpdate) {
       const computedEnactedAt = findEnactedDate(doc);
-
-      // Only update if the value has changed or doesn't exist
       const currentEnactedAt = doc.enactedAt ? new Date(doc.enactedAt).getTime() : null;
       const newEnactedAt = computedEnactedAt ? computedEnactedAt.getTime() : null;
 
@@ -99,23 +69,22 @@ async function updateEnactedFieldIncrementally() {
             update: {
               $set: {
                 enactedAt: computedEnactedAt,
-                enactedFieldUpdatedAt: new Date()
-              }
-            }
-          }
+                enactedFieldUpdatedAt: new Date(),
+              },
+            },
+          },
         });
         updatedCount++;
       } else {
-        // Just update the timestamp to mark it as checked
         bulkOps.push({
           updateOne: {
             filter: { _id: doc._id },
             update: {
               $set: {
-                enactedFieldUpdatedAt: new Date()
-              }
-            }
-          }
+                enactedFieldUpdatedAt: new Date(),
+              },
+            },
+          },
         });
       }
     }
@@ -128,7 +97,6 @@ async function updateEnactedFieldIncrementally() {
     console.log(`Processed ${documentsToUpdate.length} total documents`);
 
     return { updated: updatedCount, total: documentsToUpdate.length };
-
   } catch (error) {
     console.error('Failed to update enacted field incrementally:', error);
     throw error;

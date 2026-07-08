@@ -18,6 +18,7 @@ export default async function EnactedLegislationPage() {
     skip: 0,
     sortDir: 'desc',
     sortBy: 'createdAt',
+    showOnlyEnacted: 'true',
     context: 'policy-updates-feed',
   });
   const initialData = JSON.parse(JSON.stringify(raw)) as PolicyUpdate[];

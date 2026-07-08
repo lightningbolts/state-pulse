@@ -26,6 +26,26 @@ import { AnimatedSection } from "@/components/ui/AnimatedSection";
 const PAGE_SIZE = 20;
 const COMPACT_PAGE_SIZE = 100;
 
+function hasActiveFeedFilters(state: {
+    search?: string;
+    subject?: string;
+    classification?: string;
+    jurisdictionName?: string;
+    showCongress?: boolean;
+    showOnlyEnacted?: boolean;
+    showOnlyBookmarked?: boolean;
+}): boolean {
+    return Boolean(
+        state.search ||
+        state.subject ||
+        state.classification ||
+        state.jurisdictionName ||
+        state.showCongress ||
+        state.showOnlyEnacted ||
+        state.showOnlyBookmarked
+    );
+}
+
 function PolicyCardSkeleton({ compact }: { compact: boolean }) {
     if (compact) {
         return (
@@ -699,8 +719,7 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
         }
 
         const saved = sessionStorage.getItem('policyUpdatesFeedState');
-        const hasServerInitialData = Boolean(initialData && initialData.length > 0);
-        if (saved && !urlDrivesLegislationFeed && !hasServerInitialData) {
+        if (saved && !urlDrivesLegislationFeed) {
             try {
                 const state = JSON.parse(saved);
                 setSearch(state.search || "");
@@ -712,38 +731,33 @@ export function PolicyUpdatesFeed({ initialData, enactedOnly = false }: PolicyUp
                 setShowOnlyBookmarked(state.showOnlyBookmarked || false);
                 setCompactView(state.compactView || false);
                 setSort(state.sort || { field: 'createdAt', dir: 'desc' });
-                setSkip(state.skip || 0);
-                skipRef.current = state.skip || 0;
                 setSearchInput(state.searchInput || "");
-                if (state.updates && Array.isArray(state.updates)) {
+
+                if (state.updates && Array.isArray(state.updates) && state.updates.length > 0) {
                     setUpdates(state.updates);
                     skipRef.current = state.updates.length;
+                    setSkip(state.updates.length);
                     const restoredPageSize = state.compactView ? COMPACT_PAGE_SIZE : PAGE_SIZE;
                     setHasMore(state.updates.length >= restoredPageSize);
-                } else {
+                } else if (hasActiveFeedFilters(state)) {
                     setUpdates([]);
+                    skipRef.current = 0;
+                    setSkip(0);
+                    setHasMore(true);
+                } else if (!initialData?.length) {
+                    setUpdates([]);
+                    skipRef.current = 0;
+                    setSkip(0);
+                }
+
+                if (typeof state.skip === 'number' && state.updates?.length) {
+                    setSkip(state.skip);
                 }
             } catch (e) {
                 console.error('Error parsing feed state:', e);
                 setUpdates([]);
                 skipRef.current = 0;
                 setSkip(0);
-            }
-        } else if (saved && !urlDrivesLegislationFeed && hasServerInitialData) {
-            try {
-                const state = JSON.parse(saved);
-                setSearch(state.search || "");
-                setSubject(state.subject || "");
-                setClassification(state.classification || "");
-                setJurisdictionName(state.jurisdictionName || "");
-                setShowCongress(state.showCongress || false);
-                setShowOnlyEnacted(state.showOnlyEnacted || false);
-                setShowOnlyBookmarked(state.showOnlyBookmarked || false);
-                setCompactView(state.compactView || false);
-                setSort(state.sort || { field: 'createdAt', dir: 'desc' });
-                setSearchInput(state.searchInput || "");
-            } catch (e) {
-                console.error('Error parsing feed filters from session:', e);
             }
         } else if (urlDrivesLegislationFeed) {
             // Clear any existing state when URL params are present (state, congress, rep, sponsorId, etc.)

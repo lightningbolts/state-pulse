@@ -168,6 +168,9 @@ export interface BillSearchProps {
 }
 
 export const enactedPatterns = [
+  /^enacted(?:\s+as)?/i,
+  /signed by president/i,
+  /signed by governor/i,
   /signed.*(into|by).*(law|governor)/i,
   /approved.*by.*governor/i,
   /became.*law/i,

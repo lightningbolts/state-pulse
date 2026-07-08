@@ -11,7 +11,7 @@ import { ShareButton } from '@/components/ui/ShareButton';
 import { VotingPredictionSection } from '@/components/features/VotingPredictionSection';
 import { RelatedBillsWrapper } from '@/components/features/RelatedBillsWrapper';
 import { RelatedBillsLoading } from '@/components/features/RelatedBillsLoading';
-import { VotingBillPositionsLoader } from '@/components/features/VotingBillPositionsLoader';
+import { VotingBillPositionsWrapper } from '@/components/features/VotingBillPositionsWrapper';
 import { DetailedAISummarySection } from '@/components/features/DetailedAISummarySection';
 import { generateLegislationMetadata } from '@/lib/metadata';
 import { Metadata } from 'next';
@@ -272,7 +272,9 @@ export default async function LegislationDetailPage({ params }: { params: { id: 
           <AnimatedSection><CollapsibleSponsors sponsors={sponsors} /></AnimatedSection>
 
           <AnimatedSection>
-            <VotingBillPositionsLoader billId={id} />
+            <Suspense fallback={null}>
+              <VotingBillPositionsWrapper billId={id} />
+            </Suspense>
           </AnimatedSection>
 
           {abstracts && abstracts.length > 0 && (

@@ -1,6 +1,51 @@
 import type { Legislation } from '@/types/legislation';
 import { enactedPatterns } from "@/types/legislation";
 
+function toEnactedDate(value: string | Date | undefined | null): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+function matchesEnactedPattern(text: string | undefined | null): boolean {
+  if (!text) return false;
+  return enactedPatterns.some((pattern) => pattern.test(text));
+}
+
+/**
+ * Derive the enacted date from legislation history and action fields.
+ */
+export function findEnactedDate(legislation: Legislation | Record<string, unknown>): Date | null {
+  const doc = legislation as Record<string, unknown>;
+  const sortedHistory = Array.isArray(doc.history)
+    ? [...(doc.history as { date?: string; action?: string }[])].sort((a, b) => {
+        const dateA = toEnactedDate(a.date)?.getTime() ?? 0;
+        const dateB = toEnactedDate(b.date)?.getTime() ?? 0;
+        return dateB - dateA;
+      })
+    : [];
+
+  if (doc.isEnacted === true) {
+    return (
+      toEnactedDate(sortedHistory[0]?.date) ||
+      toEnactedDate(doc.latestPassageAt as string | Date | undefined) ||
+      toEnactedDate(doc.latestActionAt as string | Date | undefined) ||
+      toEnactedDate(doc.updatedAt as string | Date | undefined) ||
+      toEnactedDate(doc.createdAt as string | Date | undefined)
+    );
+  }
+
+  if (matchesEnactedPattern(doc.latestActionDescription as string | undefined)) {
+    return toEnactedDate(doc.latestActionAt as string | Date | undefined);
+  }
+
+  const enactedHistoryItem = sortedHistory.find((item) => matchesEnactedPattern(item.action));
+  if (enactedHistoryItem) {
+    return toEnactedDate(enactedHistoryItem.date);
+  }
+
+  return null;
+}
 
 /**
  * Check if a single action string indicates enacted status

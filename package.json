@@ -18,6 +18,8 @@
     "build-embeddings": "tsx src/scripts/build-legislation-embeddings.ts",
     "build-embeddings:fast": "tsx src/scripts/build-legislation-embeddings.ts --fast",
     "create-vector-index": "tsx src/scripts/createVectorSearchIndex.ts",
+    "update-enacted-field": "tsx src/scripts/updateEnactedFieldIncremental.ts",
+    "backfill-enacted-at": "tsx src/scripts/backfillEnactedAt.ts",
     "postinstall": "patch-package"
   },
   "dependencies": {

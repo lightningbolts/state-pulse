@@ -1,59 +1,11 @@
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
-import {enactedPatterns} from "@/types/legislation";
+import { findEnactedDate } from '@/utils/enacted-legislation';
 
 dotenv.config({ path: require('path').resolve(__dirname, '../../.env') });
 
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.MONGODB_DB_NAME || 'statepulse-data';
-
-function findEnactedDate(doc: any): Date | null {
-  const toDate = (dateStr: string | Date | undefined): Date | null => {
-    if (!dateStr) return null;
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d;
-  };
-
-  const checkPatterns = (text: string | undefined): boolean => {
-    if (!text) return false;
-    for (const pattern of enactedPatterns) {
-      if (pattern.test(text)) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  const sortedHistory = (doc.history && Array.isArray(doc.history))
-    ? [...doc.history].sort((a, b) => {
-      const dateA = toDate(a.date)?.getTime() ?? 0;
-      const dateB = toDate(b.date)?.getTime() ?? 0;
-      return dateB - dateA;
-    })
-    : [];
-
-  // 1. If isEnacted is explicitly true, find the best possible date.
-  if (doc.isEnacted === true) {
-    // Priority: latest history date, then latest passage, then update/create timestamps.
-    return toDate(sortedHistory[0]?.date) ||
-           toDate(doc.latestPassageAt) ||
-           toDate(doc.updatedAt) ||
-           toDate(doc.createdAt);
-  }
-
-  // 2. Check latest action description for an enacted pattern.
-  if (checkPatterns(doc.latestActionDescription)) {
-    return toDate(doc.latestActionAt);
-  }
-
-  // 3. Find the first history item that matches an enacted pattern.
-  const enactedHistoryItem = sortedHistory.find(item => checkPatterns(item.action));
-  if (enactedHistoryItem) {
-    return toDate(enactedHistoryItem.date);
-  }
-
-  return null;
-}
 
 async function addEnactedField() {
   console.log(`Connecting to MongoDB: ${MONGO_URI}`);
