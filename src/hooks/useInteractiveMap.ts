@@ -274,7 +274,12 @@ export const useInteractiveMap = () => {
     }, [isMobile, mapMode]);
 
     const fetchStateDetails = async (stateAbbr: string) => {
-        const cached = queryClient.getQueryData<StateDetailData>(['dashboard-detail', 'state', stateAbbr]);
+        const isCongress = stateAbbr === 'US';
+        const queryKey = isCongress
+            ? ['dashboard-detail', 'congress'] as const
+            : ['dashboard-detail', 'state', stateAbbr] as const;
+
+        const cached = queryClient.getQueryData<StateDetailData>(queryKey);
         if (cached) {
             setStateDetails(cached);
             setDetailsLoading(false);
@@ -284,9 +289,12 @@ export const useInteractiveMap = () => {
         setDetailsLoading(true);
         try {
             const data = await queryClient.fetchQuery({
-                queryKey: ['dashboard-detail', 'state', stateAbbr],
+                queryKey,
                 queryFn: async () => {
-                    const response = await fetch(`/api/dashboard/state/${stateAbbr}`);
+                    const url = isCongress
+                        ? '/api/dashboard/congress'
+                        : `/api/dashboard/state/${stateAbbr}`;
+                    const response = await fetch(url);
                     if (!response.ok) throw new Error('Failed to fetch state details');
                     const result = await response.json();
                     if (!result.success) throw new Error(result.error || 'Unknown error');

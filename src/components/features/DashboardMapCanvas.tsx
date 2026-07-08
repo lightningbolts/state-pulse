@@ -241,6 +241,7 @@ function MapSurface({
                   mapMode={mapMode}
                   state={stateStats[selectedState]}
                   activityLevel={getActivityLevel(selectedState)}
+                  isCongress={selectedState === 'US'}
                 />
               </MapLibrePopup>
             )}

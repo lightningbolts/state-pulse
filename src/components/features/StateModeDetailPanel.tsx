@@ -46,6 +46,7 @@ export function StateModeDetailPanel({
   onViewDashboard,
   onViewLegislation,
 }: StateModeDetailPanelProps) {
+  const isCongress = stateAbbr === 'US';
   const modeLabel = MODE_LABELS[mapMode] ?? "Overview";
   const listLimit = 6;
 
@@ -54,7 +55,12 @@ export function StateModeDetailPanel({
       case "legislation":
         return { label: "Total bills tracked", value: state.legislationCount, icon: FileText, color: "text-blue-500" };
       case "representatives":
-        return { label: "State legislators", value: state.activeRepresentatives, icon: Users, color: "text-green-500" };
+        return {
+          label: isCongress ? "Members of Congress" : "State legislators",
+          value: state.activeRepresentatives,
+          icon: Users,
+          color: "text-green-500",
+        };
       case "trends":
         return { label: "Distinct policy topics", value: state.topicDiversity, icon: TrendingUp, color: "text-orange-500" };
       case "recent":
@@ -143,13 +149,18 @@ export function StateModeDetailPanel({
         return (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
-              <StatCard label="Legislators in office" value={state.activeRepresentatives} />
               <StatCard label="Active sponsors" value={stateDetails.statistics.activeSponsors} hint="With at least one bill" />
               <StatCard label="Bills in jurisdiction" value={stateDetails.statistics.totalLegislation} />
+              <StatCard label="30-day actions" value={stateDetails.statistics.recentActivity} hint="Recent legislative activity" />
             </div>
             <Separator />
             <div className="space-y-3">
-              <SectionHeader title="Most active legislators" description="Ranked by recent and total bills sponsored." />
+              <SectionHeader
+                title={isCongress ? "Most active members" : "Most active legislators"}
+                description={isCongress
+                  ? "Members of Congress ranked by recent and total bills sponsored."
+                  : "Ranked by recent and total bills sponsored."}
+              />
               <div className="divide-y rounded-lg border">
                 {stateDetails.topSponsors.slice(0, listLimit).map((sponsor, index) => (
                   <SponsorRow
@@ -238,7 +249,7 @@ export function StateModeDetailPanel({
         <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{modeLabel}</p>
           <h3 className="text-2xl font-bold tracking-tight">{state.name}</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-foreground/70">
             Snapshot for {stateAbbr} based on the current map view.
           </p>
         </div>

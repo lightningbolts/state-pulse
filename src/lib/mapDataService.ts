@@ -83,7 +83,7 @@ function buildStateStatsFromResults(
         name: STATE_NAMES[stateAbbr],
         abbreviation: stateAbbr,
         legislationCount: result.totalBills || 0,
-        activeRepresentatives: representativeCounts[stateAbbr] ?? result.uniqueSponsors ?? 0,
+        activeRepresentatives: representativeCounts[stateAbbr] ?? (stateAbbr === 'US' ? 0 : result.uniqueSponsors ?? 0),
         recentActivity: result.recentBills || 0,
         topicDiversity: result.uniqueTopics || 0,
         keyTopics: topSubjects.length > 0 ? topSubjects : ['General'],
@@ -95,6 +95,22 @@ function buildStateStatsFromResults(
 
   return stateStats;
 }
+
+async function fetchCongressMemberCount(): Promise<number> {
+  const repsCollection = await getCollection('representatives');
+  return repsCollection.countDocuments({
+    $or: [
+      { jurisdiction: { $in: ['US House', 'US Senate'] } },
+      { 'jurisdiction.name': { $in: ['US House', 'US Senate'] } },
+    ],
+  });
+}
+
+const getCachedCongressMemberCount = unstable_cache(
+  () => fetchCongressMemberCount(),
+  ['map-data-congress-rep-count'],
+  { revalidate: 600 },
+);
 
 async function fetchStateLegislatorCounts(): Promise<Record<string, number>> {
   const repsCollection = await getCollection('representatives');
@@ -242,10 +258,13 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
     })
     .toArray();
 
-  const [results, representativeCounts] = await Promise.all([
+  const [results, representativeCounts, congressMemberCount] = await Promise.all([
     fetchLegislation,
     getCachedRepresentativeCounts(),
+    getCachedCongressMemberCount(),
   ]);
+
+  representativeCounts.US = congressMemberCount;
 
   const stateStats = buildStateStatsFromResults(
     results as Array<{

@@ -16,9 +16,10 @@ type StateMapTooltipProps = {
   mapMode: string;
   state: StateData;
   activityLevel?: string;
+  isCongress?: boolean;
 };
 
-export function StateMapTooltip({ mapMode, state, activityLevel }: StateMapTooltipProps) {
+export function StateMapTooltip({ mapMode, state, activityLevel, isCongress }: StateMapTooltipProps) {
   const modeLabel = MODE_LABELS[mapMode] ?? "Overview";
 
   const primary = (() => {
@@ -26,7 +27,12 @@ export function StateMapTooltip({ mapMode, state, activityLevel }: StateMapToolt
       case "legislation":
         return { label: "Bills", value: state.legislationCount, icon: FileText, color: "text-blue-500" };
       case "representatives":
-        return { label: "Legislators", value: state.activeRepresentatives, icon: Users, color: "text-green-500" };
+        return {
+          label: isCongress ? "Members" : "Legislators",
+          value: state.activeRepresentatives,
+          icon: Users,
+          color: "text-green-500",
+        };
       case "trends":
         return { label: "Topics", value: state.topicDiversity, icon: TrendingUp, color: "text-orange-500" };
       case "recent":
