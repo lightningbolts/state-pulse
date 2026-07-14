@@ -1,10 +1,19 @@
-import { cache } from 'react';
+import { cache as reactCache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { isCongressBillId } from '@/lib/congressBillId';
 import type { Legislation } from '@/types/legislation';
 import type { LegislationMongoDbDocument } from '@/types/legislation';
+
+/**
+ * React `cache` is for Next.js RSC request dedupe. Cron/tsx scripts load this
+ * same module; older React (or non-RSC resolution) has no `cache` export.
+ */
+const cache =
+  typeof reactCache === 'function'
+    ? reactCache
+    : <T extends (...args: never[]) => unknown>(fn: T): T => fn;
 
 /** Excluded on list/feed queries to shrink MongoDB payloads (cards do not need these). */
 const LEGISLATION_FEED_HEAVY_FIELDS: Record<string, 0> = {
