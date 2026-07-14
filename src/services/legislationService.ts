@@ -1,10 +1,11 @@
 import { cache as reactCache } from 'react';
-import { unstable_cache } from 'next/cache';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { isCongressBillId } from '@/lib/congressBillId';
 import type { Legislation } from '@/types/legislation';
 import type { LegislationMongoDbDocument } from '@/types/legislation';
+
+type UnstableCache = typeof import('next/cache').unstable_cache;
 
 /**
  * React `cache` is for Next.js RSC request dedupe. Cron/tsx scripts load this
@@ -14,6 +15,23 @@ const cache =
   typeof reactCache === 'function'
     ? reactCache
     : <T extends (...args: never[]) => unknown>(fn: T): T => fn;
+
+/** `unstable_cache` is Next-only; cron/tsx scripts must not require `next/cache`. */
+const unstable_cache: UnstableCache = (() => {
+  try {
+    const nextCache = require('next/cache') as { unstable_cache?: UnstableCache };
+    if (typeof nextCache.unstable_cache === 'function') {
+      return nextCache.unstable_cache;
+    }
+  } catch {
+    // next/cache is unavailable outside the Next.js runtime.
+  }
+  return (<T extends (...args: never[]) => unknown>(
+    fn: T,
+    _keyParts?: string[],
+    _options?: { revalidate?: number | false; tags?: string[] },
+  ): T => fn) as UnstableCache;
+})();
 
 /** Excluded on list/feed queries to shrink MongoDB payloads (cards do not need these). */
 const LEGISLATION_FEED_HEAVY_FIELDS: Record<string, 0> = {
