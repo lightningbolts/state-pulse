@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -8,7 +8,6 @@ import {
   AlertCircle,
   Calendar,
   Users,
-  Target,
   CheckCircle,
   XCircle,
   HelpCircle
@@ -23,15 +22,20 @@ interface VotingPredictionCardProps {
 export function VotingPredictionCard({ prediction, isLoading = false }: VotingPredictionCardProps) {
   if (isLoading || !prediction) {
     return (
-      <Card className="animate-pulse">
-        <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
-          <div className="h-5 sm:h-6 bg-muted rounded w-3/4"></div>
-        </CardHeader>
-        <CardContent className="px-4 py-3 sm:px-6 sm:py-4">
-          <div className="space-y-2 sm:space-y-3">
-            <div className="h-3 sm:h-4 bg-muted rounded w-full"></div>
-            <div className="h-3 sm:h-4 bg-muted rounded w-2/3"></div>
-            <div className="h-6 sm:h-8 bg-muted rounded w-1/2"></div>
+      <Card className="animate-pulse border-l-4 border-l-blue-500 dark:border-l-blue-400">
+        <CardContent className="px-4 py-4 sm:px-6 sm:py-5">
+          <div className="space-y-4">
+            <div className="h-6 bg-muted rounded w-1/3"></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <div className="h-4 bg-muted rounded w-full"></div>
+                <div className="h-4 bg-muted rounded w-full"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 bg-muted rounded w-full"></div>
+                <div className="h-4 bg-muted rounded w-full"></div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -60,44 +64,57 @@ export function VotingPredictionCard({ prediction, isLoading = false }: VotingPr
     }
   };
 
+  const getOutcomeLabel = (outcome: string) => {
+    switch (outcome) {
+      case 'pass':
+        return 'Likely to pass';
+      case 'fail':
+        return 'Likely to fail';
+      default:
+        return 'Outcome unclear based on available data';
+    }
+  };
+
   return (
-    <Card className="shadow-lg border-l-4 border-l-blue-500 dark:border-l-blue-400 mx-2 sm:mx-0">
-      <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
-        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-          <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-          <span className="break-words">Voting Outcome Prediction (Beta)</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 py-3 sm:px-6 sm:py-4 space-y-4 sm:space-y-6">
+    <Card className="shadow-lg border-l-4 border-l-blue-500 dark:border-l-blue-400">
+      <CardContent className="px-4 py-4 sm:px-6 sm:py-5 space-y-4 sm:space-y-5">
         {/* Main Prediction */}
-        <div className="text-center space-y-2 sm:space-y-3">
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            {getOutcomeIcon(prediction.prediction.outcome)}
-            <Badge
-              variant="outline"
-              className={`text-base sm:text-lg px-3 py-1 sm:px-4 sm:py-2 ${getOutcomeColor(prediction.prediction.outcome)}`}
-            >
-              {prediction.prediction.outcome.toUpperCase()}
-            </Badge>
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex-shrink-0">
+              {getOutcomeIcon(prediction.prediction.outcome)}
+            </div>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={`text-sm font-semibold px-2.5 py-0.5 ${getOutcomeColor(prediction.prediction.outcome)}`}
+                >
+                  {prediction.prediction.outcome.toUpperCase()}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {getOutcomeLabel(prediction.prediction.outcome)}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs sm:text-sm text-foreground">
-              <span>Confidence Level</span>
-              <span className="font-semibold">{prediction.prediction.confidence}%</span>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm text-foreground">
+                <span>Confidence Level</span>
+                <span className="font-semibold tabular-nums">{prediction.prediction.confidence}%</span>
+              </div>
+              <Progress value={prediction.prediction.confidence} />
             </div>
-            <Progress value={prediction.prediction.confidence} className="h-1.5 sm:h-2" />
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs sm:text-sm text-foreground">
-              <span>Probability of Passage</span>
-              <span className="font-semibold">{prediction.prediction.probabilityPass}%</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm text-foreground">
+                <span>Probability of Passage</span>
+                <span className="font-semibold tabular-nums">{prediction.prediction.probabilityPass}%</span>
+              </div>
+              <Progress value={prediction.prediction.probabilityPass} />
             </div>
-            <Progress
-              value={prediction.prediction.probabilityPass}
-              className="h-1.5 sm:h-2"
-            />
           </div>
         </div>
 
