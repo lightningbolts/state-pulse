@@ -2,6 +2,14 @@ import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import { sendEmail } from '@/lib/email';
 import { renderBrandedEmail } from '@/lib/emailTemplate';
+import {
+  emailMutedNote,
+  emailSectionHeading,
+  emailSponsorshipBillCard,
+  emailSubheading,
+  emailSummaryBox,
+  emailTopicBillCard,
+} from '@/lib/emailBrand';
 import { getAllLegislationWithFiltering } from '@/services/legislationService';
 
 import fetch from 'node-fetch';
@@ -317,43 +325,29 @@ async function main() {
 
       if (newLegislation.length > 0) {
         hasContent = true;
-        const sectionTitle = isWeeklyMode ?
-          `📋 Your Tracked Topics - This Week (${topicCount} updates)` :
-          `📋 Your Tracked Topics`;
+        const sectionTitle = isWeeklyMode
+          ? `Your Tracked Topics — This Week (${topicCount} updates)`
+          : `Your Tracked Topics`;
 
-        message += `<h2 style="margin:1.5em 0 1em 0;font-family:Geist,Arial,sans-serif;font-size:1.3em;color:#71a3a0;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">${sectionTitle}</h2>`;
+        message += emailSectionHeading(sectionTitle);
 
         for (const entry of newLegislation) {
-          message += `<h3 style="margin:1.5em 0 0.5em 0;font-family:Geist,Arial,sans-serif;font-size:1.1em;color:#374151;">Topic: ${entry.topic} (${entry.bills.length} ${entry.bills.length === 1 ? 'update' : 'updates'})</h3>`;
+          message += emailSubheading(
+            `Topic: ${entry.topic} (${entry.bills.length} ${entry.bills.length === 1 ? 'update' : 'updates'})`,
+          );
 
           // For weekly digest, limit to 3 most recent per topic to keep email manageable
           const billsToShow = isWeeklyMode ? entry.bills.slice(0, 3) : entry.bills;
 
           for (const legislation of billsToShow) {
-            message += `
-              <div style="border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:16px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.03);font-family:Geist,Arial,sans-serif;">
-                <div style="margin-bottom:12px;">
-                  <a href="https://statepulse.me/legislation/${legislation.id}" style="font-size:1.1em;font-weight:600;color:#71a3a0;text-decoration:none;">${legislation.identifier}: ${legislation.title}</a>
-                </div>
-                <div style="margin-bottom:8px;">
-                  ${legislation.statusText ? `<span style='display:inline-block;background:#f3f4f6;color:#374151;border-radius:6px;padding:2px 8px;font-size:0.85em;margin-right:4px;'>${legislation.statusText}</span>` : ''}
-                  ${(legislation.classification || []).map((type: string) => `<span style='display:inline-block;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;font-size:0.85em;margin-right:4px;'>${type}</span>`).join('')}
-                </div>
-                <div style="font-size:0.95em;color:#6b7280;margin-bottom:8px;">
-                  ${legislation.session} - ${legislation.jurisdictionName}${legislation.chamber ? ` (${legislation.chamber})` : ''}
-                </div>
-                ${legislation.latestActionAt ? `<div style="font-size:0.9em;color:#374151;margin-bottom:8px;"><strong>Last Action:</strong> ${new Date(legislation.latestActionAt).toLocaleDateString()}</div>` : ''}
-                ${legislation.geminiSummary ? `<div style='background:#f0f6ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#71a3a0;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
-                <div style="margin-top:10px;">
-                  <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #e7eaf3;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#71a3a0;text-decoration:none;background:#f9fafb;">View Details</a>
-                </div>
-              </div>
-            `;
+            message += emailTopicBillCard(legislation);
           }
 
           // Show "and X more" if we truncated for weekly digest
           if (isWeeklyMode && entry.bills.length > 3) {
-            message += `<p style="margin:0 0 1em 0;font-size:0.9em;color:#6b7280;text-align:center;"><em>...and ${entry.bills.length - 3} more ${entry.bills.length - 3 === 1 ? 'update' : 'updates'} for this topic</em></p>`;
+            message += emailMutedNote(
+              `...and ${entry.bills.length - 3} more ${entry.bills.length - 3 === 1 ? 'update' : 'updates'} for this topic`,
+            );
           }
         }
       }
@@ -364,40 +358,26 @@ async function main() {
         hasContent = true;
         repCount = sponsorshipAlerts.reduce((sum, alert) => sum + alert.legislation.length, 0);
 
-        const sectionTitle = isWeeklyMode ?
-          `👥 New Legislation from Your Followed Representatives - This Week (${repCount} updates)` :
-          `👥 New Legislation from Your Followed Representatives`;
+        const sectionTitle = isWeeklyMode
+          ? `New Legislation from Your Followed Representatives — This Week (${repCount} updates)`
+          : `New Legislation from Your Followed Representatives`;
 
-        message += `<h2 style="margin:2em 0 1em 0;font-family:Geist,Arial,sans-serif;font-size:1.3em;color:#71a3a0;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">${sectionTitle}</h2>`;
+        message += emailSectionHeading(sectionTitle);
 
         for (const alert of sponsorshipAlerts) {
           const rep = alert.representative;
           const repTitle = rep.current_role?.title || 'Representative';
           const repState = rep.current_role?.jurisdiction_name || '';
 
-          message += `<h3 style="margin:1.5em 0 0.5em 0;font-family:Geist,Arial,sans-serif;font-size:1.1em;color:#374151;">${rep.name} (${repTitle}${repState ? ` - ${repState}` : ''}) - ${alert.legislation.length} ${alert.legislation.length === 1 ? 'update' : 'updates'}</h3>`;
+          message += emailSubheading(
+            `${rep.name} (${repTitle}${repState ? ` — ${repState}` : ''}) — ${alert.legislation.length} ${alert.legislation.length === 1 ? 'update' : 'updates'}`,
+          );
 
           // For weekly digest, limit to 2 most recent per representative
           const legislationToShow = isWeeklyMode ? alert.legislation.slice(0, 2) : alert.legislation;
 
           for (const legislation of legislationToShow) {
-            message += `
-              <div style="border:1px solid #dcfce7;border-radius:12px;padding:20px;margin-bottom:16px;background:#f0fdf4;box-shadow:0 2px 8px rgba(0,0,0,0.03);font-family:Geist,Arial,sans-serif;">
-                <div style="margin-bottom:12px;">
-                  <a href="https://statepulse.me/legislation/${legislation.id}" style="font-size:1.1em;font-weight:600;color:#16a34a;text-decoration:none;">${legislation.identifier || 'New Bill'}: ${legislation.title}</a>
-                </div>
-                <div style="font-size:0.95em;color:#6b7280;margin-bottom:8px;">
-                  ${legislation.session} - ${legislation.jurisdictionName}${legislation.chamber ? ` (${legislation.chamber})` : ''}
-                </div>
-                <div style="font-size:0.9em;color:#374151;margin-bottom:8px;">
-                  <strong>Date Introduced:</strong> ${new Date(legislation.date_signed || legislation.createdAt).toLocaleDateString()}
-                </div>
-                ${legislation.geminiSummary ? `<div style='background:#ecfdf5;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:10px;'><b style='color:#71a3a0;'>AI Summary:</b><br/><span style='font-size:0.97em;color:#374151;'>${legislation.geminiSummary.length > 200 ? legislation.geminiSummary.substring(0, 200) + '...' : legislation.geminiSummary}</span></div>` : ''}
-                <div style="margin-top:10px;">
-                  <a href="https://statepulse.me/legislation/${legislation.id}" style="border:1px solid #16a34a;border-radius:6px;padding:6px 14px;font-size:0.95em;color:#16a34a;text-decoration:none;background:#f0fdf4;">View Details</a>
-                </div>
-              </div>
-            `;
+            message += emailSponsorshipBillCard(legislation);
 
             // Record the sponsorship notification as sent (only for daily mode)
             if (!isWeeklyMode) {
@@ -418,7 +398,9 @@ async function main() {
 
           // Show "and X more" if we truncated for weekly digest
           if (isWeeklyMode && alert.legislation.length > 2) {
-            message += `<p style="margin:0 0 1em 0;font-size:0.9em;color:#6b7280;text-align:center;"><em>...and ${alert.legislation.length - 2} more ${alert.legislation.length - 2 === 1 ? 'update' : 'updates'} from ${rep.name}</em></p>`;
+            message += emailMutedNote(
+              `...and ${alert.legislation.length - 2} more ${alert.legislation.length - 2 === 1 ? 'update' : 'updates'} from ${rep.name}`,
+            );
           }
         }
       }
@@ -485,15 +467,11 @@ async function main() {
             // Add weekly summary intro
             const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
             const weekEnd = new Date();
-            message = `
-              <div style="background:#f8f9fa;border:1px solid #e9ecef;border-radius:8px;padding:16px;margin-bottom:24px;text-align:center;font-family:Geist,Arial,sans-serif;">
-                <h3 style="margin:0 0 8px 0;color:#374151;font-size:1.1em;">📅 Weekly Summary</h3>
-                <p style="margin:0;color:#6b7280;font-size:0.95em;">
-                  ${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}<br/>
-                  <strong>${totalUpdates}</strong> total updates from your tracked topics and followed representatives
-                </p>
-              </div>
-            ` + message;
+            message =
+              emailSummaryBox(
+                'Weekly Summary',
+                `${weekStart.toLocaleDateString()} – ${weekEnd.toLocaleDateString()}<br/><strong>${totalUpdates}</strong> total updates from your tracked topics and followed representatives`,
+              ) + message;
           } else {
             if (hasTopics && hasSponsorships) {
               heading = 'New Legislation Updates & Representative Activity';
@@ -512,6 +490,9 @@ async function main() {
             message,
             ctaUrl: 'https://statepulse.me/tracker',
             ctaText: isWeeklyMode ? 'Manage Your Tracking' : 'View Your Tracker',
+            preheader: isWeeklyMode
+              ? `Your weekly StatePulse digest: ${topicCount + repCount} updates`
+              : `New StatePulse updates for your tracked legislation`,
           });
 
           try {
@@ -519,7 +500,7 @@ async function main() {
               to: email,
               subject,
               html,
-              text: `You have new legislation updates on StatePulse. ${isWeeklyMode ? 'This is your weekly digest.' : ''}`
+              text: `You have new legislation updates on StatePulse. ${isWeeklyMode ? 'This is your weekly digest.' : ''} Visit https://statepulse.me/tracker to manage preferences.`,
             });
 
             const modeText = isWeeklyMode ? 'weekly digest' : 'daily notification';

@@ -51,14 +51,16 @@ export async function POST(req: NextRequest) {
                     try {
                         const html = renderBrandedEmail({
                             heading: 'Welcome to StatePulse!',
-                            message: `Hi ${firstName || 'there'},<br>Welcome to StatePulse! You can now track legislation and receive updates on the issues you care about.`,
+                            message: `Hi ${firstName || 'there'},<br/><br/>Welcome to StatePulse! You can now track legislation and receive updates on the issues you care about.<br/><br/>Follow topics, bookmark bills, and stay on top of activity from the representatives you care about.`,
                             ctaUrl: 'https://statepulse.me/dashboard',
                             ctaText: 'Go to Dashboard',
+                            preheader: 'Welcome to StatePulse — track legislation that matters to you.',
                         });
                         await sendEmail({
                             to: email,
                             subject: 'Welcome to StatePulse!',
                             html,
+                            text: `Hi ${firstName || 'there'}, Welcome to StatePulse! Track legislation and receive updates at https://statepulse.me/dashboard`,
                         });
                     } catch (e) {
                         console.error('Failed to send welcome email:', e);

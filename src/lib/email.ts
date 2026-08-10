@@ -36,11 +36,13 @@ export async function sendEmail({
   subject,
   html,
   text,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
 }) {
   const smtpFrom = process.env.SMTP_FROM;
   if (!smtpFrom) {
@@ -53,6 +55,7 @@ export async function sendEmail({
     subject,
     html,
     text,
+    ...(replyTo ? { replyTo } : {}),
   };
 
   return getTransporter().sendMail(mailOptions);

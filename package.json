@@ -20,6 +20,10 @@
     "create-vector-index": "tsx src/scripts/createVectorSearchIndex.ts",
     "update-enacted-field": "tsx src/scripts/updateEnactedFieldIncremental.ts",
     "backfill-enacted-at": "tsx src/scripts/backfillEnactedAt.ts",
+    "email:daily": "tsx src/scripts/sendPolicyUpdateEmails.ts",
+    "email:weekly": "tsx src/scripts/sendPolicyUpdateEmails.ts --weekly",
+    "email:maintenance:dry-run": "tsx src/scripts/sendMaintenanceAnnouncement.ts --dry-run",
+    "email:maintenance": "tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm",
     "postinstall": "patch-package"
   },
   "dependencies": {
