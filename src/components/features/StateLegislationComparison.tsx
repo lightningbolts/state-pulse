@@ -278,17 +278,12 @@ export function StateLegislationComparison() {
   return (
     <div className="space-y-6">
       <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline text-2xl flex flex-wrap items-center gap-2">
-            Compare State Legislation
-            <Badge variant="secondary">Beta</Badge>
-          </CardTitle>
-          <CardDescription>
+        <CardContent className="space-y-4 pt-6">
+          <p className="text-sm text-muted-foreground">
             Search a policy issue and see how each state&apos;s most relevant bill compares.
-            Ranking runs on the server using semantic search when embeddings are available.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+            Ranking uses semantic search when embeddings are available.
+          </p>
+
           {coverage && (
             <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
               <div className="flex items-center justify-between text-sm">
@@ -303,7 +298,7 @@ export function StateLegislationComparison() {
             </div>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -311,17 +306,21 @@ export function StateLegislationComparison() {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder='e.g. "minimum wage", "gun control", "paid family leave"'
-                className="pl-9"
+                className="pl-9 h-10"
               />
             </div>
-            <Button onClick={handleSearch} disabled={isSearching || !query.trim()}>
+            <Button
+              className="h-10 shrink-0 sm:px-6"
+              onClick={handleSearch}
+              disabled={isSearching || !query.trim()}
+            >
               {isSearching ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Searching…
                 </>
               ) : (
-                "Compare States"
+                "Compare"
               )}
             </Button>
           </div>
@@ -341,8 +340,8 @@ export function StateLegislationComparison() {
             ))}
           </div>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="w-full space-y-2 sm:max-w-xs">
               <Label htmlFor="user-state">Your state (optional)</Label>
               <Select value={userState} onValueChange={handleStateChange}>
                 <SelectTrigger id="user-state">
@@ -357,13 +356,13 @@ export function StateLegislationComparison() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2 pb-2">
+            <div className="flex h-10 items-center gap-2">
               <Checkbox
                 id="enacted-only"
                 checked={enactedOnly}
                 onCheckedChange={(v) => setEnactedOnly(v === true)}
               />
-              <Label htmlFor="enacted-only" className="cursor-pointer">
+              <Label htmlFor="enacted-only" className="cursor-pointer font-normal">
                 Enacted bills only
               </Label>
             </div>

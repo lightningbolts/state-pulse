@@ -1,11 +1,13 @@
 /**
- * Send a maintenance / downtime announcement to everyone on the StatePulse email list
- * via the configured SMTP (Brevo / StatePulse Gmail).
+ * Send a maintenance / downtime or "we're back" announcement to everyone on
+ * the StatePulse email list via the configured SMTP (Brevo / StatePulse Gmail).
  *
  * Usage:
  *   npx tsx src/scripts/sendMaintenanceAnnouncement.ts --dry-run
  *   npx tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm
  *   npx tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm --return-window "1–2 weeks"
+ *   npx tsx src/scripts/sendMaintenanceAnnouncement.ts --dry-run --template restored
+ *   npx tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm --template restored
  */
 
 import { MongoClient } from 'mongodb';
@@ -13,8 +15,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { sendMaintenanceBroadcast } from '@/lib/broadcastEmail';
 import {
-  DEFAULT_MAINTENANCE_HEADING,
-  DEFAULT_MAINTENANCE_SUBJECT,
+  type BroadcastTemplate,
+  getBroadcastDefaults,
 } from '@/lib/maintenanceEmail';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -32,29 +34,39 @@ function getArgValue(flag: string): string | undefined {
   return args[idx + 1];
 }
 
+function parseTemplate(raw: string | undefined): BroadcastTemplate {
+  return raw === 'restored' ? 'restored' : 'downtime';
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run') || args.includes('-n');
   const confirm = args.includes('--confirm') || args.includes('-y');
+  const template = parseTemplate(getArgValue('--template') || getArgValue('-t'));
+  const defaults = getBroadcastDefaults(template);
   const returnWindow =
-    getArgValue('--return-window') || getArgValue('-w') || 'a week or two';
-  const subject = getArgValue('--subject') || DEFAULT_MAINTENANCE_SUBJECT;
-  const heading = getArgValue('--heading') || DEFAULT_MAINTENANCE_HEADING;
+    getArgValue('--return-window') || getArgValue('-w') || defaults.returnWindow || 'a week or two';
+  const subject = getArgValue('--subject') || defaults.subject;
+  const heading = getArgValue('--heading') || defaults.heading;
   const extraNote = getArgValue('--note');
 
   if (!dryRun && !confirm) {
     console.error(
       'Refusing to send without --dry-run or --confirm.\n' +
         '  Preview recipients:  npx tsx src/scripts/sendMaintenanceAnnouncement.ts --dry-run\n' +
-        '  Send for real:       npx tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm',
+        '  Send downtime:       npx tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm\n' +
+        '  Send back-online:    npx tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm --template restored',
     );
     process.exit(1);
   }
 
   console.log(`MongoDB: ${MONGO_URI}`);
   console.log(`Mode: ${dryRun ? 'DRY RUN (no emails sent)' : 'SENDING'}`);
+  console.log(`Template: ${template}`);
   console.log(`Subject: ${subject}`);
-  console.log(`Return window: ${returnWindow}`);
+  if (template === 'downtime') {
+    console.log(`Return window: ${returnWindow}`);
+  }
   console.log(`SMTP_FROM: ${process.env.SMTP_FROM || '(not set)'}`);
   console.log(
     `Reply-To: ${process.env.BROADCAST_REPLY_TO || 'timberlake2025@gmail.com'}`,
@@ -68,6 +80,7 @@ async function main() {
     const result = await sendMaintenanceBroadcast({
       db,
       dryRun,
+      template,
       subject,
       heading,
       returnWindow,

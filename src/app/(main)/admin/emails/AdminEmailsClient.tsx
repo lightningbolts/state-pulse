@@ -6,15 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import type { BroadcastTemplate } from '@/lib/maintenanceEmail';
 
 type PreviewResponse = {
   adminEmail: string;
   recipientCount: number;
   recipients: Array<{ email: string; sources: string[] }>;
   defaults: {
+    template: BroadcastTemplate;
     subject: string;
     heading: string;
     returnWindow: string;
+    confirmPhrase: string;
   };
   previewHtml: string;
   smtpFrom: string | null;
@@ -42,6 +45,7 @@ export default function AdminEmailsClient() {
   const [loading, setLoading] = React.useState(true);
   const [forbidden, setForbidden] = React.useState(false);
   const [preview, setPreview] = React.useState<PreviewResponse | null>(null);
+  const [template, setTemplate] = React.useState<BroadcastTemplate>('restored');
   const [subject, setSubject] = React.useState('');
   const [heading, setHeading] = React.useState('');
   const [returnWindow, setReturnWindow] = React.useState('a week or two');
@@ -50,6 +54,38 @@ export default function AdminEmailsClient() {
   const [sending, setSending] = React.useState(false);
   const [lastResult, setLastResult] = React.useState<SendResponse | null>(null);
   const [confirmText, setConfirmText] = React.useState('');
+
+  const confirmPhrase =
+    template === 'restored' ? 'SEND RESTORED' : 'SEND DOWNTIME';
+
+  const loadPreview = React.useCallback(
+    async (nextTemplate: BroadcastTemplate) => {
+      setLoading(true);
+      setStatus(null);
+      try {
+        const res = await fetch(
+          `/api/admin/emails/broadcast?template=${nextTemplate}`,
+        );
+        if (res.status === 403 || res.status === 401) {
+          setForbidden(true);
+          return;
+        }
+        const data = (await res.json()) as PreviewResponse;
+        if (!res.ok) throw new Error(data.error || 'Failed to load');
+        setPreview(data);
+        setTemplate(data.defaults.template);
+        setSubject(data.defaults.subject);
+        setHeading(data.defaults.heading);
+        setReturnWindow(data.defaults.returnWindow || 'a week or two');
+        setConfirmText('');
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : 'Failed to load');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   React.useEffect(() => {
     if (!isLoaded || !user) {
@@ -61,7 +97,7 @@ export default function AdminEmailsClient() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/admin/emails/broadcast');
+        const res = await fetch('/api/admin/emails/broadcast?template=restored');
         if (res.status === 403 || res.status === 401) {
           if (!cancelled) setForbidden(true);
           return;
@@ -70,9 +106,10 @@ export default function AdminEmailsClient() {
         if (!res.ok) throw new Error(data.error || 'Failed to load');
         if (cancelled) return;
         setPreview(data);
+        setTemplate(data.defaults.template);
         setSubject(data.defaults.subject);
         setHeading(data.defaults.heading);
-        setReturnWindow(data.defaults.returnWindow);
+        setReturnWindow(data.defaults.returnWindow || 'a week or two');
       } catch (err) {
         if (!cancelled) {
           setStatus(err instanceof Error ? err.message : 'Failed to load');
@@ -98,9 +135,10 @@ export default function AdminEmailsClient() {
         body: JSON.stringify({
           dryRun,
           confirm: !dryRun,
+          template,
           subject,
           heading,
-          returnWindow,
+          returnWindow: template === 'downtime' ? returnWindow : undefined,
           extraNote: extraNote.trim() || undefined,
           replyTo: primaryEmail || 'timberlake2025@gmail.com',
         }),
@@ -171,6 +209,30 @@ export default function AdminEmailsClient() {
 
             <div className="space-y-4 rounded border border-border bg-card p-5">
               <div className="space-y-2">
+                <Label htmlFor="template">Announcement type</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={template === 'restored' ? 'default' : 'outline'}
+                    size="sm"
+                    disabled={sending}
+                    onClick={() => void loadPreview('restored')}
+                  >
+                    Back online
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={template === 'downtime' ? 'default' : 'outline'}
+                    size="sm"
+                    disabled={sending}
+                    onClick={() => void loadPreview('downtime')}
+                  >
+                    Downtime
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="subject">Subject</Label>
                 <Input
                   id="subject"
@@ -186,15 +248,17 @@ export default function AdminEmailsClient() {
                   onChange={(e) => setHeading(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="returnWindow">Return window phrasing</Label>
-                <Input
-                  id="returnWindow"
-                  value={returnWindow}
-                  onChange={(e) => setReturnWindow(e.target.value)}
-                  placeholder="a week or two"
-                />
-              </div>
+              {template === 'downtime' && (
+                <div className="space-y-2">
+                  <Label htmlFor="returnWindow">Return window phrasing</Label>
+                  <Input
+                    id="returnWindow"
+                    value={returnWindow}
+                    onChange={(e) => setReturnWindow(e.target.value)}
+                    placeholder="a week or two"
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="extraNote">Optional extra note (HTML allowed)</Label>
                 <Textarea
@@ -219,7 +283,9 @@ export default function AdminEmailsClient() {
 
               <div className="space-y-2 border-t border-border pt-4">
                 <Label htmlFor="confirm">
-                  Type <span className="font-semibold text-foreground">SEND DOWNTIME</span> to enable send
+                  Type{' '}
+                  <span className="font-semibold text-foreground">{confirmPhrase}</span>{' '}
+                  to enable send
                 </Label>
                 <Input
                   id="confirm"
@@ -229,7 +295,7 @@ export default function AdminEmailsClient() {
                 />
                 <Button
                   type="button"
-                  disabled={sending || confirmText !== 'SEND DOWNTIME'}
+                  disabled={sending || confirmText !== confirmPhrase}
                   onClick={() => runBroadcast(false)}
                 >
                   {sending ? 'Sending…' : `Send to ${preview.recipientCount} recipients`}

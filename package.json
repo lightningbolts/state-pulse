@@ -24,6 +24,8 @@
     "email:weekly": "tsx src/scripts/sendPolicyUpdateEmails.ts --weekly",
     "email:maintenance:dry-run": "tsx src/scripts/sendMaintenanceAnnouncement.ts --dry-run",
     "email:maintenance": "tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm",
+    "email:restored:dry-run": "tsx src/scripts/sendMaintenanceAnnouncement.ts --dry-run --template restored",
+    "email:restored": "tsx src/scripts/sendMaintenanceAnnouncement.ts --confirm --template restored",
     "postinstall": "patch-package"
   },
   "dependencies": {

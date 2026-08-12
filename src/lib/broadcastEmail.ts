@@ -1,8 +1,8 @@
 import { sendEmail } from '@/lib/email';
 import { collectEmailList, type EmailListEntry } from '@/lib/emailList';
 import {
-  DEFAULT_MAINTENANCE_HEADING,
-  DEFAULT_MAINTENANCE_SUBJECT,
+  type BroadcastTemplate,
+  getBroadcastDefaults,
   renderMaintenanceAnnouncementEmail,
 } from '@/lib/maintenanceEmail';
 import type { Db } from 'mongodb';
@@ -80,11 +80,38 @@ export async function sendBroadcastEmail({
   };
 }
 
+function buildPlainText({
+  template,
+  returnWindow,
+}: {
+  template: BroadcastTemplate;
+  returnWindow: string;
+}): string {
+  if (template === 'restored') {
+    return [
+      "StatePulse is back online.",
+      'Maintenance is complete and the site is available again.',
+      'Daily and weekly legislative email digests will resume on their normal schedule.',
+      'Your tracked topics, follows, and preferences are intact.',
+      `Questions? Email ${process.env.SMTP_FROM || 'contact@statepulse.me'}.`,
+    ].join('\n\n');
+  }
+
+  return [
+    'StatePulse is temporarily unavailable.',
+    `The site is down for maintenance and will be back in ${returnWindow}.`,
+    'Daily and weekly legislative email digests are paused during the outage.',
+    'Your tracked topics, follows, and preferences are safe.',
+    `Questions? Email ${process.env.SMTP_FROM || 'contact@statepulse.me'}.`,
+  ].join('\n\n');
+}
+
 export async function sendMaintenanceBroadcast({
   db,
   dryRun = false,
-  subject = DEFAULT_MAINTENANCE_SUBJECT,
-  heading = DEFAULT_MAINTENANCE_HEADING,
+  template = 'downtime',
+  subject,
+  heading,
   returnWindow = 'a week or two',
   extraNote,
   messageHtml,
@@ -92,6 +119,7 @@ export async function sendMaintenanceBroadcast({
 }: {
   db: Db;
   dryRun?: boolean;
+  template?: BroadcastTemplate;
   subject?: string;
   heading?: string;
   returnWindow?: string;
@@ -99,24 +127,23 @@ export async function sendMaintenanceBroadcast({
   messageHtml?: string;
   replyTo?: string;
 }): Promise<BroadcastResult> {
+  const defaults = getBroadcastDefaults(template);
+  const resolvedSubject = subject || defaults.subject;
+  const resolvedHeading = heading || defaults.heading;
+
   const html = renderMaintenanceAnnouncementEmail({
-    heading,
+    template,
+    heading: resolvedHeading,
     returnWindow,
     extraNote,
     messageHtml,
   });
 
-  const text = [
-    'StatePulse is temporarily unavailable.',
-    `The site is down for maintenance and will be back in ${returnWindow}.`,
-    'Daily and weekly legislative email digests are paused during the outage.',
-    'Your tracked topics, follows, and preferences are safe.',
-    `Questions? Email ${process.env.SMTP_FROM || 'contact@statepulse.me'}.`,
-  ].join('\n\n');
+  const text = buildPlainText({ template, returnWindow });
 
   return sendBroadcastEmail({
     db,
-    subject,
+    subject: resolvedSubject,
     html,
     text,
     dryRun,

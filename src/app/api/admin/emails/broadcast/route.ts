@@ -4,10 +4,14 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { collectEmailList, isBroadcastAdmin } from '@/lib/emailList';
 import { sendMaintenanceBroadcast } from '@/lib/broadcastEmail';
 import {
-  DEFAULT_MAINTENANCE_HEADING,
-  DEFAULT_MAINTENANCE_SUBJECT,
+  type BroadcastTemplate,
+  getBroadcastDefaults,
   renderMaintenanceAnnouncementEmail,
 } from '@/lib/maintenanceEmail';
+
+function parseTemplate(value: unknown): BroadcastTemplate {
+  return value === 'restored' ? 'restored' : 'downtime';
+}
 
 async function requireBroadcastAdmin(request: NextRequest) {
   const auth = getAuth(request);
@@ -28,15 +32,19 @@ async function requireBroadcastAdmin(request: NextRequest) {
   return { userId: auth.userId, email: email! };
 }
 
-/** GET: list recipient count + preview HTML for the maintenance template */
+/** GET: list recipient count + preview HTML for the selected template */
 export async function GET(request: NextRequest) {
   const gate = await requireBroadcastAdmin(request);
   if ('error' in gate) return gate.error;
 
   try {
+    const template = parseTemplate(
+      request.nextUrl.searchParams.get('template'),
+    );
     const { db } = await connectToDatabase();
     const recipients = await collectEmailList(db);
-    const previewHtml = renderMaintenanceAnnouncementEmail();
+    const defaults = getBroadcastDefaults(template);
+    const previewHtml = renderMaintenanceAnnouncementEmail({ template });
 
     return NextResponse.json({
       adminEmail: gate.email,
@@ -45,11 +53,7 @@ export async function GET(request: NextRequest) {
         email: r.email,
         sources: r.sources,
       })),
-      defaults: {
-        subject: DEFAULT_MAINTENANCE_SUBJECT,
-        heading: DEFAULT_MAINTENANCE_HEADING,
-        returnWindow: 'a week or two',
-      },
+      defaults,
       previewHtml,
       smtpFrom: process.env.SMTP_FROM || null,
     });
@@ -62,7 +66,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST: dry-run or send maintenance broadcast */
+/** POST: dry-run or send maintenance / restored broadcast */
 export async function POST(request: NextRequest) {
   const gate = await requireBroadcastAdmin(request);
   if ('error' in gate) return gate.error;
@@ -71,6 +75,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const dryRun = Boolean(body.dryRun);
     const confirm = Boolean(body.confirm);
+    const template = parseTemplate(body.template);
 
     if (!dryRun && !confirm) {
       return NextResponse.json(
@@ -83,6 +88,7 @@ export async function POST(request: NextRequest) {
     const result = await sendMaintenanceBroadcast({
       db,
       dryRun,
+      template,
       subject: typeof body.subject === 'string' ? body.subject : undefined,
       heading: typeof body.heading === 'string' ? body.heading : undefined,
       returnWindow:
@@ -97,6 +103,7 @@ export async function POST(request: NextRequest) {
     });
 
     const previewHtml = renderMaintenanceAnnouncementEmail({
+      template,
       heading: typeof body.heading === 'string' ? body.heading : undefined,
       returnWindow:
         typeof body.returnWindow === 'string' ? body.returnWindow : undefined,
@@ -108,6 +115,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       adminEmail: gate.email,
+      template,
       ...result,
       previewHtml,
       // Don't echo full recipient list on send responses unless dry-run
