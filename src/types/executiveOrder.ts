@@ -16,6 +16,32 @@ export interface ExecutiveOrder {
   raw_data?: Record<string, any>; // store original API/scraper response
 }
 
+/** Canonical topic chips shown on the executive orders feed (matches AI topic extractor). */
+export const EXECUTIVE_ORDER_TOPICS = [
+  'climate',
+  'emergency',
+  'health',
+  'economy',
+  'housing',
+  'transportation',
+  'education',
+  'immigration',
+  'criminal-justice',
+  'technology',
+  'agriculture',
+  'energy',
+  'defense',
+  'civil-rights',
+  'budget',
+  'regulatory',
+  'international',
+  'wildfire',
+  'drought',
+  'border-security',
+  'covid',
+  'gun-control',
+] as const;
+
 // Federal Register API response types
 // noinspection JSDuplicatedDeclaration
 export interface FederalRegisterDocument {
