@@ -10,55 +10,61 @@ export function UserSyncComponent() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Only attempt to sync user when they're signed in
-    if (isLoaded && isSignedIn && userId) {
-      const syncUser = async () => {
-        try {
-          // Get the session token
-          const token = session ? await session.getToken() : null;
+    if (!isLoaded || !isSignedIn || !userId) return;
 
-          const response = await fetch('/api/auth/sync-user', {
-            headers: {
-              'Content-Type': 'application/json',
-              // Include the session token if available
-              ...(token && { Authorization: `Bearer ${token}` })
-            },
-            // Include credentials for cookies
-            credentials: 'include',
-          });
+    const storageKey = `sp-user-synced:${userId}`;
+    try {
+      if (sessionStorage.getItem(storageKey)) return;
+    } catch {
+      // sessionStorage can throw in private browsing; continue with sync.
+    }
 
-          if (!response.ok) {
-            console.error(`HTTP error! Status: ${response.status}`);
+    const syncUser = async () => {
+      try {
+        const token = session ? await session.getToken() : null;
+
+        const response = await fetch('/api/auth/sync-user', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` })
+          },
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          console.error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          try {
+            sessionStorage.setItem(storageKey, '1');
+          } catch {
+            // ignore quota / private browsing
           }
-
-          const data = await response.json();
-
-          if (data.success) {
-            // console.log('User synced with MongoDB:', data);
-          } else {
-            // Include the error message from the API response
-            const errorMessage = data.error || 'Unknown error occurred';
-            console.error('Error syncing user:', errorMessage);
-
-            toast({
-              title: "Sync Error",
-              description: `There was an issue syncing your profile: ${errorMessage}. Some features may be limited.`,
-              variant: "destructive",
-            });
-          }
-        } catch (error: any) {
-          console.error('Error syncing user:', error.message);
+        } else {
+          const errorMessage = data.error || 'Unknown error occurred';
+          console.error('Error syncing user:', errorMessage);
 
           toast({
-            title: "Connection Error",
-            description: `Failed to connect to the server: ${error.message}. Some features may be limited.`,
+            title: "Sync Error",
+            description: `There was an issue syncing your profile: ${errorMessage}. Some features may be limited.`,
             variant: "destructive",
           });
         }
-      };
+      } catch (error: any) {
+        console.error('Error syncing user:', error.message);
 
-      syncUser();
-    }
+        toast({
+          title: "Connection Error",
+          description: `Failed to connect to the server: ${error.message}. Some features may be limited.`,
+          variant: "destructive",
+        });
+      }
+    };
+
+    syncUser();
   }, [isLoaded, isSignedIn, userId, toast, session]);
 
   // This component doesn't render anything visible

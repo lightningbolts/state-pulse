@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getRepresentativeById, getBillsSponsoredByRep } from '@/services/representativesService';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(req: NextRequest, context: { params: { id: string } }) {
   const { id } = await context.params;
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
       console.error('[API] Bills fetch error:', billsError, normalizedRep);
       return NextResponse.json({ error: 'Bills fetch error', details: billsError instanceof Error ? billsError.message : billsError, rep: normalizedRep }, { status: 500 });
     }
-    return NextResponse.json({ representative: normalizedRep, bills });
+    return jsonWithCdnCache({ representative: normalizedRep, bills }, CACHE.long);
   } catch (error) {
     console.error('[API] Unexpected error in [id] endpoint:', error);
     return NextResponse.json({ error: 'Failed to fetch representative data', details: error instanceof Error ? error.message : error }, { status: 500 });

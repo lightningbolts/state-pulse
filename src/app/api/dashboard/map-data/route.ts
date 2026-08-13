@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMapDataForStates } from '@/lib/mapDataService';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -8,12 +9,12 @@ export async function GET(request: NextRequest) {
     const statesParam = request.nextUrl.searchParams.get('states');
     const stateStats = await getMapDataForStates(statesParam);
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       success: true,
       data: stateStats,
       lastUpdated: new Date().toISOString(),
       processingTime: Date.now() - startTime,
-    });
+    }, CACHE.long);
   } catch (error) {
     console.error('[Map Data API] Error fetching map data:', error);
 

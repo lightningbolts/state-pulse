@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { STATE_NAMES } from '@/types/geo';
 import { unstable_cache } from 'next/cache';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 async function fetchStateDetailData(stateParam: string) {
     const stateName = STATE_NAMES[stateParam];
@@ -203,10 +204,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       success: true,
       data,
-    });
+    }, CACHE.long);
 
   } catch (error) {
     console.error('Error fetching state details:', error);

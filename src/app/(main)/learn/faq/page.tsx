@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 
+export const revalidate = 86400;
+
 export default function LearnFAQPage() {
   return (
     <main className="max-w-4xl mx-auto py-12 px-4 md:px-0">

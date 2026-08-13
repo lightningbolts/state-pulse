@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stateVotingPowerData, calculateVotingPowerMetrics } from '@/data/statePopulations';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -121,11 +122,7 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    return NextResponse.json(response, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
-    });
+    return jsonWithCdnCache(response, CACHE.day);
 
   } catch (error) {
     console.error('Error in voting power API:', error);

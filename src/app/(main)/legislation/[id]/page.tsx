@@ -19,6 +19,8 @@ import { Suspense } from 'react';
 import { enactedPatterns } from "@/types/legislation";
 import {STATE_MAP} from "@/types/geo";
 
+export const revalidate = 300;
+
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 

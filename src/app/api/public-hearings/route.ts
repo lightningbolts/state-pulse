@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PublicHearing } from "@/types/event";
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,11 +13,11 @@ export async function GET(request: NextRequest) {
     // For now, we'll return mock data with realistic upcoming hearings
     const hearings = generateMockHearings(state, city, county);
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       hearings,
       source: 'mock',
       location: { state, city, county }
-    });
+    }, CACHE.medium);
 
   } catch (error) {
     console.error('Error fetching public hearings:', error);

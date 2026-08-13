@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Panel, PanelBody } from '@/components/layout/Panel';
 
+export const revalidate = 86400;
+
 const learnCards = [
   {
     href: '/learn/legislation',

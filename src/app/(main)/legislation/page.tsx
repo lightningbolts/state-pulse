@@ -7,6 +7,7 @@ import { pageMetadata } from '@/lib/metadata';
 import { getCachedPolicyFeedPage } from "@/services/legislationService";
 
 export const metadata = pageMetadata.legislation;
+export const revalidate = 60;
 
 export default async function UpdatesPage() {
   const initialData = await getCachedPolicyFeedPage(20, 0, 'createdAt', 'desc') as PolicyUpdate[];

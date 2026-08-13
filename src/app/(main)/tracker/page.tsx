@@ -3,6 +3,7 @@ import { pageMetadata } from '@/lib/metadata';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 export const metadata = pageMetadata.tracker;
+export const revalidate = 120;
 
 export default function TrackerPage() {
   return (

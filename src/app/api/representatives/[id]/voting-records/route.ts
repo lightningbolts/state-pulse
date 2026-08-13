@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { VotingRecord, MemberVote } from '@/types/legislation';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(
   request: NextRequest,
@@ -258,7 +259,7 @@ export async function GET(
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       success: true,
       data: {
         votingRecords,
@@ -277,7 +278,7 @@ export async function GET(
           sortOrder
         }
       }
-    });
+    }, CACHE.long);
 
   } catch (error) {
     console.error('Error fetching representative voting records:', error);

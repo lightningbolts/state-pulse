@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
 
+export const revalidate = 86400;
+
 export default function LearnChambersPage() {
   return (
     <main className="max-w-3xl mx-auto py-12 px-4 md:px-0">

@@ -1,6 +1,4 @@
 import {Button} from "@/components/ui/button";
-
-export const dynamic = 'force-dynamic';
 import React from "react";
 import { notFound } from "next/navigation";
 import type { Bill } from '@/types/legislation';
@@ -16,6 +14,8 @@ import type { Metadata } from 'next';
 import { FollowButton } from '@/components/ui/FollowButton';
 import { ShareButton } from '@/components/ui/ShareButton';
 import RepVotingRecord from '@/components/features/RepVotingRecord';
+
+export const revalidate = 600;
 
 const fetchRepresentativeData = async (id: string) => {
   try {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import simplify from '@turf/simplify';
 import type { Feature, Geometry, GeoJsonProperties } from 'geojson';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 // Map mode to type in DB
 const TYPE_MAP: Record<string, string> = {
@@ -27,7 +28,7 @@ export async function GET(
     // Serve from cache if available and fresh
     const now = Date.now();
     if (geojsonCache[type] && now - geojsonCache[type].timestamp < CACHE_TTL) {
-      return NextResponse.json(geojsonCache[type].data);
+      return jsonWithCdnCache(geojsonCache[type].data, CACHE.day);
     }
 
     const collection = await getCollection('map_boundaries');
@@ -64,7 +65,7 @@ export async function GET(
     // Cache the result
     geojsonCache[type] = { data: geojson, timestamp: now };
 
-    return NextResponse.json(geojson);
+    return jsonWithCdnCache(geojson, CACHE.day);
   } catch (err) {
     return NextResponse.json({ error: 'Failed to fetch district boundaries', details: String(err) }, { status: 500 });
   }

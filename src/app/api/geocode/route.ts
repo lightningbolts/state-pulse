@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,10 +58,10 @@ export async function GET(request: NextRequest) {
       .sort((a: any, b: any) => b.importance - a.importance)
       .slice(0, parseInt(limit));
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       suggestions: filteredSuggestions,
       count: filteredSuggestions.length
-    });
+    }, CACHE.medium);
 
   } catch (error) {
     console.error('Error in address search API:', error);

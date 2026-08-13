@@ -1,7 +1,10 @@
 import { ImageResponse } from '@vercel/og';
 import { NextRequest } from 'next/server';
+import { getLegislationDetailById } from '@/services/legislationService';
+import { getRepresentativeById } from '@/services/representativesService';
+import { CACHE, cdnCacheHeaders } from '@/lib/cdnCache';
 
-export const runtime = 'edge';
+export const revalidate = 86400;
 
 export async function GET(request: NextRequest) {
   try {
@@ -164,6 +167,7 @@ export async function GET(request: NextRequest) {
       {
         width: 1200,
         height: 630,
+        headers: cdnCacheHeaders(CACHE.day),
       }
     );
   } catch (e: any) {
@@ -176,10 +180,7 @@ export async function GET(request: NextRequest) {
 
 async function fetchBillData(id: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/legislation/${id}`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.success ? data.data : null;
+    return await getLegislationDetailById(id);
   } catch (error) {
     console.error('Error fetching bill data:', error);
     return null;
@@ -188,10 +189,7 @@ async function fetchBillData(id: string) {
 
 async function fetchRepresentativeData(id: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/representatives/${id}`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.success ? data.data : null;
+    return await getRepresentativeById(id);
   } catch (error) {
     console.error('Error fetching representative data:', error);
     return null;

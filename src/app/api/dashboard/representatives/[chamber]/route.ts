@@ -1,5 +1,6 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {getCollection} from '@/lib/mongodb';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 const CHAMBER_MAP: Record<string, string[]> = {
   state_upper: ['upper', 'state senate', 'senate'],
@@ -271,7 +272,7 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ representatives: processedReps });
+    return jsonWithCdnCache({ representatives: processedReps }, CACHE.long);
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

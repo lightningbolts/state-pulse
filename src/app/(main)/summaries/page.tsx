@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { pageMetadata } from '@/lib/metadata';
 
 export const metadata = pageMetadata.summaries;
+export const revalidate = 300;
 
 export default function SummariesPage() {
   return (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BallotMeasure, Candidate } from '@/types/ballot';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,12 +13,12 @@ export async function GET(request: NextRequest) {
     // For now, we'll return mock data with realistic ballot information
     const { measures, candidates } = generateMockBallotData(state, city, county);
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       measures,
       candidates,
       source: 'mock',
       location: { state, city, county }
-    });
+    }, CACHE.hour);
 
   } catch (error) {
     console.error('Error fetching ballot information:', error);

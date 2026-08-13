@@ -4,6 +4,7 @@ import {length} from '@turf/length';
 import {polygonToLine} from '@turf/polygon-to-line';
 import {bbox} from '@turf/bbox';
 import {feature} from 'topojson-client';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 /**
  * OPTIMIZED Gerrymandering Analysis API
@@ -436,11 +437,11 @@ export async function GET(request: NextRequest) {
       const cached = getCached(cacheKey);
       if (cached) {
         console.log(`Cache hit for ${districtType}, returning cached result`);
-        return NextResponse.json({
+        return jsonWithCdnCache({
           ...cached,
           cached: true,
           processingTime: Date.now() - startTime
-        });
+        }, CACHE.hour);
       }
     }
 
@@ -514,7 +515,7 @@ export async function GET(request: NextRequest) {
     setCache(cacheKey, response);
 
     console.log(`Gerrymandering analysis completed in ${Date.now() - startTime}ms`);
-    return NextResponse.json(response);
+    return jsonWithCdnCache(response, skipCache ? 0 : CACHE.hour);
 
   } catch (error) {
     console.error('Gerrymandering index calculation error:', error);

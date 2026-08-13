@@ -1,77 +1,56 @@
-import https from "https";
 import { MetadataRoute } from "next";
+import { getCollection } from "@/lib/mongodb";
 
-function fetchIdsFromApi(apiUrl: string): Promise<string[]> {
-  return new Promise((resolve) => {
-    https.get(apiUrl, (res) => {
-      let data = "";
-      res.on("data", (chunk) => { data += chunk; });
-      res.on("end", () => {
-        try {
-          const json = JSON.parse(data);
-          // Expecting an array of objects with 'id' property
-          if (Array.isArray(json)) {
-            resolve(json.map((item: any) => item.id).filter(Boolean));
-          } else if (json && Array.isArray(json.items)) {
-            resolve(json.items.map((item: any) => item.id).filter(Boolean));
-          } else {
-            resolve([]);
-          }
-        } catch {
-          resolve([]);
-        }
-      });
-    }).on("error", () => resolve([]));
-  });
+export const revalidate = 3600;
+
+const BASE_URL = "https://statepulse.me";
+
+const staticRoutes = [
+  "",
+  "/dashboard",
+  "/legislation",
+  "/tracker",
+  "/representatives",
+  "/posts",
+  "/summaries",
+  "/civic",
+  "/about",
+  "/privacy",
+  "/terms",
+];
+
+async function fetchRecentIds(collectionName: string, limit: number): Promise<string[]> {
+  try {
+    const collection = await getCollection(collectionName);
+    const docs = await collection
+      .find(
+        { id: { $exists: true, $nin: [null, ""] } },
+        { projection: { id: 1, _id: 0 } },
+      )
+      .sort({ latestActionAt: -1, updatedAt: -1, createdAt: -1 })
+      .limit(limit)
+      .toArray();
+    return docs.map((doc) => doc.id).filter(Boolean);
+  } catch (error) {
+    console.error(`Sitemap: failed to load ${collectionName} ids`, error);
+    return [];
+  }
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://statepulse.me";
-  const staticRoutes = [
-    "",
-    "/dashboard",
-    "/legislation",
-    "/tracker",
-    "/representatives",
-    "/posts",
-    "/summaries",
-    "/civic",
-    "/about",
-    "/privacy",
-    "/terms",
-  ];
-
-  // Fetch dynamic IDs from API endpoints
-  const [legislationIds, postIds, representativeIds, summaryIds] = await Promise.all([
-    fetchIdsFromApi("https://statepulse.me/api/legislation"),
-    fetchIdsFromApi("https://statepulse.me/api/posts"),
-    fetchIdsFromApi("https://statepulse.me/api/representatives"),
+  const [legislationIds, postIds, representativeIds] = await Promise.all([
+    fetchRecentIds("legislation", 1000),
+    fetchRecentIds("posts", 200),
+    fetchRecentIds("representatives", 2000),
   ]);
 
-  const dynamicLegislationRoutes = legislationIds.map(id => ({
-    url: `${baseUrl}/legislation/${id}`,
-    lastModified: new Date().toISOString(),
-    changeFrequency: "weekly",
-    priority: 0.9,
-  }));
-  const dynamicPostRoutes = postIds.map(id => ({
-    url: `${baseUrl}/posts/${id}`,
-    lastModified: new Date().toISOString(),
-    changeFrequency: "weekly",
-    priority: 0.7,
-  }));
-  const dynamicRepresentativeRoutes = representativeIds.map(id => ({
-    url: `${baseUrl}/representatives/${id}`,
-    lastModified: new Date().toISOString(),
-    changeFrequency: "weekly",
-    priority: 0.9,
-  }));
+  const lastModified = new Date();
 
   return [
     ...staticRoutes.map((route) => ({
-      url: `${baseUrl}${route}`,
-      lastModified: new Date().toISOString(),
-      changeFrequency: "weekly",
+      url: `${BASE_URL}${route}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
       priority:
         route === "" ? 1.0 :
         ["/dashboard", "/legislation", "/tracker", "/representatives"].includes(route) ? 0.9 :
@@ -79,8 +58,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ["/about"].includes(route) ? 0.6 :
         0.5,
     })),
-    ...dynamicLegislationRoutes,
-    ...dynamicPostRoutes,
-    ...dynamicRepresentativeRoutes,
+    ...legislationIds.map((id) => ({
+      url: `${BASE_URL}/legislation/${id}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.9,
+    })),
+    ...postIds.map((id) => ({
+      url: `${BASE_URL}/posts/${id}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
+    ...representativeIds.map((id) => ({
+      url: `${BASE_URL}/representatives/${id}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.9,
+    })),
   ];
 }

@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PageSkeleton } from '@/components/layout/PageSkeleton';
 
 export const metadata = pageMetadata.dashboard;
+export const revalidate = 300;
 
 export default function DashboardPage() {
   return (

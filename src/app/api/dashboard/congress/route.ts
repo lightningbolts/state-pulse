@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { unstable_cache } from 'next/cache';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 const CONGRESS_JURISDICTION = 'United States Congress';
 
@@ -198,10 +199,10 @@ export async function GET() {
     );
     const data = await cachedFetch();
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       success: true,
       data,
-    });
+    }, CACHE.long);
   } catch (error) {
     console.error('Error fetching US Congress dashboard data:', error);
     return NextResponse.json(

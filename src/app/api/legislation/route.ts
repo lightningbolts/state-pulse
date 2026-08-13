@@ -5,6 +5,7 @@ import {
   getCachedPolicyFeedPage,
   isUnfilteredPolicyFeedRequest,
 } from '@/services/legislationService';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function POST(request: Request) {
   try {
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
           context,
         });
 
-    return NextResponse.json(legislations, { status: 200 });
+    return jsonWithCdnCache(legislations, CACHE.list);
   } catch (error: any) {
     console.error('Error fetching all legislation:', error);
     return NextResponse.json({ message: 'Error fetching all legislation', error: (error as Error).message }, { status: 500 });

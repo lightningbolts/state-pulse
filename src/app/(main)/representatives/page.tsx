@@ -6,6 +6,7 @@ import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { pageMetadata } from '@/lib/metadata';
 
 export const metadata = pageMetadata.representatives;
+export const revalidate = 120;
 
 export default function RepresentativesPage() {
   return (

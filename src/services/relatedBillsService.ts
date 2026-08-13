@@ -17,16 +17,6 @@ interface RelatedBill {
 const relatedBillsCache = new Map<string, { data: RelatedBill[], timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Clean up expired cache entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of relatedBillsCache.entries()) {
-    if (now - value.timestamp > CACHE_TTL) {
-      relatedBillsCache.delete(key);
-    }
-  }
-}, CACHE_TTL); // Run cleanup every 5 minutes
-
 export async function getRelatedBills(
   currentBill: Legislation,
   limit: number = 3
@@ -37,6 +27,12 @@ export async function getRelatedBills(
   
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
+  }
+
+  for (const [key, value] of relatedBillsCache.entries()) {
+    if (Date.now() - value.timestamp >= CACHE_TTL) {
+      relatedBillsCache.delete(key);
+    }
   }
 
   const collection = await getCollection('legislation');

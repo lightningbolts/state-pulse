@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ElectionEvent } from '@/types/event';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,11 +12,11 @@ export async function GET(request: NextRequest) {
     // For now, we'll return mock data with realistic upcoming election dates
     const events = generateMockVotingEvents(state, city);
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       events,
       source: 'mock',
       location: { state, city }
-    });
+    }, CACHE.hour);
 
   } catch (error) {
     console.error('Error fetching voting information:', error);

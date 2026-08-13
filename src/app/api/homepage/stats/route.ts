@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getHomepageStats } from '@/lib/homepageStatsService';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET() {
   try {
     const stats = await getHomepageStats();
-    return NextResponse.json({ success: true, stats });
+    return jsonWithCdnCache({ success: true, stats }, CACHE.medium);
   } catch (error) {
     console.error('Error fetching homepage stats:', error);
     return NextResponse.json(

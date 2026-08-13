@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
     // Test the voting records API with a common bioguide ID
     const testBioguideId = 'P000197'; // Nancy Pelosi as an example

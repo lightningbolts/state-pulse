@@ -4,6 +4,7 @@ import { getCollection } from '@/lib/mongodb';
 import { FIPS_TO_ABBR, STATE_MAP, STATE_NAMES } from '@/types/geo';
 import { validStates } from '@/types/geo';
 import { getStateAbbrFromString } from "@/lib/locationUtils";
+import { CACHE, withCdnCache } from '@/lib/cdnCache';
 
 /**
  * Build Mongo $or clauses so geospatial hits resolve to representatives.
@@ -111,7 +112,14 @@ function appendDistrictRepMatchers(district: any, repOrs: any[]) {
     ],
   });
 }
+
 export async function GET(request: NextRequest) {
+  const response = await handleCivicGet(request);
+  const skipCache = request.nextUrl.searchParams.get('refresh') === 'true';
+  return withCdnCache(response, skipCache ? 0 : CACHE.medium);
+}
+
+async function handleCivicGet(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');

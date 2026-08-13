@@ -1,9 +1,9 @@
 "use client";
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, User, ArrowRight, Calendar, ExternalLink } from 'lucide-react';
+import { FileText, User, ArrowRight, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import type { HomepageExamples } from '@/lib/homepage';
 import type { Legislation } from '@/types/legislation';
@@ -17,17 +17,31 @@ async function fetchExamples(): Promise<HomepageExamples> {
   throw new Error(data.message || 'Failed to load examples');
 }
 
+async function fetchFreshExamples(): Promise<HomepageExamples> {
+  const response = await fetch('/api/homepage/random-examples?fresh=1', { cache: 'no-store' });
+  const data = await response.json();
+  if (data.success && data.data) return data.data;
+  throw new Error(data.message || 'Failed to load examples');
+}
+
 export default function ExamplesShowcase({
   initialExamples,
 }: {
   initialExamples: HomepageExamples;
 }) {
+  const queryClient = useQueryClient();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['homepage-examples'],
     queryFn: fetchExamples,
     initialData: initialExamples.legislation || initialExamples.representative ? initialExamples : undefined,
     staleTime: 60_000,
+    refetchOnMount: false,
   });
+
+  const showAnother = async () => {
+    const fresh = await fetchFreshExamples();
+    queryClient.setQueryData(['homepage-examples'], fresh);
+  };
 
   const policyUpdate = data?.legislation ?? null;
   const representative = data?.representative ?? null;
@@ -57,7 +71,7 @@ export default function ExamplesShowcase({
         {representative ? <RepExampleCard representative={representative} /> : null}
       </div>
       <div className="text-center">
-        <Button onClick={() => refetch()} variant="ghost" size="sm">Show another</Button>
+        <Button onClick={showAnother} variant="ghost" size="sm">Show another</Button>
       </div>
     </div>
   );

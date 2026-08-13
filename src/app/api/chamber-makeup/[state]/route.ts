@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { STATE_NAMES } from '@/types/geo';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(
   request: NextRequest,
@@ -338,7 +339,7 @@ export async function GET(
         })).sort((a: any, b: any) => b.count - a.count)
       }));
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       success: true,
       state: state,
       chambers: chambers,
@@ -346,7 +347,7 @@ export async function GET(
         totalRepresentatives: chambers.reduce((sum, chamber) => sum + chamber.totalSeats, 0),
         chambersAvailable: chambers.map(c => c.chamber)
       }
-    });
+    }, CACHE.long);
 
   } catch (error) {
     console.error('Error fetching party makeup:', error);

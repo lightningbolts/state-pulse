@@ -11,6 +11,7 @@ export const metadata = {
   title: 'Enacted Legislation | StatePulse',
   description: 'View all bills that have been enacted into law across states and federal government.',
 };
+export const revalidate = 120;
 
 export default async function EnactedLegislationPage() {
   const raw = await getAllLegislationWithFiltering({

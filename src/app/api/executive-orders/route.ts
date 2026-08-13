@@ -4,6 +4,7 @@ import {
   queryExecutiveOrders,
   type ExecutiveOrderSortField,
 } from '@/services/executiveOrderService';
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 const VALID_SORT_FIELDS = new Set<ExecutiveOrderSortField>(['date_signed', 'createdAt', 'title']);
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
       if (!order) {
         return NextResponse.json({ error: 'Executive order not found' }, { status: 404 });
       }
-      return NextResponse.json({ data: order });
+      return jsonWithCdnCache({ data: order }, CACHE.medium);
     }
 
     const orders = await queryExecutiveOrders({
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       sortDir,
     });
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       data: orders,
       count: orders.length,
       state: state || null,
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
       source: source || null,
       sortField,
       sortDir,
-    });
+    }, CACHE.list);
   } catch (error) {
     console.error('Error fetching executive orders:', error);
     return NextResponse.json(

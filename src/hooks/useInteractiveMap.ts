@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createEmptyStateStats, chunkArray, MAP_STATE_ABBRS } from '@/lib/mapStateDefaults';
+import { createEmptyStateStats } from '@/lib/mapStateDefaults';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { StateData } from '@/types/jurisdictions';
@@ -60,13 +60,7 @@ const cachedFetch = async (url: string, ttl: number = 300000): Promise<any> => {
     if (cached && (now - cached.timestamp) < cached.ttl) {
         return cached.data;
     }
-    const response = await fetch(url, {
-        cache: 'no-cache',
-        headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-        }
-    });
+    const response = await fetch(url);
     if (!response.ok) {
         console.error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -92,29 +86,14 @@ export const useInteractiveMap = () => {
     } = useQuery({
         queryKey: ['dashboard-map-data'],
         queryFn: async () => {
-            const batches = [...chunkArray(MAP_STATE_ABBRS, 8), ['US']];
-            const merged: Record<string, StateData> = { ...createEmptyStateStats() };
-            let completed = 0;
-
-            setMapDataProgress(8);
-            setPartialMapData({ ...merged });
-
-            await Promise.all(
-                batches.map(async (states) => {
-                    try {
-                        const response = await fetch(`/api/dashboard/map-data?states=${states.join(',')}`);
-                        if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
-                        const result = await response.json();
-                        if (!result.success) throw new Error(result.error || 'Failed to load map data');
-                        Object.assign(merged, result.data);
-                        setPartialMapData({ ...merged });
-                    } finally {
-                        completed += 1;
-                        setMapDataProgress(Math.round((completed / batches.length) * 100));
-                    }
-                }),
-            );
-
+            setMapDataProgress(20);
+            const response = await fetch('/api/dashboard/map-data');
+            if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'Failed to load map data');
+            const merged: Record<string, StateData> = { ...createEmptyStateStats(), ...result.data };
+            setPartialMapData(merged);
+            setMapDataProgress(100);
             return merged;
         },
         staleTime: 10 * 60 * 1000,
@@ -184,7 +163,7 @@ export const useInteractiveMap = () => {
         setVotingPowerError(null);
         try {
             // Add cache-busting parameter to ensure fresh data
-            const response = await fetch(`/api/dashboard/voting-power?chamber=${chamber}&_t=${Date.now()}`);
+            const response = await fetch(`/api/dashboard/voting-power?chamber=${chamber}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }

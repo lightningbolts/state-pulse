@@ -48,6 +48,7 @@ function getRateLimitConfig(identifier: string): RateLimitConfig {
  * Check if a user/IP can make a request using database-backed rate limiting
  */
 export async function checkRateLimit(identifier: string): Promise<{ allowed: boolean; timeUntilReset?: number }> {
+  cleanupRateLimitStore();
   const now = new Date();
   const config = getRateLimitConfig(identifier);
 
@@ -195,6 +196,3 @@ export async function initializeRateLimitCollection(): Promise<void> {
     console.error('[Rate Limit] Failed to create TTL index:', error);
   }
 }
-
-// Clean up old entries every 5 minutes for in-memory fallback
-setInterval(cleanupRateLimitStore, 5 * 60 * 1000);

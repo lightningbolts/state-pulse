@@ -5,6 +5,7 @@ import { Panel, PanelBody } from '@/components/layout/Panel';
 import { pageMetadata } from '@/lib/metadata';
 
 export const metadata = pageMetadata.about;
+export const revalidate = 86400;
 
 function AboutSection({
   title,

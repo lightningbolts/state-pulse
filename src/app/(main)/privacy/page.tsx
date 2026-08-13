@@ -2,6 +2,7 @@ import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { pageMetadata } from '@/lib/metadata';
 
 export const metadata = pageMetadata.privacy;
+export const revalidate = 86400;
 
 export default function PrivacyPolicy() {
   return (

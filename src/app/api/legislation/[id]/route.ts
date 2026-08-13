@@ -4,6 +4,7 @@ import {
   updateLegislation
 } from '@/services/legislationService'; // Corrected path
 import type { Legislation } from '@/types/legislation'; // Corrected path
+import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(
   request: Request,
@@ -15,7 +16,7 @@ export async function GET(
     if (!legislation) {
       return NextResponse.json({ message: 'Legislation not found' }, { status: 404 });
     }
-    return NextResponse.json(legislation, { status: 200 });
+    return jsonWithCdnCache(legislation, CACHE.medium);
   } catch (error) {
     console.error(`Error fetching legislation ${id}:`, error);
     return NextResponse.json({ message: 'Error fetching legislation', error: (error as Error).message }, { status: 500 });

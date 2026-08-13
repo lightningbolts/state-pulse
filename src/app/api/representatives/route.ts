@@ -9,6 +9,7 @@ import {
   isActivitySortField,
   sortRepresentatives,
 } from '@/lib/representativeActivity';
+import { CACHE, withCdnCache } from '@/lib/cdnCache';
 
 // US State mapping and validation
 export const validStates = Object.values(STATE_MAP);
@@ -16,6 +17,12 @@ export const validStates = Object.values(STATE_MAP);
 
 // Interface for OpenStates person data
 export async function GET(request: NextRequest) {
+  const response = await handleRepresentativesGet(request);
+  const skipCache = request.nextUrl.searchParams.get('refresh') === 'true';
+  return withCdnCache(response, skipCache ? 0 : CACHE.list);
+}
+
+async function handleRepresentativesGet(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     // Accept all possible civics page parameters
