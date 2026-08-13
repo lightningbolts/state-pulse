@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Calendar, FileText, TrendingUp, Users } from "lucide-react";
+import { Calendar, FileText, Gauge, Handshake, Timer, TrendingUp, Users, Stamp } from "lucide-react";
 import type { StateData } from "@/types/jurisdictions";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,10 @@ const MODE_LABELS: Record<string, string> = {
   representatives: "Representatives",
   trends: "Topics",
   recent: "Recent",
+  bipartisan: "Bipartisan",
+  enactment: "Enacted",
+  velocity: "Velocity",
+  pace: "Pace",
 };
 
 type StateMapTooltipProps = {
@@ -34,9 +38,17 @@ export function StateMapTooltip({ mapMode, state, activityLevel, isCongress }: S
           color: "text-green-500",
         };
       case "trends":
-        return { label: "Topics", value: state.topicDiversity, icon: TrendingUp, color: "text-orange-500" };
+        return { label: "Heating up", value: state.topicMomentum ?? state.topicDiversity, icon: TrendingUp, color: "text-orange-500" };
       case "recent":
         return { label: "30-day actions", value: state.recentActivity, icon: Calendar, color: "text-amber-500" };
+      case "bipartisan":
+        return { label: "Bipartisan", value: state.bipartisanRate ?? 0, suffix: "%", icon: Handshake, color: "text-violet-500" };
+      case "enactment":
+        return { label: "Enacted", value: state.enactmentRate ?? 0, suffix: "%", icon: Stamp, color: "text-emerald-600" };
+      case "velocity":
+        return { label: "Days to passage", value: state.averageBillVelocityDays ?? 0, icon: Timer, color: "text-amber-600" };
+      case "pace":
+        return { label: "Bills / week", value: state.legislativePace ?? 0, icon: Gauge, color: "text-sky-600" };
       default:
         return { label: "Bills", value: state.legislationCount, icon: FileText, color: "text-blue-500" };
     }
@@ -50,7 +62,10 @@ export function StateMapTooltip({ mapMode, state, activityLevel, isCongress }: S
       <p className="text-sm font-semibold leading-tight">{state.name}</p>
       <div className="flex items-center gap-1.5">
         <Icon className={cn("h-3.5 w-3.5 shrink-0", primary.color)} />
-        <span className="text-base font-bold tabular-nums leading-none">{primary.value.toLocaleString()}</span>
+        <span className="text-base font-bold tabular-nums leading-none">
+          {primary.value.toLocaleString()}
+          {"suffix" in primary && primary.suffix ? primary.suffix : ""}
+        </span>
         <span className="text-[10px] text-muted-foreground">{primary.label}</span>
       </div>
       {activityLevel && (

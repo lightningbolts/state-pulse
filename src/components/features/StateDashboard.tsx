@@ -6,13 +6,18 @@ import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, MapPin, TrendingUp, Users, X, ChevronRight } from "lucide-react";
+import { formatSignedPercent } from "@/lib/dashboardMetrics";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
 import {
   BillRow,
   formatDashboardDate,
+  formatDays,
+  formatRate,
+  MixBar,
   SectionHeader,
+  Sparkline,
   SponsorRow,
   StatCard,
   TopicBar,
@@ -121,7 +126,52 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                     <StatCard label="Total legislation" value={stateData.statistics.totalLegislation} hint="All tracked bills" />
                     <StatCard label="Recent activity" value={stateData.statistics.recentActivity} hint="Actions in last 30 days" />
                     <StatCard label="Active sponsors" value={stateData.statistics.activeSponsors} hint="Legislators with bills" />
-                    <StatCard label="Average bill age" value={`${stateData.statistics.averageBillAge} days`} hint="Since introduction" />
+                    <StatCard label="Average bill age" value={`${stateData.statistics.averageBillAge} days`} hint="Since record creation" />
+                    <StatCard
+                        label="Enactment rate"
+                        value={formatRate(stateData.statistics.enactmentRate)}
+                        hint={stateData.statistics.enactedCount
+                            ? `${stateData.statistics.enactedCount.toLocaleString()} bills with an enacted date`
+                            : "Share of bills with an enacted date"}
+                    />
+                    <StatCard
+                        label="Bill velocity"
+                        value={formatDays(stateData.statistics.averageBillVelocityDays)}
+                        hint="Average days from first action to passage"
+                    />
+                    <StatCard
+                        label="Bipartisan rate"
+                        value={formatRate(stateData.statistics.bipartisanRate)}
+                        hint={stateData.statistics.bipartisanScoredBills
+                            ? `Of ${stateData.statistics.bipartisanScoredBills.toLocaleString()} multi-sponsor bills with known party`
+                            : "Share of multi-sponsor bills with both parties"}
+                    />
+                    <StatCard label="Recent share" value={`${recentShare}%`} hint="Of all bills had action in 30d" />
+                    <StatCard
+                        label="Legislative pace"
+                        value={`${stateData.statistics.legislativePace ?? 0}/wk`}
+                        hint="Recent actions converted to a weekly rate"
+                    />
+                    <StatCard
+                        label="Sponsor concentration"
+                        value={formatRate(stateData.statistics.sponsorConcentration)}
+                        hint="Share of sponsorships from the top 10% of sponsors"
+                    />
+                    <StatCard
+                        label="Multi-sponsor rate"
+                        value={formatRate(stateData.statistics.multiSponsorRate)}
+                        hint="Bills with two or more sponsors"
+                    />
+                    <StatCard
+                        label="Dead-on-arrival"
+                        value={formatRate(stateData.statistics.doaRate)}
+                        hint="Introduced 30+ days ago with no further action"
+                    />
+                    <StatCard
+                        label="Cross-chamber"
+                        value={formatRate(stateData.statistics.pingPongRate)}
+                        hint="Bills with history in both chambers"
+                    />
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-3">
@@ -131,9 +181,17 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                             <CardDescription className="text-foreground/70">How active this jurisdiction is right now.</CardDescription>
                         </CardHeader>
                         <CardContent className="grid gap-3 sm:grid-cols-3">
-                            <StatCard label="Recent share" value={`${recentShare}%`} hint="Of all bills had action in 30d" />
+                            <StatCard
+                                label="Primary vs cosponsor"
+                                value={formatRate(stateData.statistics.primaryShare)}
+                                hint={`${(stateData.statistics.primaryMentions || 0).toLocaleString()} primary · ${(stateData.statistics.cosponsorMentions || 0).toLocaleString()} cosponsor`}
+                            />
+                            <StatCard
+                                label="Session phase"
+                                value={stateData.sessionPhase?.current ? stateData.sessionPhase.current : "—"}
+                                hint={stateData.sessionPhase?.session ? `Session ${stateData.sessionPhase.session}` : "Dominant session window"}
+                            />
                             <StatCard label="Policy topics" value={stateData.trendingTopics.length} hint="Distinct subject areas tracked" />
-                            <StatCard label="Top sponsors" value={stateData.topSponsors.length} hint="Ranked by bill activity" />
                         </CardContent>
                     </Card>
                     <Card className="shadow-sm">
@@ -188,7 +246,7 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                 Trending policy areas
                             </CardTitle>
                             <CardDescription className="text-foreground/70">
-                                Subject areas ranked by recent and total legislative volume.
+                                Subject areas ranked by recent volume, compared with the prior 30 days.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -200,6 +258,10 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                     recent={topic.recentCount}
                                     total={topic.totalCount}
                                     maxRecent={maxTopicRecent}
+                                    prior={topic.priorCount}
+                                    weeklyCounts={topic.weeklyCounts}
+                                    pctChange={topic.pctChange}
+                                    trend={topic.trend}
                                 />
                             ))}
                             {stateData.trendingTopics.length === 0 && (
@@ -267,29 +329,73 @@ export function StateDashboard({ stateData, loading, error, isCongressDashboard,
                                         .map((topic) => (
                                             <Badge key={topic.name} variant="secondary">
                                                 {topic.name}
-                                                <span className="ml-1.5 opacity-80">({topic.recentCount})</span>
+                                                <span className="ml-1.5 opacity-80">
+                                                    ({topic.recentCount}{topic.pctChange != null ? `, ${formatSignedPercent(topic.pctChange)}` : ''})
+                                                </span>
                                             </Badge>
                                         ))}
                                 </div>
                             </div>
                             <div className="rounded-lg border bg-card p-4">
                                 <SectionHeader
-                                    title="Chambers in recent activity"
-                                    description="Where recent bill movement is concentrated."
+                                    title="8-week activity"
+                                    description="Bill actions by week, oldest on the left."
                                 />
-                                <div className="mt-3 space-y-2">
-                                    {Object.entries(
-                                        stateData.recentLegislation.reduce<Record<string, number>>((acc, bill) => {
-                                            const chamber = bill.chamber || "Unknown";
-                                            acc[chamber] = (acc[chamber] || 0) + 1;
-                                            return acc;
-                                        }, {}),
-                                    ).map(([chamber, count]) => (
-                                        <div key={chamber} className="flex items-center justify-between text-sm">
-                                            <span>{chamber}</span>
-                                            <Badge variant="outline" className="border-border">{count} bills</Badge>
-                                        </div>
-                                    ))}
+                                <div className="mt-3">
+                                    {stateData.statistics.weeklyActivity && stateData.statistics.weeklyActivity.some((n) => n > 0) ? (
+                                        <Sparkline counts={stateData.statistics.weeklyActivity} className="h-10" />
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">No weekly movement in the last 8 weeks.</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="rounded-lg border bg-card p-4">
+                                <SectionHeader
+                                    title="Chamber mix"
+                                    description="Where bills originate across the full tracked set."
+                                />
+                                <div className="mt-3">
+                                    <MixBar
+                                        items={[
+                                            { label: "Upper", value: stateData.chamberMix?.upper || 0, className: "bg-violet-500/80" },
+                                            { label: "Lower", value: stateData.chamberMix?.lower || 0, className: "bg-sky-500/80" },
+                                            { label: "Unicameral", value: stateData.chamberMix?.unicameral || 0, className: "bg-emerald-500/80" },
+                                            { label: "Other", value: stateData.chamberMix?.other || 0, className: "bg-muted-foreground/40" },
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+                            <div className="rounded-lg border bg-card p-4">
+                                <SectionHeader
+                                    title="Classification mix"
+                                    description="Bills vs resolutions vs memorials."
+                                />
+                                <div className="mt-3">
+                                    <MixBar
+                                        items={[
+                                            { label: "Bills", value: stateData.classificationMix?.bills || 0, className: "bg-primary/80" },
+                                            { label: "Resolutions", value: stateData.classificationMix?.resolutions || 0, className: "bg-amber-500/80" },
+                                            { label: "Memorials", value: stateData.classificationMix?.memorials || 0, className: "bg-rose-500/70" },
+                                            { label: "Other", value: stateData.classificationMix?.other || 0, className: "bg-muted-foreground/40" },
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+                            <div className="rounded-lg border bg-card p-4 md:col-span-2">
+                                <SectionHeader
+                                    title="Session calendar phase"
+                                    description={stateData.sessionPhase?.session
+                                        ? `Introductions in session ${stateData.sessionPhase.session}, split into early / mid / late.`
+                                        : "Introductions across the dominant session window."}
+                                />
+                                <div className="mt-3">
+                                    <MixBar
+                                        items={[
+                                            { label: "Early", value: stateData.sessionPhase?.early || 0, className: "bg-emerald-500/80" },
+                                            { label: "Mid", value: stateData.sessionPhase?.mid || 0, className: "bg-amber-500/80" },
+                                            { label: "Late", value: stateData.sessionPhase?.late || 0, className: "bg-orange-600/80" },
+                                        ]}
+                                    />
                                 </div>
                             </div>
                         </div>
