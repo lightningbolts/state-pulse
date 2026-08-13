@@ -6,7 +6,7 @@ import { createEmptyStateStats } from '@/lib/mapStateDefaults';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { StateData } from '@/types/jurisdictions';
-import type { StateDetailData } from '@/types/jurisdictions';
+import type { PolicyDiffusionTopic, StateDetailData } from '@/types/jurisdictions';
 import { FIPS_TO_ABBR } from '@/types/geo';
 
 // Mobile detection utility
@@ -95,6 +95,21 @@ export const useInteractiveMap = () => {
             setPartialMapData(merged);
             setMapDataProgress(100);
             return merged;
+        },
+        staleTime: 10 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+    });
+    const {
+        data: policyDiffusion = [],
+        isLoading: policyDiffusionLoading,
+    } = useQuery({
+        queryKey: ['dashboard-policy-diffusion'],
+        queryFn: async () => {
+            const response = await fetch('/api/dashboard/policy-diffusion');
+            if (!response.ok) throw new Error(`Failed to load policy diffusion: ${response.status}`);
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'Failed to load policy diffusion');
+            return result.data as PolicyDiffusionTopic[];
         },
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
@@ -581,7 +596,9 @@ export const useInteractiveMap = () => {
         votingPowerError,
         selectedChamber,
         setSelectedChamber,
-        fetchVotingPowerData
+        fetchVotingPowerData,
+        policyDiffusion,
+        policyDiffusionLoading,
     };
 };
 

@@ -2,12 +2,24 @@
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { formatSignedPercent } from "@/lib/dashboardMetrics";
+import type { TrendDirection } from "@/types/jurisdictions";
 
 export function formatDashboardDate(value: string | Date | undefined): string {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+export function formatRate(value: number | null | undefined, fallback = "—"): string {
+  if (value == null || Number.isNaN(value)) return fallback;
+  return `${value}%`;
+}
+
+export function formatDays(value: number | null | undefined, fallback = "—"): string {
+  if (value == null || Number.isNaN(value)) return fallback;
+  return `${value} days`;
 }
 
 export function StatCard({
@@ -93,14 +105,27 @@ export function TopicBar({
   total,
   maxRecent,
   rank,
+  prior,
+  pctChange,
+  trend,
+  weeklyCounts,
 }: {
   name: string;
   recent: number;
   total: number;
   maxRecent: number;
   rank?: number;
+  prior?: number;
+  pctChange?: number;
+  trend?: TrendDirection | string;
+  weeklyCounts?: number[];
 }) {
   const width = maxRecent > 0 ? Math.max(8, Math.round((recent / maxRecent) * 100)) : 0;
+  const priorWidth =
+    maxRecent > 0 && prior != null ? Math.max(prior > 0 ? 6 : 0, Math.round((prior / maxRecent) * 100)) : 0;
+  const trendClass =
+    trend === "up" ? "text-emerald-600" : trend === "down" ? "text-red-600" : "text-foreground/70";
+
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-3 text-xs">
@@ -110,10 +135,23 @@ export function TopicBar({
         </span>
         <span className="shrink-0 tabular-nums text-foreground/70">
           {recent} recent · {total} total
+          {pctChange != null && (
+            <span className={cn("ml-1.5 font-medium", trendClass)}>{formatSignedPercent(pctChange)}</span>
+          )}
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary/80 transition-all" style={{ width: `${width}%` }} />
+      <div className="space-y-0.5">
+        <div className="h-2 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary/80 transition-all" style={{ width: `${width}%` }} />
+        </div>
+        {prior != null && (
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted/70">
+            <div className="h-full rounded-full bg-muted-foreground/35" style={{ width: `${priorWidth}%` }} />
+          </div>
+        )}
+        {weeklyCounts && weeklyCounts.length > 0 && (
+          <Sparkline counts={weeklyCounts} />
+        )}
       </div>
     </div>
   );
@@ -146,6 +184,54 @@ export function SponsorRow({
       <Badge variant={activity === "active" ? "default" : "secondary"} className="shrink-0 text-[10px]">
         {activity === "active" ? "Active" : "Quiet"}
       </Badge>
+    </div>
+  );
+}
+
+export function Sparkline({ counts, className }: { counts: number[]; className?: string }) {
+  const max = Math.max(...counts, 1);
+  return (
+    <div className={cn("flex h-5 items-end gap-px", className)} aria-hidden>
+      {counts.map((value, index) => (
+        <div
+          key={`${index}-${value}`}
+          className="flex-1 rounded-sm bg-primary/55"
+          style={{ height: `${Math.max(12, Math.round((value / max) * 100))}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function MixBar({
+  items,
+}: {
+  items: Array<{ label: string; value: number; className?: string }>;
+}) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  if (total <= 0) {
+    return <p className="text-sm text-muted-foreground">No composition data yet.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={cn("h-full", item.className || "bg-primary/70")}
+            style={{ width: `${Math.round((item.value / total) * 100)}%` }}
+            title={`${item.label}: ${item.value}`}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground/70">
+        {items.map((item) => (
+          <span key={item.label} className="tabular-nums">
+            {item.label} {Math.round((item.value / total) * 100)}%
+            <span className="ml-1 opacity-70">({item.value.toLocaleString()})</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

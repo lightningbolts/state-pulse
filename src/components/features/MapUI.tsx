@@ -5,21 +5,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Calendar, FileText, MapPin, Maximize, Minimize, TrendingUp, Users, Scale } from 'lucide-react';
+import { Calendar, FileText, Gauge, Handshake, MapPin, Maximize, Minimize, Timer, TrendingUp, Users, Scale, Stamp } from 'lucide-react';
 import { AnimatedSection } from "@/components/ui/AnimatedSection";
 import { RepresentativesResults } from "./RepresentativesResults";
 import { ChamberMakeup } from "./ChamberMakeup";
 import { DashboardMapCanvas } from './DashboardMapCanvas';
 import { DashboardFullscreenToolbar } from './DashboardFullscreenToolbar';
 import { StateModeDetailPanel } from './StateModeDetailPanel';
+import { PolicyDiffusionPanel } from './dashboard/PolicyDiffusionPanel';
 import { useInteractiveMap } from '@/hooks/useInteractiveMap';
 import { MapMode } from '@/types/geo';
 
 const mapModes: MapMode[] = [
     { id: 'legislation', label: 'Legislation Activity', description: 'View states by legislative activity and bill counts', icon: FileText },
     { id: 'representatives', label: 'Representatives', description: 'Explore representative density and activity', icon: Users },
-    { id: 'trends', label: 'Trending Topics', description: 'See what policy areas are most active', icon: TrendingUp },
+    { id: 'trends', label: 'Trending Topics', description: 'See which policy areas are heating up versus the prior 30 days', icon: TrendingUp },
     { id: 'recent', label: 'Recent Activity', description: 'Latest legislative developments', icon: Calendar },
+    { id: 'bipartisan', label: 'Bipartisan Sponsorship', description: 'Share of recent multi-sponsor bills with both parties', icon: Handshake },
+    { id: 'enactment', label: 'Enactment Rate', description: 'Share of tracked bills that have an enacted date', icon: Stamp },
+    { id: 'velocity', label: 'Bill Velocity', description: 'Average days from first action to passage — larger means slower', icon: Timer },
+    { id: 'pace', label: 'Legislative Pace', description: 'Recent bill actions converted to a weekly rate', icon: Gauge },
     { id: 'voting-power', label: 'Voting Power', description: 'Compare voting power per person across states', icon: Scale },
     { id: 'congressional-districts', label: 'Congressional Districts', description: 'View all U.S. congressional districts', icon: MapPin },
     { id: 'state-upper-districts', label: 'State Upper Districts', description: 'View all state senate (upper chamber) districts', icon: MapPin },
@@ -43,14 +48,30 @@ const DISTRICT_COLORS: Record<string, string> = {
     'state-lower-districts': '#16a34a',
 };
 
-type BubbleMapMode = 'legislation' | 'representatives' | 'trends' | 'recent';
+type BubbleMapMode = 'legislation' | 'representatives' | 'trends' | 'recent' | 'bipartisan' | 'enactment' | 'velocity' | 'pace';
 
-const getModeMetric = (state: { legislationCount: number; activeRepresentatives: number; recentActivity: number; topicDiversity: number }, mode: string): number => {
+const BUBBLE_MODES: BubbleMapMode[] = ['legislation', 'representatives', 'trends', 'recent', 'bipartisan', 'enactment', 'velocity', 'pace'];
+
+const getModeMetric = (state: {
+    legislationCount: number;
+    activeRepresentatives: number;
+    recentActivity: number;
+    topicDiversity: number;
+    topicMomentum?: number;
+    bipartisanRate?: number | null;
+    enactmentRate?: number | null;
+    averageBillVelocityDays?: number | null;
+    legislativePace?: number;
+}, mode: string): number => {
     switch (mode) {
         case 'legislation': return state.legislationCount || 0;
         case 'representatives': return state.activeRepresentatives || 0;
-        case 'trends': return state.topicDiversity || 0;
+        case 'trends': return state.topicMomentum || 0;
         case 'recent': return state.recentActivity || 0;
+        case 'bipartisan': return state.bipartisanRate || 0;
+        case 'enactment': return state.enactmentRate || 0;
+        case 'velocity': return state.averageBillVelocityDays || 0;
+        case 'pace': return state.legislativePace || 0;
         default: return 0;
     }
 };
@@ -262,7 +283,9 @@ export const MapUI = () => {
         votingPowerLoading,
         votingPowerError,
         selectedChamber,
-        setSelectedChamber
+        setSelectedChamber,
+        policyDiffusion,
+        policyDiffusionLoading,
     } = useInteractiveMap();
 
     const maxRepScore = React.useMemo(() => {
@@ -345,7 +368,7 @@ export const MapUI = () => {
     }, [isFullScreen, mapMode]);
 
     const modeMaxMetric = React.useMemo(() => {
-        if (!['legislation', 'representatives', 'trends', 'recent'].includes(mapMode)) return 1;
+        if (!BUBBLE_MODES.includes(mapMode as BubbleMapMode)) return 1;
         const values = Object.values(stateStats).map((state) => getModeMetric(state, mapMode));
         return Math.max(...values, 1);
     }, [stateStats, mapMode]);
@@ -357,7 +380,11 @@ export const MapUI = () => {
             case 'legislation':
             case 'representatives':
             case 'trends':
-            case 'recent': {
+            case 'recent':
+            case 'bipartisan':
+            case 'enactment':
+            case 'velocity':
+            case 'pace': {
                 const intensity = getActivityIntensity(getModeMetric(state, mapMode), modeMaxMetric);
                 if (intensity >= 0.7) return 'hsl(var(--primary))';
                 if (intensity >= 0.3) return 'hsl(var(--primary) / 0.5)';
@@ -374,7 +401,7 @@ export const MapUI = () => {
 
     const memoizedMarkers = React.useMemo(() => {
         const markers: Record<string, { color: string, size: number }> = {};
-        const bubbleModes: BubbleMapMode[] = ['legislation', 'representatives', 'trends', 'recent'];
+        const bubbleModes: BubbleMapMode[] = BUBBLE_MODES;
         Object.entries(stateStats).forEach(([abbr, state]) => {
             const color = getStateColor(abbr);
             let size = 20;
@@ -393,8 +420,32 @@ export const MapUI = () => {
             case 'legislation':
             case 'representatives':
             case 'trends':
-            case 'recent': {
+            case 'recent':
+            case 'bipartisan':
+            case 'enactment':
+            case 'velocity':
+            case 'pace': {
                 const intensity = getActivityIntensity(getModeMetric(state, mapMode), modeMaxMetric);
+                if (mapMode === 'bipartisan') {
+                    if (intensity >= 0.7) return 'High Bipartisanship';
+                    if (intensity >= 0.3) return 'Medium Bipartisanship';
+                    return 'Low Bipartisanship';
+                }
+                if (mapMode === 'enactment') {
+                    if (intensity >= 0.7) return 'High Enactment';
+                    if (intensity >= 0.3) return 'Medium Enactment';
+                    return 'Low Enactment';
+                }
+                if (mapMode === 'velocity') {
+                    if (intensity >= 0.7) return 'Slow Passage';
+                    if (intensity >= 0.3) return 'Typical Pace';
+                    return 'Fast Passage';
+                }
+                if (mapMode === 'pace') {
+                    if (intensity >= 0.7) return 'Hot Session';
+                    if (intensity >= 0.3) return 'Steady Session';
+                    return 'Quiet Session';
+                }
                 if (intensity >= 0.7) return 'High Activity';
                 if (intensity >= 0.3) return 'Medium Activity';
                 return 'Low Activity';
@@ -546,7 +597,7 @@ export const MapUI = () => {
                                     return (
                                         <Button key={mode.id} variant={mapMode === mode.id ? "default" : "outline"} size="sm" onClick={() => handleMapModeChange(mode.id)} disabled={isDisabled} className={`flex flex-col items-center gap-1 lg:flex-row lg:gap-2 h-auto p-2 lg:p-3 min-h-[60px] lg:min-h-[auto] ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                             <IconComponent className="h-3 w-3 lg:h-4 lg:w-4 flex-shrink-0"/>
-                                            <div className="text-center lg:text-left min-w-0 flex-1"><div className="font-medium text-xs leading-tight"><span className="hidden xl:inline">{mode.label}</span><span className="xl:hidden">{mode.label.replace('Activity', '').replace('Representatives', 'Reps').replace('Legislation', 'Bills').trim()}</span></div></div>
+                                            <div className="text-center lg:text-left min-w-0 flex-1"><div className="font-medium text-xs leading-tight"><span className="hidden xl:inline">{mode.label}</span><span className="xl:hidden">{mode.label.replace('Activity', '').replace('Representatives', 'Reps').replace('Legislation', 'Bills').replace('Bipartisan Sponsorship', 'Bipartisan').replace('Enactment Rate', 'Enacted').replace('Bill Velocity', 'Velocity').replace('Legislative Pace', 'Pace').trim()}</span></div></div>
                                         </Button>
                                     );
                                 })}
@@ -696,6 +747,7 @@ export const MapUI = () => {
                         <Card><CardContent className="p-3 md:p-4"><div className="flex items-center space-x-2"><MapPin className="h-4 w-4 md:h-5 md:w-5 text-purple-500 flex-shrink-0"/><div className="min-w-0"><p className="text-xs md:text-sm font-medium truncate"><span className="hidden sm:inline">Jurisdictions Tracked</span><span className="sm:hidden">Jurisdictions</span></p><p className="text-lg md:text-2xl font-bold">{Object.keys(stateStats).length}</p></div></div></CardContent></Card>
                     </div>
                 </AnimatedSection>
+                <PolicyDiffusionPanel topics={policyDiffusion} loading={policyDiffusionLoading} />
             </div>
             )}
         </AnimatedSection>

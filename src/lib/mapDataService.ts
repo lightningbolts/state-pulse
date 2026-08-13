@@ -2,10 +2,24 @@ import { getCollection } from '@/lib/mongodb';
 import { STATE_NAMES, STATE_COORDINATES } from '@/types/geo';
 import { StateData } from '@/types/jurisdictions';
 import { unstable_cache } from 'next/cache';
+import {
+  chamberBucketExpression,
+  dashboardDateWindows,
+  deadOnArrivalExpression,
+  enactedDateMatch,
+  multiSponsorExpression,
+  pingPongExpression,
+  roundDays,
+  roundRate,
+  sponsorConcentration,
+  topicArrayExpression,
+  velocityDaysExpression,
+  weeklyPace,
+} from '@/lib/dashboardMetrics';
+import { computeBipartisanByJurisdiction } from '@/lib/dashboardBipartisan';
 
-function buildEarlyMatchForStates(abbrs: string[]): object {
+function jurisdictionNamesForAbbrs(abbrs: string[]): string[] {
   const jurisdictionNames: string[] = [];
-
   for (const abbr of abbrs) {
     if (abbr === 'US') {
       jurisdictionNames.push('United States Congress');
@@ -14,10 +28,39 @@ function buildEarlyMatchForStates(abbrs: string[]): object {
     const name = STATE_NAMES[abbr];
     if (name) jurisdictionNames.push(name);
   }
+  return jurisdictionNames;
+}
 
+function jurisdictionNameToAbbr(jurisdictionName: string): string {
+  if (jurisdictionName.includes('Congress') || jurisdictionName.includes('United States')) {
+    return 'US';
+  }
+  for (const [abbr, name] of Object.entries(STATE_NAMES)) {
+    if (abbr === 'US') continue;
+    if (jurisdictionName.toLowerCase() === name.toLowerCase()) return abbr;
+  }
+  for (const [abbr, name] of Object.entries(STATE_NAMES)) {
+    if (abbr === 'US') continue;
+    if (
+      jurisdictionName.toLowerCase().includes(name.toLowerCase()) ||
+      name.toLowerCase().includes(jurisdictionName.toLowerCase())
+    ) {
+      return abbr;
+    }
+  }
+  const variations: Record<string, string> = {
+    wv: 'WV',
+    'west va': 'WV',
+    'w virginia': 'WV',
+    'w va': 'WV',
+  };
+  return variations[jurisdictionName.toLowerCase().trim()] || '';
+}
+
+function buildEarlyMatchForStates(abbrs: string[]): object {
   return {
     $match: {
-      jurisdictionName: { $in: jurisdictionNames },
+      jurisdictionName: { $in: jurisdictionNamesForAbbrs(abbrs) },
     },
   };
 }
@@ -31,47 +74,26 @@ function buildStateStatsFromResults(
     uniqueSponsors?: number;
     uniqueTopics?: number;
     topSubjects?: string[];
+    enactedCount?: number;
+    averageVelocity?: number | null;
+    multiSponsorBills?: number;
+    doaCount?: number;
+    pingPongCount?: number;
+    upperCount?: number;
+    lowerCount?: number;
   }>,
   representativeCounts: Record<string, number> = {},
+  extras: Record<string, {
+    bipartisanRate?: number | null;
+    topicMomentum?: number;
+    sponsorConcentration?: number | null;
+  }> = {},
 ): Record<string, StateData> {
   const stateStats: Record<string, StateData> = {};
 
   results.forEach((result) => {
     const jurisdictionName = result._id;
-    let stateAbbr = '';
-
-    if (jurisdictionName.includes('Congress') || jurisdictionName.includes('United States')) {
-      stateAbbr = 'US';
-    } else {
-      for (const [abbr, name] of Object.entries(STATE_NAMES)) {
-        if (abbr === 'US') continue;
-        if (jurisdictionName.toLowerCase() === name.toLowerCase()) {
-          stateAbbr = abbr;
-          break;
-        }
-      }
-      if (!stateAbbr) {
-        for (const [abbr, name] of Object.entries(STATE_NAMES)) {
-          if (abbr === 'US') continue;
-          if (
-            jurisdictionName.toLowerCase().includes(name.toLowerCase()) ||
-            name.toLowerCase().includes(jurisdictionName.toLowerCase())
-          ) {
-            stateAbbr = abbr;
-            break;
-          }
-        }
-      }
-      if (!stateAbbr) {
-        const variations: Record<string, string> = {
-          wv: 'WV',
-          'west va': 'WV',
-          'w virginia': 'WV',
-          'w va': 'WV',
-        };
-        stateAbbr = variations[jurisdictionName.toLowerCase().trim()] || '';
-      }
-    }
+    const stateAbbr = jurisdictionNameToAbbr(jurisdictionName);
 
     if (stateAbbr && STATE_COORDINATES[stateAbbr]) {
       const topSubjects = (result.topSubjects || result.sampleSubjects || [])
@@ -79,16 +101,28 @@ function buildStateStatsFromResults(
         .slice(0, 3);
       const intensity = Math.min((result.totalBills || 0) / 1000, 1);
       const hue = intensity * 240;
+      const extra = extras[stateAbbr] || extras[jurisdictionName] || {};
+      const totalBills = result.totalBills || 0;
       stateStats[stateAbbr] = {
         name: STATE_NAMES[stateAbbr],
         abbreviation: stateAbbr,
-        legislationCount: result.totalBills || 0,
+        legislationCount: totalBills,
         activeRepresentatives: representativeCounts[stateAbbr] ?? (stateAbbr === 'US' ? 0 : result.uniqueSponsors ?? 0),
         recentActivity: result.recentBills || 0,
         topicDiversity: result.uniqueTopics || 0,
         keyTopics: topSubjects.length > 0 ? topSubjects : ['General'],
         center: STATE_COORDINATES[stateAbbr],
         color: `hsl(${240 - hue}, 70%, 50%)`,
+        enactmentRate: roundRate(result.enactedCount || 0, totalBills),
+        averageBillVelocityDays: roundDays(result.averageVelocity),
+        bipartisanRate: extra.bipartisanRate ?? null,
+        topicMomentum: extra.topicMomentum ?? 0,
+        legislativePace: weeklyPace(result.recentBills || 0),
+        chamberUpperShare: roundRate(result.upperCount || 0, (result.upperCount || 0) + (result.lowerCount || 0)),
+        sponsorConcentration: extra.sponsorConcentration ?? null,
+        doaRate: roundRate(result.doaCount || 0, totalBills),
+        pingPongRate: roundRate(result.pingPongCount || 0, totalBills),
+        multiSponsorRate: roundRate(result.multiSponsorBills || 0, totalBills),
       };
     }
   });
@@ -180,10 +214,106 @@ const getCachedRepresentativeCounts = unstable_cache(
   { revalidate: 600 },
 );
 
+async function fetchTopicMomentumByJurisdiction(requestedAbbrs: string[]): Promise<Record<string, number>> {
+  const { thirtyDaysAgo, sixtyDaysAgo } = dashboardDateWindows();
+  const legislationCollection = await getCollection('legislation');
+  const rows = await legislationCollection
+    .aggregate(
+      [
+        {
+          $match: {
+            jurisdictionName: { $in: jurisdictionNamesForAbbrs(requestedAbbrs) },
+            latestActionAt: { $gte: sixtyDaysAgo },
+          },
+        },
+        { $addFields: { dashboardTopics: topicArrayExpression } },
+        { $unwind: '$dashboardTopics' },
+        { $match: { dashboardTopics: { $nin: [null, ''] } } },
+        {
+          $group: {
+            _id: { jurisdiction: '$jurisdictionName', topic: '$dashboardTopics' },
+            recentCount: {
+              $sum: { $cond: [{ $gte: ['$latestActionAt', thirtyDaysAgo] }, 1, 0] },
+            },
+            priorCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $gte: ['$latestActionAt', sixtyDaysAgo] },
+                      { $lt: ['$latestActionAt', thirtyDaysAgo] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: '$_id.jurisdiction',
+            topicMomentum: {
+              $sum: { $cond: [{ $gt: ['$recentCount', '$priorCount'] }, 1, 0] },
+            },
+          },
+        },
+      ],
+      { maxTimeMS: 15000, allowDiskUse: true },
+    )
+    .toArray();
+
+  const momentum: Record<string, number> = {};
+  for (const row of rows) {
+    const abbr = jurisdictionNameToAbbr(row._id);
+    if (abbr) momentum[abbr] = row.topicMomentum || 0;
+  }
+  return momentum;
+}
+
+async function fetchSponsorConcentrationByJurisdiction(requestedAbbrs: string[]): Promise<Record<string, number | null>> {
+  const legislationCollection = await getCollection('legislation');
+  const rows = await legislationCollection
+    .aggregate(
+      [
+        {
+          $match: {
+            jurisdictionName: { $in: jurisdictionNamesForAbbrs(requestedAbbrs) },
+            sponsors: { $exists: true, $ne: [] },
+          },
+        },
+        { $unwind: '$sponsors' },
+        { $match: { 'sponsors.name': { $nin: [null, ''] } } },
+        {
+          $group: {
+            _id: { jurisdiction: '$jurisdictionName', sponsor: '$sponsors.name' },
+            count: { $sum: 1 },
+          },
+        },
+        {
+          $group: {
+            _id: '$_id.jurisdiction',
+            counts: { $push: '$count' },
+          },
+        },
+      ],
+      { maxTimeMS: 15000, allowDiskUse: true },
+    )
+    .toArray();
+
+  const result: Record<string, number | null> = {};
+  for (const row of rows) {
+    const abbr = jurisdictionNameToAbbr(row._id);
+    if (!abbr) continue;
+    result[abbr] = sponsorConcentration(row.counts || []).top10Share;
+  }
+  return result;
+}
+
 async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Record<string, StateData>> {
   const legislationCollection = await getCollection('legislation');
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const { thirtyDaysAgo, sixtyDaysAgo } = dashboardDateWindows();
 
   const pipeline: object[] = [];
 
@@ -195,6 +325,13 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
         jurisdictionName: { $exists: true, $nin: [null, ''] },
       },
     });
+  }
+
+  const includeProcessMetrics = Boolean(requestedAbbrs && requestedAbbrs.length > 0);
+  const doaExpression = deadOnArrivalExpression(thirtyDaysAgo);
+
+  if (includeProcessMetrics) {
+    pipeline.push({ $addFields: { chamberBucket: chamberBucketExpression } });
   }
 
   pipeline.push(
@@ -219,6 +356,17 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
         sampleSubjects: { $push: { $arrayElemAt: ['$subjects', 0] } },
         topicSubjects: { $addToSet: { $arrayElemAt: ['$subjects', 0] } },
         sponsorCount: { $addToSet: { $arrayElemAt: ['$sponsors.name', 0] } },
+        enactedCount: { $sum: { $cond: [enactedDateMatch, 1, 0] } },
+        averageVelocity: { $avg: velocityDaysExpression },
+        ...(includeProcessMetrics
+          ? {
+              multiSponsorBills: { $sum: { $cond: [multiSponsorExpression, 1, 0] } },
+              doaCount: { $sum: { $cond: [doaExpression, 1, 0] } },
+              pingPongCount: { $sum: { $cond: [pingPongExpression, 1, 0] } },
+              upperCount: { $sum: { $cond: [{ $eq: ['$chamberBucket', 'upper'] }, 1, 0] } },
+              lowerCount: { $sum: { $cond: [{ $eq: ['$chamberBucket', 'lower'] }, 1, 0] } },
+            }
+          : {}),
       },
     },
     {
@@ -246,6 +394,13 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
           },
         },
         uniqueSponsors: { $size: '$sponsorCount' },
+        enactedCount: 1,
+        averageVelocity: 1,
+        multiSponsorBills: 1,
+        doaCount: 1,
+        pingPongCount: 1,
+        upperCount: 1,
+        lowerCount: 1,
       },
     },
     { $sort: { totalBills: -1 } },
@@ -253,18 +408,61 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
 
   const fetchLegislation = legislationCollection
     .aggregate(pipeline, {
-      maxTimeMS: requestedAbbrs ? 12000 : 25000,
+      maxTimeMS: requestedAbbrs ? 20000 : 25000,
       allowDiskUse: true,
     })
     .toArray();
 
-  const [results, representativeCounts, congressMemberCount] = await Promise.all([
+  const extrasPromise: Promise<[
+    Record<string, { bipartisanRate?: number | null }>,
+    Record<string, number>,
+    Record<string, number | null>,
+  ]> = requestedAbbrs
+    ? Promise.all([
+        computeBipartisanByJurisdiction({
+          jurisdictionName: { $in: jurisdictionNamesForAbbrs(requestedAbbrs) },
+          latestActionAt: { $gte: sixtyDaysAgo },
+        }).catch((error) => {
+          console.error('[Map Data] Bipartisan aggregation failed:', error);
+          return {};
+        }),
+        fetchTopicMomentumByJurisdiction(requestedAbbrs).catch((error) => {
+          console.error('[Map Data] Topic momentum aggregation failed:', error);
+          return {};
+        }),
+        fetchSponsorConcentrationByJurisdiction(requestedAbbrs).catch((error) => {
+          console.error('[Map Data] Sponsor concentration aggregation failed:', error);
+          return {};
+        }),
+      ])
+    : Promise.resolve([{}, {}, {}]);
+
+  const [results, representativeCounts, congressMemberCount, extraPair] = await Promise.all([
     fetchLegislation,
     getCachedRepresentativeCounts(),
     getCachedCongressMemberCount(),
+    extrasPromise,
   ]);
 
   representativeCounts.US = congressMemberCount;
+
+  const [bipartisanByJurisdiction, topicMomentum, concentrationByAbbr] = extraPair;
+  const extras: Record<string, {
+    bipartisanRate?: number | null;
+    topicMomentum?: number;
+    sponsorConcentration?: number | null;
+  }> = {};
+  for (const [jurisdiction, counts] of Object.entries(bipartisanByJurisdiction)) {
+    const abbr = jurisdictionNameToAbbr(jurisdiction);
+    if (!abbr) continue;
+    extras[abbr] = { ...extras[abbr], bipartisanRate: counts.bipartisanRate };
+  }
+  for (const [abbr, momentum] of Object.entries(topicMomentum)) {
+    extras[abbr] = { ...extras[abbr], topicMomentum: momentum };
+  }
+  for (const [abbr, share] of Object.entries(concentrationByAbbr)) {
+    extras[abbr] = { ...extras[abbr], sponsorConcentration: share };
+  }
 
   const stateStats = buildStateStatsFromResults(
     results as Array<{
@@ -275,8 +473,16 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
       uniqueSponsors?: number;
       uniqueTopics?: number;
       topSubjects?: string[];
+      enactedCount?: number;
+      averageVelocity?: number | null;
+      multiSponsorBills?: number;
+      doaCount?: number;
+      pingPongCount?: number;
+      upperCount?: number;
+      lowerCount?: number;
     }>,
     representativeCounts,
+    extras,
   );
 
   if (!requestedAbbrs) {
@@ -290,6 +496,16 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
           activeRepresentatives: representativeCounts[abbr] || 0,
           recentActivity: 0,
           topicDiversity: 0,
+          topicMomentum: 0,
+          enactmentRate: null,
+          averageBillVelocityDays: null,
+          bipartisanRate: null,
+          legislativePace: 0,
+          chamberUpperShare: null,
+          sponsorConcentration: null,
+          doaRate: null,
+          pingPongRate: null,
+          multiSponsorRate: null,
           keyTopics: ['No Data'],
           center: STATE_COORDINATES[abbr],
           color: '#e0e0e0',
@@ -310,7 +526,7 @@ export async function getMapDataForStates(statesParam: string | null): Promise<R
     const cacheKey = requestedAbbrs.slice().sort().join(',');
     const cachedFetch = unstable_cache(
       () => fetchMapDataFromDb(requestedAbbrs),
-      ['map-data-states', cacheKey],
+      ['map-data-states-v3', cacheKey],
       { revalidate: 600 },
     );
     return cachedFetch();
@@ -318,7 +534,7 @@ export async function getMapDataForStates(statesParam: string | null): Promise<R
 
   const cachedFetch = unstable_cache(
     () => fetchMapDataFromDb(null),
-    ['map-data-all'],
+    ['map-data-all-v3'],
     { revalidate: 600 },
   );
   return cachedFetch();
