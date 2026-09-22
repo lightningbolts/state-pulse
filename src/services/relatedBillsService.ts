@@ -29,8 +29,20 @@ function cleanupRelatedBillsCache(now = Date.now()) {
     }
   }
 
+}
+
+function enforceRelatedBillsCacheLimit() {
   while (relatedBillsCache.size > MAX_CACHE_ENTRIES) {
-    const oldestKey = relatedBillsCache.keys().next().value as string | undefined;
+    let oldestKey: string | undefined;
+    let oldestTimestamp = Number.POSITIVE_INFINITY;
+
+    for (const [key, entry] of relatedBillsCache.entries()) {
+      if (entry.timestamp < oldestTimestamp) {
+        oldestTimestamp = entry.timestamp;
+        oldestKey = key;
+      }
+    }
+
     if (!oldestKey) break;
     relatedBillsCache.delete(oldestKey);
   }
@@ -243,6 +255,7 @@ export async function getRelatedBills(
 
   // Cache the results before returning
   relatedBillsCache.set(cacheKey, { data: diverseResults, timestamp: Date.now() });
+  enforceRelatedBillsCacheLimit();
   
   return diverseResults;
 }
