@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createEmptyStateStats, chunkArray, MAP_STATE_ABBRS } from '@/lib/mapStateDefaults';
 import { useRouter } from 'next/navigation';
@@ -124,11 +124,38 @@ export const useInteractiveMap = () => {
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
     });
+    const supplementalMetric =
+        mapMode === 'trends'
+            ? 'trends'
+            : mapMode === 'bipartisan'
+                ? 'bipartisan'
+                : mapMode === 'enactment' || mapMode === 'velocity'
+                    ? 'lifecycle'
+                    : null;
+
+    const {
+        data: supplementalMetricData,
+        isFetching: supplementalMetricFetching,
+    } = useQuery({
+        queryKey: ['dashboard-map-metric', supplementalMetric],
+        enabled: supplementalMetric !== null,
+        queryFn: async () => {
+            const response = await fetch(`/api/dashboard/map-metrics?metric=${supplementalMetric}`);
+            if (!response.ok) throw new Error(`Failed to load ${supplementalMetric} map metric: ${response.status}`);
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'Failed to load map metric');
+            return result.data as Record<string, Partial<StateData>>;
+        },
+        staleTime: 10 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+    });
+
     const {
         data: policyDiffusion = [],
         isLoading: policyDiffusionLoading,
     } = useQuery({
         queryKey: ['dashboard-policy-diffusion'],
+        enabled: Boolean(mapData),
         queryFn: async () => {
             const response = await fetch('/api/dashboard/policy-diffusion');
             if (!response.ok) throw new Error(`Failed to load policy diffusion: ${response.status}`);
@@ -139,7 +166,16 @@ export const useInteractiveMap = () => {
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
     });
-    const stateStats = mapData ?? createEmptyStateStats();
+    const stateStats = useMemo(() => {
+        const base = mapData ?? createEmptyStateStats();
+        if (!supplementalMetric || !supplementalMetricData) return base;
+
+        const merged: Record<string, StateData> = {};
+        for (const [abbr, state] of Object.entries(base)) {
+            merged[abbr] = { ...state, ...(supplementalMetricData[abbr] || {}) };
+        }
+        return merged;
+    }, [mapData, supplementalMetric, supplementalMetricData]);
     const [stateDetails, setStateDetails] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const isMapLoading = mapDataLoading || mapDataFetching;
@@ -606,7 +642,7 @@ export const useInteractiveMap = () => {
         showDistrictBorders,
         setShowDistrictBorders,
         isMobile,
-        mapModeTransitioning,
+        mapModeTransitioning: mapModeTransitioning || Boolean(supplementalMetric && supplementalMetricFetching && !supplementalMetricData),
         memoryPressure,
         isFullScreen,
         setIsFullScreen,
