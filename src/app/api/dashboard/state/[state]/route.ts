@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { STATE_NAMES } from '@/types/geo';
 import { unstable_cache } from 'next/cache';
 import { fetchJurisdictionDashboard } from '@/lib/dashboardDetailService';
+import { CDN_CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(
   _request: NextRequest,
@@ -28,10 +29,10 @@ export async function GET(
     );
     const data = await cachedFetch();
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       success: true,
       data,
-    });
+    }, CDN_CACHE.dashboard);
 
   } catch (error) {
     console.error('Error fetching state details:', error);

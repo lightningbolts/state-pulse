@@ -60,13 +60,7 @@ const cachedFetch = async (url: string, ttl: number = 300000): Promise<any> => {
     if (cached && (now - cached.timestamp) < cached.ttl) {
         return cached.data;
     }
-    const response = await fetch(url, {
-        cache: 'no-cache',
-        headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-        }
-    });
+    const response = await fetch(url);
     if (!response.ok) {
         console.error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -83,7 +77,6 @@ export const useInteractiveMap = () => {
     const [selectedStatePopupCoords, setSelectedStatePopupCoords] = useState<[number, number] | null>(null);
     const [mapMode, setMapMode] = useState<string>('legislation');
     const [mapDataProgress, setMapDataProgress] = useState(0);
-    const [partialMapData, setPartialMapData] = useState<Record<string, StateData> | null>(null);
     const {
         data: mapData,
         isLoading: mapDataLoading,
@@ -92,30 +85,41 @@ export const useInteractiveMap = () => {
     } = useQuery({
         queryKey: ['dashboard-map-data'],
         queryFn: async () => {
-            const batches = [...chunkArray(MAP_STATE_ABBRS, 8), ['US']];
-            const merged: Record<string, StateData> = { ...createEmptyStateStats() };
-            let completed = 0;
+            setMapDataProgress(10);
 
-            setMapDataProgress(8);
-            setPartialMapData({ ...merged });
+            try {
+                const response = await fetch('/api/dashboard/map-data');
+                if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error || 'Failed to load map data');
+                setMapDataProgress(100);
+                return { ...createEmptyStateStats(), ...result.data } as Record<string, StateData>;
+            } catch (error) {
+                // Preserve the previous loading path as a resilience fallback. Under
+                // normal operation the single request avoids Function fan-out; if the
+                // consolidated endpoint fails, the dashboard still remains usable.
+                console.warn('[InteractiveMap] Consolidated map request failed, falling back to batches', error);
+                const batches = [...chunkArray(MAP_STATE_ABBRS, 8), ['US']];
+                const merged: Record<string, StateData> = { ...createEmptyStateStats() };
+                let completed = 0;
 
-            await Promise.all(
-                batches.map(async (states) => {
-                    try {
-                        const response = await fetch(`/api/dashboard/map-data?states=${states.join(',')}`);
-                        if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
-                        const result = await response.json();
-                        if (!result.success) throw new Error(result.error || 'Failed to load map data');
-                        Object.assign(merged, result.data);
-                        setPartialMapData({ ...merged });
-                    } finally {
-                        completed += 1;
-                        setMapDataProgress(Math.round((completed / batches.length) * 100));
-                    }
-                }),
-            );
+                await Promise.all(
+                    batches.map(async (states) => {
+                        try {
+                            const response = await fetch(`/api/dashboard/map-data?states=${states.join(',')}`);
+                            if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
+                            const result = await response.json();
+                            if (!result.success) throw new Error(result.error || 'Failed to load map data');
+                            Object.assign(merged, result.data);
+                        } finally {
+                            completed += 1;
+                            setMapDataProgress(Math.round((completed / batches.length) * 100));
+                        }
+                    }),
+                );
 
-            return merged;
+                return merged;
+            }
         },
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
@@ -135,7 +139,7 @@ export const useInteractiveMap = () => {
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
     });
-    const stateStats = mapData ?? partialMapData ?? createEmptyStateStats();
+    const stateStats = mapData ?? createEmptyStateStats();
     const [stateDetails, setStateDetails] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const isMapLoading = mapDataLoading || mapDataFetching;
@@ -198,8 +202,7 @@ export const useInteractiveMap = () => {
         setVotingPowerLoading(true);
         setVotingPowerError(null);
         try {
-            // Add cache-busting parameter to ensure fresh data
-            const response = await fetch(`/api/dashboard/voting-power?chamber=${chamber}&_t=${Date.now()}`);
+            const response = await fetch(`/api/dashboard/voting-power?chamber=${chamber}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }

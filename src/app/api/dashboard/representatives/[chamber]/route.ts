@@ -1,4 +1,5 @@
 import {NextRequest, NextResponse} from 'next/server';
+import { CDN_CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 import {getCollection} from '@/lib/mongodb';
 
 const CHAMBER_MAP: Record<string, string[]> = {
@@ -271,7 +272,7 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ representatives: processedReps });
+    return jsonWithCdnCache({ representatives: processedReps }, CDN_CACHE.dashboard);
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

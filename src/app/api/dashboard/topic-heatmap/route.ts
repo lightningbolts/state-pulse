@@ -1,6 +1,7 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {getCollection} from '@/lib/mongodb';
 import {ABR_TO_FIPS, STATE_MAP} from "@/types/geo";
+import { CDN_CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 function normalizeIds(...ids: (string | undefined | null)[]): string[] {
   const out = new Set<string>();
@@ -329,7 +330,7 @@ export async function GET(request: NextRequest) {
 
     if (!results || results.length === 0) {
       // console.log('No topic data found, returning empty result set');
-      return NextResponse.json({ success: true, scores: {}, availableTopics: ['all'], selectedTopic, districtType, metadata: { totalDistricts: 0, totalRepresentatives: representatives.length, maxScore: 0, uniqueTopics: 0, processedResults: 0 }});
+      return jsonWithCdnCache({ success: true, scores: {}, availableTopics: ['all'], selectedTopic, districtType, metadata: { totalDistricts: 0, totalRepresentatives: representatives.length, maxScore: 0, uniqueTopics: 0, processedResults: 0 }}, CDN_CACHE.dashboard);
     }
 
     const districtTopicCounts: Record<string, Record<string, number>> = {};
@@ -391,7 +392,7 @@ export async function GET(request: NextRequest) {
 
     // console.log(`Returning ${Object.keys(normalizedScores).length} scored districts with ${availableTopics.length} available topics`);
 
-    return NextResponse.json({
+    return jsonWithCdnCache({
       success: true,
       scores: normalizedScores,
       availableTopics,
@@ -405,7 +406,7 @@ export async function GET(request: NextRequest) {
         uniqueTopics: allBroadTopics.size,
         processedResults: results.length
       }
-    });
+    }, CDN_CACHE.dashboard);
 
   } catch (error: any) {
     console.error('Topic heatmap error:', error);

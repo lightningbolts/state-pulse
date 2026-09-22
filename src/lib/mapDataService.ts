@@ -532,10 +532,27 @@ export async function getMapDataForStates(statesParam: string | null): Promise<R
     return cachedFetch();
   }
 
-  const cachedFetch = unstable_cache(
-    () => fetchMapDataFromDb(null),
-    ['map-data-all-v3'],
-    { revalidate: 600 },
+  // Preserve the previous per-batch query shape while collapsing browser
+  // fan-out into a single Function invocation. This keeps each MongoDB
+  // aggregation bounded to the same jurisdictions as before.
+  const stateAbbrs = Object.keys(STATE_NAMES).filter((abbr) => abbr !== 'US');
+  const batches: string[][] = [];
+  for (let i = 0; i < stateAbbrs.length; i += 8) {
+    batches.push(stateAbbrs.slice(i, i + 8));
+  }
+  batches.push(['US']);
+
+  const batchResults = await Promise.all(
+    batches.map(async (abbrs) => {
+      const cacheKey = abbrs.slice().sort().join(',');
+      const cachedFetch = unstable_cache(
+        () => fetchMapDataFromDb(abbrs),
+        ['map-data-states-v3', cacheKey],
+        { revalidate: 600 },
+      );
+      return cachedFetch();
+    }),
   );
-  return cachedFetch();
+
+  return Object.assign({}, ...batchResults);
 }
