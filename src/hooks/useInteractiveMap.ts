@@ -153,6 +153,7 @@ export const useInteractiveMap = () => {
         isLoading: policyDiffusionLoading,
     } = useQuery({
         queryKey: ['dashboard-policy-diffusion'],
+        enabled: Boolean(mapData),
         queryFn: async () => {
             const response = await fetch('/api/dashboard/policy-diffusion');
             if (!response.ok) throw new Error(`Failed to load policy diffusion: ${response.status}`);
