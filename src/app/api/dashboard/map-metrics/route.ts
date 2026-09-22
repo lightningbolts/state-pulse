@@ -5,14 +5,14 @@ import {
   type MapSupplementalMetric,
 } from '@/lib/mapDataService';
 
-const VALID_METRICS = new Set<MapSupplementalMetric>(['trends', 'bipartisan']);
+const VALID_METRICS = new Set<MapSupplementalMetric>(['trends', 'bipartisan', 'lifecycle']);
 
 export async function GET(request: NextRequest) {
   const metric = request.nextUrl.searchParams.get('metric') as MapSupplementalMetric | null;
 
   if (!metric || !VALID_METRICS.has(metric)) {
     return NextResponse.json(
-      { success: false, error: 'metric must be "trends" or "bipartisan"' },
+      { success: false, error: 'metric must be "trends", "bipartisan", or "lifecycle"' },
       { status: 400 },
     );
   }
