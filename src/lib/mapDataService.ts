@@ -327,7 +327,8 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
     });
   }
 
-  const includeProcessMetrics = Boolean(requestedAbbrs && requestedAbbrs.length > 0);
+  const metricAbbrs = requestedAbbrs ?? Object.keys(STATE_NAMES).filter((abbr) => Boolean(STATE_COORDINATES[abbr]));
+  const includeProcessMetrics = true;
   const doaExpression = deadOnArrivalExpression(thirtyDaysAgo);
 
   if (includeProcessMetrics) {
@@ -417,25 +418,23 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
     Record<string, { bipartisanRate?: number | null }>,
     Record<string, number>,
     Record<string, number | null>,
-  ]> = requestedAbbrs
-    ? Promise.all([
-        computeBipartisanByJurisdiction({
-          jurisdictionName: { $in: jurisdictionNamesForAbbrs(requestedAbbrs) },
-          latestActionAt: { $gte: sixtyDaysAgo },
-        }).catch((error) => {
-          console.error('[Map Data] Bipartisan aggregation failed:', error);
-          return {};
-        }),
-        fetchTopicMomentumByJurisdiction(requestedAbbrs).catch((error) => {
-          console.error('[Map Data] Topic momentum aggregation failed:', error);
-          return {};
-        }),
-        fetchSponsorConcentrationByJurisdiction(requestedAbbrs).catch((error) => {
-          console.error('[Map Data] Sponsor concentration aggregation failed:', error);
-          return {};
-        }),
-      ])
-    : Promise.resolve([{}, {}, {}]);
+  ]> = Promise.all([
+    computeBipartisanByJurisdiction({
+      jurisdictionName: { $in: jurisdictionNamesForAbbrs(metricAbbrs) },
+      latestActionAt: { $gte: sixtyDaysAgo },
+    }).catch((error) => {
+      console.error('[Map Data] Bipartisan aggregation failed:', error);
+      return {};
+    }),
+    fetchTopicMomentumByJurisdiction(metricAbbrs).catch((error) => {
+      console.error('[Map Data] Topic momentum aggregation failed:', error);
+      return {};
+    }),
+    fetchSponsorConcentrationByJurisdiction(metricAbbrs).catch((error) => {
+      console.error('[Map Data] Sponsor concentration aggregation failed:', error);
+      return {};
+    }),
+  ]);
 
   const [results, representativeCounts, congressMemberCount, extraPair] = await Promise.all([
     fetchLegislation,
