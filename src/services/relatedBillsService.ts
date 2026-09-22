@@ -15,22 +15,33 @@ interface RelatedBill {
 
 // Simple in-memory cache for related bills (in production, you'd use Redis or similar)
 const relatedBillsCache = new Map<string, { data: RelatedBill[], timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 500;
+let lastCleanupAt = 0;
 
-// Clean up expired cache entries periodically
-setInterval(() => {
-  const now = Date.now();
+function cleanupRelatedBillsCache(now = Date.now()) {
+  if (now - lastCleanupAt < CACHE_TTL) return;
+  lastCleanupAt = now;
+
   for (const [key, value] of relatedBillsCache.entries()) {
     if (now - value.timestamp > CACHE_TTL) {
       relatedBillsCache.delete(key);
     }
   }
-}, CACHE_TTL); // Run cleanup every 5 minutes
+
+  while (relatedBillsCache.size > MAX_CACHE_ENTRIES) {
+    const oldestKey = relatedBillsCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    relatedBillsCache.delete(oldestKey);
+  }
+}
 
 export async function getRelatedBills(
   currentBill: Legislation,
   limit: number = 3
 ): Promise<RelatedBill[]> {
+  cleanupRelatedBillsCache();
+
   // Check cache first
   const cacheKey = `${currentBill.id}-${limit}`;
   const cached = relatedBillsCache.get(cacheKey);
