@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMapDataForStates } from '@/lib/mapDataService';
+import { getBaseMapData, getMapDataForStates } from '@/lib/mapDataService';
 import { CDN_CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(request: NextRequest) {
@@ -7,7 +7,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const statesParam = request.nextUrl.searchParams.get('states');
-    const stateStats = await getMapDataForStates(statesParam);
+    const stateStats = statesParam
+      ? await getMapDataForStates(statesParam)
+      : await getBaseMapData();
 
     return jsonWithCdnCache({
       success: true,
