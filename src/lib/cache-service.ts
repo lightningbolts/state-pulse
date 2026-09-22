@@ -211,11 +211,5 @@ class AdvancedCacheService {
 // Global cache instance
 const cacheService = new AdvancedCacheService(100); // 100MB cache
 
-// Start background cleanup every 5 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    cacheService.cleanup();
-  }, 5 * 60 * 1000);
-}
 
 export default cacheService;
