@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export const CDN_CACHE = {
+  homepage: 5 * 60,
   dashboard: 10 * 60,
   long: 60 * 60,
   static: 24 * 60 * 60,
