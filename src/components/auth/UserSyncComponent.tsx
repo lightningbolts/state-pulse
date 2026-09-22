@@ -5,13 +5,20 @@ import { useAuth, useClerk } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
 
 export function UserSyncComponent() {
-  const { userId, isSignedIn, isLoaded, getToken } = useAuth();
+  const { userId, isSignedIn, isLoaded } = useAuth();
   const { session } = useClerk();
   const { toast } = useToast();
 
   useEffect(() => {
     // Only attempt to sync user when they're signed in
     if (isLoaded && isSignedIn && userId) {
+      const syncKey = `statepulse:user-sync:${userId}`;
+      try {
+        if (sessionStorage.getItem(syncKey) === '1') return;
+      } catch {
+        // Storage can be unavailable in hardened/private browser contexts.
+      }
+
       const syncUser = async () => {
         try {
           // Get the session token
@@ -34,7 +41,11 @@ export function UserSyncComponent() {
           const data = await response.json();
 
           if (data.success) {
-            // console.log('User synced with MongoDB:', data);
+            try {
+              sessionStorage.setItem(syncKey, '1');
+            } catch {
+              // The sync succeeded; storage persistence is only an optimization.
+            }
           } else {
             // Include the error message from the API response
             const errorMessage = data.error || 'Unknown error occurred';
