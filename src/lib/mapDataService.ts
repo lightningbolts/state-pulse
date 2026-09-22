@@ -571,7 +571,7 @@ async function fetchBaseMapDataFromDb(): Promise<Record<string, StateData>> {
                 ],
               },
             },
-            sampleSubjects: { $push: { $arrayElemAt: ['$subjects', 0] } },
+            sampleSubjects: { $addToSet: { $arrayElemAt: ['$subjects', 0] } },
             topicSubjects: { $addToSet: { $arrayElemAt: ['$subjects', 0] } },
           },
         },
