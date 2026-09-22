@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createEmptyStateStats } from '@/lib/mapStateDefaults';
+import { createEmptyStateStats, chunkArray, MAP_STATE_ABBRS } from '@/lib/mapStateDefaults';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { StateData } from '@/types/jurisdictions';
@@ -86,12 +86,40 @@ export const useInteractiveMap = () => {
         queryKey: ['dashboard-map-data'],
         queryFn: async () => {
             setMapDataProgress(10);
-            const response = await fetch('/api/dashboard/map-data');
-            if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
-            const result = await response.json();
-            if (!result.success) throw new Error(result.error || 'Failed to load map data');
-            setMapDataProgress(100);
-            return { ...createEmptyStateStats(), ...result.data } as Record<string, StateData>;
+
+            try {
+                const response = await fetch('/api/dashboard/map-data');
+                if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
+                const result = await response.json();
+                if (!result.success) throw new Error(result.error || 'Failed to load map data');
+                setMapDataProgress(100);
+                return { ...createEmptyStateStats(), ...result.data } as Record<string, StateData>;
+            } catch (error) {
+                // Preserve the previous loading path as a resilience fallback. Under
+                // normal operation the single request avoids Function fan-out; if the
+                // consolidated endpoint fails, the dashboard still remains usable.
+                console.warn('[InteractiveMap] Consolidated map request failed, falling back to batches', error);
+                const batches = [...chunkArray(MAP_STATE_ABBRS, 8), ['US']];
+                const merged: Record<string, StateData> = { ...createEmptyStateStats() };
+                let completed = 0;
+
+                await Promise.all(
+                    batches.map(async (states) => {
+                        try {
+                            const response = await fetch(`/api/dashboard/map-data?states=${states.join(',')}`);
+                            if (!response.ok) throw new Error(`Failed to load map data: ${response.status}`);
+                            const result = await response.json();
+                            if (!result.success) throw new Error(result.error || 'Failed to load map data');
+                            Object.assign(merged, result.data);
+                        } finally {
+                            completed += 1;
+                            setMapDataProgress(Math.round((completed / batches.length) * 100));
+                        }
+                    }),
+                );
+
+                return merged;
+            }
         },
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
