@@ -129,7 +129,9 @@ export const useInteractiveMap = () => {
             ? 'trends'
             : mapMode === 'bipartisan'
                 ? 'bipartisan'
-                : null;
+                : mapMode === 'enactment' || mapMode === 'velocity'
+                    ? 'lifecycle'
+                    : null;
 
     const {
         data: supplementalMetricData,
@@ -142,7 +144,7 @@ export const useInteractiveMap = () => {
             if (!response.ok) throw new Error(`Failed to load ${supplementalMetric} map metric: ${response.status}`);
             const result = await response.json();
             if (!result.success) throw new Error(result.error || 'Failed to load map metric');
-            return result.data as Record<string, number | null>;
+            return result.data as Record<string, Partial<StateData>>;
         },
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
@@ -170,10 +172,7 @@ export const useInteractiveMap = () => {
 
         const merged: Record<string, StateData> = {};
         for (const [abbr, state] of Object.entries(base)) {
-            const value = supplementalMetricData[abbr];
-            merged[abbr] = supplementalMetric === 'trends'
-                ? { ...state, topicMomentum: typeof value === 'number' ? value : 0 }
-                : { ...state, bipartisanRate: typeof value === 'number' ? value : null };
+            merged[abbr] = { ...state, ...(supplementalMetricData[abbr] || {}) };
         }
         return merged;
     }, [mapData, supplementalMetric, supplementalMetricData]);
