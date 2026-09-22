@@ -143,7 +143,7 @@ async function fetchCongressMemberCount(): Promise<number> {
 const getCachedCongressMemberCount = unstable_cache(
   () => fetchCongressMemberCount(),
   ['map-data-congress-rep-count'],
-  { revalidate: 600 },
+  { revalidate: 3600 },
 );
 
 async function fetchStateLegislatorCounts(): Promise<Record<string, number>> {
@@ -211,7 +211,7 @@ async function fetchStateLegislatorCounts(): Promise<Record<string, number>> {
 const getCachedRepresentativeCounts = unstable_cache(
   () => fetchStateLegislatorCounts(),
   ['map-data-rep-counts'],
-  { revalidate: 600 },
+  { revalidate: 3600 },
 );
 
 async function fetchTopicMomentumByJurisdiction(requestedAbbrs: string[]): Promise<Record<string, number>> {
@@ -573,8 +573,6 @@ async function fetchBaseMapDataFromDb(): Promise<Record<string, StateData>> {
             },
             sampleSubjects: { $push: { $arrayElemAt: ['$subjects', 0] } },
             topicSubjects: { $addToSet: { $arrayElemAt: ['$subjects', 0] } },
-            enactedCount: { $sum: { $cond: [enactedDateMatch, 1, 0] } },
-            averageVelocity: { $avg: velocityDaysExpression },
           },
         },
         {
@@ -601,8 +599,6 @@ async function fetchBaseMapDataFromDb(): Promise<Record<string, StateData>> {
                 },
               },
             },
-            enactedCount: 1,
-            averageVelocity: 1,
           },
         },
       ],
@@ -623,8 +619,6 @@ async function fetchBaseMapDataFromDb(): Promise<Record<string, StateData>> {
       recentBills?: number;
       uniqueTopics?: number;
       topSubjects?: string[];
-      enactedCount?: number;
-      averageVelocity?: number | null;
     }>,
     representativeCounts,
   );
@@ -667,33 +661,71 @@ export async function getBaseMapData(): Promise<Record<string, StateData>> {
   return getCachedBaseMapData();
 }
 
-export type MapSupplementalMetric = 'trends' | 'bipartisan';
+export type MapSupplementalMetric = 'trends' | 'bipartisan' | 'lifecycle';
 
 export async function getMapSupplementalMetric(
   metric: MapSupplementalMetric,
-): Promise<Record<string, number | null>> {
+): Promise<Record<string, Partial<StateData>>> {
   const cachedFetch = unstable_cache(
     async () => {
       const abbrs = Object.keys(STATE_NAMES).filter((abbr) => Boolean(STATE_COORDINATES[abbr]));
 
       if (metric === 'trends') {
-        return fetchTopicMomentumByJurisdiction(abbrs);
+        const momentum = await fetchTopicMomentumByJurisdiction(abbrs);
+        return Object.fromEntries(
+          Object.entries(momentum).map(([abbr, topicMomentum]) => [abbr, { topicMomentum }]),
+        );
       }
 
-      const { sixtyDaysAgo } = dashboardDateWindows();
-      const rows = await computeBipartisanByJurisdiction({
-        jurisdictionName: { $in: jurisdictionNamesForAbbrs(abbrs) },
-        latestActionAt: { $gte: sixtyDaysAgo },
-      });
+      if (metric === 'bipartisan') {
+        const { sixtyDaysAgo } = dashboardDateWindows();
+        const rows = await computeBipartisanByJurisdiction({
+          jurisdictionName: { $in: jurisdictionNamesForAbbrs(abbrs) },
+          latestActionAt: { $gte: sixtyDaysAgo },
+        });
 
-      const result: Record<string, number | null> = {};
-      for (const [jurisdiction, counts] of Object.entries(rows)) {
-        const abbr = jurisdictionNameToAbbr(jurisdiction);
-        if (abbr) result[abbr] = counts.bipartisanRate;
+        const result: Record<string, Partial<StateData>> = {};
+        for (const [jurisdiction, counts] of Object.entries(rows)) {
+          const abbr = jurisdictionNameToAbbr(jurisdiction);
+          if (abbr) result[abbr] = { bipartisanRate: counts.bipartisanRate };
+        }
+        return result;
+      }
+
+      const legislationCollection = await getCollection('legislation');
+      const rows = await legislationCollection
+        .aggregate(
+          [
+            {
+              $match: {
+                jurisdictionName: { $in: jurisdictionNamesForAbbrs(abbrs) },
+              },
+            },
+            {
+              $group: {
+                _id: '$jurisdictionName',
+                totalBills: { $sum: 1 },
+                enactedCount: { $sum: { $cond: [enactedDateMatch, 1, 0] } },
+                averageVelocity: { $avg: velocityDaysExpression },
+              },
+            },
+          ],
+          { maxTimeMS: 20000, allowDiskUse: true },
+        )
+        .toArray();
+
+      const result: Record<string, Partial<StateData>> = {};
+      for (const row of rows) {
+        const abbr = jurisdictionNameToAbbr(row._id);
+        if (!abbr) continue;
+        result[abbr] = {
+          enactmentRate: roundRate(row.enactedCount || 0, row.totalBills || 0),
+          averageBillVelocityDays: roundDays(row.averageVelocity),
+        };
       }
       return result;
     },
-    ['map-data-supplemental-v1', metric],
+    ['map-data-supplemental-v2', metric],
     { revalidate: 600 },
   );
 
