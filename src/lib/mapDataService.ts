@@ -327,8 +327,7 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
     });
   }
 
-  const metricAbbrs = requestedAbbrs ?? Object.keys(STATE_NAMES).filter((abbr) => Boolean(STATE_COORDINATES[abbr]));
-  const includeProcessMetrics = true;
+  const includeProcessMetrics = Boolean(requestedAbbrs && requestedAbbrs.length > 0);
   const doaExpression = deadOnArrivalExpression(thirtyDaysAgo);
 
   if (includeProcessMetrics) {
@@ -418,23 +417,25 @@ async function fetchMapDataFromDb(requestedAbbrs: string[] | null): Promise<Reco
     Record<string, { bipartisanRate?: number | null }>,
     Record<string, number>,
     Record<string, number | null>,
-  ]> = Promise.all([
-    computeBipartisanByJurisdiction({
-      jurisdictionName: { $in: jurisdictionNamesForAbbrs(metricAbbrs) },
-      latestActionAt: { $gte: sixtyDaysAgo },
-    }).catch((error) => {
-      console.error('[Map Data] Bipartisan aggregation failed:', error);
-      return {};
-    }),
-    fetchTopicMomentumByJurisdiction(metricAbbrs).catch((error) => {
-      console.error('[Map Data] Topic momentum aggregation failed:', error);
-      return {};
-    }),
-    fetchSponsorConcentrationByJurisdiction(metricAbbrs).catch((error) => {
-      console.error('[Map Data] Sponsor concentration aggregation failed:', error);
-      return {};
-    }),
-  ]);
+  ]> = requestedAbbrs
+    ? Promise.all([
+        computeBipartisanByJurisdiction({
+          jurisdictionName: { $in: jurisdictionNamesForAbbrs(requestedAbbrs) },
+          latestActionAt: { $gte: sixtyDaysAgo },
+        }).catch((error) => {
+          console.error('[Map Data] Bipartisan aggregation failed:', error);
+          return {};
+        }),
+        fetchTopicMomentumByJurisdiction(requestedAbbrs).catch((error) => {
+          console.error('[Map Data] Topic momentum aggregation failed:', error);
+          return {};
+        }),
+        fetchSponsorConcentrationByJurisdiction(requestedAbbrs).catch((error) => {
+          console.error('[Map Data] Sponsor concentration aggregation failed:', error);
+          return {};
+        }),
+      ])
+    : Promise.resolve([{}, {}, {}]);
 
   const [results, representativeCounts, congressMemberCount, extraPair] = await Promise.all([
     fetchLegislation,
@@ -531,10 +532,27 @@ export async function getMapDataForStates(statesParam: string | null): Promise<R
     return cachedFetch();
   }
 
-  const cachedFetch = unstable_cache(
-    () => fetchMapDataFromDb(null),
-    ['map-data-all-v3'],
-    { revalidate: 600 },
+  // Preserve the previous per-batch query shape while collapsing browser
+  // fan-out into a single Function invocation. This keeps each MongoDB
+  // aggregation bounded to the same jurisdictions as before.
+  const stateAbbrs = Object.keys(STATE_NAMES).filter((abbr) => abbr !== 'US');
+  const batches: string[][] = [];
+  for (let i = 0; i < stateAbbrs.length; i += 8) {
+    batches.push(stateAbbrs.slice(i, i + 8));
+  }
+  batches.push(['US']);
+
+  const batchResults = await Promise.all(
+    batches.map(async (abbrs) => {
+      const cacheKey = abbrs.slice().sort().join(',');
+      const cachedFetch = unstable_cache(
+        () => fetchMapDataFromDb(abbrs),
+        ['map-data-states-v3', cacheKey],
+        { revalidate: 600 },
+      );
+      return cachedFetch();
+    }),
   );
-  return cachedFetch();
+
+  return Object.assign({}, ...batchResults);
 }
