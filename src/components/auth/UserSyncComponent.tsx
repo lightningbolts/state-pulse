@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
 
@@ -8,6 +8,7 @@ export function UserSyncComponent() {
   const { userId, isSignedIn, isLoaded } = useAuth();
   const { session } = useClerk();
   const { toast } = useToast();
+  const inFlightSyncs = useRef(new Set<string>());
 
   useEffect(() => {
     // Only attempt to sync user when they're signed in
@@ -18,6 +19,8 @@ export function UserSyncComponent() {
       } catch {
         // Storage can be unavailable in hardened/private browser contexts.
       }
+      if (inFlightSyncs.current.has(syncKey)) return;
+      inFlightSyncs.current.add(syncKey);
 
       const syncUser = async () => {
         try {
@@ -65,6 +68,8 @@ export function UserSyncComponent() {
             description: `Failed to connect to the server: ${error.message}. Some features may be limited.`,
             variant: "destructive",
           });
+        } finally {
+          inFlightSyncs.current.delete(syncKey);
         }
       };
 
