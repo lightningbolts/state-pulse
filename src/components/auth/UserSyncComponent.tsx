@@ -1,27 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useToast } from '@/hooks/use-toast';
 
 export function UserSyncComponent() {
-  const { userId, isSignedIn, isLoaded } = useAuth();
+  const { userId, isSignedIn, isLoaded, getToken } = useAuth();
   const { session } = useClerk();
   const { toast } = useToast();
-  const inFlightSyncs = useRef(new Set<string>());
 
   useEffect(() => {
     // Only attempt to sync user when they're signed in
     if (isLoaded && isSignedIn && userId) {
-      const syncKey = `statepulse:user-sync:${userId}`;
-      try {
-        if (sessionStorage.getItem(syncKey) === '1') return;
-      } catch {
-        // Storage can be unavailable in hardened/private browser contexts.
-      }
-      if (inFlightSyncs.current.has(syncKey)) return;
-      inFlightSyncs.current.add(syncKey);
-
       const syncUser = async () => {
         try {
           // Get the session token
@@ -44,11 +34,7 @@ export function UserSyncComponent() {
           const data = await response.json();
 
           if (data.success) {
-            try {
-              sessionStorage.setItem(syncKey, '1');
-            } catch {
-              // The sync succeeded; storage persistence is only an optimization.
-            }
+            // console.log('User synced with MongoDB:', data);
           } else {
             // Include the error message from the API response
             const errorMessage = data.error || 'Unknown error occurred';
@@ -68,8 +54,6 @@ export function UserSyncComponent() {
             description: `Failed to connect to the server: ${error.message}. Some features may be limited.`,
             variant: "destructive",
           });
-        } finally {
-          inFlightSyncs.current.delete(syncKey);
         }
       };
 
