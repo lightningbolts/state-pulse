@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { STATE_NAMES } from '@/types/geo';
 import { unstable_cache } from 'next/cache';
-import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 import { fetchJurisdictionDashboard } from '@/lib/dashboardDetailService';
+import { CDN_CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET(
   _request: NextRequest,
@@ -29,17 +29,10 @@ export async function GET(
     );
     const data = await cachedFetch();
 
-    if (!data) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid state parameter' },
-        { status: 400 }
-      );
-    }
-
     return jsonWithCdnCache({
       success: true,
       data,
-    }, CACHE.long);
+    }, CDN_CACHE.dashboard);
 
   } catch (error) {
     console.error('Error fetching state details:', error);

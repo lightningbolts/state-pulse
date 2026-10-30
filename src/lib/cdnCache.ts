@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 
+export const CDN_CACHE = {
+  homepage: 5 * 60,
+  dashboard: 10 * 60,
+  long: 60 * 60,
+  static: 24 * 60 * 60,
+} as const;
+
 /** CDN TTLs in seconds. Tuned so public data stays fresh without extra origin hits. */
 export const CACHE = {
   /** Search/list endpoints that change often */
@@ -14,37 +21,34 @@ export const CACHE = {
   day: 86400,
 } as const;
 
-export function cdnCacheHeaders(sMaxAge: number, swr?: number): Record<string, string> {
-  const staleWhileRevalidate = swr ?? Math.max(sMaxAge * 2, 60);
-  const value = `public, s-maxage=${sMaxAge}, stale-while-revalidate=${staleWhileRevalidate}`;
+/**
+ * Cache public, non-user-specific responses at Vercel's CDN while forcing browsers
+ * to revalidate. This avoids repeated Function invocations without persisting
+ * stale responses in a user's browser cache.
+ */
+export function cdnCacheHeaders(maxAgeSeconds: number, swr?: number): Record<string, string> {
+  const staleWhileRevalidate = swr ?? Math.max(maxAgeSeconds * 6, 60 * 60);
   return {
-    'Cache-Control': value,
-    'CDN-Cache-Control': value,
-    // Next.js may overwrite Cache-Control on dynamic routes; Vercel honors this one.
-    'Vercel-CDN-Cache-Control': value,
+    'Cache-Control': 'public, max-age=0, must-revalidate',
+    'Vercel-CDN-Cache-Control': `public, max-age=${maxAgeSeconds}, stale-while-revalidate=${staleWhileRevalidate}`,
   };
 }
 
-export function jsonWithCdnCache(
-  data: unknown,
-  sMaxAge: number,
-  init?: { status?: number; swr?: number },
-) {
-  const status = init?.status ?? 200;
-  if (status !== 200 || sMaxAge <= 0) {
-    return NextResponse.json(data, { status });
-  }
-  return NextResponse.json(data, {
-    status,
-    headers: cdnCacheHeaders(sMaxAge, init?.swr),
-  });
-}
-
-export function withCdnCache(response: NextResponse, sMaxAge: number, swr?: number): NextResponse {
-  if (sMaxAge > 0 && response.status === 200) {
-    for (const [key, value] of Object.entries(cdnCacheHeaders(sMaxAge, swr))) {
+export function withCdnCache(response: NextResponse, maxAgeSeconds: number, swr?: number): NextResponse {
+  // Never pin errors at the CDN.
+  if (maxAgeSeconds > 0 && response.status === 200) {
+    for (const [key, value] of Object.entries(cdnCacheHeaders(maxAgeSeconds, swr))) {
       response.headers.set(key, value);
     }
   }
   return response;
+}
+
+export function jsonWithCdnCache<T>(
+  body: T,
+  maxAgeSeconds: number = CDN_CACHE.dashboard,
+  init?: ResponseInit & { swr?: number },
+) {
+  const { swr, ...responseInit } = init ?? {};
+  return withCdnCache(NextResponse.json(body, responseInit), maxAgeSeconds, swr);
 }

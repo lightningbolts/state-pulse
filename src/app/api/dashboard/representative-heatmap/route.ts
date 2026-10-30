@@ -1,7 +1,7 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {getCollection} from '@/lib/mongodb';
 import {ABR_TO_FIPS, STATE_MAP} from "@/types/geo";
-import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
+import { CDN_CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 function normalizeIds(...ids: (string | undefined | null)[]): string[] {
   const out = new Set<string>();
@@ -710,7 +710,7 @@ export async function GET(request: NextRequest) {
         availableMetrics: ['sponsored_bills', 'recent_activity', 'enacted_bills', 'enacted_recent_activity', 'voted_with_majority', 'voted_against_party'],
         enactedOnly
       }
-    }, CACHE.long);
+    }, CDN_CACHE.dashboard);
 
   } catch (error: any) {
     console.error('Representative heatmap error:', error);

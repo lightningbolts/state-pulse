@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPolicyDiffusion } from '@/lib/policyDiffusionService';
-import { CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
+import { CDN_CACHE, jsonWithCdnCache } from '@/lib/cdnCache';
 
 export async function GET() {
   try {
@@ -8,7 +8,7 @@ export async function GET() {
     return jsonWithCdnCache({
       success: true,
       data,
-    }, CACHE.long);
+    }, CDN_CACHE.dashboard);
   } catch (error) {
     console.error('[Policy Diffusion API] Error:', error);
     return NextResponse.json(

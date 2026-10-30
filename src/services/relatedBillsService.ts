@@ -15,24 +15,51 @@ interface RelatedBill {
 
 // Simple in-memory cache for related bills (in production, you'd use Redis or similar)
 const relatedBillsCache = new Map<string, { data: RelatedBill[], timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 500;
+let lastCleanupAt = 0;
+
+function cleanupRelatedBillsCache(now = Date.now()) {
+  if (now - lastCleanupAt < CACHE_TTL) return;
+  lastCleanupAt = now;
+
+  for (const [key, value] of relatedBillsCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      relatedBillsCache.delete(key);
+    }
+  }
+
+}
+
+function enforceRelatedBillsCacheLimit() {
+  while (relatedBillsCache.size > MAX_CACHE_ENTRIES) {
+    let oldestKey: string | undefined;
+    let oldestTimestamp = Number.POSITIVE_INFINITY;
+
+    for (const [key, entry] of relatedBillsCache.entries()) {
+      if (entry.timestamp < oldestTimestamp) {
+        oldestTimestamp = entry.timestamp;
+        oldestKey = key;
+      }
+    }
+
+    if (!oldestKey) break;
+    relatedBillsCache.delete(oldestKey);
+  }
+}
 
 export async function getRelatedBills(
   currentBill: Legislation,
   limit: number = 3
 ): Promise<RelatedBill[]> {
+  cleanupRelatedBillsCache();
+
   // Check cache first
   const cacheKey = `${currentBill.id}-${limit}`;
   const cached = relatedBillsCache.get(cacheKey);
   
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
-  }
-
-  for (const [key, value] of relatedBillsCache.entries()) {
-    if (Date.now() - value.timestamp >= CACHE_TTL) {
-      relatedBillsCache.delete(key);
-    }
   }
 
   const collection = await getCollection('legislation');
@@ -228,6 +255,7 @@ export async function getRelatedBills(
 
   // Cache the results before returning
   relatedBillsCache.set(cacheKey, { data: diverseResults, timestamp: Date.now() });
+  enforceRelatedBillsCacheLimit();
   
   return diverseResults;
 }
