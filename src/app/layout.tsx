@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
-import { ClerkProvider, SignedIn } from '@clerk/nextjs';
+import { ClerkProvider } from '@clerk/nextjs';
 import { DM_Sans, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
 import { UserSyncComponent } from '@/components/auth/UserSyncComponent';
 import { ThemeProvider } from '@/components/theme/theme-provider';
@@ -64,9 +64,8 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <QueryProvider>
-              <SignedIn>
-                <UserSyncComponent />
-              </SignedIn>
+              {/* UserSyncComponent checks isSignedIn client-side; server <SignedIn> calls auth() and forces every route dynamic. */}
+              <UserSyncComponent />
               <Suspense fallback={null}>
                 <ScrollRestoration />
               </Suspense>

@@ -17,6 +17,11 @@ import RepVotingRecord from '@/components/features/RepVotingRecord';
 
 export const revalidate = 600;
 
+// Render each page on first request, then serve it from the ISR cache.
+export function generateStaticParams() {
+  return [];
+}
+
 const fetchRepresentativeData = async (id: string) => {
   try {
     // Fetch representative data

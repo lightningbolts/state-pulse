@@ -5,12 +5,13 @@ import { Panel, PanelBody } from "@/components/layout/Panel";
 import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { pageMetadata } from '@/lib/metadata';
 import { getCachedPolicyFeedPage } from "@/services/legislationService";
+import { buildSafe } from "@/lib/buildSafe";
 
 export const metadata = pageMetadata.legislation;
 export const revalidate = 60;
 
 export default async function UpdatesPage() {
-  const initialData = await getCachedPolicyFeedPage(20, 0, 'createdAt', 'desc') as PolicyUpdate[];
+  const initialData = await buildSafe(() => getCachedPolicyFeedPage(20, 0, 'createdAt', 'desc'), []) as PolicyUpdate[];
 
   return (
     <div className="animate-content-in space-y-6">

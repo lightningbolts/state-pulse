@@ -5,6 +5,7 @@ import { Panel, PanelBody } from "@/components/layout/Panel";
 import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { getAllLegislationWithFiltering } from "@/services/legislationService";
+import { buildSafe } from "@/lib/buildSafe";
 import type { PolicyUpdate } from "@/components/features/PolicyUpdatesFeed";
 
 export const metadata = {
@@ -14,14 +15,14 @@ export const metadata = {
 export const revalidate = 120;
 
 export default async function EnactedLegislationPage() {
-  const raw = await getAllLegislationWithFiltering({
+  const raw = await buildSafe(() => getAllLegislationWithFiltering({
     limit: 20,
     skip: 0,
     sortDir: 'desc',
     sortBy: 'createdAt',
     showOnlyEnacted: 'true',
     context: 'policy-updates-feed',
-  });
+  }), []);
   const initialData = JSON.parse(JSON.stringify(raw)) as PolicyUpdate[];
 
   return (

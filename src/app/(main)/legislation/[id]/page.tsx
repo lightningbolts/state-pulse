@@ -21,6 +21,11 @@ import {STATE_MAP} from "@/types/geo";
 
 export const revalidate = 300;
 
+// Render each page on first request, then serve it from the ISR cache.
+export function generateStaticParams() {
+  return [];
+}
+
 // Helper for consistent UTC date formatting
 const formatDateUTC = (date: Date) => date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
